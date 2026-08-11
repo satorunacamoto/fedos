@@ -2,23 +2,24 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_218_relay_boundary_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullRelaySource from "../src/desktop/null_relay.ts?raw";
+import nullRelaySource from "../src/os/messenger/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const RELAY_SYMBOLS = ["FedosRelay", "NullRelay", "WebSocketRelay", "FedosRelaySocket", "FedosRelaySocketFactory"];
 const RUNTIME_WORKER_DESKTOP_FILES: Record<string, string> = {
@@ -64,7 +65,7 @@ describe("Secure Runtime Alpha 218 -- Relay Boundary Review", () => {
 
   it("5. structural: package.json dependency count remains 2 -- unchanged across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. the design doc's own §5 records the five-symbol/five-file grep with zero matches", () => {

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_254_canonical_board_author.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import authorModuleSource from "../src/board/fedos_board_author.ts?raw";
-import type { FedosBoardAuthorReference } from "../src/board/fedos_board_author.js";
+import authorModuleSource from "../src/os/messenger/board/fedos_board_author.ts?raw";
+import type { FedosBoardAuthorReference } from "../src/os/messenger/board/fedos_board_author.js";
 
 function codeOnly(source: string): string {
   return source

@@ -14,7 +14,7 @@ import process from "node:process";
  * Secure Runtime Alpha 619 -- "Production Caller Reality Check": Stage
  * 19 of the Alpha 601-620 Desktop Local Runtime Entry Point & Publish
  * Pipeline Ownership Arc. Launches the REAL, `npm run build:runtime`-
- * built `dist/desktop/runtime/run_fedos_desktop_runtime.js` as an
+ * built `dist/os/messenger/desktop/runtime/run_fedos_desktop_runtime.js` as an
  * actual, separate OS process (`node:child_process.spawn`, never a
  * function call from within this test's own process) against a real
  * temporary directory, with the SAME `--board-log=`/`--outbox-log=`
@@ -110,7 +110,7 @@ describe("Secure Runtime Alpha 619 -- Production Caller Reality Check", () => {
       const child = spawn(
         process.execPath,
         [
-          "dist/desktop/runtime/run_fedos_desktop_runtime.js",
+          "dist/os/messenger/desktop/runtime/run_fedos_desktop_runtime.js",
           `--board-log=${boardLogPath}`,
           `--outbox-log=${outboxLogPath}`,
         ],
@@ -131,7 +131,7 @@ describe("Secure Runtime Alpha 619 -- Production Caller Reality Check", () => {
   it(
     "invoking with missing required CLI arguments fails closed with a clear, non-zero exit -- no partial ready state, no hang",
     async () => {
-      const child = spawn(process.execPath, ["dist/desktop/runtime/run_fedos_desktop_runtime.js"], {
+      const child = spawn(process.execPath, ["dist/os/messenger/desktop/runtime/run_fedos_desktop_runtime.js"], {
         stdio: ["ignore", "pipe", "pipe"],
         cwd: process.cwd(),
       });
@@ -147,7 +147,7 @@ describe("Secure Runtime Alpha 619 -- Production Caller Reality Check", () => {
   );
 
   it("the built dist/ output is a genuine artifact of npm run build:runtime -- confirmed present, real JS, importable", () => {
-    const entry = "dist/desktop/runtime/run_fedos_desktop_runtime.js";
+    const entry = "dist/os/messenger/desktop/runtime/run_fedos_desktop_runtime.js";
     expect(existsSync(entry)).toBe(true);
   });
 });

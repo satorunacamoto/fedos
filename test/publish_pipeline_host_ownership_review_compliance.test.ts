@@ -23,6 +23,7 @@ import doc09 from "../docs/publish_pipeline_host_ownership_review_09_private_boa
 import doc10 from "../docs/publish_pipeline_host_ownership_review_10_abuse_defense_separation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc11 from "../docs/publish_pipeline_host_ownership_review_11_deliverables_and_dependency_order.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Publish Pipeline Host Ownership Review -- prohibition compliance.
@@ -50,7 +51,7 @@ describe("Publish Pipeline Host Ownership Review -- prohibition compliance", () 
 
   it("1. package.json still carries exactly two production dependencies -- no new dependency introduced", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("2. no review doc recommends Lightning stake, NIP-13 PoW, Capability invite, JA4, or CrowdSec as part of the delivery Host design itself", () => {

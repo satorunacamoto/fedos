@@ -24,15 +24,15 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { FedosWasmMasterSeedAuthority } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import { FedosWasmLoaderSkeleton } from "../src/runtime/fedos_wasm_loader.js";
-import { FedosDirectRatchetStateRuntime } from "../src/conversation/ratchet/fedos_direct_ratchet_state_runtime.js";
-import { AppendOnlyFedosDirectRatchetSessionPersistence } from "../src/conversation/ratchet/persistence/append_only_fedos_direct_ratchet_session_persistence.js";
-import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../src/conversation/ratchet/persistence/append_only_fedos_sealed_direct_ratchet_secret_persistence.js";
-import { toFedosDirectRatchetSessionId } from "../src/conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import { toFedosPrivateConversationId } from "../src/conversation/construction/fedos_private_conversation_id.js";
-import type { FedosDirectRatchetSessionBinding } from "../src/conversation/ratchet/fedos_direct_ratchet_session_binding.js";
-import type { FedosDirectRatchetSealingAuthority } from "../src/conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
+import { FedosDirectRatchetStateRuntime } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_state_runtime.js";
+import { AppendOnlyFedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/append_only_fedos_direct_ratchet_session_persistence.js";
+import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../src/os/messenger/conversations/ratchet/persistence/append_only_fedos_sealed_direct_ratchet_secret_persistence.js";
+import { toFedosDirectRatchetSessionId } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_id.js";
+import { toFedosPrivateConversationId } from "../src/os/messenger/conversations/construction/fedos_private_conversation_id.js";
+import type { FedosDirectRatchetSessionBinding } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_binding.js";
+import type { FedosDirectRatchetSealingAuthority } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_sealing_authority.js";
 
 declare const process: { cwd(): string; env: { NODE_ENV?: string; [key: string]: string | undefined } };
 

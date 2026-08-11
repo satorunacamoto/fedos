@@ -6,17 +6,18 @@ import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerDiagnosticsSource from "../src/runtime/worker_crypto_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Prototype EXECUTION Phase 009 — "Adopt wasm-bindgen Dependency":
@@ -76,7 +77,7 @@ describe("FedOS wasm-bindgen dependency adoption -- Cargo.toml change only, no #
 
   it("7. package.json dependencies remain unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("8. src/runtime/fedos_wasm_loader.ts is byte-for-byte untouched by this stage", () => {

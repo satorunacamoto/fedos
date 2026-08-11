@@ -18,26 +18,26 @@ import { join } from "node:path";
 import {
   FEDOS_DIRECT_RATCHET_SESSION_RESET_REASONS,
   isWellFormedFedosDirectRatchetSessionResetReason,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_reset_reason.js";
 import {
   isWellFormedFedosDirectRatchetNip17Payload,
   type FedosDirectRatchetSessionInitPayloadV1,
-} from "../src/conversation/delivery/nostr/nip17/fedos_direct_ratchet_nip17_payload.js";
+} from "../src/os/messenger/adapters/nostr/conversation_delivery/nip17/fedos_direct_ratchet_nip17_payload.js";
 import {
   createFedosDirectRatchetSessionResetDeviceSignature,
   verifyFedosDirectRatchetSessionResetDeviceSignature,
   type FedosDirectRatchetSessionResetSignableContent,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_session_reset_authentication.js";
-import { generateFedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { FedosDirectRatchetSessionResetAuthority } from "../src/conversation/ratchet/fedos_direct_ratchet_session_reset_authority.js";
-import { FedosDirectRatchetResetCoordinator } from "../src/conversation/ratchet/fedos_direct_ratchet_reset_coordinator.js";
-import { InMemoryFedosDirectRatchetSessionResetRecordPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_direct_ratchet_session_reset_record_persistence.js";
-import { AppendOnlyFedosDirectRatchetSessionResetRecordPersistence } from "../src/conversation/ratchet/persistence/append_only_fedos_direct_ratchet_session_reset_record_persistence.js";
-import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
-import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
-import { FedosDirectRatchetStateRuntime } from "../src/conversation/ratchet/fedos_direct_ratchet_state_runtime.js";
-import { toFedosDirectRatchetSessionId } from "../src/conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosDeviceBindingV1 } from "../src/device/fedos_device_binding.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_reset_authentication.js";
+import { generateFedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { FedosDirectRatchetSessionResetAuthority } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_reset_authority.js";
+import { FedosDirectRatchetResetCoordinator } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_reset_coordinator.js";
+import { InMemoryFedosDirectRatchetSessionResetRecordPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_direct_ratchet_session_reset_record_persistence.js";
+import { AppendOnlyFedosDirectRatchetSessionResetRecordPersistence } from "../src/os/messenger/conversations/ratchet/persistence/append_only_fedos_direct_ratchet_session_reset_record_persistence.js";
+import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
+import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
+import { FedosDirectRatchetStateRuntime } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_state_runtime.js";
+import { toFedosDirectRatchetSessionId } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_id.js";
+import type { FedosDeviceBindingV1 } from "../src/os/messenger/device/fedos_device_binding.js";
 
 const ACCOUNT_A = { authority: "nostr", publicIdentifier: "a".repeat(64), identityId: null };
 const ACCOUNT_B = { authority: "nostr", publicIdentifier: "b".repeat(64), identityId: null };

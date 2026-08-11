@@ -50,8 +50,8 @@ const preloadCjsPath = `${packageDir}/dist/fedos_electron_navigation_preload.cjs
 const pageHtmlPath = `${packageDir}/dist/fedos_electron_navigation_page.html`;
 const rendererJsPath = `${packageDir}/dist/fedos_electron_navigation_renderer.js`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
-const rootDistPresentationPath = `${repoRoot}/dist/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js`;
-const rootDistRegistryPath = `${repoRoot}/dist/desktop/navigation/fedos_desktop_conversation_window_registry.js`;
+const rootDistPresentationPath = `${repoRoot}/dist/os/messenger/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js`;
+const rootDistRegistryPath = `${repoRoot}/dist/os/messenger/desktop/navigation/fedos_desktop_conversation_window_registry.js`;
 
 let spawnedElectronPid: number | undefined;
 function killSpawnedElectronIfAny(): void {

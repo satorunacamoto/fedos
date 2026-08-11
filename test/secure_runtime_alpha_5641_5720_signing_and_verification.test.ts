@@ -5,13 +5,13 @@ import {
   signFedosDeletionRequestRecordV1,
   verifyFedosSignedDeletionRequestV1,
   type FedosSignedDeletionRequestV1,
-} from "../src/conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosDeletionRequestRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_request_record.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_signing.js";
+import type { FedosDeletionRequestRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_record.js";
 import {
   signFedosDeletionAcknowledgementRecordV1,
   verifyFedosSignedDeletionAcknowledgementV1,
-} from "../src/conversation/deletion_request/fedos_deletion_acknowledgement_signing.js";
-import type { FedosDeletionAcknowledgementRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_acknowledgement_signing.js";
+import type { FedosDeletionAcknowledgementRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_acknowledgement_record.js";
 
 /**
  * Secure Runtime Alpha 5641-5720 -- real signing/verification boundary.

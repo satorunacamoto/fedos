@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_334_desktop_host_dependency_assembly.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import factorySource from "../src/desktop/host/create_fedos_desktop_host.ts?raw";
+import factorySource from "../src/os/messenger/desktop/host/create_fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 
-import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
+import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
 
 function codeOnly(source: string): string {
   return source

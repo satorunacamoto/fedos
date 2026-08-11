@@ -7,14 +7,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
-import { AppendOnlyFedosConversationPayloadStorage } from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
+import { AppendOnlyFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlyImplementationSource from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.ts?raw";
+import appendOnlyImplementationSource from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.ts?raw";
 import {
   serializeFedosConversationPayload,
   deserializeFedosConversationPayload,
-} from "../src/conversation/payload_storage/fedos_conversation_payload_codec.js";
-import type { FedosConversationPayloadDescriptor } from "../src/conversation/payload_storage/fedos_conversation_payload_descriptor.js";
+} from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_codec.js";
+import type { FedosConversationPayloadDescriptor } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor.js";
 
 const DESCRIPTOR: FedosConversationPayloadDescriptor = {
   id: "payload-1" as any,

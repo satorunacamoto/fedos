@@ -140,29 +140,29 @@ interface RootModules {
 }
 
 async function loadRootModules(): Promise<RootModules> {
-  const attestation = (await import(distUrl("desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
+  const attestation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
     createElectronMainHostAttestation: RootModules["createElectronMainHostAttestation"];
   };
-  const activation = (await import(distUrl("desktop", "production_activation", "fedos_production_profile_activation.js"))) as {
+  const activation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_profile_activation.js"))) as {
     activateFedosProductionProfileMasterSeed: RootModules["activateFedosProductionProfileMasterSeed"];
   };
-  const signer = (await import(distUrl("desktop", "production_activation", "fedos_production_nostr_signing_authority.js"))) as {
+  const signer = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_nostr_signing_authority.js"))) as {
     FedosProductionNostrSigningAuthority: RootModules["NostrSigningAuthority"];
   };
-  const paths = (await import(distUrl("desktop", "onboarding", "fedos_local_profile_paths.js"))) as {
+  const paths = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_local_profile_paths.js"))) as {
     planFedosLocalProfilePaths: RootModules["planFedosLocalProfilePaths"];
     ensureFedosLocalProfileDirectories: RootModules["ensureFedosLocalProfileDirectories"];
   };
-  const profilePersistence = (await import(distUrl("desktop", "onboarding", "fedos_local_profile_persistence.js"))) as {
+  const profilePersistence = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_local_profile_persistence.js"))) as {
     FileFedosLocalProfilePersistence: RootModules["ProfilePersistence"];
   };
   const sealedPersistence = (await import(distUrl("runtime", "master_seed", "fedos_sealed_master_seed_envelope_persistence.js"))) as {
     FileFedosSealedMasterSeedEnvelopePersistence: RootModules["SealedSeedPersistence"];
   };
-  const coordinator = (await import(distUrl("desktop", "onboarding", "fedos_profile_initialization_coordinator.js"))) as {
+  const coordinator = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_profile_initialization_coordinator.js"))) as {
     FedosProfileInitializationCoordinator: RootModules["Coordinator"];
   };
-  const secret = (await import(distUrl("desktop", "onboarding", "fedos_profile_unlock_secret.js"))) as {
+  const secret = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_profile_unlock_secret.js"))) as {
     FedosProfileUnlockSecret: RootModules["UnlockSecret"];
   };
   return {

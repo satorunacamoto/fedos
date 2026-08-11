@@ -9,24 +9,24 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { createHash } from "node:crypto";
 
-import { FedosPrivateTransport } from "../src/conversation/transport/fedos_private_transport.js";
-import { FedosConversationRelaySet } from "../src/conversation/transport/relay/fedos_conversation_relay_set.js";
-import { AppendOnlyFedosConversationTransportOutboxPersistence } from "../src/conversation/transport/append_only_fedos_conversation_transport_outbox_persistence.js";
-import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
-import { AppendOnlyFedosConversationPayloadStorage } from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
-import { serializeFedosConversationMessageEnvelope } from "../src/conversation/envelope/persistence/fedos_conversation_message_envelope_codec.js";
-import { validateFedosConversationMessageEnvelope } from "../src/conversation/envelope/fedos_conversation_message_envelope_validator.js";
-import { validateFedosConversationPayloadDescriptor } from "../src/conversation/payload_storage/fedos_conversation_payload_descriptor_validator.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/board/observation/append_only_fedos_delivery_observation_persistence.js";
-import { WebSocketRelay } from "../src/desktop/websocket_relay.js";
-import { createNodeWebSocketRelaySocketFactory } from "../src/desktop/node_websocket_relay_socket_factory.js";
+import { FedosPrivateTransport } from "../src/os/messenger/adapters/nostr/transport/fedos_private_transport.js";
+import { FedosConversationRelaySet } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
+import { AppendOnlyFedosConversationTransportOutboxPersistence } from "../src/os/messenger/adapters/nostr/transport/append_only_fedos_conversation_transport_outbox_persistence.js";
+import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
+import { AppendOnlyFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.js";
+import { serializeFedosConversationMessageEnvelope } from "../src/os/messenger/conversations/envelope/persistence/fedos_conversation_message_envelope_codec.js";
+import { validateFedosConversationMessageEnvelope } from "../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope_validator.js";
+import { validateFedosConversationPayloadDescriptor } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor_validator.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/append_only_fedos_delivery_observation_persistence.js";
+import { WebSocketRelay } from "../src/os/messenger/desktop/websocket_relay.js";
+import { createNodeWebSocketRelaySocketFactory } from "../src/os/messenger/desktop/node_websocket_relay_socket_factory.js";
 import {
   startFedosRealLocalWebSocketRelayServer,
   type FedosRealLocalWebSocketRelayServer,
 } from "./support/fedos_real_local_websocket_relay_server.js";
-import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosConversationMembership } from "../src/conversation/membership/fedos_conversation_membership.js";
+import type { FedosNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosConversationMembership } from "../src/os/messenger/conversations/membership/fedos_conversation_membership.js";
 
 /**
  * Secure Runtime Alpha 7561-7640 -- "FedOS Conversation Outbox Restart

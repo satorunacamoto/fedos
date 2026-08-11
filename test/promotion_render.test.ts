@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderPromotionPlaceholder } from "../src/render/promotion.js";
-import { resolvePlacement } from "../src/promotion/policy.js";
+import { renderPromotionPlaceholder } from "../src/os/_legacy_prototype/render/promotion.js";
+import { resolvePlacement } from "../src/os/_legacy_prototype/promotion/policy.js";
 
 describe("promotion render placeholder", () => {
   it("renders a labeled, escaped placeholder for a placement", () => {

@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createHostSource from "../src/desktop/host/create_fedos_desktop_host.ts?raw";
+import createHostSource from "../src/os/messenger/desktop/host/create_fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlyOutboxSource from "../src/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
+import appendOnlyOutboxSource from "../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 
 /**
  * Publish Pipeline Host Ownership Review -- current-state verification.

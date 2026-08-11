@@ -2,19 +2,21 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_242_validated_nostr_event_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import validatedEventSource from "../src/desktop/fedos_validated_nostr_event.ts?raw";
+import validatedEventSource from "../src/os/messenger/desktop/fedos_validated_nostr_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wireEventSource from "../src/desktop/fedos_nostr_wire_event.ts?raw";
+import wireEventSource from "../src/os/messenger/desktop/fedos_nostr_wire_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import combinedValidatorSource from "../src/desktop/combined_inbound_event_validator.ts?raw";
+import canonicalNostrEventSource from "../src/os/messenger/adapters/nostr/protocol/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relayInboundMessageSource from "../src/desktop/fedos_relay_inbound_message.ts?raw";
+import combinedValidatorSource from "../src/os/messenger/desktop/combined_inbound_event_validator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import relayInboundMessageSource from "../src/os/messenger/desktop/fedos_relay_inbound_message.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relayInboundParserSource from "../src/desktop/relay_inbound_parser.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import validatedSubscriptionAdapterSource from "../src/desktop/validated_subscription_adapter.ts?raw";
+import relayInboundParserSource from "../src/os/messenger/desktop/relay_inbound_parser.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import validatedSubscriptionAdapterSource from "../src/os/messenger/desktop/validated_subscription_adapter.ts?raw";
 
 function codeOnly(source: string): string {
   return source
@@ -52,8 +54,21 @@ describe("Secure Runtime Alpha 242 -- Validated Nostr Event Model", () => {
     expect(validatedEventSource).toMatch(
       /export interface FedosValidatedNostrEvent \{\s*\n\s*readonly id: string;\s*\n\s*readonly pubkey: string;\s*\n\s*readonly created_at: number;\s*\n\s*readonly kind: number;\s*\n\s*readonly tags: readonly \(readonly string\[\]\)\[\];\s*\n\s*readonly content: string;\s*\n\s*readonly sig: string;\s*\n\}/,
     );
+    // Nostr Consolidation Plan, Step 1 (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`)
+    // unified `FedosNostrWireEvent` with `NostrEvent` into one canonical
+    // type, defined once in `adapters/nostr/protocol/types.ts` and
+    // re-exported here under the `FedosNostrWireEvent` name (a type
+    // alias, not a duplicate interface declaration) -- so this file no
+    // longer declares the interface literally. This is a STRONGER
+    // guarantee than "field-for-field identical" (the original Alpha 242
+    // requirement this test enforces): the two names now refer to the
+    // exact same type, not merely two interfaces with matching shapes.
     expect(wireEventSource).toMatch(
-      /export interface FedosNostrWireEvent \{\s*\n\s*readonly id: string;\s*\n\s*readonly pubkey: string;\s*\n\s*readonly created_at: number;\s*\n\s*readonly kind: number;\s*\n\s*readonly tags: readonly \(readonly string\[\]\)\[\];\s*\n\s*readonly content: string;\s*\n\s*readonly sig: string;\s*\n\}/,
+      /export type \{ NostrEvent as FedosNostrWireEvent \} from ["']\.\.\/adapters\/nostr\/protocol\/types\.js["'];/,
+    );
+    // The canonical definition it aliases still has the identical shape.
+    expect(canonicalNostrEventSource).toMatch(
+      /export interface NostrEvent \{\s*\n(?:\s*\/\*\*.*\*\/\s*\n)?\s*readonly id: string;\s*\n(?:\s*\/\*\*.*\*\/\s*\n)?\s*readonly pubkey: string;\s*\n(?:\s*\/\*\*.*\*\/\s*\n)?\s*readonly created_at: number;\s*\n(?:\s*\/\*\*.*\*\/\s*\n)?\s*readonly kind: number;\s*\n(?:\s*\/\*\*.*\*\/\s*\n)?\s*readonly tags: readonly \(readonly string\[\]\)\[\];\s*\n\s*readonly content: string;\s*\n(?:\s*\/\*\*.*\*\/\s*\n)?\s*readonly sig: string;\s*\n\}/,
     );
   });
 

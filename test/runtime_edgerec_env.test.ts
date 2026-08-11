@@ -5,22 +5,22 @@ import {
   resolveEdgeRecViewerOptions,
   selectPromotionProvider,
   selectRecommendationProvider,
-} from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
 import {
   MockPromotionProvider,
   MockRecommendationProvider,
   type PromotionProvider,
   type RecommendationProvider,
-} from "../src/promotion/adapter.js";
-import { EdgeRecPromotionProvider } from "../src/promotion/edge_rec_adapter.js";
+} from "../src/os/_legacy_prototype/promotion/adapter.js";
+import { EdgeRecPromotionProvider } from "../src/os/_legacy_prototype/promotion/edge_rec_adapter.js";
 import type {
   EdgeRecFetchLike,
   EdgeRecRequestBody,
-} from "../src/promotion/edge_rec_adapter.js";
-import { buildPromotionRequest, resolvePlacement } from "../src/promotion/policy.js";
+} from "../src/os/_legacy_prototype/promotion/edge_rec_adapter.js";
+import { buildPromotionRequest, resolvePlacement } from "../src/os/_legacy_prototype/promotion/policy.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /** A fetch client that records the endpoint, headers, and JSON-parsed body. */
 function captureFetch(): EdgeRecFetchLike & {

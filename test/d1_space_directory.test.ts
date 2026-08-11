@@ -5,17 +5,17 @@ import {
   spaceToRows,
   type SpaceMemberRow,
   type SpaceRow,
-} from "../src/community/d1_directory.js";
+} from "../src/os/_legacy_prototype/community/d1_directory.js";
 import type {
   D1LikeDatabase,
   D1LikePreparedStatement,
-} from "../src/indexer/d1_index.js";
+} from "../src/os/_legacy_prototype/indexer/d1_index.js";
 import type {
   ChannelSpace,
   CommunitySpace,
   GroupSpace,
   Space,
-} from "../src/community/types.js";
+} from "../src/os/_legacy_prototype/community/types.js";
 
 interface Recorded {
   sql: string;

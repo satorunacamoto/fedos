@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_522_retry_coordination_scope_decision.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 
 describe("Secure Runtime Alpha 522 -- Retry Coordination Scope Decision", () => {
   it("declares zero Scheduler changes as the adopted design, and honestly documents the one Host field the Arc actually needed", () => {

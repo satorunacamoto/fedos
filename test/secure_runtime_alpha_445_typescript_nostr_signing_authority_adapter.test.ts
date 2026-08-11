@@ -2,12 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import {
   FedosWasmNostrSigningAuthority,
   type FedosNostrSigningWasmLoaderBoundary,
-} from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.js";
-import { FedosWasmMasterSeedAuthority } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosMasterSeedWasmLoaderBoundary } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
+} from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { FedosMasterSeedWasmLoaderBoundary } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import type { FedosMasterSeedAuthorityHandle } from "../src/runtime/fedos_wasm_loader.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterSource from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.ts?raw";
+import adapterSource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.ts?raw";
 
 const REAL_SIGNED_EVENT_JSON =
   '{"id":"8dfc662e1c95a0aa2e803316149583ff08b8e0a15c622b5b9a48b84983333cf2","pubkey":"0dd114ce42282a141284d9658753545d86574f763781ed302236d2e89f6668f7","created_at":1735000000,"kind":1,"tags":[["e","deadbeefcafe"],["p","abc123"]],"content":"Secure Runtime Alpha 446 fixture","sig":"cca2e65a427c06c01152baba037d68b978b0443c2211037a4df5a4579509bd3a993afa769b255880e0d962ca4b2d84f658eff155beaf81b623601ade3c57d100"}';

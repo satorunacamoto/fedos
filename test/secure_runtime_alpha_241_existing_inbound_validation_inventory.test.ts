@@ -2,19 +2,20 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_241_existing_inbound_validation_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import cryptoSource from "../src/nostr/crypto.ts?raw";
+import cryptoSource from "../src/os/messenger/adapters/nostr/protocol/crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import eventSource from "../src/nostr/event.ts?raw";
+import eventSource from "../src/os/messenger/adapters/nostr/protocol/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wireEventSource from "../src/desktop/fedos_nostr_wire_event.ts?raw";
+import wireEventSource from "../src/os/messenger/desktop/fedos_nostr_wire_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 241 -- "Existing Inbound Validation Inventory":
@@ -112,6 +113,6 @@ describe("Secure Runtime Alpha 241 -- Existing Inbound Validation Inventory", ()
 
   it("14. Regression: package.json dependency count remains unchanged at 2 -- no new Cargo/npm dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

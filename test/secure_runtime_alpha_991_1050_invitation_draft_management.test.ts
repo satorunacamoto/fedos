@@ -22,30 +22,30 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
 
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { InMemoryFedosConversationCapabilityAuthority } from "../src/conversation/capability/in_memory_fedos_conversation_capability_authority.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { InMemoryFedosConversationCapabilityAuthority } from "../src/os/messenger/conversations/capability/in_memory_fedos_conversation_capability_authority.js";
 import {
   toFedosConversationCapabilityBearerSecret,
   type FedosConversationCapabilityBearerSecret,
-} from "../src/conversation/capability/fedos_conversation_capability_bearer_secret.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationCapabilityId } from "../src/conversation/capability/fedos_conversation_capability_id.js";
+} from "../src/os/messenger/conversations/capability/fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationCapabilityId } from "../src/os/messenger/conversations/capability/fedos_conversation_capability_id.js";
 
-import { FedosConversationInvitationTransport } from "../src/conversation/invitation/fedos_conversation_invitation_transport.js";
-import { InMemoryFedosConversationInvitationRevocationRegistry } from "../src/conversation/invitation/in_memory_fedos_conversation_invitation_revocation_registry.js";
-import { AppendOnlyFedosConversationInvitationRevocationRegistry } from "../src/conversation/invitation/append_only_fedos_conversation_invitation_revocation_registry.js";
-import type { FedosPersistedConversationInvitationRevocationV1 } from "../src/conversation/invitation/fedos_persisted_conversation_invitation_revocation_v1.js";
+import { FedosConversationInvitationTransport } from "../src/os/messenger/conversations/invitation/fedos_conversation_invitation_transport.js";
+import { InMemoryFedosConversationInvitationRevocationRegistry } from "../src/os/messenger/conversations/invitation/in_memory_fedos_conversation_invitation_revocation_registry.js";
+import { AppendOnlyFedosConversationInvitationRevocationRegistry } from "../src/os/messenger/conversations/invitation/append_only_fedos_conversation_invitation_revocation_registry.js";
+import type { FedosPersistedConversationInvitationRevocationV1 } from "../src/os/messenger/conversations/invitation/fedos_persisted_conversation_invitation_revocation_v1.js";
 
-import { InMemoryFedosConversationDraftPersistence } from "../src/conversation/construction/in_memory_fedos_conversation_draft_persistence.js";
-import { InMemoryFedosConversationDraftManagementPersistence } from "../src/conversation/construction/in_memory_fedos_conversation_draft_management_persistence.js";
-import { AppendOnlyFedosConversationDraftManagementPersistence } from "../src/conversation/construction/append_only_fedos_conversation_draft_management_persistence.js";
-import { FedosConversationDraftManager } from "../src/conversation/construction/fedos_conversation_draft_manager.js";
-import { validateFedosConversationDraftRecord } from "../src/conversation/construction/fedos_conversation_draft_record_validator.js";
-import { serializeFedosConversationDraftRecord } from "../src/conversation/construction/fedos_conversation_draft_record_codec.js";
+import { InMemoryFedosConversationDraftPersistence } from "../src/os/messenger/conversations/construction/in_memory_fedos_conversation_draft_persistence.js";
+import { InMemoryFedosConversationDraftManagementPersistence } from "../src/os/messenger/conversations/construction/in_memory_fedos_conversation_draft_management_persistence.js";
+import { AppendOnlyFedosConversationDraftManagementPersistence } from "../src/os/messenger/conversations/construction/append_only_fedos_conversation_draft_management_persistence.js";
+import { FedosConversationDraftManager } from "../src/os/messenger/conversations/construction/fedos_conversation_draft_manager.js";
+import { validateFedosConversationDraftRecord } from "../src/os/messenger/conversations/construction/fedos_conversation_draft_record_validator.js";
+import { serializeFedosConversationDraftRecord } from "../src/os/messenger/conversations/construction/fedos_conversation_draft_record_codec.js";
 
 // ---------------------------------------------------------------------------
 // Small deterministic generators (this Arc mints no real randomness itself).

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { Nip07EventSigner, isNip07Available } from "../src/sign/nip07.js";
+import { Nip07EventSigner, isNip07Available } from "../src/os/_legacy_prototype/sign/nip07.js";
 import type {
   Nip07Provider,
   SignedNostrEvent,
   UnsignedNostrEvent,
-} from "../src/sign/types.js";
+} from "../src/os/_legacy_prototype/sign/types.js";
 
 const PUB_A = "a".repeat(64);
 const PUB_B = "b".repeat(64);

@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   canOpenChatFromSpace,
   chatFromGroupSpace,
-} from "../src/chat/space_bridge.js";
-import { canPostChat, canReadChat } from "../src/chat/policy.js";
+} from "../src/os/_legacy_prototype/chat/space_bridge.js";
+import { canPostChat, canReadChat } from "../src/os/_legacy_prototype/chat/policy.js";
 import type {
   ChannelSpace,
   CommunitySpace,
   GroupSpace,
-} from "../src/community/types.js";
+} from "../src/os/_legacy_prototype/community/types.js";
 
 const OWNER = "a".repeat(64);
 const ADMIN = "b".repeat(64);

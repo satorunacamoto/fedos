@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_291_existing_session_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sessionBoundarySource from "../src/identity/session_boundary.ts?raw";
+import sessionBoundarySource from "../src/os/core/identity/session_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 291 -- "Existing Session Inventory": Stage 1 of
@@ -32,8 +33,7 @@ describe("Secure Runtime Alpha 291 -- Existing Session Inventory", () => {
 
   it("4. structural: package.json carries no Session/Oxen-related dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    const deps = Object.keys(pkg.dependencies ?? {});
-    expect(deps).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("5. the design doc confirms FedosBoardSourceProtocol already reserves 'session' with a Gateway-shaped convention", () => {

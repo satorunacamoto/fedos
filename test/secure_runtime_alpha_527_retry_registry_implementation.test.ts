@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { FedosDeliveryRetryRegistry } from "../src/board/observation/fedos_delivery_retry_registry.js";
-import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryRetryRegistry } from "../src/os/messenger/board/observation/fedos_delivery_retry_registry.js";
+import { toFedosDeliveryObservationSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
 
 describe("Secure Runtime Alpha 527 -- Retry Registry Implementation", () => {
   it("starts at 1 and increments by exactly 1 per call for the same subject", () => {

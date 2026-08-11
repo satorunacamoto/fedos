@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { createFedosBoardRuntime } from "../src/board/runtime/fedos_board_runtime.js";
-import type { FedosBoardRuntimeIdGenerator } from "../src/board/runtime/fedos_board_runtime_id_generator.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { createFedosBoardRuntime } from "../src/os/messenger/board/runtime/fedos_board_runtime.js";
+import type { FedosBoardRuntimeIdGenerator } from "../src/os/messenger/board/runtime/fedos_board_runtime_id_generator.js";
 import {
   FEDOS_BOARD_RUNTIME_PUBLIC_ELIGIBLE_PROTOCOLS,
   isEligibleForPublicOutboundTarget,
-} from "../src/board/runtime/fedos_board_runtime_outbound_eligibility.js";
-import { anonymousLocalAuthorReference } from "../src/board/runtime/fedos_board_runtime_author_authority.js";
-import type { FedosPublicIdentityReader } from "../src/desktop/fedos_public_identity_reader.js";
+} from "../src/os/messenger/board/runtime/fedos_board_runtime_outbound_eligibility.js";
+import { anonymousLocalAuthorReference } from "../src/os/messenger/board/runtime/fedos_board_runtime_author_authority.js";
+import type { FedosPublicIdentityReader } from "../src/os/messenger/desktop/fedos_public_identity_reader.js";
 
 function fixedIdGenerator(...ids: string[]): FedosBoardRuntimeIdGenerator {
   let i = 0;

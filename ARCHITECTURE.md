@@ -52,7 +52,7 @@ FedosDesktopApplicationShell (packages/.../src/desktop/shell/)
      delegates every mutating call to the Runtime layer below
        │
        ▼
-FedosDesktopRuntime (src/desktop/runtime/fedos_desktop_runtime.ts)
+FedosDesktopRuntime (src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts)
   └─ the ONE assembly point wiring: Profile/Master Seed, Device Registry
      & Trust, Conversation Runtime (Direct Ratchet + NIP-17 delivery),
      Archive, Search, Identity Transition, Deletion Request, Safety
@@ -68,7 +68,7 @@ WASM crypto boundary (packages/fedos-core-rust/, cdylib via wasm-bindgen)
 
 ### Domain model
 
-- **Conversation** (`src/conversation/`) — Direct (1:1) conversations use
+- **Conversation** (`src/os/messenger/conversations/`) — Direct (1:1) conversations use
   a real Double-Ratchet session per conversation (this codebase's own
   FedOS-protocol implementation, not the Signal Protocol library) over
   NIP-17 (Nostr gift-wrapped Direct messages), with an authenticated
@@ -78,7 +78,7 @@ WASM crypto boundary (packages/fedos-core-rust/, cdylib via wasm-bindgen)
   pairwise Double-Ratchet fanout** (N separate 1:1 sends of the same
   plaintext), not a group ratchet and not Sender-Key — see
   `KNOWN_LIMITATIONS.md` for the receive-side gap this implies.
-- **Device** (`src/device/`) — an event-sourced Device Registry
+- **Device** (`src/os/messenger/device/`) — an event-sourced Device Registry
   (`FedosDeviceBindingV1` records: deviceId, accountRef, trustState,
   devicePublicKeyRef), a per-Device signing keypair independent of the
   account's Master Seed, and a real BIP-340/Schnorr pairing
@@ -97,7 +97,7 @@ WASM crypto boundary (packages/fedos-core-rust/, cdylib via wasm-bindgen)
   review history. Both surface as inboxes nested inside the real Safety
   Center screen.
 - **"Capability" is two unrelated concepts** in this codebase, by
-  deliberate naming choice, not confusion: `src/conversation/capability/`
+  deliberate naming choice, not confusion: `src/os/messenger/conversations/capability/`
   (invitation/membership authorization tokens) is unrelated to Direct
   Ratchet "Peer Capability" (per-peer negotiated feature capabilities).
 
@@ -119,7 +119,7 @@ and has done so unchanged since long before the pivot. It is reachable
 only from `src/worker.ts` (the original product's own entry point, which
 has no deploy path) and from ~295 test files — **never** from the shipped
 Desktop app, which imports exclusively from
-`src/desktop/production_activation/`. Recommended treatment (from the
+`src/os/messenger/desktop/production_activation/`. Recommended treatment (from the
 Dead Runtime review, not implemented by that read-only review nor by any
 later Arc as of this writing): a narrow naming/discoverability fix so a
 new contributor doesn't mistake it for the real crypto entry point —

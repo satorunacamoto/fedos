@@ -4,9 +4,9 @@ import {
   renderPublishPrototype,
   renderUnsignedEventPreview,
   renderPublishDenied,
-} from "../src/render/publish.js";
-import type { CommunitySpace, SpaceDecision } from "../src/community/types.js";
-import type { UnsignedNostrEvent } from "../src/sign/types.js";
+} from "../src/os/_legacy_prototype/render/publish.js";
+import type { CommunitySpace, SpaceDecision } from "../src/os/_legacy_prototype/community/types.js";
+import type { UnsignedNostrEvent } from "../src/os/_legacy_prototype/sign/types.js";
 
 const ACTOR = "a".repeat(64);
 

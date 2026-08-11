@@ -22,23 +22,23 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { createFedosDesktopApplicationShell, type FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
-import { createFedosDesktopHostBridge } from "../src/desktop/host_boundary/fedos_desktop_host_bridge.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { createFedosDesktopApplicationShell, type FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
+import { createFedosDesktopHostBridge } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_bridge.js";
 import { fedosElectronHandleInvoke, type FedosElectronHostBridgeLike } from "../packages/fedos-desktop-electron-spike/src/fedos_electron_host_adapter_dispatch_translation.js";
-import { createFedosDeviceBindingBoundary, type FedosDeviceBindingBoundary } from "../src/device/binding_challenge/fedos_device_binding_boundary_factory.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
-import { generateFedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { PersistedFedosDeviceTrustAuthority } from "../src/device/persistence/persisted_fedos_device_trust_authority.js";
-import { UnavailableFedosDeviceRegistrationAuthority } from "../src/device/unavailable_fedos_device_registration_authority.js";
-import { FedosDeviceTrustRuntime } from "../src/desktop/runtime/fedos_device_trust_runtime.js";
+import { createFedosDeviceBindingBoundary, type FedosDeviceBindingBoundary } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_boundary_factory.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import { generateFedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { PersistedFedosDeviceTrustAuthority } from "../src/os/messenger/device/persistence/persisted_fedos_device_trust_authority.js";
+import { UnavailableFedosDeviceRegistrationAuthority } from "../src/os/messenger/device/unavailable_fedos_device_registration_authority.js";
+import { FedosDeviceTrustRuntime } from "../src/os/messenger/desktop/runtime/fedos_device_trust_runtime.js";
 import { FedosSyncState } from "../src/sync/fedos_sync_state.js";
 import { FedosSyncJournal } from "../src/sync/fedos_sync_journal.js";
 import { InMemoryFedosSyncJournalPersistence } from "../src/sync/persistence/in_memory_fedos_sync_journal_persistence.js";
 import { AppendOnlyFedosSyncJournalPersistence } from "../src/sync/persistence/append_only_fedos_sync_journal_persistence.js";
-import { FedosDevicePairingFacade } from "../src/desktop/runtime/fedos_device_pairing_facade.js";
+import { FedosDevicePairingFacade } from "../src/os/messenger/desktop/runtime/fedos_device_pairing_facade.js";
 import {
   decodeFedosDevicePairingApprovalV1,
   decodeFedosDevicePairingRequestV1,
@@ -47,9 +47,9 @@ import {
   isWellFormedFedosDevicePairingRequestV1,
   isWellFormedFedosDevicePairingApprovalV1,
   FEDOS_DEVICE_PAIRING_EXCHANGE_MAX_BYTE_LENGTH,
-} from "../src/device/binding_challenge/fedos_device_binding_pairing_exchange.js";
-import { createFedosDeviceBindingProofOfPossession } from "../src/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
-import { authorizeFedosDeviceBindingChallenge } from "../src/device/binding_challenge/fedos_device_binding_account_authorization.js";
+} from "../src/os/messenger/device/binding_challenge/fedos_device_binding_pairing_exchange.js";
+import { createFedosDeviceBindingProofOfPossession } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_proof_of_possession.js";
+import { authorizeFedosDeviceBindingChallenge } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_account_authorization.js";
 
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 

@@ -3,9 +3,9 @@ import {
   serializeFedosBoardOutboxIntent,
   deserializeFedosBoardOutboxIntent,
   type FedosPersistedBoardOutboxRecordV1,
-} from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 /**
  * Secure Runtime Alpha 416 -- "Persisted Outbox Record V1 and Codec":

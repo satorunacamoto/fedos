@@ -14,17 +14,18 @@ import hkdfBridgeSource from "../packages/fedos-core-rust/src/crypto/hkdf_bridge
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import dependencyAdoptionDoc from "../docs/nip44_dependency_adoption.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageTypesSource from "../src/storage/types.ts?raw";
+import storageTypesSource from "../src/os/core/storage/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopStorageSource from "../src/storage/noop_storage.ts?raw";
+import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import federationTypesSource from "../src/federation/types.ts?raw";
+import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 193 — NIP-44 PRE-ADOPTION GUARD (superseded IN PART by Stage
@@ -233,8 +234,7 @@ describe("NIP-44 pre-adoption guard (Stage 193, updated Stage 194-197, 198-201)"
 
   it("12. package.json is unchanged — still 2 production dependencies, no secp256k1/k256/elliptic-curve library", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("13. docs/nip44_dependency_adoption.md names both candidates, and now records the Stage 194 k256 decision (Stage 192's original 'no decision' framing is superseded)", () => {

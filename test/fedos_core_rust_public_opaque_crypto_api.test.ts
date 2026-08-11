@@ -11,9 +11,9 @@ import ciphertextEnvelopeSource from "../packages/fedos-core-rust/src/crypto/cip
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import integrationTestSource from "../packages/fedos-core-rust/tests/public_crypto_api.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Stage 171–176 — "Public opaque crypto API completion."

@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_501_existing_host_and_delivery_boundary_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createHostSource from "../src/desktop/host/create_fedos_desktop_host.ts?raw";
+import createHostSource from "../src/os/messenger/desktop/host/create_fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import stateSource from "../src/desktop/host/fedos_desktop_host_state.ts?raw";
+import stateSource from "../src/os/messenger/desktop/host/fedos_desktop_host_state.ts?raw";
 
 describe("Secure Runtime Alpha 501 -- Existing Host and Delivery Boundary Inventory", () => {
   it("FedosDesktopHost's own Scheduler/Publisher/Observation wiring is added later in this same Arc (Alpha 507), not by this Stage itself", () => {

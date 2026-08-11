@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { NullRelay } from "../src/desktop/null_relay.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_213_null_relay.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullRelaySource from "../src/desktop/null_relay.ts?raw";
+import nullRelaySource from "../src/os/messenger/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 
 /**
  * Secure Runtime Alpha 213 -- "Null Relay": Stage 3 of the Nostr Relay

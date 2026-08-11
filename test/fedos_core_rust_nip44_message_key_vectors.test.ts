@@ -22,17 +22,18 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageTypesSource from "../src/storage/types.ts?raw";
+import storageTypesSource from "../src/os/core/storage/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopStorageSource from "../src/storage/noop_storage.ts?raw";
+import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import federationTypesSource from "../src/federation/types.ts?raw";
+import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip44V2VectorsSource from "../test-vectors/nip44/nip44-v2.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 219–223 — the first real slice of a "NIP-44 v2 wire-compatible
@@ -194,8 +195,7 @@ describe("NIP-44 exact message key HKDF-expand + vector verification (Stage 219-
 
   it("15. package.json is unchanged — still 2 production dependencies", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("16. no serialization change: no serde derive in nip44_message_keys.rs production code", () => {

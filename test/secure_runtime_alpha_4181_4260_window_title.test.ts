@@ -4,11 +4,11 @@
  * Shell/Runtime of any kind.
  */
 import { describe, it, expect } from "vitest";
-import { fedosConversationTitle, fedosDesktopConversationWindowTitle } from "../src/desktop/navigation/fedos_desktop_conversation_window_title.js";
-import { fedosNavigationEmpty, fedosNavigationOpen, fedosNavigationOpenFailed, fedosNavigationOpening } from "../src/desktop/navigation/fedos_desktop_conversation_navigation_state.js";
-import type { FedosConversationDetailView } from "../src/desktop/shell/fedos_desktop_shell_view_models.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationMembership } from "../src/conversation/membership/fedos_conversation_membership.js";
+import { fedosConversationTitle, fedosDesktopConversationWindowTitle } from "../src/os/messenger/desktop/navigation/fedos_desktop_conversation_window_title.js";
+import { fedosNavigationEmpty, fedosNavigationOpen, fedosNavigationOpenFailed, fedosNavigationOpening } from "../src/os/messenger/desktop/navigation/fedos_desktop_conversation_navigation_state.js";
+import type { FedosConversationDetailView } from "../src/os/messenger/desktop/shell/fedos_desktop_shell_view_models.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationMembership } from "../src/os/messenger/conversations/membership/fedos_conversation_membership.js";
 
 const ALICE: FedosConversationParticipantReference = { authority: "fedos", publicIdentifier: "alice-local", identityId: null };
 const BOB: FedosConversationParticipantReference = { authority: "nostr", publicIdentifier: "bob-pubkey", identityId: null };

@@ -35,47 +35,47 @@ import {
   isWellFormedFedosLocalProfileDescriptorV1,
   withFedosLocalProfileInitializationState,
   fedosLocalProfileDescriptorsIdentical,
-} from "../src/desktop/onboarding/fedos_local_profile_descriptor.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_local_profile_descriptor.js";
 import {
   InMemoryFedosLocalProfilePersistence,
   FileFedosLocalProfilePersistence,
   FedosLocalProfileCorruptError,
   classifyFedosLocalProfileDuplicate,
-} from "../src/desktop/onboarding/fedos_local_profile_persistence.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_local_profile_persistence.js";
 import {
   planFedosLocalProfilePaths,
   ensureFedosLocalProfileDirectories,
   fedosLocalProfilePathsIsolated,
-} from "../src/desktop/onboarding/fedos_local_profile_paths.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_local_profile_paths.js";
 import {
   applyFedosProfileLifecycleTransition,
   canFedosProfileLifecycleTransition,
   fedosProfileLifecyclePermitsRuntime,
   fedosProfileLifecycleNextState,
-} from "../src/desktop/onboarding/fedos_profile_lifecycle_state.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_profile_lifecycle_state.js";
 import {
   FedosProfileUnlockSecret,
   fedosProfileUnlockSecretFromUtf8,
   validateFedosUnlockSecretBytes,
   FEDOS_UNLOCK_SECRET_REDACTION,
-} from "../src/desktop/onboarding/fedos_profile_unlock_secret.js";
-import { DevelopmentFedosMasterSeedAuthority } from "../src/desktop/onboarding/fedos_development_master_seed_authority.js";
-import { buildFedosProfileRecoveryNotice } from "../src/desktop/onboarding/fedos_profile_recovery_notice.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_profile_unlock_secret.js";
+import { DevelopmentFedosMasterSeedAuthority } from "../src/os/messenger/desktop/onboarding/fedos_development_master_seed_authority.js";
+import { buildFedosProfileRecoveryNotice } from "../src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.js";
 import {
   FedosProfileInitializationCoordinator,
   type FedosProfileInitializationDependencies,
-} from "../src/desktop/onboarding/fedos_profile_initialization_coordinator.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.js";
 import {
   validateFedosOnboardingCommand,
   redactFedosOnboardingCommand,
   dispatchFedosOnboardingCommand,
-} from "../src/desktop/onboarding/fedos_onboarding_command.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_onboarding_command.js";
 import {
   fedosOnboardingViewForStatus,
   fedosOnboardingViewForFailure,
   fedosOnboardingReadyView,
-} from "../src/desktop/onboarding/fedos_onboarding_presentation.js";
-import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_onboarding_presentation.js";
+import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/os/core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.js";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 
 // ---------------------------------------------------------------------

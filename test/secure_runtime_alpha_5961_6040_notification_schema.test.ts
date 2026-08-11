@@ -11,18 +11,18 @@ import {
   decodeFedosIdentityTransitionNotificationV1,
   FEDOS_IDENTITY_TRANSITION_NOTIFICATION_MAX_DEVICE_CORROBORATIONS,
   type FedosIdentityTransitionNotificationV1,
-} from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_notification.js";
+} from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_notification.js";
 import {
   isWellFormedFedosRatchetPeerCapabilityControlPayload,
   encodeFedosRatchetPeerCapabilityControlPayload,
   decodeFedosRatchetPeerCapabilityControlPayloadFromContent,
-} from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
-import { isKnownFedosRatchetLifecycleCapability } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
-import { isWellFormedFedosDirectRatchetSessionResetReason } from "../src/conversation/ratchet/fedos_direct_ratchet_session_reset_reason.js";
-import { createFedosIdentityTransitionRecordV1 } from "../src/conversation/identity_transition/fedos_identity_transition_record.js";
-import { generateFedosIdentityTransitionId } from "../src/conversation/identity_transition/fedos_identity_transition_id.js";
-import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest } from "../src/conversation/identity_transition/fedos_identity_transition_canonical.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+} from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
+import { isKnownFedosRatchetLifecycleCapability } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
+import { isWellFormedFedosDirectRatchetSessionResetReason } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_reset_reason.js";
+import { createFedosIdentityTransitionRecordV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_record.js";
+import { generateFedosIdentityTransitionId } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_id.js";
+import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_canonical.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 function accountRef(pubkey: string): FedosDeviceBindingAccountRef {
   return { authority: "nostr", publicIdentifier: pubkey, identityId: null };

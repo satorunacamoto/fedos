@@ -2,19 +2,19 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import documentSource from "../../../src/conversation/search/fedos_conversation_search_document.ts?raw";
+import documentSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_document.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import indexSource from "../../../src/conversation/search/fedos_conversation_search_index.ts?raw";
+import indexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import keywordIndexSource from "../../../src/conversation/search/fedos_conversation_search_keyword_index.ts?raw";
+import keywordIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_keyword_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import dateIndexSource from "../../../src/conversation/search/fedos_conversation_search_date_index.ts?raw";
+import dateIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_date_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import replyIndexSource from "../../../src/conversation/search/fedos_conversation_search_reply_index.ts?raw";
+import replyIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_reply_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantIndexSource from "../../../src/conversation/search/fedos_conversation_search_participant_index.ts?raw";
+import participantIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_participant_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import archiveIndexSource from "../../../src/conversation/search/fedos_conversation_search_archive_index.ts?raw";
+import archiveIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_archive_index.ts?raw";
 
 /**
  * Private Conversation Search V1 runtime audit -- encryption/privacy

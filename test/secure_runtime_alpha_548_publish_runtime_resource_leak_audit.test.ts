@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { FedosPublishScheduler } from "../src/board/outbox/fedos_publish_scheduler.js";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { MockFedosBoardOutboxPublisher } from "../src/board/outbox/fedos_board_outbox_publisher.js";
+import { FedosPublishScheduler } from "../src/os/messenger/board/outbox/fedos_publish_scheduler.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { MockFedosBoardOutboxPublisher } from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 
 /**
  * Secure Runtime Alpha 548 -- "Resource Leak Audit": Stage 8 of the

@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_519_git_diff_confirmation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxPublisherSource from "../src/board/outbox/fedos_board_outbox_publisher.ts?raw";
+import outboxPublisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 
 describe("Secure Runtime Alpha 519 -- Git Diff Confirmation", () => {
   it("names all four modified pre-existing files and the additive/deletion counts per file", () => {

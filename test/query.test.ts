@@ -5,11 +5,11 @@ import {
   countDescendants,
   filterThread,
   MAX_LIMIT,
-} from "../src/query/thread_query.js";
-import { buildThreads } from "../src/thread/thread.js";
-import type { NostrEvent, NostrTag } from "../src/nostr/types.js";
-import type { IngestedEvent } from "../src/ingest/types.js";
-import type { ThreadBuildResult } from "../src/thread/types.js";
+} from "../src/os/_legacy_prototype/query/thread_query.js";
+import { buildThreads } from "../src/os/_legacy_prototype/thread/thread.js";
+import type { NostrEvent, NostrTag } from "../src/os/messenger/adapters/nostr/protocol/types.js";
+import type { IngestedEvent } from "../src/os/_legacy_prototype/ingest/types.js";
+import type { ThreadBuildResult } from "../src/os/_legacy_prototype/thread/types.js";
 
 const SIG = "0".repeat(128);
 

@@ -8,8 +8,8 @@ import {
   createFedosSealedDirectRatchetSecretRecordV1,
   isWellFormedFedosSealedDirectRatchetSecretRecordV1,
   fedosSealedDirectRatchetSecretRecordKey,
-} from "../src/conversation/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
-import type { FedosDirectRatchetSessionId } from "../src/conversation/ratchet/fedos_direct_ratchet_session_id.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_sealed_direct_ratchet_secret_record.js";
+import type { FedosDirectRatchetSessionId } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_id.js";
 
 const SESSION_ID = "direct-ratchet-v1##a##b##c##d##e##fedos-direct-ratchet-v1##0" as FedosDirectRatchetSessionId;
 

@@ -1,14 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
-import { NullEventReader } from "../src/desktop/null_event_reader.js";
-import type { FedosEventReader } from "../src/desktop/fedos_event_reader.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { createDesktopApplication } from "../src/desktop/create_desktop_application.js";
+import { NullEventReader } from "../src/os/messenger/desktop/null_event_reader.js";
+import type { FedosEventReader } from "../src/os/messenger/desktop/fedos_event_reader.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { createDesktopApplication } from "../src/os/messenger/desktop/create_desktop_application.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_209_end_to_end_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 
 /**
  * Secure Runtime Alpha 209 -- "End-to-End Verification": Stage 9 of

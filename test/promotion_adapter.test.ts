@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { MockPromotionProvider } from "../src/promotion/adapter.js";
-import { buildPromotionRequest, resolvePlacement } from "../src/promotion/policy.js";
-import type { PromotionCandidate, PromotionRequest } from "../src/promotion/types.js";
+import { MockPromotionProvider } from "../src/os/_legacy_prototype/promotion/adapter.js";
+import { buildPromotionRequest, resolvePlacement } from "../src/os/_legacy_prototype/promotion/policy.js";
+import type { PromotionCandidate, PromotionRequest } from "../src/os/_legacy_prototype/promotion/types.js";
 
 function request(limit: number): PromotionRequest {
   return buildPromotionRequest(resolvePlacement("space_sidebar"), {

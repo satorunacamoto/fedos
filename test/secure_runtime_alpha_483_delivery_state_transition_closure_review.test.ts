@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   createFedosDeliveryObservation,
   toFedosDeliveryObservationSubjectId,
-} from "../src/board/observation/fedos_delivery_observation.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
-import { createFedosBoardOutboxObservation } from "../src/board/outbox/fedos_board_outbox_observation.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosDeliveryObservationQuery } from "../src/os/messenger/board/observation/fedos_delivery_observation_query.js";
+import { createFedosBoardOutboxObservation } from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.js";
 
 /**
  * Secure Runtime Alpha 483 -- "Delivery State Transition Closure

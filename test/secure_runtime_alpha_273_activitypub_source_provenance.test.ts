@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_273_activitypub_source_provenance.md?raw";
-import { mapValidatedActivityPubPostToBoardPostInput } from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import { fedosBoardSourceKey } from "../src/board/fedos_board_source.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
+import { mapValidatedActivityPubPostToBoardPostInput } from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import { fedosBoardSourceKey } from "../src/os/messenger/board/fedos_board_source.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
 
 const POST: FedosValidatedActivityPubPost = {
   objectId: "https://example.social/users/alice/statuses/1",

@@ -7,6 +7,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 import guardSource from "../packages/fedos-core-rust/src/crypto/secp256k1_dependency_guard.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 181 -- "k256 Schnorr API Inventory & Dependency
@@ -97,6 +98,6 @@ describe("Secure Runtime Alpha 181 -- k256 Schnorr API Inventory & Dependency De
   it("10. Regression: package.json is untouched -- zero new npm dependency, this is a Rust-only Stage", () => {
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_181/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

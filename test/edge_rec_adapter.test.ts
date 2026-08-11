@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 // Vite/Vitest `?raw` import: the adapter source as a string (no node:fs needed).
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import edgeRecSource from "../src/promotion/edge_rec_adapter.ts?raw";
+import edgeRecSource from "../src/os/_legacy_prototype/promotion/edge_rec_adapter.ts?raw";
 import {
   EdgeRecPromotionProvider,
   isEdgeRecResponseLike,
@@ -9,9 +9,9 @@ import {
   mapPromotionRequestToEdgeRec,
   type EdgeRecFetchLike,
   type EdgeRecHttpResponse,
-} from "../src/promotion/edge_rec_adapter.js";
-import { buildPromotionRequest, resolvePlacement } from "../src/promotion/policy.js";
-import type { PromotionRequest } from "../src/promotion/types.js";
+} from "../src/os/_legacy_prototype/promotion/edge_rec_adapter.js";
+import { buildPromotionRequest, resolvePlacement } from "../src/os/_legacy_prototype/promotion/policy.js";
+import type { PromotionRequest } from "../src/os/_legacy_prototype/promotion/types.js";
 
 const VIEWER = "a".repeat(64);
 

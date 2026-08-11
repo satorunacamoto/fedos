@@ -2,13 +2,14 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_321_board_deployment_runtime_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import tsconfigSource from "../tsconfig.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 321 -- "Board Deployment and Runtime Inventory":
@@ -51,7 +52,7 @@ describe("Secure Runtime Alpha 321 -- Board Deployment and Runtime Inventory", (
 
   it("6. Regression: package.json dependency count remains unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("7. the design doc's own strongest finding: Board has no real caller in any production runtime today", () => {

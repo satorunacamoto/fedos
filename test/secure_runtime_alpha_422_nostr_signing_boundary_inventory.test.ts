@@ -6,11 +6,11 @@ import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import vaultTypesSource from "../src/vault/types.ts?raw";
+import vaultTypesSource from "../src/os/core/vault/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import runtimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 
 /**
  * Secure Runtime Alpha 422 -- "Existing Rust / WASM Boundary

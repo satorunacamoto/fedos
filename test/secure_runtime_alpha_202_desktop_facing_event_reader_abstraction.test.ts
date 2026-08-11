@@ -2,21 +2,21 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_202_desktop_facing_event_reader_abstraction.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import descriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import descriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readerSource from "../src/desktop/fedos_event_reader.ts?raw";
+import readerSource from "../src/os/messenger/desktop/fedos_event_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Secure Runtime Alpha 202 -- "Desktop-Facing Event Reader

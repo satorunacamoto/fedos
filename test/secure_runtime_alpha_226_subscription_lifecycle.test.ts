@@ -1,18 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import { WebSocketRelay } from "../src/desktop/websocket_relay.js";
-import type { FedosRelaySocket } from "../src/desktop/websocket_relay.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
+import { WebSocketRelay } from "../src/os/messenger/desktop/websocket_relay.js";
+import type { FedosRelaySocket } from "../src/os/messenger/desktop/websocket_relay.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_226_subscription_lifecycle.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullRelaySource from "../src/desktop/null_relay.ts?raw";
+import nullRelaySource from "../src/os/messenger/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import wsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 
 function fakeSocket(): {
   socket: FedosRelaySocket;

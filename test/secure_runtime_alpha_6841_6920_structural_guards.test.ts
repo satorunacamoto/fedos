@@ -60,10 +60,13 @@ describe("Secure Runtime Alpha 6841-6920 -- structural guards", () => {
   });
 
   it("5. the Dev-only Gate (FedosWasmLoaderSkeleton#evaluateDevOnlyGate / determineFedosRuntimeMode) is byte-for-byte untouched by this Arc -- still permanently denies outside NODE_ENV=development", () => {
-    const modeSource = read("src/runtime/fedos_runtime_mode_authority.ts");
+    // Runtime Ownership Extraction Arc: both files physically moved to
+    // src/os/core/vault/wasm/ (shims left at the old paths) -- read the real
+    // implementations at their new canonical location, not the shims.
+    const modeSource = read("src/os/core/vault/wasm/fedos_runtime_mode_authority.ts");
     expect(modeSource).toMatch(/nodeEnv === "development"/);
     expect(modeSource).toMatch(/nodeEnv === "production"/);
-    const loaderSource = stripComments(read("src/runtime/fedos_wasm_loader.ts"));
+    const loaderSource = stripComments(read("src/os/core/vault/wasm/fedos_wasm_loader.ts"));
     expect(loaderSource).toMatch(/developmentAllowed:\s*false,\s*reason:\s*"ProductionRuntime"/);
   });
 

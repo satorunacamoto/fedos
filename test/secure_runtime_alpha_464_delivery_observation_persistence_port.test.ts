@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { fedosPersistedDeliveryObservationRecordsAreEqual } from "../src/board/observation/fedos_delivery_observation_persistence.js";
-import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/board/observation/fedos_delivery_observation_codec.js";
+import { fedosPersistedDeliveryObservationRecordsAreEqual } from "../src/os/messenger/board/observation/fedos_delivery_observation_persistence.js";
+import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/os/messenger/board/observation/fedos_delivery_observation_codec.js";
 
 /**
  * Secure Runtime Alpha 464 -- "Delivery Observation Persistence Port":

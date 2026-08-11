@@ -5,20 +5,20 @@ import {
   decodeFedosDeletionRequestControlPayloadFromContent,
   FEDOS_DELETION_REQUEST_CONTROL_PAYLOAD_MAX_BYTES,
   type FedosDeletionRequestControlPayloadV1,
-} from "../src/conversation/deletion_request/fedos_deletion_request_control_payload.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_control_payload.js";
 import {
   FedosNobleTestNostrSigningAuthority,
   fedosTestSecretKeyFromSeed,
   signFedosDeletionRequestRecordV1,
-} from "../src/conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosDeletionRequestRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_request_record.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_signing.js";
+import type { FedosDeletionRequestRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_record.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 import {
   evaluateFedosDeletionRecipientPolicy,
   isFedosDeletionRecipientPolicy,
   FEDOS_DELETION_RECIPIENT_POLICIES,
-} from "../src/conversation/deletion_request/fedos_deletion_recipient_policy.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_recipient_policy.js";
 
 const CONVERSATION_ID = toFedosConversationId(toFedosBoardId("board-a")!, toFedosThreadId("thread-1")!);
 

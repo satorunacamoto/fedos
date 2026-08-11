@@ -10,7 +10,7 @@ import {
   fedosNavigationHistoryEmpty,
   fedosNavigationHistoryForward,
   fedosNavigationHistoryPush,
-} from "../src/desktop/navigation/fedos_desktop_conversation_navigation_history.js";
+} from "../src/os/messenger/desktop/navigation/fedos_desktop_conversation_navigation_history.js";
 
 describe("Alpha 4181-4260 -- Navigation History: push/back/forward", () => {
   it("starts empty: current null, no back, no forward", () => {

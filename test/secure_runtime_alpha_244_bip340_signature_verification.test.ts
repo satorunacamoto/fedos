@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { verifyNostrEventSignature } from "../src/desktop/nostr_signature_verifier.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+import { verifyNostrEventSignature } from "../src/os/messenger/desktop/nostr_signature_verifier.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_244_bip340_signature_verification.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import verifierSource from "../src/desktop/nostr_signature_verifier.ts?raw";
+import verifierSource from "../src/os/messenger/desktop/nostr_signature_verifier.ts?raw";
 
 const CANONICALIZATION_EVENT: FedosNostrWireEvent = {
   id: "42e04d5703c1ce6b135d167273eb4936720f008c517e2d9120445616b9e8c660",

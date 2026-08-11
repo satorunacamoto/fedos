@@ -2,23 +2,24 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_231_existing_relay_inbound_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/nostr/relay.ts?raw";
+import relaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import wsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import publishSource from "../src/nostr/publish.ts?raw";
+import publishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import messagesSource from "../src/nostr/messages.ts?raw";
+import messagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosEventDescriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import fedosEventDescriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRelaySource from "../src/desktop/fedos_relay.ts?raw";
+import fedosRelaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 231 -- "Existing Relay Inbound Inventory":
@@ -114,6 +115,6 @@ describe("Secure Runtime Alpha 231 -- Existing Relay Inbound Inventory", () => {
 
   it("14. Regression: package.json dependency count remains unchanged at 2 -- no new Cargo/npm dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

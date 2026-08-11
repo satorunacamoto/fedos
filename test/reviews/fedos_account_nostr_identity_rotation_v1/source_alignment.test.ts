@@ -92,7 +92,7 @@ describe("Alpha 5721-5800 successor review -- Master Seed / account / Nostr iden
   });
 
   it("6. account identity is constructed as {authority: 'nostr', publicIdentifier: <pubkey hex>, identityId: null} -- not a separate value", () => {
-    const source = readFileSync("src/desktop/onboarding/fedos_profile_initialization_coordinator.ts", "utf8") as string;
+    const source = readFileSync("src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.ts", "utf8") as string;
     expect(source).toMatch(/authority:\s*"nostr"/);
     expect(source).toMatch(/identityId:\s*null/);
   });

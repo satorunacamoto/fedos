@@ -4,31 +4,32 @@ import designDocSource from "../docs/secure_runtime_alpha_240_relay_reception_co
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullRelaySource from "../src/desktop/null_relay.ts?raw";
+import nullRelaySource from "../src/os/messenger/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import parserSource from "../src/desktop/relay_inbound_parser.ts?raw";
+import parserSource from "../src/os/messenger/desktop/relay_inbound_parser.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyRelaySource from "../src/nostr/relay.ts?raw";
+import legacyRelaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyWsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import legacyWsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyPublishSource from "../src/nostr/publish.ts?raw";
+import legacyPublishSource from "../src/os/messenger/adapters/nostr/protocol/publish.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyMessagesSource from "../src/nostr/messages.ts?raw";
+import legacyMessagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const RUNTIME_WORKER_DESKTOP_FILES: Record<string, string> = {
   "create_runtime.ts": createRuntimeSource,
@@ -117,7 +118,7 @@ describe("Secure Runtime Alpha 240 -- Relay Message Reception Completion", () =>
       expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
     }
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("9. structural: relay_inbound_parser.ts performs no cryptographic verification of any kind", () => {

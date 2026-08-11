@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_281_existing_atproto_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 281 -- "Existing AT Protocol / Bluesky
@@ -26,8 +27,7 @@ describe("Secure Runtime Alpha 281 -- Existing AT Protocol / Bluesky Inventory",
 
   it("3. structural: package.json carries no HTML/AT-Protocol/CID-related dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    const deps = Object.keys(pkg.dependencies ?? {});
-    expect(deps).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("4. the design doc confirms no TypeScript AT Protocol code exists, but reviews and excludes the Rust-side ATProto root domain", () => {

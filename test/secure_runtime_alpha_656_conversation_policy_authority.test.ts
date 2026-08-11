@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { StaticFedosConversationPolicyAuthority } from "../src/board/runtime/policy/fedos_conversation_policy_authority.js";
-import { FEDOS_CONVERSATION_POLICY_PUBLIC_V1 } from "../src/board/runtime/policy/fedos_conversation_policy.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
+import { StaticFedosConversationPolicyAuthority } from "../src/os/messenger/board/runtime/policy/fedos_conversation_policy_authority.js";
+import { FEDOS_CONVERSATION_POLICY_PUBLIC_V1 } from "../src/os/messenger/board/runtime/policy/fedos_conversation_policy.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 /**
  * Secure Runtime Alpha 656 ("Conversation Policy Authority") — Stage 6

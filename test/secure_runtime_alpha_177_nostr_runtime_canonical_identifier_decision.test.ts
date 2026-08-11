@@ -8,13 +8,14 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identityDescriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
+import identityDescriptorSource from "../src/os/core/identity/fedos_identity_descriptor.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 177 -- "Nostr Runtime Canonical Identifier
@@ -124,6 +125,6 @@ describe("Secure Runtime Alpha 177 -- Nostr Runtime Canonical Identifier Decisio
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_177/);
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_177/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

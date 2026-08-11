@@ -1,26 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { FedosPayloadRetentionAuthority } from "../src/conversation/retention/fedos_payload_retention_authority.js";
-import { InMemoryFedosPayloadRetentionPersistence } from "../src/conversation/retention/in_memory_fedos_payload_retention_persistence.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { toFedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { InMemoryFedosConversationDraftPersistence } from "../src/conversation/construction/in_memory_fedos_conversation_draft_persistence.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { FedosConversationSearchIndex, type FedosConversationSearchIndexDependencies } from "../src/conversation/search/fedos_conversation_search_index.js";
-import { validateFedosConversationMessageEnvelope } from "../src/conversation/envelope/fedos_conversation_message_envelope_validator.js";
-import type { FedosConversationMessageEnvelope } from "../src/conversation/envelope/fedos_conversation_message_envelope.js";
+import { FedosPayloadRetentionAuthority } from "../src/os/messenger/conversations/retention/fedos_payload_retention_authority.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_payload_retention_persistence.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { toFedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { InMemoryFedosConversationDraftPersistence } from "../src/os/messenger/conversations/construction/in_memory_fedos_conversation_draft_persistence.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { FedosConversationSearchIndex, type FedosConversationSearchIndexDependencies } from "../src/os/messenger/conversations/search/fedos_conversation_search_index.js";
+import { validateFedosConversationMessageEnvelope } from "../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope_validator.js";
+import type { FedosConversationMessageEnvelope } from "../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope.js";
 import { FedosSyncDeviceRegistry } from "../src/sync/fedos_sync_device_registry.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { assessFedosLocalPayloadDeletion } from "../src/conversation/deletion/fedos_deletion_assessment.js";
-import { buildFedosLocalPayloadDeletionPlan, buildFedosLocalDeviceAccessRevocationPlan, buildFedosLocalMembershipAccessRevocationPlan } from "../src/conversation/deletion/fedos_deletion_plan.js";
-import { assessFedosLocalDeviceAccessRevocation, assessFedosLocalMembershipAccessRevocation } from "../src/conversation/deletion/fedos_deletion_assessment.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { assessFedosLocalPayloadDeletion } from "../src/os/messenger/conversations/deletion/fedos_deletion_assessment.js";
+import { buildFedosLocalPayloadDeletionPlan, buildFedosLocalDeviceAccessRevocationPlan, buildFedosLocalMembershipAccessRevocationPlan } from "../src/os/messenger/conversations/deletion/fedos_deletion_plan.js";
+import { assessFedosLocalDeviceAccessRevocation, assessFedosLocalMembershipAccessRevocation } from "../src/os/messenger/conversations/deletion/fedos_deletion_assessment.js";
 import {
   executeFedosLocalPayloadDeletionPlan,
   executeFedosLocalDeviceAccessRevocationPlan,
   executeFedosLocalMembershipAccessRevocationPlan,
-} from "../src/conversation/deletion/fedos_deletion_execution_coordinator.js";
-import { InMemoryFedosDeletionExecutionPersistence } from "../src/conversation/deletion/in_memory_fedos_deletion_execution_persistence.js";
+} from "../src/os/messenger/conversations/deletion/fedos_deletion_execution_coordinator.js";
+import { InMemoryFedosDeletionExecutionPersistence } from "../src/os/messenger/conversations/deletion/in_memory_fedos_deletion_execution_persistence.js";
 
 /**
  * Secure Runtime Alpha 5401-5480 -- Execution Coordinator: real Retention +

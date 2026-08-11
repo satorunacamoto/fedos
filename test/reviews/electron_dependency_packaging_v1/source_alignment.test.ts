@@ -6,15 +6,16 @@ import packageJsonSource from "../../../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageLockSource from "../../../package-lock.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostPortSource from "../../../src/desktop/host_boundary/fedos_desktop_host_port.ts?raw";
+import hostPortSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_port.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostBridgeSource from "../../../src/desktop/host_boundary/fedos_desktop_host_bridge.ts?raw";
+import hostBridgeSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostCommandSource from "../../../src/desktop/host_boundary/fedos_desktop_host_command.ts?raw";
+import hostCommandSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostResponseSource from "../../../src/desktop/host_boundary/fedos_desktop_host_response.ts?raw";
+import hostResponseSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_response.ts?raw";
 // @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { execFileSync } from "node:child_process";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /** `git grep` exits 1 (not 0) when NO line matches -- that is the EXPECTED, passing case for the checks below, never a tool failure. Returns the matched file list (empty when none). */
 function gitGrepFiles(pattern: string, pathspec: string): string[] {
@@ -119,7 +120,7 @@ describe("Electron Dependency and Desktop Packaging V1 review -- source alignmen
 
   it("7. package.json still carries exactly two production dependencies -- no dependency was added by this review", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   // Real CODE USAGE only (an actual import, construction, or method call) --

@@ -3,16 +3,16 @@ import {
   fedosDeletionRequestDeviceStatus,
   fedosDeletionRequestAggregateAccountStatus,
   type FedosDeletionRequestPerDeviceRow,
-} from "../src/desktop/presentation/deletion_request/fedos_deletion_request_device_status.js";
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
+} from "../src/os/messenger/desktop/presentation/deletion_request/fedos_deletion_request_device_status.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
 import {
   fedosDeletionRequestInboxDisplayStatus,
   fedosDeletionRequestBuildInboxItem,
   fedosDeletionRequestSortInboxItems,
   fedosDeletionRequestTruncateInboxItems,
   fedosDeletionRequestBuildConsentDetail,
-} from "../src/desktop/presentation/deletion_request/fedos_deletion_request_screen_model.js";
-import type { FedosDeletionRequestInboxSummaryV1 } from "../src/conversation/deletion_request/fedos_deletion_request_inbox_summary.js";
+} from "../src/os/messenger/desktop/presentation/deletion_request/fedos_deletion_request_screen_model.js";
+import type { FedosDeletionRequestInboxSummaryV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_inbox_summary.js";
 
 function snapshot(overrides: Partial<FedosPersistedDeletionRequestStateRecordV1> = {}): FedosPersistedDeletionRequestStateRecordV1 {
   return {

@@ -46,7 +46,7 @@ const packageDir = `${repoRoot}/packages/fedos-desktop-electron-spike`;
 const mainCjsPath = `${packageDir}/dist/fedos_electron_beta_main.cjs`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
 const pkgWasmPath = `${repoRoot}/packages/fedos-core-rust/pkg/fedos_core_rust_bg.wasm`;
-const settingsControllerDistPath = `${repoRoot}/dist/desktop/settings/fedos_desktop_settings_controller.js`;
+const settingsControllerDistPath = `${repoRoot}/dist/os/messenger/desktop/settings/fedos_desktop_settings_controller.js`;
 
 const REAL_ARTIFACT_PRESENT = existsSync(pkgWasmPath);
 const ELECTRON_PRESENT = existsSync(electronBinPath);

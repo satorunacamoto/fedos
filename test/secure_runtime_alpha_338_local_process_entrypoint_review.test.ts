@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_338_local_process_entrypoint_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonBefore from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 338 -- "Local Process Entry-Point Review":
@@ -36,7 +37,7 @@ describe("Secure Runtime Alpha 338 -- Local Process Entry-Point Review", () => {
 
   it("5. Regression: package.json dependency count remains unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonBefore);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. the design doc names all five unresolved requirements a future entry-point Stage must fix first", () => {

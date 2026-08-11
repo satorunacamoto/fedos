@@ -4,35 +4,36 @@ import designDocSource from "../docs/secure_runtime_alpha_250_inbound_validation
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRelaySource from "../src/desktop/fedos_relay.ts?raw";
+import fedosRelaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullRelaySource from "../src/desktop/null_relay.ts?raw";
+import nullRelaySource from "../src/os/messenger/desktop/null_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyEventSource from "../src/nostr/event.ts?raw";
+import legacyEventSource from "../src/os/messenger/adapters/nostr/protocol/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyNobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import legacyNobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import validatedEventTypeSource from "../src/desktop/fedos_validated_nostr_event.ts?raw";
+import validatedEventTypeSource from "../src/os/messenger/desktop/fedos_validated_nostr_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import idVerifierSource from "../src/desktop/nostr_event_id_verifier.ts?raw";
+import idVerifierSource from "../src/os/messenger/desktop/nostr_event_id_verifier.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sigVerifierSource from "../src/desktop/nostr_signature_verifier.ts?raw";
+import sigVerifierSource from "../src/os/messenger/desktop/nostr_signature_verifier.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import combinedValidatorSource from "../src/desktop/combined_inbound_event_validator.ts?raw";
+import combinedValidatorSource from "../src/os/messenger/desktop/combined_inbound_event_validator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterSource from "../src/desktop/validated_subscription_adapter.ts?raw";
+import adapterSource from "../src/os/messenger/desktop/validated_subscription_adapter.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const RUNTIME_WORKER_DESKTOP_FILES: Record<string, string> = {
   "create_runtime.ts": createRuntimeSource,
@@ -146,7 +147,7 @@ describe("Secure Runtime Alpha 250 -- Inbound Validation Completion", () => {
       expect(packageJsonSource).not.toMatch(new RegExp(`secure_runtime_alpha_${stage}`));
     }
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("10. structural: none of the five Arc-owned files reference src/nostr/* or src/sign/*", () => {

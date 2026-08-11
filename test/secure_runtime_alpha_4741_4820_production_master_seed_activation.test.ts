@@ -27,21 +27,21 @@ import { tmpdir } from "node:os";
 import {
   createElectronMainHostAttestation,
   isFedosProductionDesktopHostAttestation,
-} from "../src/desktop/production_activation/fedos_production_desktop_host_attestation.js";
+} from "../src/os/messenger/desktop/production_activation/fedos_production_desktop_host_attestation.js";
 import {
   authorizeAndActivateFedosProductionDesktopMasterSeed,
   FEDOS_PRODUCTION_ARTIFACT_DIR,
-} from "../src/desktop/production_activation/fedos_production_desktop_crypto_activation_authority.js";
-import { activateFedosProductionProfileMasterSeed } from "../src/desktop/production_activation/fedos_production_profile_activation.js";
-import { FedosProductionMasterSeedAuthority } from "../src/desktop/production_activation/fedos_production_master_seed_authority.js";
+} from "../src/os/messenger/desktop/production_activation/fedos_production_desktop_crypto_activation_authority.js";
+import { activateFedosProductionProfileMasterSeed } from "../src/os/messenger/desktop/production_activation/fedos_production_profile_activation.js";
+import { FedosProductionMasterSeedAuthority } from "../src/os/messenger/desktop/production_activation/fedos_production_master_seed_authority.js";
 import {
   planFedosLocalProfilePaths,
   ensureFedosLocalProfileDirectories,
-} from "../src/desktop/onboarding/fedos_local_profile_paths.js";
-import { FileFedosLocalProfilePersistence } from "../src/desktop/onboarding/fedos_local_profile_persistence.js";
-import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.js";
-import { FedosProfileInitializationCoordinator } from "../src/desktop/onboarding/fedos_profile_initialization_coordinator.js";
-import { FedosProfileUnlockSecret } from "../src/desktop/onboarding/fedos_profile_unlock_secret.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_local_profile_paths.js";
+import { FileFedosLocalProfilePersistence } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_persistence.js";
+import { FileFedosSealedMasterSeedEnvelopePersistence } from "../src/os/core/vault/wasm/fedos_sealed_master_seed_envelope_persistence.js";
+import { FedosProfileInitializationCoordinator } from "../src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.js";
+import { FedosProfileUnlockSecret } from "../src/os/messenger/desktop/onboarding/fedos_profile_unlock_secret.js";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 
 declare const process: { cwd(): string };

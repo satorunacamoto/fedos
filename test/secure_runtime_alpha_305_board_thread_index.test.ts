@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_305_board_thread_index.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardIndexSource from "../src/board/repository/fedos_board_index.ts?raw";
-import { FedosBoardIndex } from "../src/board/repository/fedos_board_index.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import boardIndexSource from "../src/os/messenger/board/repository/fedos_board_index.ts?raw";
+import { FedosBoardIndex } from "../src/os/messenger/board/repository/fedos_board_index.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 function codeOnly(source: string): string {
   return source

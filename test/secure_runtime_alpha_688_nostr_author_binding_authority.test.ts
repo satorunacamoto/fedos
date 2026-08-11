@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { FedosSigningAuthorityNostrAuthorBinding } from "../src/board/runtime/identity/fedos_nostr_author_binding_authority.js";
-import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosNostrSigningPublicIdentity } from "../src/nostr/sign/fedos_nostr_signing_public_identity.js";
-import type { FedosBoardAuthorReference } from "../src/board/fedos_board_author.js";
+import { FedosSigningAuthorityNostrAuthorBinding } from "../src/os/messenger/board/runtime/identity/fedos_nostr_author_binding_authority.js";
+import type { FedosNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrSigningPublicIdentity } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_public_identity.js";
+import type { FedosBoardAuthorReference } from "../src/os/messenger/board/fedos_board_author.js";
 
 /** Deterministic, exactly-64-hex-char test fixture -- pads `seed` with itself until long enough, then truncates. */
 function fixtureHex(seed: string): string {

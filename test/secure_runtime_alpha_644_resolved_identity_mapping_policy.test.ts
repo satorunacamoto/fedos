@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { NostrPublicIdentityReader } from "../src/desktop/nostr_public_identity_reader.js";
-import { StaticNostrPublicIdentitySource } from "../src/desktop/static_nostr_public_identity_source.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { FedosDesktopPublicAuthorAuthority } from "../src/board/runtime/identity/fedos_desktop_public_author_authority.js";
-import type { FedosPublicIdentityReader } from "../src/desktop/fedos_public_identity_reader.js";
-import type { FedosIdentityDescriptor } from "../src/identity/fedos_identity_descriptor.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { NostrPublicIdentityReader } from "../src/os/messenger/desktop/nostr_public_identity_reader.js";
+import { StaticNostrPublicIdentitySource } from "../src/os/messenger/desktop/static_nostr_public_identity_source.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { FedosDesktopPublicAuthorAuthority } from "../src/os/messenger/board/runtime/identity/fedos_desktop_public_author_authority.js";
+import type { FedosPublicIdentityReader } from "../src/os/messenger/desktop/fedos_public_identity_reader.js";
+import type { FedosIdentityDescriptor } from "../src/os/core/identity/fedos_identity_descriptor.js";
 
 function fixedDescriptorReader(descriptor: FedosIdentityDescriptor): FedosPublicIdentityReader {
   return { readPublicIdentity: async () => descriptor };

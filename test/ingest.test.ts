@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { ingestRawEvents, dedupeById } from "../src/ingest/ingest.js";
+import { ingestRawEvents, dedupeById } from "../src/os/_legacy_prototype/ingest/ingest.js";
 import {
   InMemoryRelayAdapter,
   eventMatchesFilter,
-} from "../src/nostr/relay.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+} from "../src/os/messenger/adapters/nostr/protocol/relay.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 const HEX64 = "a".repeat(64);
 const HEX128 = "b".repeat(128);

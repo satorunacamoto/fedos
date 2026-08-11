@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { MeshKVBrowserClient } from "../src/asset/meshkv_browser_client.js";
-import type { MeshKVClient } from "../src/asset/meshkv_asset_cache.js";
+import { MeshKVBrowserClient } from "../src/os/_legacy_prototype/asset/meshkv_browser_client.js";
+import type { MeshKVClient } from "../src/os/_legacy_prototype/asset/meshkv_asset_cache.js";
 import { MeshKV, createMeshKV } from "../packages/meshkv/src/index.js";
 import type {
   MeshKVApi,
   MeshKVData,
   MeshKVInitOptions,
 } from "../packages/meshkv/src/index.js";
-import type { AssetMetadata } from "../src/asset/types.js";
+import type { AssetMetadata } from "../src/os/_legacy_prototype/asset/types.js";
 // Runtime / Worker sources as strings: prove the adapter is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 
 function bytes(text: string): ArrayBuffer {
   return new TextEncoder().encode(text).buffer;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NoopChatProvider } from "../src/chat/noop_chat.js";
-import { CHAT_PROVIDER_KINDS } from "../src/chat/types.js";
+import { NoopChatProvider } from "../src/os/_legacy_prototype/chat/noop_chat.js";
+import { CHAT_PROVIDER_KINDS } from "../src/os/_legacy_prototype/chat/types.js";
 import type {
   ChatFetchDecision,
   ChatFetchRequest,
@@ -9,18 +9,18 @@ import type {
   ChatProviderStatus,
   ChatSendDecision,
   ChatSendRequest,
-} from "../src/chat/types.js";
-import { createRuntime, selectChatProvider } from "../src/runtime/create_runtime.js";
+} from "../src/os/_legacy_prototype/chat/types.js";
+import { createRuntime, selectChatProvider } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import chatTypesSource from "../src/chat/types.ts?raw";
+import chatTypesSource from "../src/os/_legacy_prototype/chat/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopChatSource from "../src/chat/noop_chat.ts?raw";
+import noopChatSource from "../src/os/_legacy_prototype/chat/noop_chat.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const chatProviderSources = [chatTypesSource, noopChatSource].join("\n");
 const runtimeSources = [runtimeSource, runtimeTypesSource].join("\n");

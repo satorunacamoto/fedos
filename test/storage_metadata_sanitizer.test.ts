@@ -3,11 +3,11 @@ import {
   isLocationDerivedValue,
   isSensitiveStorageValue,
   sanitizeStorageMetadata,
-} from "../src/storage/policy.js";
+} from "../src/os/core/storage/policy.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storagePolicySource from "../src/storage/policy.ts?raw";
+import storagePolicySource from "../src/os/core/storage/policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopStorageSource from "../src/storage/noop_storage.ts?raw";
+import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 
 describe("sanitizeStorageMetadata", () => {
   it("1. keeps non-sensitive, non-location metadata unchanged", () => {

@@ -23,12 +23,12 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { FedosWasmMasterSeedAuthority } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import { FedosWasmLoaderSkeleton } from "../src/runtime/fedos_wasm_loader.js";
 import {
   FedosDirectRatchetCryptographicSession,
   type FedosDirectRatchetSealedState,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_cryptographic_session.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_cryptographic_session.js";
 
 declare const process: { cwd(): string; env: { NODE_ENV?: string; [key: string]: string | undefined } };
 

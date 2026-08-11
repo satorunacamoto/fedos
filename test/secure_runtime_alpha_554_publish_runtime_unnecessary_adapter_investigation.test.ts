@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { FedosBoardServiceReader } from "../src/board/repository/fedos_board_reader.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { nostrWireEventToFedosEventDescriptor } from "../src/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
+import { FedosBoardServiceReader } from "../src/os/messenger/board/repository/fedos_board_reader.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { nostrWireEventToFedosEventDescriptor } from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 
 /**
  * Secure Runtime Alpha 554 -- "Unnecessary Adapter Investigation":

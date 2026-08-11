@@ -3,23 +3,23 @@ import {
   enqueuePlaceholder,
   dequeuePlaceholder,
   isSensitiveOutboundQueueValue,
-} from "../src/federation/outbound_queue.js";
-import type { OutboundQueueItemDescriptor } from "../src/federation/outbound_queue.js";
+} from "../src/os/_legacy_prototype/federation/outbound_queue.js";
+import type { OutboundQueueItemDescriptor } from "../src/os/_legacy_prototype/federation/outbound_queue.js";
 import {
   renderCreatorAnalyticsPreview,
   renderCreatorAnalyticsPreviewPage,
   SAMPLE_CREATOR_ANALYTICS,
-} from "../src/render/creator_analytics_preview.js";
+} from "../src/os/_legacy_prototype/render/creator_analytics_preview.js";
 import {
   handleRequest,
   isCreatorAnalyticsPreviewEnabled,
-} from "../src/worker.js";
+} from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboundQueueSource from "../src/federation/outbound_queue.ts?raw";
+import outboundQueueSource from "../src/os/_legacy_prototype/federation/outbound_queue.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import analyticsPreviewSource from "../src/render/creator_analytics_preview.ts?raw";
+import analyticsPreviewSource from "../src/os/_legacy_prototype/render/creator_analytics_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const boundarySources = [outboundQueueSource, analyticsPreviewSource].join("\n");
 

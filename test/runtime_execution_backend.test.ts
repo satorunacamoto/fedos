@@ -21,9 +21,9 @@ import invocationAdapterSource from "../src/runtime/fedos_rust_invocation_adapte
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmBoundarySource from "../src/runtime/fedos_wasm_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -31,6 +31,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 401–408 — "FedOS Execution Backend Architecture": FedOS Core
@@ -217,7 +218,7 @@ describe("FedOS Execution Backend, not connected, fail-closed everywhere (Stage 
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
 
     const pubFnNames = [...libRsSource.matchAll(/^\s*pub\s+fn\s+([a-zA-Z0-9_]+)/gm)].map((m: RegExpMatchArray) => m[1]);
     expect(pubFnNames.length).toBe(69);  });

@@ -31,32 +31,32 @@ import {
   FEDOS_SETTINGS_MAX_RELAY_COUNT,
   FEDOS_SETTINGS_MAX_AUTO_LOCK_TIMEOUT_MINUTES,
   type FedosSettingsDescriptorV1,
-} from "../src/settings/fedos_settings_descriptor.js";
+} from "../src/os/core/settings/fedos_settings_descriptor.js";
 import {
   fedosSettingsValidationErrors,
   isWellFormedFedosSettingsDescriptorV1,
   isValidFedosRelayUrl,
-} from "../src/settings/fedos_settings_validator.js";
+} from "../src/os/core/settings/fedos_settings_validator.js";
 import {
   encodeFedosSettingsDescriptorV1,
   decodeFedosSettingsDescriptorV1,
   fedosSettingsDescriptorsIdentical,
-} from "../src/settings/fedos_settings_codec.js";
+} from "../src/os/core/settings/fedos_settings_codec.js";
 import {
   FileFedosSettingsPersistence,
   InMemoryFedosSettingsPersistence,
   FedosSettingsCorruptError,
-} from "../src/settings/fedos_settings_persistence.js";
-import { FedosSettingsAuthority } from "../src/settings/fedos_settings_authority.js";
+} from "../src/os/core/settings/fedos_settings_persistence.js";
+import { FedosSettingsAuthority } from "../src/os/core/settings/fedos_settings_authority.js";
 import {
   FedosDesktopSettingsController,
   createFileBackedFedosDesktopSettingsController,
   fedosDesktopSettingsFilePath,
-} from "../src/desktop/settings/fedos_desktop_settings_controller.js";
-import { validateFedosDesktopSettingsHostCommand } from "../src/desktop/settings/fedos_desktop_settings_host_command.js";
-import { createFedosDesktopSettingsHostBridge } from "../src/desktop/settings/fedos_desktop_settings_host_bridge.js";
-import { FedosDesktopSettingsViewModel } from "../src/desktop/presentation/fedos_desktop_settings_view_model.js";
-import { FedosDesktopSettingsRenderer } from "../src/desktop/renderer/fedos_desktop_settings_renderer.js";
+} from "../src/os/messenger/desktop/settings/fedos_desktop_settings_controller.js";
+import { validateFedosDesktopSettingsHostCommand } from "../src/os/messenger/desktop/settings/fedos_desktop_settings_host_command.js";
+import { createFedosDesktopSettingsHostBridge } from "../src/os/messenger/desktop/settings/fedos_desktop_settings_host_bridge.js";
+import { FedosDesktopSettingsViewModel } from "../src/os/messenger/desktop/presentation/fedos_desktop_settings_view_model.js";
+import { FedosDesktopSettingsRenderer } from "../src/os/messenger/desktop/renderer/fedos_desktop_settings_renderer.js";
 import {
   fedosElectronSettingsValidateInvokeRequest,
   fedosElectronSettingsHandleInvoke,

@@ -4,8 +4,8 @@ import {
   createAssetKey,
   isPublicCacheable,
   normalizeAssetMetadata,
-} from "../src/asset/policy.js";
-import type { AssetMetadata } from "../src/asset/types.js";
+} from "../src/os/_legacy_prototype/asset/policy.js";
+import type { AssetMetadata } from "../src/os/_legacy_prototype/asset/types.js";
 
 function meta(overrides: Partial<AssetMetadata> = {}): AssetMetadata {
   return {

@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_223_filter_representation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import filterSource from "../src/desktop/fedos_subscription_filter.ts?raw";
+import filterSource from "../src/os/messenger/desktop/fedos_subscription_filter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import legacyRelaySource from "../src/nostr/relay.ts?raw";
+import legacyRelaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 
 function codeOnly(source: string): string {
   return source

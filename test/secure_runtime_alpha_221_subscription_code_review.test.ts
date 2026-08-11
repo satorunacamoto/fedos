@@ -2,23 +2,24 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_221_subscription_code_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/nostr/relay.ts?raw";
+import relaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import wsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import messagesSource from "../src/nostr/messages.ts?raw";
+import messagesSource from "../src/os/messenger/adapters/nostr/protocol/messages.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRelaySource from "../src/desktop/fedos_relay.ts?raw";
+import fedosRelaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 221 -- "Existing Subscription Code Review":
@@ -94,6 +95,6 @@ describe("Secure Runtime Alpha 221 -- Existing Subscription Code Review", () => 
 
   it("11. Regression: package.json dependency count remains unchanged at 2 -- no new Cargo/npm dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

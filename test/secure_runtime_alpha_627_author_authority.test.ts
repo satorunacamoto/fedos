@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import type { FedosPublicIdentityReader } from "../src/desktop/fedos_public_identity_reader.js";
-import type { FedosIdentityDescriptor } from "../src/identity/fedos_identity_descriptor.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import type { FedosPublicIdentityReader } from "../src/os/messenger/desktop/fedos_public_identity_reader.js";
+import type { FedosIdentityDescriptor } from "../src/os/core/identity/fedos_identity_descriptor.js";
 import {
   FEDOS_BOARD_RUNTIME_ANONYMOUS_LOCAL_AUTHOR_PUBLIC_IDENTIFIER,
   anonymousLocalAuthorReference,
   resolvePublicAuthorReference,
-} from "../src/board/runtime/fedos_board_runtime_author_authority.js";
+} from "../src/os/messenger/board/runtime/fedos_board_runtime_author_authority.js";
 
 function readerResolvingTo(descriptor: FedosIdentityDescriptor | null): FedosPublicIdentityReader {
   return { readPublicIdentity: async () => descriptor };

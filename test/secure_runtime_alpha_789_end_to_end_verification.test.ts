@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { validateFedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference_validator.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationCapabilityAuthority } from "../src/conversation/capability/in_memory_fedos_conversation_capability_authority.js";
-import { toFedosConversationCapabilityBearerSecret } from "../src/conversation/capability/fedos_conversation_capability_bearer_secret.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { validateFedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference_validator.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationCapabilityAuthority } from "../src/os/messenger/conversations/capability/in_memory_fedos_conversation_capability_authority.js";
+import { toFedosConversationCapabilityBearerSecret } from "../src/os/messenger/conversations/capability/fedos_conversation_capability_bearer_secret.js";
 
 /**
  * Secure Runtime Alpha 774 ("Phase A Verification") + Alpha 789 ("End-

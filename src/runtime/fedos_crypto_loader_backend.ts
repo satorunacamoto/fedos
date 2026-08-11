@@ -94,6 +94,14 @@
  */
 
 import { createCryptoBackendInterface } from "./fedos_crypto_backend_interface.js";
+import type { FedosCryptoLoaderBackendKind } from "./fedos_crypto_loader_backend_kind.js";
+
+// Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+// reduction — `FedosCryptoLoaderBackendKind` now lives in the dedicated
+// `./fedos_crypto_loader_backend_kind.ts` (see that file's own header for
+// why); re-exported here, unchanged in shape, so this file's own existing
+// consumer (`runtime_crypto_diagnostics.ts`) needed zero call-site changes.
+export type { FedosCryptoLoaderBackendKind };
 
 /**
  * The Backend Abstraction's own coarse state. `"PlanningOnly"` is the
@@ -101,22 +109,6 @@ import { createCryptoBackendInterface } from "./fedos_crypto_backend_interface.j
  * RESERVED, unreachable from this file.
  */
 export type FedosCryptoLoaderBackendState = "PlanningOnly" | "Active";
-
-/**
- * Every backend candidate this Abstraction currently names.
- * `"WasmPlanned"` is the ONLY value `createCryptoLoaderBackend()`
- * ever produces in this stage — the first implementation candidate,
- * mirroring `fedos_execution_backend.ts`'s own WASM-first selection.
- * `"NativePlanned"` names a future native/desktop/mobile candidate;
- * `"PythonPlanned"` names a future experimentation/analysis-layer
- * candidate. None of the three is connected to anything — naming a
- * candidate here is a label of intent, not a working or reachable
- * backend.
- */
-export type FedosCryptoLoaderBackendKind =
-  | "WasmPlanned"
-  | "NativePlanned"
-  | "PythonPlanned";
 
 /**
  * Every reason `createCryptoLoaderBackend()` can name.

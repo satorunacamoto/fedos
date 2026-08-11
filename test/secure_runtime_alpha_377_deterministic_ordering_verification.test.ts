@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_377_deterministic_ordering_verification.md?raw";
 
-import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { FedosBoardFeed } from "../src/board/repository/fedos_board_feed.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId, FedosThreadId } from "../src/board/fedos_board_identifiers.js";
+import { FedosBoardQuery } from "../src/os/messenger/board/query/fedos_board_query.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { FedosBoardFeed } from "../src/os/messenger/board/repository/fedos_board_feed.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId, FedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 function root(id: string, protocol: string, createdAt: number): FedosBoardPostInput {
   return {

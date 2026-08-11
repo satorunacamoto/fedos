@@ -2,24 +2,24 @@ import { describe, it, expect } from "vitest";
 import {
   NoopPasskeyBoundary,
   PlaceholderPasskeyBoundary,
-} from "../src/identity/passkey_boundary.js";
+} from "../src/os/core/identity/passkey_boundary.js";
 import {
   PASSKEY_CAPABILITIES,
   type PasskeyAuthenticationRequest,
-} from "../src/identity/types.js";
-import { passkeyAuthenticationToVaultRequest } from "../src/identity/vault_bridge.js";
+} from "../src/os/core/identity/types.js";
+import { passkeyAuthenticationToVaultRequest } from "../src/os/core/identity/vault_bridge.js";
 // Identity sources as strings: prove no crypto import and a type-only vault import.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identityTypesSource from "../src/identity/types.ts?raw";
+import identityTypesSource from "../src/os/core/identity/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import passkeyBoundarySource from "../src/identity/passkey_boundary.ts?raw";
+import passkeyBoundarySource from "../src/os/core/identity/passkey_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identityVaultBridgeSource from "../src/identity/vault_bridge.ts?raw";
+import identityVaultBridgeSource from "../src/os/core/identity/vault_bridge.ts?raw";
 // Runtime / Worker sources: prove the identity layer is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const identitySources = [
   identityTypesSource,

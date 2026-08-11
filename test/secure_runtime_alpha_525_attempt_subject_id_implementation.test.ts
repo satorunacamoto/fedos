@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   makeFedosDeliveryAttemptSubjectId,
   parseFedosDeliveryAttemptSubjectId,
-} from "../src/board/observation/fedos_delivery_attempt_subject_id.js";
-import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_attempt_subject_id.js";
+import { toFedosDeliveryObservationSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
 
 describe("Secure Runtime Alpha 525 -- Attempt Subject ID Implementation", () => {
   it("is deterministic: the same pair always yields the same id", () => {

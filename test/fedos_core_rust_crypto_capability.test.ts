@@ -12,9 +12,9 @@ import capabilityMatrixSource from "../packages/fedos-core-rust/src/crypto/capab
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import diagnosticsSource from "../packages/fedos-core-rust/src/crypto/diagnostics.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Stage 150–151 — crypto capability matrix + diagnostics preview.

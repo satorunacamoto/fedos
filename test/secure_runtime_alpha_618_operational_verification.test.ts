@@ -5,9 +5,9 @@ import { mkdtempSync, rmSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import type { FedosBoardOutboxPublisher, FedosBoardOutboxPublishResult } from "../src/board/outbox/fedos_board_outbox_publisher.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosBoardOutboxPublisher, FedosBoardOutboxPublishResult } from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
 
 /**
  * Secure Runtime Alpha 618 -- "Operational Verification": Stage 18 of
@@ -153,11 +153,11 @@ describe("Secure Runtime Alpha 618 -- Operational Verification", () => {
 
   it("p2p/ untouched -- no file under this Arc's own runtime module IMPORTS from p2p/ (a doc comment naming the prohibition is not a reference)", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const assembly = (await import("../src/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
+    const assembly = (await import("../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const config = (await import("../src/desktop/runtime/fedos_desktop_runtime_config.ts?raw")).default as string;
+    const config = (await import("../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.ts?raw")).default as string;
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const main = (await import("../src/desktop/runtime/run_fedos_desktop_runtime.ts?raw")).default as string;
+    const main = (await import("../src/os/messenger/desktop/runtime/run_fedos_desktop_runtime.ts?raw")).default as string;
     for (const source of [assembly, config, main]) {
       const codeOnly = source
         .split("\n")

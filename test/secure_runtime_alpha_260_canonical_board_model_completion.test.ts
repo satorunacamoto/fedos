@@ -4,15 +4,16 @@ import designDocSource from "../docs/secure_runtime_alpha_260_canonical_board_mo
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
-import * as identifiers from "../src/board/fedos_board_identifiers.js";
-import * as source from "../src/board/fedos_board_source.js";
-import * as author from "../src/board/fedos_board_author.js";
-import * as post from "../src/board/fedos_board_post.js";
-import * as validator from "../src/board/fedos_board_post_validator.js";
-import * as moderation from "../src/board/fedos_board_moderation.js";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
+import * as identifiers from "../src/os/messenger/board/fedos_board_identifiers.js";
+import * as source from "../src/os/messenger/board/fedos_board_source.js";
+import * as author from "../src/os/messenger/board/fedos_board_author.js";
+import * as post from "../src/os/messenger/board/fedos_board_post.js";
+import * as validator from "../src/os/messenger/board/fedos_board_post_validator.js";
+import * as moderation from "../src/os/messenger/board/fedos_board_moderation.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 260 -- "Canonical Board Model Completion":
@@ -67,7 +68,7 @@ describe("Secure Runtime Alpha 260 -- Canonical Board Model Completion", () => {
 
   it("6. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("7. Regression: the frozen Relay/WebSocket transport layer carries zero reference to src/board/", () => {

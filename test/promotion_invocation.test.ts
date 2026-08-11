@@ -1,19 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { invokePromotionProviderPreview } from "../src/promotion/invocation.js";
+import { invokePromotionProviderPreview } from "../src/os/_legacy_prototype/promotion/invocation.js";
 import type {
   PromotionInvocationOptions,
-} from "../src/promotion/invocation.js";
-import { MockPromotionProvider } from "../src/promotion/adapter.js";
-import type { PromotionProvider } from "../src/promotion/adapter.js";
-import { renderMockPromotionPreview, renderPromotionDecisionPreview } from "../src/render/promotion.js";
-import { buildPromotionRequest, resolvePlacement } from "../src/promotion/policy.js";
-import type { PromotionDecision, PromotionRequest } from "../src/promotion/types.js";
+} from "../src/os/_legacy_prototype/promotion/invocation.js";
+import { MockPromotionProvider } from "../src/os/_legacy_prototype/promotion/adapter.js";
+import type { PromotionProvider } from "../src/os/_legacy_prototype/promotion/adapter.js";
+import { renderMockPromotionPreview, renderPromotionDecisionPreview } from "../src/os/_legacy_prototype/render/promotion.js";
+import { buildPromotionRequest, resolvePlacement } from "../src/os/_legacy_prototype/promotion/policy.js";
+import type { PromotionDecision, PromotionRequest } from "../src/os/_legacy_prototype/promotion/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import invocationSource from "../src/promotion/invocation.ts?raw";
+import invocationSource from "../src/os/_legacy_prototype/promotion/invocation.ts?raw";
 
 function request(overrides: Partial<PromotionRequest> = {}): PromotionRequest {
   return buildPromotionRequest(resolvePlacement("product_sidebar"), overrides);

@@ -10,39 +10,40 @@ import alpha113DocSource from "../docs/secure_runtime_alpha_113_identity_flow_re
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import alpha114DocSource from "../docs/secure_runtime_alpha_114_single_source_of_truth_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrIdentityProviderSource from "../src/identity/fedos_nostr_identity_provider.ts?raw";
+import nostrIdentityProviderSource from "../src/os/core/identity/fedos_nostr_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublicIdentityReaderSource from "../src/desktop/nostr_public_identity_reader.ts?raw";
+import nostrPublicIdentityReaderSource from "../src/os/messenger/desktop/nostr_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import serviceSource from "../src/identity/fedos_identity_service.ts?raw";
+import serviceSource from "../src/os/core/identity/fedos_identity_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import registrySource from "../src/identity/fedos_identity_registry.ts?raw";
+import registrySource from "../src/os/core/identity/fedos_identity_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import resolverClassSource from "../src/identity/fedos_identity_resolver.ts?raw";
+import resolverClassSource from "../src/os/core/identity/fedos_identity_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identityProviderResolverSource from "../src/identity/fedos_identity_provider_resolver.ts?raw";
+import identityProviderResolverSource from "../src/os/core/identity/fedos_identity_provider_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageResolverSource from "../src/runtime/fedos_runtime_storage_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageBackendSource from "../src/runtime/fedos_runtime_storage_backend.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const ARC_STAGES = ["111", "112", "113", "114", "115"];
 
@@ -184,7 +185,7 @@ describe("Secure Runtime Alpha 115 -- Identity Authority Completion", () => {
 
   it("14. Regression: package.json still declares exactly two dependencies and no bin field, unaffected by this Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_451_existing_publisher_boundary_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import signingAuthoritySource from "../src/nostr/sign/fedos_nostr_signing_authority.ts?raw";
+import signingAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmSigningAuthoritySource from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.ts?raw";
+import wasmSigningAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.ts?raw";
 
 describe("Secure Runtime Alpha 451 -- Existing Publisher Boundary Inventory", () => {
   it("the doc is substantial and names the gap this Arc resolves", () => {

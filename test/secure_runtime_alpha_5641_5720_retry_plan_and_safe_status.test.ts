@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   planFedosDeletionRequestRetry,
   FEDOS_DELETION_REQUEST_MAX_RETRY_ATTEMPTS,
-} from "../src/conversation/deletion_request/fedos_deletion_request_retry_plan.js";
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_retry_plan.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
 import {
   safeStatusForFedosDeletionRequestLifecycle,
   safeStatusForFedosDeletionAcknowledgementOutcome,
   buildFedosDeletionRequestAggregateStatusView,
-} from "../src/conversation/deletion_request/fedos_deletion_request_safe_status.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_safe_status.js";
 
 /** Secure Runtime Alpha 5641-5720 -- expiry/retry planner and safe status/aggregation DTOs. */
 

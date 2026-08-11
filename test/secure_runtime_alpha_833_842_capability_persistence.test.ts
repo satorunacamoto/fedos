@@ -5,34 +5,34 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { validateFedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference_validator.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { PersistedFedosConversationMembershipAuthority } from "../src/conversation/membership/persistence/persisted_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationMembershipPersistence } from "../src/conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { validateFedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference_validator.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { PersistedFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/persistence/persisted_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../src/os/messenger/conversations/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
 import {
   toFedosConversationCapabilityBearerSecret,
   fedosConversationCapabilityBearerSecretsMatch,
   type FedosConversationCapabilityBearerSecret,
-} from "../src/conversation/capability/fedos_conversation_capability_bearer_secret.js";
+} from "../src/os/messenger/conversations/capability/fedos_conversation_capability_bearer_secret.js";
 import {
   createFedosConversationCapabilityBearerVerifier,
   fedosConversationCapabilityBearerVerifierMatches,
-} from "../src/conversation/capability/persistence/fedos_conversation_capability_bearer_verifier.js";
+} from "../src/os/messenger/conversations/capability/persistence/fedos_conversation_capability_bearer_verifier.js";
 import {
   serializeFedosConversationCapabilityIssuedEvent,
   deserializeFedosConversationCapabilityIssuedEvent,
   serializeFedosConversationCapabilityRedeemedEvent,
   deserializeFedosConversationCapabilityRedeemedEvent,
-} from "../src/conversation/capability/persistence/fedos_conversation_capability_codec.js";
-import { InMemoryFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
-import { AppendOnlyFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
-import { PersistedFedosConversationCapabilityAuthority } from "../src/conversation/capability/persistence/persisted_fedos_conversation_capability_authority.js";
-import type { FedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/fedos_conversation_capability_persistence.js";
-import type { FedosConversationCapabilityIdGenerator } from "../src/conversation/capability/in_memory_fedos_conversation_capability_authority.js";
-import type { FedosConversationCapabilitySecretGenerator } from "../src/conversation/capability/fedos_conversation_capability_bearer_secret.js";
-import type { FedosConversationMembershipAuthority } from "../src/conversation/membership/fedos_conversation_membership_authority.js";
+} from "../src/os/messenger/conversations/capability/persistence/fedos_conversation_capability_codec.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { AppendOnlyFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
+import { PersistedFedosConversationCapabilityAuthority } from "../src/os/messenger/conversations/capability/persistence/persisted_fedos_conversation_capability_authority.js";
+import type { FedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/fedos_conversation_capability_persistence.js";
+import type { FedosConversationCapabilityIdGenerator } from "../src/os/messenger/conversations/capability/in_memory_fedos_conversation_capability_authority.js";
+import type { FedosConversationCapabilitySecretGenerator } from "../src/os/messenger/conversations/capability/fedos_conversation_capability_bearer_secret.js";
+import type { FedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/fedos_conversation_membership_authority.js";
 
 const conversationId = toFedosConversationId(toFedosBoardId("board-a")!, toFedosThreadId("thread-a")!);
 const alice = validateFedosConversationParticipantReference({ authority: "nostr", publicIdentifier: "npub1alice", identityId: null })!;

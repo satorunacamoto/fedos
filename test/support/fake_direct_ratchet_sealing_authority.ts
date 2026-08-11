@@ -17,7 +17,7 @@
  * fails closed" and "tamper fails closed" behavior without touching any
  * real cryptographic primitive.
  */
-import type { FedosDirectRatchetSealingAuthority } from "../../src/conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
+import type { FedosDirectRatchetSealingAuthority } from "../../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_sealing_authority.js";
 
 function fnv1aHash(input: string): number {
   let hash = 0x811c9dc5;

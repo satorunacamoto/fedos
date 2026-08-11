@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_315_board_persistence_port.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import portSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
-import { fedosPersistedBoardPostRecordsAreEqual } from "../src/board/persistence/fedos_board_persistence.js";
-import type { FedosPersistedBoardPostRecordV1 } from "../src/board/persistence/fedos_persisted_board_post_v1.js";
+import portSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
+import { fedosPersistedBoardPostRecordsAreEqual } from "../src/os/messenger/board/persistence/fedos_board_persistence.js";
+import type { FedosPersistedBoardPostRecordV1 } from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.js";
 
 function codeOnly(source: string): string {
   return source

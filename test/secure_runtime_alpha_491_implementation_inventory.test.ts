@@ -2,15 +2,15 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_491_implementation_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxPublisherSource from "../src/board/outbox/fedos_board_outbox_publisher.ts?raw";
+import outboxPublisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublisherSource from "../src/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
+import nostrPublisherSource from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxObservationSource from "../src/board/outbox/fedos_board_outbox_observation.ts?raw";
+import outboxObservationSource from "../src/os/messenger/board/outbox/fedos_board_outbox_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deliveryObservationSource from "../src/board/observation/fedos_delivery_observation.ts?raw";
+import deliveryObservationSource from "../src/os/messenger/board/observation/fedos_delivery_observation.ts?raw";
 
 function codeOnly(source: string): string {
   return source

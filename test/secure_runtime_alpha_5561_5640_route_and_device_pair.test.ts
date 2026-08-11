@@ -8,18 +8,18 @@
  * ports).
  */
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
-import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/conversation/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
-import { FedosDirectRatchetStateRuntime } from "../src/conversation/ratchet/fedos_direct_ratchet_state_runtime.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";
+import { InMemoryFedosSealedDirectRatchetSecretPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_sealed_direct_ratchet_secret_persistence.js";
+import { FedosDirectRatchetStateRuntime } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_state_runtime.js";
 import {
   resolveFedosDirectRatchetDevicePair,
   findCurrentFedosDirectRatchetSession,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_device_pair_resolver.js";
-import { resolveFedosDirectRatchetRoute } from "../src/conversation/ratchet/fedos_direct_ratchet_route_resolution.js";
-import type { FedosDirectRatchetSealingAuthority } from "../src/conversation/ratchet/fedos_direct_ratchet_sealing_authority.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_device_pair_resolver.js";
+import { resolveFedosDirectRatchetRoute } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_route_resolution.js";
+import type { FedosDirectRatchetSealingAuthority } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_sealing_authority.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 
 /** Fake — only readiness/route-resolution policy is under test here, never real cryptography (see the Foundation Arc's own identical fake-sealing-authority-injection test pattern). */
 const FAKE_SEALING_AUTHORITY: FedosDirectRatchetSealingAuthority = {

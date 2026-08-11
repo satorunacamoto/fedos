@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync, readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import cryptoTypesSource from "../../../src/crypto/types.ts?raw";
+import cryptoTypesSource from "../../../src/os/core/crypto/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopCryptoSource from "../../../src/crypto/noop_crypto.ts?raw";
+import noopCryptoSource from "../../../src/os/core/crypto/noop_crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import coreAdapterSource from "../../../src/crypto/fedos_core_adapter.ts?raw";
+import coreAdapterSource from "../../../src/os/core/crypto/fedos_core_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeCryptoProviderSource from "../../../src/runtime/crypto_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -18,17 +18,18 @@ import runtimeDecryptSource from "../../../src/runtime/fedos_runtime_decrypt.ts?
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import ciphertextStorageSource from "../../../src/runtime/fedos_runtime_ciphertext_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageTypesSource from "../../../src/storage/types.ts?raw";
+import storageTypesSource from "../../../src/os/core/storage/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storagePolicySource from "../../../src/storage/policy.ts?raw";
+import storagePolicySource from "../../../src/os/core/storage/policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptedPayloadSource from "../../../src/storage/encrypted_payload.ts?raw";
+import encryptedPayloadSource from "../../../src/os/core/storage/encrypted_payload.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import chatTypesSource from "../../../src/chat/types.ts?raw";
+import chatTypesSource from "../../../src/os/_legacy_prototype/chat/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import masterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_master_seed_authority.ts?raw";
+import masterSeedAuthoritySource from "../../../src/os/core/vault/wasm/fedos_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Private Message Envelope and Encryption Activation V1 review --
@@ -221,6 +222,6 @@ describe("Private Message Envelope V1 review -- source alignment (master reality
 
   it("22. package.json still carries exactly two production dependencies -- no new dependency introduced by this review", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 });

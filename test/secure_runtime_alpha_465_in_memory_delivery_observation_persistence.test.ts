@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/board/observation/fedos_delivery_observation_codec.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import type { FedosPersistedDeliveryObservationRecordV1 } from "../src/os/messenger/board/observation/fedos_delivery_observation_codec.js";
 
 /**
  * Secure Runtime Alpha 465 -- "In-Memory Delivery Observation Persistence

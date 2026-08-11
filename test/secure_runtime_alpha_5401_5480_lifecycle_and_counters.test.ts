@@ -8,13 +8,13 @@ import {
   isFedosDirectRatchetSessionLifecycleTransitionAllowed,
   isFedosDirectRatchetSessionLifecycleTerminal,
   FEDOS_DIRECT_RATCHET_SESSION_LIFECYCLE_STATES,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_session_lifecycle.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_lifecycle.js";
 import {
   advanceFedosDirectRatchetCounters,
   isWellFormedFedosDirectRatchetCounters,
   FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_counters.js";
-import { FEDOS_DIRECT_RATCHET_LIMITS } from "../src/conversation/ratchet/fedos_direct_ratchet_limits.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_counters.js";
+import { FEDOS_DIRECT_RATCHET_LIMITS } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_limits.js";
 
 describe("Alpha 5401-5480 — session lifecycle", () => {
   it("6. valid transitions: initialized -> active, active -> suspended -> active, active -> revoked", () => {

@@ -4,5 +4,5 @@
     "noEmit": false,
     "outDir": "dist"
   },
-  "include": ["src/desktop/host_boundary/fedos_desktop_host_bridge.ts"]
+  "include": ["src/os/messenger/desktop/host_boundary/fedos_desktop_host_bridge.ts"]
 }

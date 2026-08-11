@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { FedosConversationRelaySet } from "../src/conversation/transport/relay/fedos_conversation_relay_set.js";
-import { FedosDeviceRelaySyncPublisher, FEDOS_DEVICE_RELAY_SYNC_MAX_RELAYS } from "../src/device/relay_sync/fedos_device_relay_sync_publisher.js";
-import { FedosDeviceRelaySyncOutboundCoordinator } from "../src/device/relay_sync/fedos_device_relay_sync_outbound_coordinator.js";
-import { InMemoryFedosDeviceRelaySyncOutboxPersistence } from "../src/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_outbox_persistence.js";
-import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../src/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
-import { queryFedosDeviceRelaySyncStatusForSession } from "../src/device/relay_sync/fedos_device_relay_sync_observation.js";
+import { FedosConversationRelaySet } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
+import { FedosDeviceRelaySyncPublisher, FEDOS_DEVICE_RELAY_SYNC_MAX_RELAYS } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_publisher.js";
+import { FedosDeviceRelaySyncOutboundCoordinator } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_outbound_coordinator.js";
+import { InMemoryFedosDeviceRelaySyncOutboxPersistence } from "../src/os/messenger/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_outbox_persistence.js";
+import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../src/os/messenger/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
+import { queryFedosDeviceRelaySyncStatusForSession } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_observation.js";
 import { FakeDeviceRelaySyncRelay } from "./support/fake_device_relay_sync_relay.js";
 import {
   buildDeviceRelaySyncFixture,
@@ -15,9 +15,9 @@ import {
   DEVICE_RELAY_SYNC_BUILD_FIELDS,
   type DeviceRelaySyncFixture,
 } from "./support/device_relay_sync_test_fixture.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { createFedosDeviceTransferCoordinator } from "../src/device/transfer/fedos_device_transfer_coordinator.js";
-import { InMemoryFedosDeviceTransferSessionPersistence } from "../src/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { createFedosDeviceTransferCoordinator } from "../src/os/messenger/device/transfer/fedos_device_transfer_coordinator.js";
+import { InMemoryFedosDeviceTransferSessionPersistence } from "../src/os/messenger/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
 
 const NOW = 1_900_000_000;
 

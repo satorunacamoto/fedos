@@ -4,17 +4,17 @@ import {
   validateFedosArchiveSuppressionFact,
   fedosArchiveSuppressionFactCanonicalBytes,
   fedosArchiveSuppressionFactId,
-} from "../src/conversation/retention/fedos_archive_suppression_fact.js";
+} from "../src/os/messenger/conversations/retention/fedos_archive_suppression_fact.js";
 import {
   createFedosArchiveSuppressionFactDeviceEvidence,
   verifyFedosArchiveSuppressionFactDeviceEvidence,
-} from "../src/conversation/retention/fedos_archive_suppression_fact_signing.js";
-import { generateFedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { FedosArchiveSuppressionObservationAuthority } from "../src/conversation/retention/fedos_archive_suppression_observation_authority.js";
-import { InMemoryFedosArchiveSuppressionObservationPersistence } from "../src/conversation/retention/in_memory_fedos_archive_suppression_observation_persistence.js";
-import { createAndRecordLocalArchiveSuppressionFact } from "../src/conversation/retention/fedos_archive_suppression_local_bridge.js";
-import type { FedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+} from "../src/os/messenger/conversations/retention/fedos_archive_suppression_fact_signing.js";
+import { generateFedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { FedosArchiveSuppressionObservationAuthority } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_observation_authority.js";
+import { InMemoryFedosArchiveSuppressionObservationPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_archive_suppression_observation_persistence.js";
+import { createAndRecordLocalArchiveSuppressionFact } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_local_bridge.js";
+import type { FedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 const ACCOUNT_REF: FedosDeviceBindingAccountRef = { authority: "nostr", publicIdentifier: "a".repeat(64), identityId: null };
 const SUBJECT = "payload-7721" as unknown as FedosConversationPayloadId;

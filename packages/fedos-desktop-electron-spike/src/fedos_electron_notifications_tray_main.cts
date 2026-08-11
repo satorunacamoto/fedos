@@ -144,26 +144,26 @@ interface RootModules {
 }
 
 async function loadRootModules(): Promise<RootModules> {
-  const presentation = (await import(distUrl("desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.js"))) as {
+  const presentation = (await import(distUrl("os", "messenger", "desktop", "presentation", "fedos_desktop_conversation_ui_presentation_boundary.js"))) as {
     createFedosDesktopConversationUiPresentationBoundary: () => BoundaryLike;
   };
-  const registry = (await import(distUrl("desktop", "navigation", "fedos_desktop_conversation_window_registry.js"))) as {
+  const registry = (await import(distUrl("os", "messenger", "desktop", "navigation", "fedos_desktop_conversation_window_registry.js"))) as {
     FedosDesktopConversationWindowRegistry: RootModules["WindowRegistry"];
   };
   const identity = (await import(distUrl("conversation", "construction", "fedos_conversation_creator_identity_authority.js"))) as {
     StaticFedosConversationCreatorIdentityAuthority: RootModules["StaticCreatorIdentityAuthority"];
   };
-  const notification = (await import(distUrl("desktop", "notification", "fedos_desktop_notification_coordinator.js"))) as {
+  const notification = (await import(distUrl("os", "messenger", "notifications", "fedos_desktop_notification_coordinator.js"))) as {
     FedosDesktopNotificationCoordinator: RootModules["NotificationCoordinator"];
   };
-  const tray = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_coordinator.js"))) as { TrayCoordinator: RootModules["TrayCoordinator"] };
-  const trayTypes = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_types.js"))) as {
+  const tray = (await import(distUrl("os", "messenger", "desktop", "tray", "fedos_desktop_tray_coordinator.js"))) as { TrayCoordinator: RootModules["TrayCoordinator"] };
+  const trayTypes = (await import(distUrl("os", "messenger", "desktop", "tray", "fedos_desktop_tray_types.js"))) as {
     fedosDesktopTrayMenuItems: RootModules["fedosDesktopTrayMenuItems"];
   };
-  const background = (await import(distUrl("desktop", "background", "fedos_desktop_background_lifecycle_coordinator.js"))) as {
+  const background = (await import(distUrl("os", "messenger", "desktop", "background", "fedos_desktop_background_lifecycle_coordinator.js"))) as {
     BackgroundLifecycleCoordinator: RootModules["BackgroundLifecycleCoordinator"];
   };
-  const status = (await import(distUrl("desktop", "presentation", "fedos_desktop_notifications_tray_status_view_model.js"))) as {
+  const status = (await import(distUrl("os", "messenger", "desktop", "presentation", "fedos_desktop_notifications_tray_status_view_model.js"))) as {
     FedosDesktopNotificationsTrayStatusViewModel: RootModules["StatusViewModel"];
   };
   return {

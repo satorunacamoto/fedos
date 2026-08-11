@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosBoardOutboxPersistence } from "../src/board/outbox/in_memory_fedos_board_outbox_persistence.js";
-import { createFedosBoardOutboxIntent, FEDOS_BOARD_OUTBOUND_PROTOCOLS } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardOutboxPublisher, FedosBoardOutboxPublishResult } from "../src/board/outbox/fedos_board_outbox_publisher.js";
-import type { FedosPersistedBoardOutboxRecordV1 } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
-import { FedosValidatingDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_write_validator.js";
-import { FedosDeliveryRetryRegistry } from "../src/board/observation/fedos_delivery_retry_registry.js";
-import { FedosHostDeliveryController } from "../src/desktop/host/fedos_host_delivery_controller.js";
-import { createFedosDeliveryScheduler } from "../src/desktop/host/fedos_delivery_recovery_hydration.js";
+import { InMemoryFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.js";
+import { createFedosBoardOutboxIntent, FEDOS_BOARD_OUTBOUND_PROTOCOLS } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { serializeFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardOutboxPublisher, FedosBoardOutboxPublishResult } from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
+import type { FedosPersistedBoardOutboxRecordV1 } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosDeliveryObservationQuery } from "../src/os/messenger/board/observation/fedos_delivery_observation_query.js";
+import { FedosValidatingDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_write_validator.js";
+import { FedosDeliveryRetryRegistry } from "../src/os/messenger/board/observation/fedos_delivery_retry_registry.js";
+import { FedosHostDeliveryController } from "../src/os/messenger/desktop/host/fedos_host_delivery_controller.js";
+import { createFedosDeliveryScheduler } from "../src/os/messenger/desktop/host/fedos_delivery_recovery_hydration.js";
 
 /**
  * Secure Runtime Alpha 590 -- "Four-Protocol Verification": Stage 10
@@ -117,7 +117,7 @@ describe("Secure Runtime Alpha 590 -- Four-Protocol Verification", () => {
 
   it("hydration never reads target.protocol -- structurally confirmed, not just behaviorally", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const hydrationSource = (await import("../src/desktop/host/fedos_delivery_recovery_hydration.ts?raw")).default as string;
+    const hydrationSource = (await import("../src/os/messenger/desktop/host/fedos_delivery_recovery_hydration.ts?raw")).default as string;
     const codeOnly = hydrationSource
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { handleRequest } from "../src/worker.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
-import type { AppRuntime } from "../src/runtime/types.js";
-import type { PromotionDecision, PromotionRequest } from "../src/promotion/types.js";
-import type { PromotionProvider } from "../src/promotion/adapter.js";
+import { handleRequest } from "../src/os/_legacy_prototype/worker.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { AppRuntime } from "../src/os/_legacy_prototype/runtime/types.js";
+import type { PromotionDecision, PromotionRequest } from "../src/os/_legacy_prototype/promotion/types.js";
+import type { PromotionProvider } from "../src/os/_legacy_prototype/promotion/adapter.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const CANDIDATE = {
   id: "edge-1",

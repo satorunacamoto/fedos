@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hydrationSource from "../src/board/persistence/fedos_board_hydration.ts?raw";
-import { PersistedFedosBoardRepository } from "../src/board/persistence/persisted_fedos_board_repository.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { hydrateFedosBoardService } from "../src/board/persistence/fedos_board_hydration.js";
+import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_hydration.ts?raw";
+import { PersistedFedosBoardRepository } from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { hydrateFedosBoardService } from "../src/os/messenger/board/persistence/fedos_board_hydration.js";
 
 /**
  * Secure Runtime Alpha 555 -- "Unnecessary Repository Investigation":

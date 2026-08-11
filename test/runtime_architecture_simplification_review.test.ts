@@ -14,9 +14,9 @@ import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerDiagnosticsSource from "../src/runtime/worker_crypto_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -93,7 +93,7 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
     const names = Object.keys(files)
       .map((path) => path.split("/").pop() as string)
       .sort();
-    expect(names.length).toBe(57);
+    expect(names.length).toBe(59);
     // Stage 1004 (Secure Runtime Alpha 008) adds a second, separate,
     // later exception -- fedos_runtime_random_bytes.ts -- the Runtime
     // Service for randomBytes(), same reasoning as
@@ -155,6 +155,22 @@ describe("FedOS Runtime Architecture Simplification Review -- review only, no ru
         // own internal Runtime wiring (FedosRuntimeIdentity), held
         // internally by create_runtime.ts and never exposed on AppRuntime.
         "fedos_runtime_identity.ts",
+        // Nostr Consolidation Plan, Step 5 / architecture cycle detector
+        // baseline reduction adds a SIXTEENTH, separate, later exception --
+        // fedos_internal_rust_call_shape.ts, `FedosInternalRustCall`'s own
+        // plain-data shape, extracted out of fedos_internal_rust_call.ts so
+        // fedos_rust_invocation_adapter.ts could depend on the type without
+        // depending on the file that CALLS it (breaking a 2-file type-only
+        // SCC) -- see that file's own header.
+        "fedos_internal_rust_call_shape.ts",
+        // Same pass adds a SEVENTEENTH, separate, later exception --
+        // fedos_crypto_loader_backend_kind.ts, the shared backend-candidate
+        // vocabulary extracted out of fedos_crypto_loader_backend.ts so
+        // fedos_crypto_backend_interface.ts/fedos_crypto_backend_resolver.ts
+        // (both reached BELOW it in the same real call chain) could depend
+        // on the type without depending back on the file that calls them
+        // (breaking a 3-file type-only SCC) -- see that file's own header.
+        "fedos_crypto_loader_backend_kind.ts",
       ].sort(),
     );
 

@@ -19,9 +19,9 @@ import presencePolicyDocSource from "../docs/runtime_generated_artifact_presence
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionContractDocSource from "../docs/runtime_internal_execution_contract.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import presenceSource from "../src/runtime/fedos_generated_artifact_presence.ts?raw";
+import presenceSource from "../src/os/core/vault/wasm/fedos_generated_artifact_presence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readinessSource from "../src/runtime/fedos_wasm_static_import_readiness.ts?raw";
+import readinessSource from "../src/os/core/vault/wasm/fedos_wasm_static_import_readiness.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -29,9 +29,9 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 function codeOnlyLines(source: string): string {
   return source

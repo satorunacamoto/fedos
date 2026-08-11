@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { FedosIdentityTransitionController } from "../src/desktop/presentation/identity_transition/fedos_identity_transition_controller.js";
-import { FedosDeletionRequestController } from "../src/desktop/presentation/deletion_request/fedos_deletion_request_controller.js";
-import type { FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
+import { FedosIdentityTransitionController } from "../src/os/messenger/desktop/presentation/identity_transition/fedos_identity_transition_controller.js";
+import { FedosDeletionRequestController } from "../src/os/messenger/desktop/presentation/deletion_request/fedos_deletion_request_controller.js";
+import type { FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
 
 /**
  * Secure Runtime Alpha 8121-8200 — Security Finding 3 (external audit

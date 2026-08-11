@@ -5,17 +5,17 @@ import {
   PlaceholderIpfsAssetCache,
   isIpfsCidLike,
   assetKeyToIpfsRef,
-} from "../src/asset/ipfs_asset_cache.js";
-import type { IpfsClient } from "../src/asset/ipfs_asset_cache.js";
-import { createAssetKey } from "../src/asset/policy.js";
-import type { AssetMetadata, CachedAsset } from "../src/asset/types.js";
+} from "../src/os/_legacy_prototype/asset/ipfs_asset_cache.js";
+import type { IpfsClient } from "../src/os/_legacy_prototype/asset/ipfs_asset_cache.js";
+import { createAssetKey } from "../src/os/_legacy_prototype/asset/policy.js";
+import type { AssetMetadata, CachedAsset } from "../src/os/_legacy_prototype/asset/types.js";
 // Source-level checks: prove no real transport import and no runtime/worker auto-wire.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import ipfsAssetCacheSource from "../src/asset/ipfs_asset_cache.ts?raw";
+import ipfsAssetCacheSource from "../src/os/_legacy_prototype/asset/ipfs_asset_cache.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 // Real-shaped example CIDs (well-known public examples, no relation to any
 // user content): a CIDv0 and a CIDv1 (base32).

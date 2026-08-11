@@ -2,23 +2,23 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync, readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import cryptoTypesSource from "../../../src/crypto/types.ts?raw";
+import cryptoTypesSource from "../../../src/os/core/crypto/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopCryptoSource from "../../../src/crypto/noop_crypto.ts?raw";
+import noopCryptoSource from "../../../src/os/core/crypto/noop_crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import vaultBridgeSource from "../../../src/crypto/vault_bridge.ts?raw";
+import vaultBridgeSource from "../../../src/os/core/crypto/vault_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import masterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_master_seed_authority.ts?raw";
+import masterSeedAuthoritySource from "../../../src/os/core/vault/wasm/fedos_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sealedEnvelopeSource from "../../../src/runtime/master_seed/fedos_sealed_master_seed_envelope.ts?raw";
+import sealedEnvelopeSource from "../../../src/os/core/vault/wasm/fedos_sealed_master_seed_envelope.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmMasterSeedAuthoritySource from "../../../src/runtime/master_seed/fedos_wasm_master_seed_authority.ts?raw";
+import wasmMasterSeedAuthoritySource from "../../../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import vaultTypesSource from "../../../src/vault/types.ts?raw";
+import vaultTypesSource from "../../../src/os/core/vault/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import memoryVaultSource from "../../../src/vault/memory_vault.ts?raw";
+import memoryVaultSource from "../../../src/os/core/vault/memory_vault.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopVaultSource from "../../../src/vault/noop_vault.ts?raw";
+import noopVaultSource from "../../../src/os/core/vault/noop_vault.ts?raw";
 
 /**
  * Private Message Envelope and Encryption Activation V1 review --
@@ -118,7 +118,7 @@ describe("Private Message Envelope V1 review -- crypto boundary invariants", () 
   });
 
   it("10. InMemoryVaultBoundary.unlock() derives no key -- behavioral, confirms the placeholder truly derives nothing", async () => {
-    const { InMemoryVaultBoundary } = await import("../../../src/vault/memory_vault.js");
+    const { InMemoryVaultBoundary } = await import("../../../src/os/core/vault/memory_vault.js");
     const vault = new InMemoryVaultBoundary();
     const decision = await vault.unlock({ kind: "passphrase" });
     expect(decision.allowed).toBe(true);
@@ -133,7 +133,7 @@ describe("Private Message Envelope V1 review -- crypto boundary invariants", () 
   });
 
   it("12. NoopVaultBoundary is permanently unavailable and never unlocks -- behavioral", async () => {
-    const { NoopVaultBoundary } = await import("../../../src/vault/noop_vault.js");
+    const { NoopVaultBoundary } = await import("../../../src/os/core/vault/noop_vault.js");
     const vault = new NoopVaultBoundary();
     expect(vault.getState()).toBe("unavailable");
     expect(vault.isUnlocked()).toBe(false);

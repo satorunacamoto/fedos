@@ -3,16 +3,16 @@ import { describe, it, expect, vi } from "vitest";
 // ambient here the same way `src/runtime/fedos_wasm_loader.ts` itself does.
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 import { attemptDevOnlyRuntimeRustIntegration } from "../src/runtime/fedos_runtime_prototype_execution.js";
-import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/runtime/create_runtime.js";
+import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { FedosWasmLoaderSkeleton } from "../src/runtime/fedos_wasm_loader.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

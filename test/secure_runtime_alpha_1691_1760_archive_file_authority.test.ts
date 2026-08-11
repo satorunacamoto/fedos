@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync, readdirSync, existsSync, mkdirSync, writeFileSync 
 import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
-import { NodeFedosConversationArchiveFileAuthority } from "../src/conversation/archive/fs/fedos_conversation_archive_file_authority.js";
+import { NodeFedosConversationArchiveFileAuthority } from "../src/os/messenger/conversations/archive/fs/fedos_conversation_archive_file_authority.js";
 
 let dir: string;
 let authority: NodeFedosConversationArchiveFileAuthority;

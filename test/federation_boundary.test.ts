@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { NoopFederationProvider } from "../src/federation/noop_federation.js";
+import { NoopFederationProvider } from "../src/os/_legacy_prototype/federation/noop_federation.js";
 import {
   FEDERATION_CAPABILITIES,
   FEDERATION_PROVIDER_KINDS,
-} from "../src/federation/types.js";
+} from "../src/os/_legacy_prototype/federation/types.js";
 import type {
   FederationFetchDecision,
   FederationFetchRequest,
@@ -11,18 +11,18 @@ import type {
   FederationPublishDecision,
   FederationPublishRequest,
   FederationStatus,
-} from "../src/federation/types.js";
-import { createRuntime, selectFederationProvider } from "../src/runtime/create_runtime.js";
+} from "../src/os/_legacy_prototype/federation/types.js";
+import { createRuntime, selectFederationProvider } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import federationTypesSource from "../src/federation/types.ts?raw";
+import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopFederationSource from "../src/federation/noop_federation.ts?raw";
+import noopFederationSource from "../src/os/_legacy_prototype/federation/noop_federation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const federationSources = [federationTypesSource, noopFederationSource].join("\n");
 const runtimeSources = [runtimeSource, runtimeTypesSource].join("\n");

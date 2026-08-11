@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 // @ts-expect-error `node:url` has no type declarations without `@types/node` in this project's tsconfig.
 import { fileURLToPath } from "node:url";
-import { validateFedosDesktopHostCommand } from "../src/desktop/host_boundary/fedos_desktop_host_command.js";
+import { validateFedosDesktopHostCommand } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.js";
 
 describe("Secure Runtime Alpha 6041-6120 -- Phase G/L Host command structural validation", () => {
   it("1. deletion-request-create requires every structural field, rejects a malformed one", () => {
@@ -116,7 +116,7 @@ describe("Secure Runtime Alpha 6041-6120 -- Phase Q structural guards", () => {
   });
 
   it("14. the Controller never calls a Shell method beyond the deletion-request/device-detail surface (no arbitrary command execution)", () => {
-    const controllerSource = readFileSync(join(dir, "../src/desktop/presentation/deletion_request/fedos_deletion_request_controller.ts"), "utf8") as string;
+    const controllerSource = readFileSync(join(dir, "../src/os/messenger/desktop/presentation/deletion_request/fedos_deletion_request_controller.ts"), "utf8") as string;
     const shellCalls = [...controllerSource.matchAll(/this\.#shell\.(\w+)/g)].map((m) => m[1] ?? "");
     const allowed = new Set(["deletionRequestCreate", "deletionRequestListSentForTarget", "deletionRequestAcknowledgementOutcome", "deletionRequestListReceived", "deletionRequestAssessPolicy", "deletionRequestApprove", "deletionRequestReject", "deviceDetail"]);
     for (const call of shellCalls) expect(allowed.has(call)).toBe(true);

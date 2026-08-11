@@ -10,15 +10,15 @@ import {
   createPublicConversationPolicy,
   resolveFedosPrivateConversationPolicy,
   validateFedosPrivateConversationPolicy,
-} from "../src/conversation/construction/fedos_private_conversation_policy.js";
+} from "../src/os/messenger/conversations/construction/fedos_private_conversation_policy.js";
 import {
   FEDOS_CONVERSATION_POLICY_PUBLIC_V1,
   validateFedosConversationPolicy,
-} from "../src/board/runtime/policy/fedos_conversation_policy.js";
+} from "../src/os/messenger/board/runtime/policy/fedos_conversation_policy.js";
 import {
   UnavailableFedosConversationEncryptionReadinessAuthority,
-} from "../src/conversation/readiness/fedos_conversation_encryption_readiness_authority.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
+} from "../src/os/messenger/conversations/readiness/fedos_conversation_encryption_readiness_authority.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 
 describe("Alpha 896 — exact private policies", () => {
   it("private-group draft policy has the exact axis values", () => {

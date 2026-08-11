@@ -2,19 +2,19 @@ import { describe, it, expect } from "vitest";
 import {
   NoopNearbyConsentProvider,
   PlaceholderNearbyConsentProvider,
-} from "../src/nearby/noop_consent.js";
-import { NEARBY_CONSENT_CAPABILITIES } from "../src/nearby/types.js";
-import type { NearbyConsentRequest } from "../src/nearby/types.js";
+} from "../src/os/_legacy_prototype/nearby/noop_consent.js";
+import { NEARBY_CONSENT_CAPABILITIES } from "../src/os/_legacy_prototype/nearby/types.js";
+import type { NearbyConsentRequest } from "../src/os/_legacy_prototype/nearby/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nearbyTypesSource from "../src/nearby/types.ts?raw";
+import nearbyTypesSource from "../src/os/_legacy_prototype/nearby/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopConsentSource from "../src/nearby/noop_consent.ts?raw";
+import noopConsentSource from "../src/os/_legacy_prototype/nearby/noop_consent.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const nearbySources = [nearbyTypesSource, noopConsentSource].join("\n");
 

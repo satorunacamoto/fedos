@@ -7,13 +7,13 @@ import { describe, it, expect } from "vitest";
 import {
   resolveFedosPrivateWireRoute,
   FEDOS_PRIVATE_WIRE_ROUTE_DEFAULT,
-} from "../src/conversation/transport/fedos_private_wire_route.js";
-import { FedosPrivateV1WireAdapter } from "../src/conversation/transport/fedos_private_v1_wire_adapter.js";
-import { NostrNip17V1WireAdapter } from "../src/conversation/delivery/nostr/nip17/fedos_nostr_nip17_v1_wire_adapter.js";
-import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
-import type { FedosPrivateWireAdapter } from "../src/conversation/transport/fedos_private_wire_adapter.js";
-import type { FedosConversationMessageEnvelope } from "../src/conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_private_wire_route.js";
+import { FedosPrivateV1WireAdapter } from "../src/os/messenger/adapters/nostr/transport/fedos_private_v1_wire_adapter.js";
+import { NostrNip17V1WireAdapter } from "../src/os/messenger/adapters/nostr/conversation_delivery/nip17/fedos_nostr_nip17_v1_wire_adapter.js";
+import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/os/messenger/adapters/nostr/conversation_delivery/fedos_private_nostr_delivery_mode.js";
+import type { FedosPrivateWireAdapter } from "../src/os/messenger/adapters/nostr/transport/fedos_private_wire_adapter.js";
+import type { FedosConversationMessageEnvelope } from "../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
 
 function adapters(): Record<"fedos-private-v1" | "nostr-nip17-v1", FedosPrivateWireAdapter> {
   return {

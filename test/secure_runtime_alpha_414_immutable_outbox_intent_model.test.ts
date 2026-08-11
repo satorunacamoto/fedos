@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   createFedosBoardOutboxIntent,
   makeFedosBoardOutboxId,
-} from "../src/board/outbox/fedos_board_outbox_types.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 /**
  * Secure Runtime Alpha 414 -- "Immutable Outbox Intent Model": Stage 4

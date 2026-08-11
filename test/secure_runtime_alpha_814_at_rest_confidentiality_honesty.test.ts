@@ -5,20 +5,20 @@ import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { AppendOnlyFedosConversationPayloadStorage } from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
-import type { FedosConversationPayloadDescriptor } from "../src/conversation/payload_storage/fedos_conversation_payload_descriptor.js";
+import { AppendOnlyFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.js";
+import type { FedosConversationPayloadDescriptor } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import codecSource from "../src/conversation/payload_storage/fedos_conversation_payload_codec.ts?raw";
+import codecSource from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageSource from "../src/conversation/payload_storage/fedos_conversation_payload_storage.ts?raw";
+import storageSource from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import inMemorySource from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.ts?raw";
+import inMemorySource from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import appendOnlySource from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.ts?raw";
+import appendOnlySource from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import retentionAuthoritySource from "../src/conversation/retention/fedos_payload_retention_authority.ts?raw";
+import retentionAuthoritySource from "../src/os/messenger/conversations/retention/fedos_payload_retention_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wireSource from "../src/conversation/payload_storage/fedos_persisted_conversation_payload_v1.ts?raw";
+import wireSource from "../src/os/messenger/conversations/payload_storage/fedos_persisted_conversation_payload_v1.ts?raw";
 
 function codeOnlyLines(source: string): string {
   return source

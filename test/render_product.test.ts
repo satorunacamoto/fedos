@@ -3,8 +3,8 @@ import {
   renderProductLabel,
   renderProductPromotionPlaceholder,
   renderProductSummary,
-} from "../src/render/product.js";
-import type { Product } from "../src/commerce/types.js";
+} from "../src/os/_legacy_prototype/render/product.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
 
 function product(overrides: Partial<Product> = {}): Product {
   return {

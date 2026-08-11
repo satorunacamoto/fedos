@@ -51,40 +51,40 @@ import { Buffer } from "node:buffer";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
-import { FedosSigningAuthorityNostrAuthorBinding } from "../src/board/runtime/identity/fedos_nostr_author_binding_authority.js";
-import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
+import { FedosSigningAuthorityNostrAuthorBinding } from "../src/os/messenger/board/runtime/identity/fedos_nostr_author_binding_authority.js";
+import type { FedosNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import type {
   FedosConversationEncryptionAuthority,
   FedosConversationEncryptionRequest,
   FedosConversationEncryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
 import type {
   FedosConversationDecryptionAuthority,
   FedosConversationDecryptionRequest,
   FedosConversationDecryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { AppendOnlyFedosConversationPersistence } from "../src/conversation/persistence/append_only_fedos_conversation_persistence.js";
-import { AppendOnlyFedosConversationMembershipPersistence } from "../src/conversation/membership/persistence/append_only_fedos_conversation_membership_persistence.js";
-import { AppendOnlyFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
-import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
-import { AppendOnlyFedosConversationPayloadStorage } from "../src/conversation/payload_storage/append_only_fedos_conversation_payload_storage.js";
-import { AppendOnlyFedosGroupGenerationPersistence } from "../src/conversation/group/append_only_fedos_group_generation_persistence.js";
-import { AppendOnlyFedosGroupDirectPathPersistence } from "../src/conversation/group/append_only_fedos_group_direct_path_persistence.js";
-import { AppendOnlyFedosGroupMessagePersistence } from "../src/conversation/group/append_only_fedos_group_message_persistence.js";
-import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../src/conversation/group/append_only_fedos_group_fanout_delivery_persistence.js";
-import type { FedosMasterSeedAuthority } from "../src/runtime/master_seed/fedos_master_seed_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { AppendOnlyFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/append_only_fedos_conversation_persistence.js";
+import { AppendOnlyFedosConversationMembershipPersistence } from "../src/os/messenger/conversations/membership/persistence/append_only_fedos_conversation_membership_persistence.js";
+import { AppendOnlyFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
+import { AppendOnlyFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/append_only_fedos_conversation_message_envelope_persistence.js";
+import { AppendOnlyFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.js";
+import { AppendOnlyFedosGroupGenerationPersistence } from "../src/os/messenger/conversations/group/append_only_fedos_group_generation_persistence.js";
+import { AppendOnlyFedosGroupDirectPathPersistence } from "../src/os/messenger/conversations/group/append_only_fedos_group_direct_path_persistence.js";
+import { AppendOnlyFedosGroupMessagePersistence } from "../src/os/messenger/conversations/group/append_only_fedos_group_message_persistence.js";
+import { AppendOnlyFedosGroupFanoutDeliveryPersistence } from "../src/os/messenger/conversations/group/append_only_fedos_group_fanout_delivery_persistence.js";
+import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_master_seed_authority.js";
 import type { AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../src/runtime/fedos_wasm_loader.js";
 import {
   FedosWasmConversationArchiveEncryptionAuthority,
   type FedosConversationArchiveEncryptionRuntimeBoundary,
-} from "../src/conversation/archive/fedos_conversation_archive_encryption.js";
-import { NodeFedosConversationArchiveFileAuthority } from "../src/conversation/archive/fs/fedos_conversation_archive_file_authority.js";
-import { createFedosConversationArchiveRuntime, type FedosConversationArchiveRuntime } from "../src/conversation/archive/runtime/fedos_conversation_archive_runtime.js";
+} from "../src/os/messenger/conversations/archive/fedos_conversation_archive_encryption.js";
+import { NodeFedosConversationArchiveFileAuthority } from "../src/os/messenger/conversations/archive/fs/fedos_conversation_archive_file_authority.js";
+import { createFedosConversationArchiveRuntime, type FedosConversationArchiveRuntime } from "../src/os/messenger/conversations/archive/runtime/fedos_conversation_archive_runtime.js";
 
 function fakeSymmetricMarker(ownPubkey: string, counterpartyPublicKeyHex: string): Uint8Array {
   const pair = [ownPubkey, counterpartyPublicKeyHex].sort().join(":");

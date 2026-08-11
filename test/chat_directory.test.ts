@@ -4,9 +4,9 @@ import {
   findChatById,
   getChatMessages,
   listReadableChats,
-} from "../src/chat/directory.js";
-import type { ChatMessage, ChatRoom, DMThread, GroupChat } from "../src/chat/types.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+} from "../src/os/_legacy_prototype/chat/directory.js";
+import type { ChatMessage, ChatRoom, DMThread, GroupChat } from "../src/os/_legacy_prototype/chat/types.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 const ALICE = "a".repeat(64);
 const BOB = "b".repeat(64);

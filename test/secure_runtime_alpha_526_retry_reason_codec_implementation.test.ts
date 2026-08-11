@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   encodeFedosDeliveryRetryReason,
   decodeFedosDeliveryRetryReason,
-} from "../src/board/observation/fedos_delivery_retry_reason_codec.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_retry_reason_codec.js";
 
 describe("Secure Runtime Alpha 526 -- Retry Reason Codec Implementation", () => {
   it("round-trips final with no detail", () => {

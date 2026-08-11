@@ -8,13 +8,13 @@
  * mirroring this codebase's own established failure-matrix convention.
  */
 import { describe, it, expect } from "vitest";
-import { assembleFedosConversationCanonicalProductionCryptoGraph } from "../src/conversation/encryption/production/fedos_conversation_canonical_production_crypto_authority_factory.js";
-import { FedosProductionEphemeralGiftWrapSigningAuthority } from "../src/desktop/production_activation/fedos_production_ephemeral_gift_wrap_signing_authority.js";
+import { assembleFedosConversationCanonicalProductionCryptoGraph } from "../src/os/messenger/conversations/encryption/production/fedos_conversation_canonical_production_crypto_authority_factory.js";
+import { FedosProductionEphemeralGiftWrapSigningAuthority } from "../src/os/messenger/desktop/production_activation/fedos_production_ephemeral_gift_wrap_signing_authority.js";
 import {
   FedosProductionConversationEncryptionRuntimeBoundary,
   FedosProductionConversationDecryptionRuntimeBoundary,
-} from "../src/desktop/production_activation/fedos_production_conversation_encryption_runtime_boundary.js";
-import { FEDOS_GIFT_WRAP_KIND } from "../src/conversation/delivery/nostr/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.js";
+} from "../src/os/messenger/desktop/production_activation/fedos_production_conversation_encryption_runtime_boundary.js";
+import { FEDOS_GIFT_WRAP_KIND } from "../src/os/messenger/adapters/nostr/conversation_delivery/nip17/fedos_wasm_ephemeral_gift_wrap_signing_authority.js";
 
 function mockMasterSeedAuthority(publicKeyHex: string | null) {
   return {

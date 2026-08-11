@@ -1,17 +1,9 @@
 /**
- * Secure Runtime Alpha 3401-3480 — Loading Renderer.
- *
- * Mirrors `FedosDesktopErrorRenderer`'s own shape and rationale exactly,
- * for the `"loading"` branch — the ONE shared place every other Renderer
- * delegates to (via `fedosRenderModel()`), plus its own standalone,
- * directly-testable unit.
+ * Shim — physically moved to `src/os/messenger/desktop/renderer/fedos_desktop_loading_renderer.ts`
+ * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
+ * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and
+ * `docs/architecture/MESSENGER-MIGRATION-STAGING.md`). Kept here so any
+ * not-yet-updated importer elsewhere in the repo keeps resolving and
+ * compiling.
  */
-
-import type { FedosDesktopViewModelState } from "../presentation/fedos_desktop_view_model_state.js";
-
-export class FedosDesktopLoadingRenderer {
-  /** `true` iff `state.status === "loading"` — a future UI's ONE question ("should I show a spinner / disable this button right now") answered without it ever inspecting a ViewModel's own state shape directly. */
-  static isLoading<T>(state: FedosDesktopViewModelState<T>): boolean {
-    return state.status === "loading";
-  }
-}
+export * from "../../os/messenger/desktop/renderer/fedos_desktop_loading_renderer.js";

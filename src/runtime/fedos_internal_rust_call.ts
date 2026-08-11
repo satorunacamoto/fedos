@@ -52,14 +52,15 @@
  */
 
 import { createFedosRustInvocationAdapter, planFedosRustInvocationAdapterExecution } from "./fedos_rust_invocation_adapter.js";
+import type { FedosInternalRustCallKind, FedosInternalRustCall } from "./fedos_internal_rust_call_shape.js";
 
-/** Which Rust operation a `FedosInternalRustCall` represents. */
-export type FedosInternalRustCallKind = "Encrypt" | "Decrypt";
-
-/** A planned internal Rust call — plain data, carries no request material of any kind. */
-export interface FedosInternalRustCall {
-  readonly kind: FedosInternalRustCallKind;
-}
+// Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+// reduction — `FedosInternalRustCallKind`/`FedosInternalRustCall` now live
+// in the dedicated `./fedos_internal_rust_call_shape.ts` (see that file's
+// own header for why); re-exported here, unchanged in shape, so this
+// file's own existing consumer (`fedos_rust_execution_review.ts`) needed
+// zero call-site changes.
+export type { FedosInternalRustCallKind, FedosInternalRustCall };
 
 /**
  * Coarse status of a `FedosInternalRustCall`. `"Planned"` is the ONLY

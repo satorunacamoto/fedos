@@ -16,9 +16,9 @@ import ciphertextSerializationFormatDecisionDocSource from "../docs/ciphertext_s
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import publicCryptoOpaqueHandlesDocSource from "../docs/public_crypto_opaque_handles.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptServiceSource from "../src/runtime/fedos_runtime_decrypt.ts?raw";
+import decryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_decrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptServiceSource from "../src/runtime/fedos_runtime_encrypt.ts?raw";
+import encryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_encrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import keyGenerationServiceSource from "../src/runtime/fedos_runtime_aead_key_generation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -26,13 +26,13 @@ import randomBytesServiceSource from "../src/runtime/fedos_runtime_random_bytes.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -198,7 +198,7 @@ describe("Secure Runtime Alpha 016 Ciphertext Wire Format Boundary Review -- rev
   });
 
   it("13. initializeCrypto()'s own return value is confirmed byte-for-byte unchanged by an ACTUAL call", async () => {
-    const { createRuntimeInitializeCryptoResult } = await import("../src/runtime/create_runtime.js");
+    const { createRuntimeInitializeCryptoResult } = await import("../src/os/_legacy_prototype/runtime/create_runtime.js");
     const decision = createRuntimeInitializeCryptoResult();
     expect(decision).toEqual({ allowed: false, initialized: false, reason: "PrototypeDisabled" });
   });
@@ -235,7 +235,7 @@ describe("Secure Runtime Alpha 016 Ciphertext Wire Format Boundary Review -- rev
   });
 
   it("15. createRuntime()'s assembled AppRuntime still exposes the same six fields this review found -- exportCiphertext/importCiphertext were later added by Stage 1011 (Secure Runtime Alpha 018), still no importKey/exportKey", async () => {
-    const { createRuntime } = await import("../src/runtime/create_runtime.js");
+    const { createRuntime } = await import("../src/os/_legacy_prototype/runtime/create_runtime.js");
     const runtime = createRuntime();
     expect(typeof runtime.initializeCrypto).toBe("function");
     expect(typeof runtime.runtimeCapabilities).toBe("function");

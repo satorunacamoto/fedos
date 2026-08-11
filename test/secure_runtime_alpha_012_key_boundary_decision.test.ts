@@ -16,13 +16,13 @@ import aeadKeyGenerationServiceSource from "../src/runtime/fedos_runtime_aead_ke
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -141,7 +141,7 @@ describe("Secure Runtime Alpha 012 Public Runtime Key Boundary Decision -- revie
   });
 
   it("14. initializeCrypto()'s own return value is confirmed byte-for-byte unchanged by an ACTUAL call", async () => {
-    const { createRuntimeInitializeCryptoResult } = await import("../src/runtime/create_runtime.js");
+    const { createRuntimeInitializeCryptoResult } = await import("../src/os/_legacy_prototype/runtime/create_runtime.js");
     const decision = createRuntimeInitializeCryptoResult();
     expect(decision).toEqual({ allowed: false, initialized: false, reason: "PrototypeDisabled" });
   });
@@ -164,7 +164,7 @@ describe("Secure Runtime Alpha 012 Public Runtime Key Boundary Decision -- revie
   });
 
   it("16. createRuntime()'s assembled AppRuntime still exposes the same four Crypto API fields this decision found, still no importKey -- encrypt()/decrypt() were later added by Stage 1009 (Secure Runtime Alpha 014)/Stage 1010 (Secure Runtime Alpha 015) respectively", async () => {
-    const { createRuntime } = await import("../src/runtime/create_runtime.js");
+    const { createRuntime } = await import("../src/os/_legacy_prototype/runtime/create_runtime.js");
     const runtime = createRuntime();
     expect(typeof runtime.initializeCrypto).toBe("function");
     expect(typeof runtime.runtimeCapabilities).toBe("function");

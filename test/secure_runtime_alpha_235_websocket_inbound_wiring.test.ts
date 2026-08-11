@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { WebSocketRelay } from "../src/desktop/websocket_relay.js";
-import type { FedosRelaySocket, FedosRelaySocketEvent } from "../src/desktop/websocket_relay.js";
+import { WebSocketRelay } from "../src/os/messenger/desktop/websocket_relay.js";
+import type { FedosRelaySocket, FedosRelaySocketEvent } from "../src/os/messenger/desktop/websocket_relay.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_235_websocket_inbound_wiring.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import websocketRelaySource from "../src/desktop/websocket_relay.ts?raw";
+import websocketRelaySource from "../src/os/messenger/desktop/websocket_relay.ts?raw";
 
 function fakeSocket(): {
   socket: FedosRelaySocket;

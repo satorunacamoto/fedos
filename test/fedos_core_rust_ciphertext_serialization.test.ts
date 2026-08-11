@@ -11,19 +11,20 @@ import serializationSource from "../packages/fedos-core-rust/src/crypto/cipherte
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nip44SchemaSource from "../packages/fedos-core-rust/src/crypto/nip44_vector_schema.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptedPayloadSource from "../src/storage/encrypted_payload.ts?raw";
+import encryptedPayloadSource from "../src/os/core/storage/encrypted_payload.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageTypesSource from "../src/storage/types.ts?raw";
+import storageTypesSource from "../src/os/core/storage/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopStorageSource from "../src/storage/noop_storage.ts?raw";
+import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import federationTypesSource from "../src/federation/types.ts?raw";
+import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 186–188 — "Ciphertext serialization implementation in Rust +
@@ -271,8 +272,7 @@ describe("FedOS Rust crate — ciphertext serialization implementation + NIP-44 
 
   it("16. package.json is unchanged — no new dependency, still 2 production dependencies, no base64/CBOR library", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     for (const dep of Object.keys(pkg.dependencies ?? {})) {
       expect(dep.toLowerCase()).not.toMatch(/base64|cbor|msgpack/);
     }

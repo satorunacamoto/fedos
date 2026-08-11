@@ -185,6 +185,10 @@ const fedosApp: FedosAppBridge = Object.freeze({
   safetyCenterOverview: () => ipcRenderer.invoke("fedos-app:safety-center-overview"),
   settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
   relayStatus: () => ipcRenderer.invoke("fedos-app:relay-status"),
+  // Commerce Reachable Catalog + Product Surface Phase 1 -- read-only,
+  // same bounded-string discipline as every method above.
+  commerceCatalogList: () => ipcRenderer.invoke("fedos-app:commerce-catalog-list"),
+  commerceProductDetail: (productId: string) => ipcRenderer.invoke("fedos-app:commerce-product-detail", { productId: boundedString(productId, MAX_ID_CHARS) }),
 });
 
 contextBridge.exposeInMainWorld("fedosProfile", fedosProfile);

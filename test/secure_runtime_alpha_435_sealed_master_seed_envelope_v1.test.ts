@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   isWellFormedSealedMasterSeedEnvelopeV1Json,
   toSealedMasterSeedEnvelopeV1,
-} from "../src/runtime/master_seed/fedos_sealed_master_seed_envelope.js";
+} from "../src/os/core/vault/wasm/fedos_sealed_master_seed_envelope.js";
 
 const REAL_ENVELOPE_SHAPE =
   '{"v":1,"kdf":"argon2id","m":19456,"t":2,"p":1,"salt":"c2FsdA","alg":"chacha20poly1305","n":"bm9uY2U","ct":"Y2lwaGVydGV4dA"}';

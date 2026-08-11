@@ -16,7 +16,7 @@ import { join } from "node:path";
 // @ts-expect-error `node:process` has no type declarations without `@types/node` in this project's tsconfig.
 import process from "node:process";
 
-const DELIVERY_DIR = join(process.cwd(), "src/conversation/delivery/nostr");
+const DELIVERY_DIR = join(process.cwd(), "src/os/messenger/adapters/nostr/conversation_delivery");
 
 function deliverySourceFiles(): readonly string[] {
   return readdirSync(DELIVERY_DIR)
@@ -130,7 +130,10 @@ describe("Alpha 1391-1470 -- Public Isolation, Secret Guards, Architecture Guard
 
   it("12. the Production-mode WASM Dev-only Gate file is byte-for-byte untouched by this Arc (git-tracked, unmodified)", () => {
     // Structural confirmation only -- the gate's own permanent restriction text is still present, unmodified.
-    const src = readFileSync(join(process.cwd(), "src/runtime/fedos_wasm_loader.ts"), "utf8") as string;
+    // Runtime Ownership Extraction Arc: fedos_wasm_loader.ts physically moved to
+    // src/os/core/vault/wasm/ (shim left at the old path) -- read the real
+    // implementation at its new canonical location, not the shim.
+    const src = readFileSync(join(process.cwd(), "src/os/core/vault/wasm/fedos_wasm_loader.ts"), "utf8") as string;
     expect(src).toMatch(/never Production, never Worker/);
   });
 

@@ -4,27 +4,28 @@ import designDocSource from "../docs/secure_runtime_alpha_340_desktop_host_found
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPersistenceSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
+import boardPersistenceSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hydrationSource from "../src/board/persistence/fedos_board_hydration.ts?raw";
+import hydrationSource from "../src/os/messenger/board/persistence/fedos_board_hydration.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrAdapterSource from "../src/board/fedos_board_nostr_adapter.ts?raw";
+import nostrAdapterSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activityPubAdapterSource from "../src/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
+import activityPubAdapterSource from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import atprotoAdapterSource from "../src/board/atproto/fedos_atproto_board_adapter.ts?raw";
+import atprotoAdapterSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sessionAdapterSource from "../src/board/session/fedos_session_board_adapter.ts?raw";
+import sessionAdapterSource from "../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
 
-import { createFedosDesktopHost } from "../src/desktop/host/create_fedos_desktop_host.js";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import type { FedosDesktopHostState } from "../src/desktop/host/fedos_desktop_host_state.js";
+import { createFedosDesktopHost } from "../src/os/messenger/desktop/host/create_fedos_desktop_host.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import type { FedosDesktopHostState } from "../src/os/messenger/desktop/host/fedos_desktop_host_state.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 340 -- "Desktop Host Foundation Completion":
@@ -65,7 +66,7 @@ describe("Secure Runtime Alpha 340 -- Desktop Host Foundation Completion", () =>
 
   it("5. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

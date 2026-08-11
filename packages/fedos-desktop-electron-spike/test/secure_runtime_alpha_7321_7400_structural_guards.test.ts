@@ -185,7 +185,7 @@ describe("Secure Runtime Alpha 7321-7400 -- structural guards", () => {
     expect(diffOutput).not.toMatch(/fedos_desktop_runtime_v2/);
     expect(diffOutput).not.toMatch(/fedos_conversation_runtime_v2/);
     expect(diffOutput).not.toMatch(/fedos_desktop_application_shell_v2/);
-    const runtimeSource = stripComments(read("src/desktop/runtime/fedos_desktop_runtime.ts"));
+    const runtimeSource = stripComments(read("src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts"));
     expect((runtimeSource.match(/export async function startFedosDesktopRuntime/g) ?? []).length).toBe(1);
   });
 

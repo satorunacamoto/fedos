@@ -3,32 +3,32 @@ import {
   renderCreatorProfilePreview,
   renderCreatorProfilePreviewPage,
   SAMPLE_CREATOR_PROFILES,
-} from "../src/render/creator_profile_preview.js";
-import type { CreatorProfileDescriptor } from "../src/creator/profile.js";
+} from "../src/os/_legacy_prototype/render/creator_profile_preview.js";
+import type { CreatorProfileDescriptor } from "../src/os/commerce/creator/profile.js";
 import {
   CREATOR_TRUST_LABELS,
   reviewCreatorProfile,
   sanitizeCreatorProfileMetadata,
-} from "../src/creator/profile.js";
+} from "../src/os/commerce/creator/profile.js";
 import {
   COMMUNITY_MODERATION_POLICY_KINDS,
   COMMUNITY_MODERATION_TARGET_KINDS,
   COMMUNITY_MODERATION_REQUESTED_ACTIONS,
   reviewCommunityModerationTarget,
-} from "../src/community/moderation.js";
-import type { CommunityModerationTargetInput } from "../src/community/moderation.js";
+} from "../src/os/_legacy_prototype/community/moderation.js";
+import type { CommunityModerationTargetInput } from "../src/os/_legacy_prototype/community/moderation.js";
 import {
   handleRequest,
   isCreatorPreviewEnabled,
-} from "../src/worker.js";
+} from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import creatorProfilePreviewSource from "../src/render/creator_profile_preview.ts?raw";
+import creatorProfilePreviewSource from "../src/os/_legacy_prototype/render/creator_profile_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import creatorProfileSource from "../src/creator/profile.ts?raw";
+import creatorProfileSource from "../src/os/commerce/creator/profile.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import communityModerationSource from "../src/community/moderation.ts?raw";
+import communityModerationSource from "../src/os/_legacy_prototype/community/moderation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const previewSource = creatorProfilePreviewSource as string;
 const boundarySources = [creatorProfileSource, communityModerationSource].join("\n");

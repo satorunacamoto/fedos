@@ -17,7 +17,7 @@ import { join } from "node:path";
 import {
   FEDOS_IDENTITY_TRANSITION_KNOWN_DEVICE_POLICIES,
   FEDOS_IDENTITY_TRANSITION_KNOWN_RATCHET_POLICIES,
-} from "../src/conversation/identity_transition/fedos_identity_transition_vocabulary.js";
+} from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_vocabulary.js";
 
 declare const process: { cwd(): string };
 

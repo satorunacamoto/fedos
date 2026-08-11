@@ -2,15 +2,16 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_251_existing_board_model_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import socialEventSource from "../src/social/event.ts?raw";
+import socialEventSource from "../src/os/_legacy_prototype/social/event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import socialBoardSource from "../src/social/board.ts?raw";
+import socialBoardSource from "../src/os/_legacy_prototype/social/board.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import communityModerationSource from "../src/community/moderation.ts?raw";
+import communityModerationSource from "../src/os/_legacy_prototype/community/moderation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import indexSource from "../src/index.ts?raw";
+import indexSource from "../src/os/_legacy_prototype/index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 251 -- "Existing Board Model Inventory": Stage 1
@@ -60,7 +61,7 @@ describe("Secure Runtime Alpha 251 -- Existing Board Model Inventory", () => {
 
   it("8. Regression: package.json dependency count remains unchanged at 2 -- no new Cargo/npm dependency", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("9. the design doc cross-references Alpha 250, Alpha 242, and Alpha 028/040", () => {

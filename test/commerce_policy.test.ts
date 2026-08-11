@@ -4,8 +4,8 @@ import {
   canEditProduct,
   canViewProduct,
   hasPurchaseGrant,
-} from "../src/commerce/policy.js";
-import type { Product, PurchaseGrant } from "../src/commerce/types.js";
+} from "../src/os/commerce/catalog/policy.js";
+import type { Product, PurchaseGrant } from "../src/os/commerce/catalog/types.js";
 
 const CREATOR = "a".repeat(64);
 const BUYER = "b".repeat(64);

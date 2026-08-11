@@ -4,7 +4,7 @@ import {
   isFedosDeliveryObservationState,
   makeFedosDeliveryObservationId,
   toFedosDeliveryObservationSubjectId,
-} from "../src/board/observation/fedos_delivery_observation.js";
+} from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
 
 /**
  * Secure Runtime Alpha 462 -- "Delivery Observation State Model": Stage 2

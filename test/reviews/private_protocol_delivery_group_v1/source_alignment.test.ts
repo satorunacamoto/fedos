@@ -2,31 +2,32 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import envelopeSource from "../../../src/conversation/envelope/fedos_conversation_message_envelope.ts?raw";
+import envelopeSource from "../../../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptionCoordinatorSource from "../../../src/conversation/encryption/fedos_conversation_encryption_coordinator.ts?raw";
+import encryptionCoordinatorSource from "../../../src/os/messenger/conversations/encryption/fedos_conversation_encryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptionCoordinatorSource from "../../../src/conversation/encryption/fedos_conversation_decryption_coordinator.ts?raw";
+import decryptionCoordinatorSource from "../../../src/os/messenger/conversations/encryption/fedos_conversation_decryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantResolverSource from "../../../src/conversation/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
+import participantResolverSource from "../../../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import counterpartyResolverSource from "../../../src/conversation/encryption/identity/fedos_conversation_counterparty_public_key_resolver.ts?raw";
+import counterpartyResolverSource from "../../../src/os/messenger/conversations/encryption/identity/fedos_conversation_counterparty_public_key_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import lifecycleStateSource from "../../../src/conversation/construction/fedos_conversation_lifecycle_state.ts?raw";
+import lifecycleStateSource from "../../../src/os/messenger/conversations/construction/fedos_conversation_lifecycle_state.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardOutboxTypesSource from "../../../src/board/outbox/fedos_board_outbox_types.ts?raw";
+import boardOutboxTypesSource from "../../../src/os/messenger/board/outbox/fedos_board_outbox_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboundPublishResultSource from "../../../src/board/publish/fedos_outbound_publish_result.ts?raw";
+import outboundPublishResultSource from "../../../src/os/messenger/board/publish/fedos_outbound_publish_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deliveryObservationSource from "../../../src/board/observation/fedos_delivery_observation.ts?raw";
+import deliveryObservationSource from "../../../src/os/messenger/board/observation/fedos_delivery_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import transitionGraphSource from "../../../src/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
+import transitionGraphSource from "../../../src/os/messenger/board/observation/fedos_delivery_observation_transition_graph.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilityMatrixSource from "../../../src/federation/nostr_mapping.ts?raw";
+import capabilityMatrixSource from "../../../src/os/_legacy_prototype/federation/nostr_mapping.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedCapabilityMatrixSource from "../../../src/federation/capability_matrix.ts?raw";
+import fedCapabilityMatrixSource from "../../../src/os/_legacy_prototype/federation/capability_matrix.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Private Protocol Delivery and Group Encryption V1 review -- source
@@ -243,6 +244,6 @@ describe("Private Protocol Delivery and Group Encryption V1 review -- source ali
 
   it("19. package.json still carries exactly two production dependencies -- no new dependency introduced by this review", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 });

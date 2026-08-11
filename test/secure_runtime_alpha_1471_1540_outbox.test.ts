@@ -8,13 +8,13 @@ import { tmpdir } from "node:os";
 import {
   createFedosConversationTransportOutboxIntent,
   makeFedosConversationTransportOutboxId,
-} from "../src/conversation/transport/fedos_conversation_transport_outbox_types.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_outbox_types.js";
 import {
   serializeFedosConversationTransportOutboxIntent,
   deserializeFedosConversationTransportOutboxIntent,
-} from "../src/conversation/transport/fedos_conversation_transport_outbox_codec.js";
-import { InMemoryFedosConversationTransportOutboxPersistence } from "../src/conversation/transport/in_memory_fedos_conversation_transport_outbox_persistence.js";
-import { AppendOnlyFedosConversationTransportOutboxPersistence } from "../src/conversation/transport/append_only_fedos_conversation_transport_outbox_persistence.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_outbox_codec.js";
+import { InMemoryFedosConversationTransportOutboxPersistence } from "../src/os/messenger/adapters/nostr/transport/in_memory_fedos_conversation_transport_outbox_persistence.js";
+import { AppendOnlyFedosConversationTransportOutboxPersistence } from "../src/os/messenger/adapters/nostr/transport/append_only_fedos_conversation_transport_outbox_persistence.js";
 
 const ENVELOPE_ID = "e".repeat(32) as never;
 const CONVERSATION_ID = "board-1::thread-1" as never;

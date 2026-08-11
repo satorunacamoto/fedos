@@ -21,12 +21,12 @@
  * refuse it.
  */
 
-import type { FedosDeviceBindingV1 } from "../../src/device/fedos_device_binding.js";
+import type { FedosDeviceBindingV1 } from "../../src/os/messenger/device/fedos_device_binding.js";
 import type {
   FedosDeviceRegistrationAuthority,
   FedosDeviceRegistrationAuthorityDecision,
   FedosDeviceRegistrationRequest,
-} from "../../src/device/fedos_device_registration_authority.js";
+} from "../../src/os/messenger/device/fedos_device_registration_authority.js";
 
 export class StubVerifiedFedosDeviceRegistrationAuthority implements FedosDeviceRegistrationAuthority {
   readonly #expectedAccountAuthority: string;

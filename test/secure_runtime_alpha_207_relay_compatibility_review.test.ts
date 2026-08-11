@@ -2,15 +2,15 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_207_relay_compatibility_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import descriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import descriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import readerSource from "../src/desktop/fedos_event_reader.ts?raw";
+import readerSource from "../src/os/messenger/desktop/fedos_event_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullEventReaderSource from "../src/desktop/null_event_reader.ts?raw";
+import nullEventReaderSource from "../src/os/messenger/desktop/null_event_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/nostr/relay.ts?raw";
+import relaySource from "../src/os/messenger/adapters/nostr/protocol/relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wsRelaySource from "../src/nostr/ws_relay.ts?raw";
+import wsRelaySource from "../src/os/messenger/adapters/nostr/protocol/ws_relay.ts?raw";
 
 const NEW_FILE_SOURCES: Record<string, string> = {
   "fedos_event_descriptor.ts": descriptorSource,

@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_286_atproto_thread_reply_mapping.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/atproto/fedos_atproto_board_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 import {
   mapValidatedAtprotoPostToBoardPostInput,
   validateAtprotoBoardPost,
-} from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+} from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 const BASE_POST: FedosValidatedAtprotoPost = {
   uri: "at://did:plc:abc123/app.bsky.feed.post/xyz789",

@@ -15,7 +15,7 @@ import { createDynamicLoaderGate } from "../src/runtime/fedos_dynamic_loader_gat
 import { evaluateWasmLoaderImportPolicy } from "../src/runtime/fedos_wasm_loader_import_policy.js";
 import { evaluateRuntimeCryptoActivation } from "../src/runtime/runtime_crypto_activation_policy.js";
 import { evaluateWorkerCryptoActivation } from "../src/runtime/worker_crypto_activation_policy.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { runtimeCryptoActivationStatus } from "../src/runtime/runtime_crypto_diagnostics.js";
 import { workerCryptoActivationStatus } from "../src/runtime/worker_crypto_diagnostics.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -33,9 +33,9 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 function codeOnlyLines(source: string): string {
   return source

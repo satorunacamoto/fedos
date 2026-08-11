@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import {
   createRuntime,
   selectCryptoProvider,
-} from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
-import { NoopCryptoProvider } from "../src/crypto/noop_crypto.js";
-import { FedosCoreCryptoProvider } from "../src/crypto/fedos_core_adapter.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
+import { NoopCryptoProvider } from "../src/os/core/crypto/noop_crypto.js";
+import { FedosCoreCryptoProvider } from "../src/os/core/crypto/fedos_core_adapter.js";
 import type {
   CryptoDecision,
   CryptoProvider,
@@ -13,14 +13,14 @@ import type {
   DeriveKeyRequest,
   EncryptRequest,
   RandomBytesRequest,
-} from "../src/crypto/types.js";
-import { buildRuntimeStatusView } from "../src/render/runtime_status.js";
+} from "../src/os/core/crypto/types.js";
+import { buildRuntimeStatusView } from "../src/os/_legacy_prototype/render/runtime_status.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 
 /** A crypto provider that records every method call — proves the runtime calls none. */
 function makeSpyCryptoProvider(): { provider: CryptoProvider; calls: string[] } {

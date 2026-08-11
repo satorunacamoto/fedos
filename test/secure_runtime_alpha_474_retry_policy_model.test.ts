@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_474_retry_policy_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import publisherSource from "../src/board/outbox/fedos_board_outbox_publisher.ts?raw";
+import publisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import schedulerSource from "../src/board/outbox/fedos_publish_scheduler.ts?raw";
+import schedulerSource from "../src/os/messenger/board/outbox/fedos_publish_scheduler.ts?raw";
 
 /**
  * Secure Runtime Alpha 474 -- "Retry Policy Model": Stage 4 of the

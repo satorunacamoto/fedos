@@ -4,25 +4,25 @@ import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `node:child_process` has no type declarations without `@types/node` in this project's tsconfig.
 import { execSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import documentSource from "../../../src/conversation/search/fedos_conversation_search_document.ts?raw";
+import documentSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_document.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import indexSource from "../../../src/conversation/search/fedos_conversation_search_index.ts?raw";
+import indexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import keywordIndexSource from "../../../src/conversation/search/fedos_conversation_search_keyword_index.ts?raw";
+import keywordIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_keyword_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import archiveIndexSource from "../../../src/conversation/search/fedos_conversation_search_archive_index.ts?raw";
+import archiveIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_archive_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantIndexSource from "../../../src/conversation/search/fedos_conversation_search_participant_index.ts?raw";
+import participantIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_participant_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import modeIndexSource from "../../../src/conversation/search/fedos_conversation_search_mode_index.ts?raw";
+import modeIndexSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_mode_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import envelopeIdSource from "../../../src/conversation/envelope/fedos_conversation_envelope_id.ts?raw";
+import envelopeIdSource from "../../../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import retentionAuthoritySource from "../../../src/conversation/retention/fedos_payload_retention_authority.ts?raw";
+import retentionAuthoritySource from "../../../src/os/messenger/conversations/retention/fedos_payload_retention_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import archiveCollectorSource from "../../../src/conversation/archive/fedos_conversation_archive_collector.ts?raw";
+import archiveCollectorSource from "../../../src/os/messenger/conversations/archive/fedos_conversation_archive_collector.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import archiveRestoreSource from "../../../src/conversation/archive/fedos_conversation_archive_restore.ts?raw";
+import archiveRestoreSource from "../../../src/os/messenger/conversations/archive/fedos_conversation_archive_restore.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import executionSpecSource from "../../../docs/secure_runtime_alpha_2501_2580_execution_spec.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -171,7 +171,21 @@ describe("Private Conversation Search V1 runtime audit -- source alignment (cent
   });
 
   it("8. [Alpha 2581-2620 update] FedosConversationSearchIndexDependencies is now the SAME Pick of draftPersistence/membershipAuthority, additively intersected with a new, narrow retentionAuthority dependency", () => {
-    expect(indexSource as string).toMatch(/Pick<\s*\n?\s*FedosConversationRuntimeDependencies,\s*\n?\s*"draftPersistence" \| "membershipAuthority"\s*\n?\s*>\s*&\s*\{/);
+    // Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+    // reduction (`docs/architecture/NOSTR-CONSOLIDATION-PLAN.md`,
+    // `test/architecture_cycle_detector.test.ts`) -- this Pick's SOURCE type
+    // changed from `FedosConversationRuntimeDependencies`
+    // (`../runtime/fedos_conversation_runtime.ts`) to the LOWER-level
+    // `FedosPrivateConversationConstructionCoordinatorDependencies`
+    // (`../construction/fedos_private_conversation_construction_coordinator.ts`),
+    // which is where `draftPersistence`/`membershipAuthority` are actually
+    // declared and always were -- `FedosConversationRuntimeDependencies` is a
+    // structural intersection that does not redeclare either field, so this
+    // is a zero-behavior-change redirect to the type's true owner (breaking a
+    // 5-file type-only import cycle that used to close back through
+    // `fedos_conversation_runtime.ts`), not a design change. The resolved
+    // shape asserted below is unchanged.
+    expect(indexSource as string).toMatch(/Pick<\s*\n?\s*FedosPrivateConversationConstructionCoordinatorDependencies,\s*\n?\s*"draftPersistence" \| "membershipAuthority"\s*\n?\s*>\s*&\s*\{/);
     expect(indexSource as string).toMatch(/readonly retentionAuthority: FedosConversationSearchRetentionAuthorityDependency/);
   });
 

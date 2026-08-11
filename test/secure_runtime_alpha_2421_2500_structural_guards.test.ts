@@ -1,24 +1,31 @@
 import { describe, it, expect } from "vitest";
+// Compatibility Facade Reduction + Package Extraction Readiness arc: these
+// `?raw` imports now point at the real (moved) source under
+// `os/messenger/sync/` -- `../src/sync/*.ts` are one-line
+// `export * from "../os/messenger/sync/*.js";` shims as of this arc, so a
+// `?raw` import of the OLD path would only see the shim's own one line, not
+// the class/interface bodies these structural guards inspect.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deviceBindingSource from "../src/sync/fedos_sync_device_binding.ts?raw";
+import deviceBindingSource from "../src/os/messenger/sync/fedos_sync_device_binding.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import deviceRegistrySource from "../src/sync/fedos_sync_device_registry.ts?raw";
+import deviceRegistrySource from "../src/os/messenger/sync/fedos_sync_device_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import journalSource from "../src/sync/fedos_sync_journal.ts?raw";
+import journalSource from "../src/os/messenger/sync/fedos_sync_journal.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import cursorSource from "../src/sync/fedos_sync_cursor.ts?raw";
+import cursorSource from "../src/os/messenger/sync/fedos_sync_cursor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import conflictSource from "../src/sync/fedos_sync_conflict.ts?raw";
+import conflictSource from "../src/os/messenger/sync/fedos_sync_conflict.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import pendingChangesSource from "../src/sync/fedos_sync_pending_changes.ts?raw";
+import pendingChangesSource from "../src/os/messenger/sync/fedos_sync_pending_changes.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import queueSource from "../src/sync/fedos_sync_queue.ts?raw";
+import queueSource from "../src/os/messenger/sync/fedos_sync_queue.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import recoverySource from "../src/sync/fedos_sync_recovery.ts?raw";
+import recoverySource from "../src/os/messenger/sync/fedos_sync_recovery.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import stateSource from "../src/sync/fedos_sync_state.ts?raw";
+import stateSource from "../src/os/messenger/sync/fedos_sync_state.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const ALL_SYNC_SOURCES: readonly string[] = [
   deviceBindingSource,
@@ -75,7 +82,7 @@ describe("Secure Runtime Alpha 2421-2500 -- Multi Device Sync Structural Guards"
 
   it("6. no new production dependency was introduced by this arc -- still exactly @noble/curves and @noble/hashes", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("7. package.json's own scripts carry no entry point added by THIS arc -- genuinely stale otherwise (updated per later Arcs' own 'update historical exact-shape tests only when genuinely stale' instruction, e.g. Alpha 4101-4180): the Electron Build Spike/Node Type Isolation/Electron Host Adapter Arcs (Alpha 3881-3940/4021-4100/4101-4180) legitimately added their own build/start/typecheck entry points well after this Arc's own scope closed. This Arc's own original protection -- no entry point THIS Arc itself would have added is present -- is preserved by asserting the CURRENT real, closed list rather than a frozen pre-Electron snapshot.", () => {

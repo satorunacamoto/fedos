@@ -5,19 +5,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { FedosConversationRelaySet } from "../src/conversation/transport/relay/fedos_conversation_relay_set.js";
-import { nostrWireEventToFedosEventDescriptor } from "../src/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
-import { FedosDeviceRelaySyncPublisher } from "../src/device/relay_sync/fedos_device_relay_sync_publisher.js";
-import { FedosDeviceRelaySyncOutboundCoordinator } from "../src/device/relay_sync/fedos_device_relay_sync_outbound_coordinator.js";
-import { FedosDeviceRelaySyncInboundHandler } from "../src/device/relay_sync/fedos_device_relay_sync_inbound_handler.js";
-import { InMemoryFedosDeviceRelaySyncOutboxPersistence } from "../src/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_outbox_persistence.js";
-import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../src/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
-import { InMemoryFedosDeviceRelaySyncInboundDedupPersistence } from "../src/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_inbound_dedup_persistence.js";
-import { AppendOnlyFedosDeviceRelaySyncInboundDedupPersistence } from "../src/device/relay_sync/persistence/append_only_fedos_device_relay_sync_inbound_dedup_persistence.js";
-import type { FedosDeviceRelaySyncInboundDedupPersistence } from "../src/device/relay_sync/persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
-import { buildFedosDeviceRelaySyncWirePayload } from "../src/device/relay_sync/fedos_device_relay_sync_wire_payload.js";
-import { buildFedosDeviceRelaySyncUnsignedEventRequest } from "../src/device/relay_sync/fedos_device_relay_sync_event.js";
-import { queryFedosDeviceRelaySyncStatusForSession, type FedosDeviceRelaySyncObservationRepository } from "../src/device/relay_sync/fedos_device_relay_sync_observation.js";
+import { FedosConversationRelaySet } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
+import { nostrWireEventToFedosEventDescriptor } from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
+import { FedosDeviceRelaySyncPublisher } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_publisher.js";
+import { FedosDeviceRelaySyncOutboundCoordinator } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_outbound_coordinator.js";
+import { FedosDeviceRelaySyncInboundHandler } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_inbound_handler.js";
+import { InMemoryFedosDeviceRelaySyncOutboxPersistence } from "../src/os/messenger/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_outbox_persistence.js";
+import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../src/os/messenger/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
+import { InMemoryFedosDeviceRelaySyncInboundDedupPersistence } from "../src/os/messenger/device/relay_sync/persistence/in_memory_fedos_device_relay_sync_inbound_dedup_persistence.js";
+import { AppendOnlyFedosDeviceRelaySyncInboundDedupPersistence } from "../src/os/messenger/device/relay_sync/persistence/append_only_fedos_device_relay_sync_inbound_dedup_persistence.js";
+import type { FedosDeviceRelaySyncInboundDedupPersistence } from "../src/os/messenger/device/relay_sync/persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
+import { buildFedosDeviceRelaySyncWirePayload } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_wire_payload.js";
+import { buildFedosDeviceRelaySyncUnsignedEventRequest } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_event.js";
+import { queryFedosDeviceRelaySyncStatusForSession, type FedosDeviceRelaySyncObservationRepository } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_observation.js";
 import { FakeDeviceRelaySyncRelay } from "./support/fake_device_relay_sync_relay.js";
 import {
   buildDeviceRelaySyncFixture,
@@ -28,16 +28,16 @@ import {
   DEVICE_RELAY_SYNC_BUILD_FIELDS,
   type DeviceRelaySyncFixture,
 } from "./support/device_relay_sync_test_fixture.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
-import { createFedosDeviceTransferCoordinator } from "../src/device/transfer/fedos_device_transfer_coordinator.js";
-import { InMemoryFedosDeviceTransferSessionPersistence } from "../src/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
-import { createFedosDeviceSyncRuntime } from "../src/device/runtime/fedos_device_sync_runtime.js";
-import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
-import { authorizeFedosDeviceBindingChallenge } from "../src/device/binding_challenge/fedos_device_binding_account_authorization.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
-import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import { createFedosDeviceTransferCoordinator } from "../src/os/messenger/device/transfer/fedos_device_transfer_coordinator.js";
+import { InMemoryFedosDeviceTransferSessionPersistence } from "../src/os/messenger/device/transfer/persistence/in_memory_fedos_device_transfer_session_persistence.js";
+import { createFedosDeviceSyncRuntime } from "../src/os/messenger/device/runtime/fedos_device_sync_runtime.js";
+import { InMemoryFedosDeviceBindingChallengeReplayPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_binding_challenge_replay_persistence.js";
+import { authorizeFedosDeviceBindingChallenge } from "../src/os/messenger/device/binding_challenge/fedos_device_binding_account_authorization.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
+import type { FedosSubscription } from "../src/os/messenger/desktop/fedos_subscription.js";
 
 const NOW = 2_000_000_000;
 

@@ -92,8 +92,8 @@ lines.push("This is a factual inventory of what dependencies declare about their
 lines.push("licensing, deterministically re-derived from a real install and from");
 lines.push("`cargo metadata` (a standard Cargo built-in — no new tool was installed to");
 lines.push("produce this file). It makes **no decision** about this repository's own");
-lines.push("license — see `LICENSE_STATUS.md` for that (currently: **not yet");
-lines.push("selected — HUMAN INPUT REQUIRED**, see `ARCHITECTURE.md`/`ROADMAP.md`).");
+lines.push("license — see `LICENSE_STATUS.md` for that (currently: **MPL-2.0**,");
+lines.push("decided; see `LICENSE_STATUS.md` for the full decision record).");
 lines.push("");
 lines.push(`Generated at: ${new Date().toISOString()}`);
 lines.push("");

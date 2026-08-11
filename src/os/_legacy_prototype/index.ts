@@ -1,0 +1,193 @@
+/**
+ * nostr-window — public surface (Stage 1).
+ *
+ * A Reddit-style "window" into Nostr. This barrel re-exports the read-only
+ * ingest building blocks. Threading, UI, replies, communities, content and
+ * ads layer on in later stages behind the same adapter boundaries.
+ */
+
+// Nostr core
+export type { NostrEvent, NostrTag, EventCore } from "../messenger/adapters/nostr/protocol/types.js";
+export {
+  validateEventStructure,
+  isNostrEvent,
+  serializeForId,
+  computeEventId,
+  verifyEventId,
+  type StructureIssue,
+} from "../messenger/adapters/nostr/protocol/event.js";
+export {
+  webCryptoSha256Hex,
+  constantTimeHexEqual,
+  type Sha256Hex,
+} from "../messenger/adapters/nostr/protocol/crypto.js";
+export {
+  InMemoryRelayAdapter,
+  eventMatchesFilter,
+  eventMatchesAnyFilter,
+  type RelayAdapter,
+  type NostrFilter,
+} from "../messenger/adapters/nostr/protocol/relay.js";
+export {
+  parseRelayMessage,
+  isEventMessage,
+  isEoseMessage,
+  isNoticeMessage,
+  type RelayMessage,
+} from "../messenger/adapters/nostr/protocol/messages.js";
+export {
+  NoopSignatureVerifier,
+  RejectAllSignatureVerifier,
+  type SignatureVerifier,
+} from "../messenger/adapters/nostr/protocol/signature.js";
+export {
+  NobleSignatureVerifier,
+  isValidHex,
+} from "../messenger/adapters/nostr/protocol/noble_signature.js";
+export {
+  WebSocketRelayAdapter,
+  type WebSocketFactory,
+  type WebSocketRelayOptions,
+  type RelaySocketLike,
+  type RelaySocketEvent,
+  type RelaySocketEventType,
+} from "../messenger/adapters/nostr/protocol/ws_relay.js";
+
+// Ingest
+export { ingestRawEvents, dedupeById } from "./ingest/ingest.js";
+export type {
+  IngestedEvent,
+  RejectedEvent,
+  IngestResult,
+  IngestContext,
+} from "./ingest/types.js";
+
+// Thread builder (Stage 2)
+export { buildThreads, getReplyTarget, getRootTarget } from "./thread/thread.js";
+export type {
+  ThreadNode,
+  ThreadBuildResult,
+  ThreadBuildWarning,
+  ThreadWarningKind,
+} from "./thread/types.js";
+
+// Query / sort / filter policy (Stage 4)
+export {
+  queryThreads,
+  scoreThread,
+  countDescendants,
+  filterThread,
+  MAX_LIMIT,
+} from "./query/thread_query.js";
+export type {
+  SortMode,
+  ThreadQueryOptions,
+  ResolvedQueryOptions,
+  ThreadQueryResult,
+} from "./query/types.js";
+
+// Relay event cache (Stage 6)
+export {
+  InMemoryEventCache,
+  getCachedOrFetchEvents,
+  createRelayCacheKey,
+  normalizeFiltersForCache,
+  type GetCachedOrFetchOptions,
+  type GetCachedOrFetchResult,
+} from "./cache/event_cache.js";
+export type {
+  CacheKey,
+  CacheStatus,
+  CachedEventBatch,
+  CacheLookupResult,
+  EventCache,
+} from "./cache/types.js";
+export {
+  KvEventCache,
+  type KvLikeNamespace,
+  type KvEventCacheOptions,
+} from "./cache/kv_event_cache.js";
+
+// Community / channel / group spaces (Stage 9)
+export {
+  getRole,
+  listMemberships,
+  canRead,
+  canPost,
+  canModerate,
+  canAdmin,
+} from "./community/policy.js";
+export {
+  getSpaceTags,
+  eventMatchesSpace,
+  classifyEventToSpaces,
+} from "./community/classify.js";
+export {
+  InMemorySpaceDirectory,
+  findSpaceById,
+  listReadableSpaces,
+  filterEventsForSpace,
+  type SpaceDirectory,
+} from "./community/directory.js";
+export { SAMPLE_SPACES, SAMPLE_VAULT_MEMBER } from "./community/sample_spaces.js";
+export type {
+  SpaceType,
+  SpaceVisibility,
+  MembershipPolicy,
+  PostPolicy,
+  SpaceRole,
+  SpaceMembership,
+  SpaceBase,
+  CommunitySpace,
+  ChannelSpace,
+  GroupSpace,
+  Space,
+  SpaceDecision,
+} from "./community/types.js";
+
+// Signer boundary (Stage 10) — builds unsigned events; never holds keys
+export {
+  buildUnsignedTextNote,
+  buildReplyTags,
+  buildSpaceTags,
+  prepareSpacePost,
+  type PrepareSpacePostOptions,
+  type PrepareSpacePostResult,
+} from "./sign/build.js";
+export { Nip07EventSigner, isNip07Available } from "./sign/nip07.js";
+export { isSignedEventLike, assertSignerPubkeyMatches } from "./sign/validate.js";
+export type {
+  UnsignedNostrEvent,
+  SignedNostrEvent,
+  EventSigner,
+  Nip07Provider,
+  SignRequest,
+  BuildTextNoteOptions,
+} from "./sign/types.js";
+
+// Render layer (Stage 3, read-only demo)
+export {
+  escapeHtml,
+  shortenHex,
+  renderThreadNode,
+  renderRoots,
+  renderThreadList,
+  renderWarnings,
+  renderQueryStatus,
+  renderNotice,
+  renderCacheStatus,
+  renderSpaceLabel,
+  renderSpaceLabels,
+  renderPage,
+  type QueryStatusView,
+  type CacheStatusView,
+  type SpaceLabelView,
+  type PageView,
+} from "./render/html.js";
+export {
+  renderSpaceDirectory,
+  renderSpaceLanding,
+  renderSpaceNotFound,
+  renderSpaceAccessDenied,
+} from "./render/space.js";
+export { handleRequest, selectCache, selectVerifier, type Env } from "./worker.js";

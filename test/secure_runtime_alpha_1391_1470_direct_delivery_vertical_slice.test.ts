@@ -40,35 +40,35 @@ import { sha256 } from "@noble/hashes/sha2.js";
 // @ts-expect-error see above.
 import { Buffer } from "node:buffer";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
-import { toFedosConversationInvitationToken } from "../src/conversation/invitation/fedos_conversation_invitation_token.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
+import { toFedosConversationInvitationToken } from "../src/os/messenger/conversations/invitation/fedos_conversation_invitation_token.js";
 import type {
   FedosConversationEncryptionAuthority,
   FedosConversationEncryptionRequest,
   FedosConversationEncryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
 import type {
   FedosConversationDecryptionAuthority,
   FedosConversationDecryptionRequest,
   FedosConversationDecryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
 import type {
   FedosNostrSigningAuthority,
   FedosNostrUnsignedEventRequest,
-} from "../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosNostrWireEvent } from "../src/desktop/fedos_nostr_wire_event.js";
-import type { FedosRelay } from "../src/desktop/fedos_relay.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
-import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/desktop/fedos_relay_listeners.js";
-import type { FedosSubscription } from "../src/desktop/fedos_subscription.js";
-import type { FedosSubscriptionFilter } from "../src/desktop/fedos_subscription_filter.js";
-import { FedosRelayOkCorrelatedPrivateNostrDeliveryPublisher } from "../src/conversation/delivery/nostr/fedos_private_nostr_delivery_publisher.js";
-import { FedosSigningAuthorityNostrAuthorBinding } from "../src/board/runtime/identity/fedos_nostr_author_binding_authority.js";
-import { validateInboundNostrEvent } from "../src/desktop/combined_inbound_event_validator.js";
-import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
+} from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
+import type { FedosRelay } from "../src/os/messenger/desktop/fedos_relay.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
+import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/os/messenger/desktop/fedos_relay_listeners.js";
+import type { FedosSubscription } from "../src/os/messenger/desktop/fedos_subscription.js";
+import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
+import { FedosRelayOkCorrelatedPrivateNostrDeliveryPublisher } from "../src/os/messenger/adapters/nostr/conversation_delivery/fedos_private_nostr_delivery_publisher.js";
+import { FedosSigningAuthorityNostrAuthorBinding } from "../src/os/messenger/board/runtime/identity/fedos_nostr_author_binding_authority.js";
+import { validateInboundNostrEvent } from "../src/os/messenger/desktop/combined_inbound_event_validator.js";
+import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/os/messenger/adapters/nostr/conversation_delivery/fedos_private_nostr_delivery_mode.js";
 
 /**
  * Every prior Arc's own Fake Authority pair (e.g.

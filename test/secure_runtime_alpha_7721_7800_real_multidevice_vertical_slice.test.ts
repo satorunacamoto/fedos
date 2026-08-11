@@ -8,39 +8,39 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { Buffer } from "node:buffer";
 
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import type { FedosPersistedDeviceBindingEventV1 } from "../src/device/persistence/fedos_persisted_device_binding_event_v1.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import { FedosConversationRelaySet } from "../src/conversation/transport/relay/fedos_conversation_relay_set.js";
-import { FedosDeviceRelaySyncPublisher } from "../src/device/relay_sync/fedos_device_relay_sync_publisher.js";
-import { FedosArchiveSuppressionOutboundCoordinator } from "../src/device/archive_suppression_sync/fedos_archive_suppression_outbound_coordinator.js";
-import { FedosArchiveSuppressionInboundHandler } from "../src/device/archive_suppression_sync/fedos_archive_suppression_inbound_handler.js";
-import { AppendOnlyFedosArchiveSuppressionInboundDedupPersistence } from "../src/device/archive_suppression_sync/persistence/append_only_fedos_archive_suppression_inbound_dedup_persistence.js";
-import { FedosArchiveSuppressionObservationAuthority } from "../src/conversation/retention/fedos_archive_suppression_observation_authority.js";
-import { AppendOnlyFedosArchiveSuppressionObservationPersistence } from "../src/conversation/retention/append_only_fedos_archive_suppression_observation_persistence.js";
-import { createAndRecordLocalArchiveSuppressionFact } from "../src/conversation/retention/fedos_archive_suppression_local_bridge.js";
-import type { FedosArchiveSuppressionFact } from "../src/conversation/retention/fedos_archive_suppression_fact.js";
-import { nostrWireEventToFedosEventDescriptor } from "../src/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
-import { WebSocketRelay } from "../src/desktop/websocket_relay.js";
-import { createNodeWebSocketRelaySocketFactory } from "../src/desktop/node_websocket_relay_socket_factory.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import type { FedosPersistedDeviceBindingEventV1 } from "../src/os/messenger/device/persistence/fedos_persisted_device_binding_event_v1.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosConversationRelaySet } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
+import { FedosDeviceRelaySyncPublisher } from "../src/os/messenger/device/relay_sync/fedos_device_relay_sync_publisher.js";
+import { FedosArchiveSuppressionOutboundCoordinator } from "../src/os/messenger/device/archive_suppression_sync/fedos_archive_suppression_outbound_coordinator.js";
+import { FedosArchiveSuppressionInboundHandler } from "../src/os/messenger/device/archive_suppression_sync/fedos_archive_suppression_inbound_handler.js";
+import { AppendOnlyFedosArchiveSuppressionInboundDedupPersistence } from "../src/os/messenger/device/archive_suppression_sync/persistence/append_only_fedos_archive_suppression_inbound_dedup_persistence.js";
+import { FedosArchiveSuppressionObservationAuthority } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_observation_authority.js";
+import { AppendOnlyFedosArchiveSuppressionObservationPersistence } from "../src/os/messenger/conversations/retention/append_only_fedos_archive_suppression_observation_persistence.js";
+import { createAndRecordLocalArchiveSuppressionFact } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_local_bridge.js";
+import type { FedosArchiveSuppressionFact } from "../src/os/messenger/conversations/retention/fedos_archive_suppression_fact.js";
+import { nostrWireEventToFedosEventDescriptor } from "../src/os/messenger/board/publish/nostr/fedos_nostr_wire_event_to_event_descriptor.js";
+import { WebSocketRelay } from "../src/os/messenger/desktop/websocket_relay.js";
+import { createNodeWebSocketRelaySocketFactory } from "../src/os/messenger/desktop/node_websocket_relay_socket_factory.js";
 import {
   startFedosRealLocalWebSocketRelayServer,
   type FedosRealLocalWebSocketRelayServer,
 } from "./support/fedos_real_local_websocket_relay_server.js";
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 
-import { InMemoryFedosConversationPersistence } from "../src/conversation/persistence/in_memory_fedos_conversation_persistence.js";
-import { InMemoryFedosConversationMembershipPersistence } from "../src/conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
-import { InMemoryFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/conversation/archive/fedos_conversation_archive_schema_version.js";
-import type { FedosConversationArchiveBundleV1 } from "../src/conversation/archive/fedos_conversation_archive_bundle.js";
-import { restoreFedosConversationArchiveBundle } from "../src/conversation/archive/fedos_conversation_archive_restore.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../src/os/messenger/conversations/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_schema_version.js";
+import type { FedosConversationArchiveBundleV1 } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_bundle.js";
+import { restoreFedosConversationArchiveBundle } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_restore.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 /**
  * Secure Runtime Alpha 7721-7800 -- Phase K: real multi-Device vertical

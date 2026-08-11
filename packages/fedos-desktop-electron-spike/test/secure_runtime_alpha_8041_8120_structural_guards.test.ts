@@ -211,7 +211,7 @@ describe("Secure Runtime Alpha 8041-8120 -- structural guards", () => {
     //     already-public accessors (`#knownConversationIds` itself, `FedosConversationRuntime.listDrafts()`)
     //     -- no new persistence, business rule, or Runtime capability, no protocol change.
     expect(diffNames("src/desktop/shell").trim()).toBe("src/desktop/shell/fedos_desktop_application_shell.ts");
-    const shellSource = stripComments(read("src/desktop/shell/fedos_desktop_application_shell.ts"));
+    const shellSource = stripComments(read("src/os/messenger/desktop/shell/fedos_desktop_application_shell.ts"));
     expect(shellSource).toMatch(/if \(outcome\.outcome === "sent"\) this\.#knownConversationIds\.add\(outcome\.conversationId\);/);
     expect(shellSource).toMatch(/for \(const draft of this\.#runtime\.conversationRuntime\(\)\.listDrafts\(\)\) allIds\.add\(draft\.id\);/);
   });

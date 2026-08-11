@@ -120,7 +120,13 @@
  */
 
 import { createExecutionBackend } from "./fedos_execution_backend.js";
-import type { FedosInternalRustCall } from "./fedos_internal_rust_call.js";
+// Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+// reduction — sourced from the dedicated `fedos_internal_rust_call_shape.ts`
+// (not `fedos_internal_rust_call.ts`, which itself calls INTO this file —
+// see that shape file's own header for why importing back from here would
+// close a cycle). `fedos_internal_rust_call.ts` re-exports the identical
+// type unchanged, so this is a zero-behavior-change redirect.
+import type { FedosInternalRustCall } from "./fedos_internal_rust_call_shape.js";
 
 /**
  * Coarse status of the Rust Invocation Adapter abstraction itself.

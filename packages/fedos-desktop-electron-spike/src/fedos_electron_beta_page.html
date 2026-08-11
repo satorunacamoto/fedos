@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'none'"
     />
     <title>FedOS Desktop — Beta</title>
     <style>
@@ -58,6 +58,15 @@
       .relay-row span { flex: 1; font-family: ui-monospace, monospace; font-size: 0.8rem; }
       .relay-row button { margin: 0; }
       [role="alert"]:empty { display: none; }
+      /* Commerce Reachable Catalog + Product Surface Phase 1. */
+      .commerce-thumb, .commerce-thumb-fallback { width: 64px; height: 64px; border-radius: 4px; margin-bottom: 0.4rem; }
+      .commerce-thumb { object-fit: cover; display: block; background: #0f1114; }
+      .commerce-thumb-fallback { display: flex; align-items: center; justify-content: center; background: #23262b; color: #9bd; font-weight: 600; font-size: 1.1rem; }
+      .commerce-detail-media, .commerce-detail-media-fallback { width: 192px; height: 192px; border-radius: 6px; margin-bottom: 0.75rem; }
+      .commerce-detail-media { object-fit: cover; display: block; background: #0f1114; }
+      .commerce-detail-media-fallback { display: flex; align-items: center; justify-content: center; background: #23262b; color: #9bd; font-weight: 600; font-size: 2rem; }
+      .commerce-price { font-weight: 600; }
+      .commerce-unavailable-pill { display: inline-block; margin-top: 0.75rem; padding: 0.4rem 0.9rem; border-radius: 4px; background: #23262b; color: #889; font-size: 0.85rem; border: 1px dashed #445; }
     </style>
   </head>
   <body>
@@ -134,6 +143,7 @@
 
       <nav id="app-nav" aria-label="Primary">
         <button id="nav-conversations" type="button">Conversations</button>
+        <button id="nav-commerce" type="button">Commerce</button>
         <button id="nav-search" type="button">Search</button>
         <button id="nav-archive" type="button">Archive</button>
         <button id="nav-devices" type="button">Devices</button>
@@ -170,6 +180,25 @@
           <textarea id="chat-compose" maxlength="8192"></textarea>
           <button id="chat-send" type="button">Send</button>
           <p id="chat-send-feedback" role="status" aria-live="polite" class="muted"></p>
+        </div>
+
+        <div class="app-screen" id="app-screen-commerce">
+          <h2>Commerce</h2>
+          <p class="muted">Read-only catalog preview. Ordering, payment, delivery, and Trust/QR are not wired yet.</p>
+          <div id="commerce-error" class="error" role="alert"></div>
+          <ul class="plain-list" id="commerce-catalog-list"></ul>
+        </div>
+
+        <div class="app-screen" id="app-screen-commerce-detail">
+          <button id="commerce-detail-back" type="button">&larr; Back to Commerce</button>
+          <h2 id="commerce-detail-title">Product</h2>
+          <div id="commerce-detail-error" class="error" role="alert"></div>
+          <div id="commerce-detail-media-area"></div>
+          <p class="commerce-price" id="commerce-detail-price"></p>
+          <p class="muted" id="commerce-detail-merchant"></p>
+          <p class="muted" id="commerce-detail-status"></p>
+          <p id="commerce-detail-description"></p>
+          <span class="commerce-unavailable-pill">Ordering not available yet</span>
         </div>
 
         <div class="app-screen" id="app-screen-search">

@@ -4,8 +4,8 @@ import {
   renderSpaceLanding,
   renderSpaceNotFound,
   renderSpaceAccessDenied,
-} from "../src/render/space.js";
-import type { CommunitySpace, SpaceDecision } from "../src/community/types.js";
+} from "../src/os/_legacy_prototype/render/space.js";
+import type { CommunitySpace, SpaceDecision } from "../src/os/_legacy_prototype/community/types.js";
 
 function space(overrides: Partial<CommunitySpace> = {}): CommunitySpace {
   return {

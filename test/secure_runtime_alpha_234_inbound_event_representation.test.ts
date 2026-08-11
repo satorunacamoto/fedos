@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_234_inbound_event_representation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wireEventSource from "../src/desktop/fedos_nostr_wire_event.ts?raw";
+import wireEventSource from "../src/os/messenger/desktop/fedos_nostr_wire_event.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosEventDescriptorSource from "../src/desktop/fedos_event_descriptor.ts?raw";
+import fedosEventDescriptorSource from "../src/os/messenger/desktop/fedos_event_descriptor.ts?raw";
+// @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
+import canonicalTypesSource from "../src/os/messenger/adapters/nostr/protocol/types.ts?raw";
 
 /**
  * Secure Runtime Alpha 234 -- "Inbound Event Representation": Stage 4
@@ -27,21 +29,39 @@ describe("Secure Runtime Alpha 234 -- Inbound Event Representation", () => {
     );
   });
 
-  it("3. structural: FedosNostrWireEvent is the only export, naming exactly the seven NIP-01 wire fields verbatim", () => {
-    const exportNames = [...wireEventSource.matchAll(/^export (?:interface|class|function|const) (\w+)/gm)].map(
+  // Nostr Consolidation Plan, Step 1 (docs/architecture/NOSTR-CONSOLIDATION-PLAN.md):
+  // FedosNostrWireEvent and NostrEvent (adapters/nostr/protocol/types.ts)
+  // converged on one canonical type -- this file is now a one-line
+  // re-export ALIAS of that name, not a local interface declaration (see
+  // its own header comment for the full reasoning). "The only export,
+  // naming exactly the seven fields" now means: this file re-exports
+  // exactly one name, and the canonical definition it points at still
+  // declares exactly those seven fields verbatim -- not that the fields
+  // are declared inline here anymore.
+  it("3. structural: FedosNostrWireEvent is the only export, aliasing the canonical type that names exactly the seven NIP-01 wire fields verbatim", () => {
+    const reExportNames = [...wireEventSource.matchAll(/^export type \{ \w+ as (\w+) \}/gm)].map(
       (m: RegExpMatchArray) => m[1],
     );
-    expect(exportNames).toEqual(["FedosNostrWireEvent"]);
-    expect(wireEventSource).toMatch(
-      /export interface FedosNostrWireEvent \{\s*\n\s*readonly id: string;\s*\n\s*readonly pubkey: string;\s*\n\s*readonly created_at: number;\s*\n\s*readonly kind: number;\s*\n\s*readonly tags: readonly \(readonly string\[\]\)\[\];\s*\n\s*readonly content: string;\s*\n\s*readonly sig: string;\s*\n\}/,
+    expect(reExportNames).toEqual(["FedosNostrWireEvent"]);
+    // The canonical definition documents each field with its own doc
+    // comment (unlike the old wire_event.ts file this test originally
+    // checked) -- strip comments before checking field order/names.
+    const rawBody = (canonicalTypesSource.match(/export interface NostrEvent \{([\s\S]*?)\n\}/) ?? [])[1] ?? "";
+    const codeOnlyBody = rawBody.replace(/\/\*\*[\s\S]*?\*\//g, "").replace(/^\s*\n/gm, "");
+    expect(codeOnlyBody).toMatch(
+      /^\s*readonly id: string;\s*\n\s*readonly pubkey: string;\s*\n\s*readonly created_at: number;\s*\n\s*readonly kind: number;\s*\n\s*readonly tags: readonly \(readonly string\[\]\)\[\];\s*\n\s*readonly content: string;\s*\n\s*readonly sig: string;\s*$/,
     );
   });
 
-  it("4. structural: no provider field, and no protocol-neutral rename (author/createdAt/signature) IN CODE", () => {
-    const interfaceBody = (wireEventSource.match(/export interface FedosNostrWireEvent \{([\s\S]*?)\n\}/) ?? [])[1] ?? "";
+  it("4. structural: the canonical type has no provider field, and no protocol-neutral rename (author/createdAt/signature) IN CODE", () => {
+    const interfaceBody = (canonicalTypesSource.match(/export interface NostrEvent \{([\s\S]*?)\n\}/) ?? [])[1] ?? "";
     expect(interfaceBody.length).toBeGreaterThan(0);
-    expect(interfaceBody).not.toMatch(/provider/);
-    expect(interfaceBody).not.toMatch(/\bauthor\b|\bcreatedAt\b|\bsignature\b/);
+    // Strip doc comments before checking -- the canonical type's field docs
+    // legitimately describe e.g. "schnorr signature" in prose without
+    // renaming the field itself (still `sig`, not `signature`).
+    const codeOnly = interfaceBody.replace(/\/\*\*[\s\S]*?\*\//g, "");
+    expect(codeOnly).not.toMatch(/provider/);
+    expect(codeOnly).not.toMatch(/\breadonly author\b|\breadonly createdAt\b|\breadonly signature\b/);
   });
 
   it("5. structural: fedos_nostr_wire_event.ts has zero import of any kind -- depends on nothing", () => {

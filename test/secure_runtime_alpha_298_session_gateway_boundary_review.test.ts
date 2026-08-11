@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_298_session_gateway_boundary_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/session/fedos_session_board_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import postModelSource from "../src/board/session/fedos_validated_session_post.ts?raw";
+import postModelSource from "../src/os/messenger/board/session/fedos_validated_session_post.ts?raw";
 
 /**
  * Secure Runtime Alpha 298 -- "Session Gateway Boundary Review": Stage

@@ -3,8 +3,8 @@ import {
   canPostChat,
   canReadChat,
   isChatParticipant,
-} from "../src/chat/policy.js";
-import type { DMThread, GroupChat } from "../src/chat/types.js";
+} from "../src/os/_legacy_prototype/chat/policy.js";
+import type { DMThread, GroupChat } from "../src/os/_legacy_prototype/chat/types.js";
 
 const ALICE = "a".repeat(64);
 const BOB = "b".repeat(64);

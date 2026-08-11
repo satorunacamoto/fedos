@@ -8,8 +8,8 @@ import type {
   FedosCoreCrypto,
   FedosCoreDecision,
 } from "../packages/fedos-core-rust/src/index.js";
-import { FedosCoreCryptoProvider } from "../src/crypto/fedos_core_adapter.js";
-import type { CryptoProvider, EncryptRequest } from "../src/crypto/types.js";
+import { FedosCoreCryptoProvider } from "../src/os/core/crypto/fedos_core_adapter.js";
+import type { CryptoProvider, EncryptRequest } from "../src/os/core/crypto/types.js";
 import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 // Sources as strings: prove no crypto-library import and no auto-wiring.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -17,11 +17,11 @@ import pkgIndexSource from "../packages/fedos-core-rust/src/index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import pkgTypesSource from "../packages/fedos-core-rust/src/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterSource from "../src/crypto/fedos_core_adapter.ts?raw";
+import adapterSource from "../src/os/core/crypto/fedos_core_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /** A FedOS core whose every method throws — proves the adapter never leaks it. */
 class ThrowingFedosCore implements FedosCoreCrypto {

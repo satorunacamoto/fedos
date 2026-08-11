@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/runtime/create_runtime.js";
+import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { runtimeCapabilities } from "../src/runtime/fedos_runtime_prototype_execution.js";
 import { randomBytes } from "../src/runtime/fedos_runtime_random_bytes.js";
 import { generateAeadKey } from "../src/runtime/fedos_runtime_aead_key_generation.js";
@@ -8,48 +8,48 @@ import { decrypt } from "../src/runtime/fedos_runtime_decrypt.js";
 import { exportCiphertext } from "../src/runtime/fedos_runtime_export_ciphertext.js";
 import { importCiphertext } from "../src/runtime/fedos_runtime_import_ciphertext.js";
 import { storeCiphertext, loadCiphertext, deleteCiphertext } from "../src/runtime/fedos_runtime_ciphertext_storage.js";
-import { resolveFedosIdentityProvider } from "../src/identity/fedos_identity_provider_resolver.js";
+import { resolveFedosIdentityProvider } from "../src/os/core/identity/fedos_identity_provider_resolver.js";
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_032_fedos_identity_provider_resolver.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import alpha031DocSource from "../docs/secure_runtime_alpha_031_fedos_identity_service_skeleton.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import resolverSource from "../src/identity/fedos_identity_provider_resolver.ts?raw";
+import resolverSource from "../src/os/core/identity/fedos_identity_provider_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import serviceSource from "../src/identity/fedos_identity_service.ts?raw";
+import serviceSource from "../src/os/core/identity/fedos_identity_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import descriptorSource from "../src/identity/fedos_identity_descriptor.ts?raw";
+import descriptorSource from "../src/os/core/identity/fedos_identity_descriptor.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import providerInterfaceSource from "../src/identity/fedos_identity_provider.ts?raw";
+import providerInterfaceSource from "../src/os/core/identity/fedos_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import capabilitySource from "../src/identity/fedos_identity_capability.ts?raw";
+import capabilitySource from "../src/os/core/identity/fedos_identity_capability.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import providerBoundarySource from "../src/identity/provider_boundary.ts?raw";
+import providerBoundarySource from "../src/os/core/identity/provider_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import providerTypesSource from "../src/identity/provider_types.ts?raw";
+import providerTypesSource from "../src/os/core/identity/provider_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import providerBridgeSource from "../src/identity/provider_bridge.ts?raw";
+import providerBridgeSource from "../src/os/core/identity/provider_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import webauthnAdapterSource from "../src/identity/webauthn_adapter.ts?raw";
+import webauthnAdapterSource from "../src/os/core/identity/webauthn_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identityTypesSource from "../src/identity/types.ts?raw";
+import identityTypesSource from "../src/os/core/identity/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sessionBoundarySource from "../src/identity/session_boundary.ts?raw";
+import sessionBoundarySource from "../src/os/core/identity/session_boundary.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import storageResolverSource from "../src/runtime/fedos_runtime_storage_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

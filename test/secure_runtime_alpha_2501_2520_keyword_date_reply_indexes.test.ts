@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { FedosConversationSearchKeywordIndex } from "../src/conversation/search/fedos_conversation_search_keyword_index.js";
-import { FedosConversationSearchDateIndex } from "../src/conversation/search/fedos_conversation_search_date_index.js";
-import { FedosConversationSearchReplyIndex } from "../src/conversation/search/fedos_conversation_search_reply_index.js";
-import type { FedosConversationSearchEnvelopeDocument } from "../src/conversation/search/fedos_conversation_search_document.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationEnvelopeId } from "../src/conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationMembershipId } from "../src/conversation/membership/fedos_conversation_membership_id.js";
+import { FedosConversationSearchKeywordIndex } from "../src/os/messenger/conversations/search/fedos_conversation_search_keyword_index.js";
+import { FedosConversationSearchDateIndex } from "../src/os/messenger/conversations/search/fedos_conversation_search_date_index.js";
+import { FedosConversationSearchReplyIndex } from "../src/os/messenger/conversations/search/fedos_conversation_search_reply_index.js";
+import type { FedosConversationSearchEnvelopeDocument } from "../src/os/messenger/conversations/search/fedos_conversation_search_document.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationEnvelopeId } from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationMembershipId } from "../src/os/messenger/conversations/membership/fedos_conversation_membership_id.js";
 
 const CONVERSATION_ID = "private-draft::direct::req-1" as FedosConversationId;
 const SENDER = "private-draft::direct::req-1::fedos::alice" as FedosConversationMembershipId;

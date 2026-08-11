@@ -3,15 +3,15 @@ import {
   resolveProductAssetPreviews,
   filterPreviewAssetMetadata,
   isPreviewAssetVisible,
-} from "../src/commerce/asset_preview.js";
-import type { ProductAsset } from "../src/commerce/directory.js";
-import type { Product } from "../src/commerce/types.js";
+} from "../src/os/commerce/catalog/asset_preview.js";
+import type { ProductAsset } from "../src/os/commerce/catalog/directory.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
 import type {
   AssetCache,
   AssetKey,
   AssetMetadata,
   CachedAsset,
-} from "../src/asset/types.js";
+} from "../src/os/_legacy_prototype/asset/types.js";
 
 /** A product referencing three asset ids. */
 function product(assetIds: string[]): Product {

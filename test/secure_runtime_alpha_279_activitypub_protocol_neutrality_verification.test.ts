@@ -4,11 +4,11 @@ import designDocSource from "../docs/secure_runtime_alpha_279_activitypub_protoc
 import {
   validateActivityPubBoardPost,
   mapValidatedActivityPubPostToBoardPostInput,
-} from "../src/board/activitypub/fedos_activitypub_board_adapter.js";
-import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/board/fedos_board_post_validator.js";
-import type { FedosValidatedActivityPubPost } from "../src/board/activitypub/fedos_validated_activitypub_post.js";
-import { validateNostrBoardPost } from "../src/board/fedos_board_nostr_adapter.js";
-import type { FedosValidatedNostrEvent } from "../src/desktop/fedos_validated_nostr_event.js";
+} from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.js";
+import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosValidatedActivityPubPost } from "../src/os/messenger/board/activitypub/fedos_validated_activitypub_post.js";
+import { validateNostrBoardPost } from "../src/os/messenger/board/fedos_board_nostr_adapter.js";
+import type { FedosValidatedNostrEvent } from "../src/os/messenger/desktop/fedos_validated_nostr_event.js";
 
 const MASTODON_ROOT: FedosValidatedActivityPubPost = {
   objectId: "https://mastodon.example/users/alice/statuses/123456789012345678",

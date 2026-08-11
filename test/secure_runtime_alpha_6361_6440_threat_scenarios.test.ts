@@ -17,57 +17,57 @@ import { join } from "node:path";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { isFedosDeviceBindingRevoked } from "../src/device/fedos_device_binding.js";
-import { FedosDeletionRequestOutboundCoordinator } from "../src/conversation/deletion_request/fedos_deletion_request_outbound_coordinator.js";
-import { FedosDeletionRequestInboundCoordinator } from "../src/conversation/deletion_request/fedos_deletion_request_inbound_coordinator.js";
-import { InMemoryFedosDeletionRequestPendingReviewPersistence } from "../src/conversation/deletion_request/fedos_deletion_request_pending_review_persistence.js";
-import { AppendOnlyFedosDeletionRequestPendingReviewPersistence } from "../src/conversation/deletion_request/append_only_fedos_deletion_request_pending_review_persistence.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { InMemoryFedosPayloadRetentionPersistence } from "../src/conversation/retention/in_memory_fedos_payload_retention_persistence.js";
-import { FedosPayloadRetentionAuthority } from "../src/conversation/retention/fedos_payload_retention_authority.js";
-import { toFedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
-import { InMemoryFedosDeletionRecipientDecisionPersistence } from "../src/conversation/deletion_request/in_memory_fedos_deletion_recipient_decision_persistence.js";
-import { InMemoryFedosDeletionExecutionPersistence } from "../src/conversation/deletion/in_memory_fedos_deletion_execution_persistence.js";
-import { FedosNobleTestNostrSigningAuthority, fedosTestSecretKeyFromSeed } from "../src/conversation/deletion_request/fedos_deletion_request_signing.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { toFedosConversationEnvelopeId } from "../src/conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import type { FedosConversationPersistence, FedosConversationPersistenceWriteResult } from "../src/conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { isFedosDeviceBindingRevoked } from "../src/os/messenger/device/fedos_device_binding.js";
+import { FedosDeletionRequestOutboundCoordinator } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_outbound_coordinator.js";
+import { FedosDeletionRequestInboundCoordinator } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_inbound_coordinator.js";
+import { InMemoryFedosDeletionRequestPendingReviewPersistence } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_pending_review_persistence.js";
+import { AppendOnlyFedosDeletionRequestPendingReviewPersistence } from "../src/os/messenger/conversations/deletion_request/append_only_fedos_deletion_request_pending_review_persistence.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_payload_retention_persistence.js";
+import { FedosPayloadRetentionAuthority } from "../src/os/messenger/conversations/retention/fedos_payload_retention_authority.js";
+import { toFedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
+import { InMemoryFedosDeletionRecipientDecisionPersistence } from "../src/os/messenger/conversations/deletion_request/in_memory_fedos_deletion_recipient_decision_persistence.js";
+import { InMemoryFedosDeletionExecutionPersistence } from "../src/os/messenger/conversations/deletion/in_memory_fedos_deletion_execution_persistence.js";
+import { FedosNobleTestNostrSigningAuthority, fedosTestSecretKeyFromSeed } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_signing.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { toFedosConversationEnvelopeId } from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationPersistence, FedosConversationPersistenceWriteResult } from "../src/os/messenger/conversations/persistence/fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/os/messenger/conversations/persistence/fedos_persisted_conversation_record_v1.js";
 
 import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
-import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../src/conversation/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
-import { InMemoryFedosIdentityTransitionRatchetResetLinkPersistence } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
-import { InMemoryFedosIdentityTransitionManualVerificationPersistence } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
-import { InMemoryFedosIdentityTransitionConversationContinuityPersistence } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
-import { InMemoryFedosIdentityTransitionLocalDecisionPersistence } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_local_decision.js";
-import { FedosIdentityTransitionOutboundNotificationCoordinator } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_outbound_notification_coordinator.js";
-import { createFedosIdentityTransitionRecordV1 } from "../src/conversation/identity_transition/fedos_identity_transition_record.js";
-import { generateFedosIdentityTransitionId } from "../src/conversation/identity_transition/fedos_identity_transition_id.js";
-import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest, fedosIdentityTransitionContinuityProofDigest } from "../src/conversation/identity_transition/fedos_identity_transition_canonical.js";
-import { encodeFedosRatchetPeerCapabilityControlPayload, decodeFedosRatchetPeerCapabilityControlPayloadFromContent } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
-import { createFedosConversationRuntime, type FedosConversationRuntime } from "../src/conversation/runtime/fedos_conversation_runtime.js";
-import { assembleFedosConversationRuntimeDependencies } from "../src/conversation/runtime/fedos_conversation_runtime_assembly.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
+import { InMemoryFedosIdentityTransitionRatchetResetLinkPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_ratchet_reset_link.js";
+import { InMemoryFedosIdentityTransitionManualVerificationPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_manual_verification.js";
+import { InMemoryFedosIdentityTransitionConversationContinuityPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_conversation_continuity.js";
+import { InMemoryFedosIdentityTransitionLocalDecisionPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_local_decision.js";
+import { FedosIdentityTransitionOutboundNotificationCoordinator } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_outbound_notification_coordinator.js";
+import { createFedosIdentityTransitionRecordV1 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_record.js";
+import { generateFedosIdentityTransitionId } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_id.js";
+import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionNewKeyProofDigest, fedosIdentityTransitionContinuityProofDigest } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_canonical.js";
+import { encodeFedosRatchetPeerCapabilityControlPayload, decodeFedosRatchetPeerCapabilityControlPayloadFromContent } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
+import { createFedosConversationRuntime, type FedosConversationRuntime } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";
+import { assembleFedosConversationRuntimeDependencies } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
-import { FedosRatchetPeerCapabilityRuntime } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
-import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../src/conversation/ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
+import { FedosRatchetPeerCapabilityRuntime } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
+import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../src/os/messenger/conversations/ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
 
-import { FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
+import { FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
 
 import {
   FedosProfileInitializationCoordinator,
   type FedosProfileInitializationDependencies,
-} from "../src/desktop/onboarding/fedos_profile_initialization_coordinator.js";
-import { InMemoryFedosLocalProfilePersistence } from "../src/desktop/onboarding/fedos_local_profile_persistence.js";
-import { planFedosLocalProfilePaths, ensureFedosLocalProfileDirectories } from "../src/desktop/onboarding/fedos_local_profile_paths.js";
-import { DevelopmentFedosMasterSeedAuthority } from "../src/desktop/onboarding/fedos_development_master_seed_authority.js";
-import { fedosProfileUnlockSecretFromUtf8 } from "../src/desktop/onboarding/fedos_profile_unlock_secret.js";
+} from "../src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.js";
+import { InMemoryFedosLocalProfilePersistence } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_persistence.js";
+import { planFedosLocalProfilePaths, ensureFedosLocalProfileDirectories } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_paths.js";
+import { DevelopmentFedosMasterSeedAuthority } from "../src/os/messenger/desktop/onboarding/fedos_development_master_seed_authority.js";
+import { fedosProfileUnlockSecretFromUtf8 } from "../src/os/messenger/desktop/onboarding/fedos_profile_unlock_secret.js";
 
 const NOW = 1_700_000_000;
 const clock = () => NOW;
@@ -297,7 +297,7 @@ describe("Secure Runtime Alpha 6361-6440 -- Threat Scenario 4/5: replay and down
 
 describe("Secure Runtime Alpha 6361-6440 -- Threat Scenario 6: duplicated notification", () => {
   it("6. Safety Center fires a device-revoked notification at most once per fact, even across repeated refreshes", async () => {
-    const { FedosSafetyCenterController } = await import("../src/desktop/presentation/safety_center/fedos_safety_center_controller.js");
+    const { FedosSafetyCenterController } = await import("../src/os/messenger/desktop/presentation/safety_center/fedos_safety_center_controller.js");
     const shell = FedosDesktopApplicationShell.create();
     const controller = new FedosSafetyCenterController(shell);
     let deliveredCount = 0;

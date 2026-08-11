@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_325_d1_backend_review.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import d1IndexSource from "../src/indexer/d1_index.ts?raw";
+import d1IndexSource from "../src/os/_legacy_prototype/indexer/d1_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import d1DirectorySource from "../src/community/d1_directory.ts?raw";
+import d1DirectorySource from "../src/os/_legacy_prototype/community/d1_directory.ts?raw";
 
 /**
  * Secure Runtime Alpha 325 -- "Candidate C: Cloudflare D1 Backend

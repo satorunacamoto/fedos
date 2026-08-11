@@ -4,14 +4,14 @@ import { Buffer } from "node:buffer";
 import {
   FedosWasmConversationEncryptionAuthority,
   type FedosConversationEncryptionRuntimeBoundary,
-} from "../src/conversation/encryption/fedos_wasm_conversation_encryption_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_wasm_conversation_encryption_authority.js";
 import {
   FedosWasmConversationDecryptionAuthority,
   type FedosConversationDecryptionRuntimeBoundary,
-} from "../src/conversation/encryption/fedos_wasm_conversation_decryption_authority.js";
-import type { FedosConversationEncryptionRequest } from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
-import type { FedosConversationDecryptionRequest } from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
-import type { FedosMasterSeedAuthority } from "../src/runtime/master_seed/fedos_master_seed_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_wasm_conversation_decryption_authority.js";
+import type { FedosConversationEncryptionRequest } from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
+import type { FedosConversationDecryptionRequest } from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_master_seed_authority.js";
 import type { AeadCiphertextHandle, AeadKeyHandle } from "../src/runtime/fedos_wasm_loader.js";
 
 const REQUEST: FedosConversationEncryptionRequest = {

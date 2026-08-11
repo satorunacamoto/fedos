@@ -5,8 +5,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { StaticFedosPublicAuthorAuthority } from "../src/board/runtime/identity/static_fedos_public_author_authority.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { StaticFedosPublicAuthorAuthority } from "../src/os/messenger/board/runtime/identity/static_fedos_public_author_authority.js";
 
 const dirs: string[] = [];
 function freshDir(): string {

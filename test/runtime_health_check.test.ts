@@ -8,11 +8,11 @@ import type { HealthCheckTarget } from "../src/runtime/health_check.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import healthCheckSource from "../src/runtime/health_check.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 function target(overrides: Partial<HealthCheckTarget> = {}): HealthCheckTarget {
   return {

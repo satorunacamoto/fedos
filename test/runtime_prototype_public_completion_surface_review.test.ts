@@ -6,11 +6,11 @@ import runtimeIntegrationDocSource from "../docs/runtime_prototype_execution_run
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -103,7 +103,7 @@ describe("FedOS Public Runtime Completion Surface Review -- review only, no Runt
   });
 
   it("11. Fail Closed is confirmed maintained -- initializeCrypto()'s own real return value is still the pinned constant", async () => {
-    const { createRuntimeInitializeCryptoResult } = await import("../src/runtime/create_runtime.js");
+    const { createRuntimeInitializeCryptoResult } = await import("../src/os/_legacy_prototype/runtime/create_runtime.js");
     const decision = createRuntimeInitializeCryptoResult();
     expect(decision).toEqual({ allowed: false, initialized: false, reason: "PrototypeDisabled" });
   });

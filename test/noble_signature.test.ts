@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   NobleSignatureVerifier,
   isValidHex,
-} from "../src/nostr/noble_signature.js";
-import { ingestRawEvents } from "../src/ingest/ingest.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+} from "../src/os/messenger/adapters/nostr/protocol/noble_signature.js";
+import { ingestRawEvents } from "../src/os/_legacy_prototype/ingest/ingest.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 /**
  * A known-good, deterministically-generated NIP-01 event.

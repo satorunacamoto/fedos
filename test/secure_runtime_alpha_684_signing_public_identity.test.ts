@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { FedosWasmNostrSigningAuthority } from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.js";
-import { FedosWasmMasterSeedAuthority } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosMasterSeedWasmLoaderBoundary } from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
-import type { FedosNostrSigningWasmLoaderBoundary } from "../src/nostr/sign/fedos_wasm_nostr_signing_authority.js";
+import { FedosWasmNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.js";
+import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { FedosMasterSeedWasmLoaderBoundary } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
+import type { FedosNostrSigningWasmLoaderBoundary } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.js";
 import type { FedosMasterSeedAuthorityHandle } from "../src/runtime/fedos_wasm_loader.js";
-import { isWellFormedFedosNostrSigningPublicIdentity } from "../src/nostr/sign/fedos_nostr_signing_public_identity.js";
+import { isWellFormedFedosNostrSigningPublicIdentity } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_public_identity.js";
 
 const VALID_HEX = "645ac5".repeat(11).slice(0, 64);
 

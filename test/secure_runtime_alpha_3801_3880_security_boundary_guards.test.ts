@@ -13,29 +13,30 @@ import { execFileSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error see above.
-import facadeSource from "../src/desktop/runtime/fedos_device_sync_operational_facade.js?raw";
+import facadeSource from "../src/os/messenger/desktop/runtime/fedos_device_sync_operational_facade.js?raw";
 // @ts-expect-error see above.
-import shellSource from "../src/desktop/shell/fedos_desktop_application_shell.ts?raw";
+import shellSource from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.ts?raw";
 // @ts-expect-error see above.
-import deviceInventoryVmSource from "../src/desktop/presentation/fedos_desktop_device_inventory_view_model.ts?raw";
+import deviceInventoryVmSource from "../src/os/messenger/desktop/presentation/fedos_desktop_device_inventory_view_model.ts?raw";
 // @ts-expect-error see above.
-import deviceSyncStatusVmSource from "../src/desktop/presentation/fedos_desktop_device_sync_status_view_model.ts?raw";
+import deviceSyncStatusVmSource from "../src/os/messenger/desktop/presentation/fedos_desktop_device_sync_status_view_model.ts?raw";
 // @ts-expect-error see above.
-import syncScheduleVmSource from "../src/desktop/presentation/fedos_desktop_sync_schedule_view_model.ts?raw";
+import syncScheduleVmSource from "../src/os/messenger/desktop/presentation/fedos_desktop_sync_schedule_view_model.ts?raw";
 // @ts-expect-error see above.
-import transferSessionVmSource from "../src/desktop/presentation/fedos_desktop_transfer_session_view_model.ts?raw";
+import transferSessionVmSource from "../src/os/messenger/desktop/presentation/fedos_desktop_transfer_session_view_model.ts?raw";
 // @ts-expect-error see above.
-import syncConflictVmSource from "../src/desktop/presentation/fedos_desktop_sync_conflict_view_model.ts?raw";
+import syncConflictVmSource from "../src/os/messenger/desktop/presentation/fedos_desktop_sync_conflict_view_model.ts?raw";
 // @ts-expect-error see above.
-import deviceListRendererSource from "../src/desktop/renderer/fedos_desktop_device_list_renderer.ts?raw";
+import deviceListRendererSource from "../src/os/messenger/desktop/renderer/fedos_desktop_device_list_renderer.ts?raw";
 // @ts-expect-error see above.
-import deviceSyncStatusRendererSource from "../src/desktop/renderer/fedos_desktop_device_sync_status_renderer.ts?raw";
+import deviceSyncStatusRendererSource from "../src/os/messenger/desktop/renderer/fedos_desktop_device_sync_status_renderer.ts?raw";
 // @ts-expect-error see above.
-import syncScheduleRendererSource from "../src/desktop/renderer/fedos_desktop_sync_schedule_renderer.ts?raw";
+import syncScheduleRendererSource from "../src/os/messenger/desktop/renderer/fedos_desktop_sync_schedule_renderer.ts?raw";
 // @ts-expect-error see above.
-import transferSessionRendererSource from "../src/desktop/renderer/fedos_desktop_transfer_session_renderer.ts?raw";
+import transferSessionRendererSource from "../src/os/messenger/desktop/renderer/fedos_desktop_transfer_session_renderer.ts?raw";
 // @ts-expect-error see above.
-import syncConflictRendererSource from "../src/desktop/renderer/fedos_desktop_sync_conflict_renderer.ts?raw";
+import syncConflictRendererSource from "../src/os/messenger/desktop/renderer/fedos_desktop_sync_conflict_renderer.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 const DEVICE_SYNC_VIEW_MODEL_SOURCES: readonly string[] = [
   deviceInventoryVmSource,
@@ -123,7 +124,7 @@ describe("Secure Runtime Alpha 3801-3880 -- Phase K: layering guards", () => {
 describe("Secure Runtime Alpha 3801-3880 -- Phase K: dependency/scope guards", () => {
   it("9. no new npm dependency was introduced -- package.json still carries exactly two production dependencies", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("10. no Electron/React/Vue/Svelte/Tauri reference anywhere in this Arc's own new files", () => {

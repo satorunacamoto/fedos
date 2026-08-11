@@ -2,16 +2,16 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_308_chronological_board_feed.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import feedSource from "../src/board/repository/fedos_board_feed.ts?raw";
+import feedSource from "../src/os/messenger/board/repository/fedos_board_feed.ts?raw";
 import {
   FedosBoardFeed,
   FEDOS_BOARD_FEED_MIN_LIMIT,
   FEDOS_BOARD_FEED_MAX_LIMIT,
   type FedosBoardFeedSource,
-} from "../src/board/repository/fedos_board_feed.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import type { FedosBoardPost } from "../src/board/fedos_board_post.js";
+} from "../src/os/messenger/board/repository/fedos_board_feed.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosBoardPost } from "../src/os/messenger/board/fedos_board_post.js";
 
 function codeOnly(source: string): string {
   return source

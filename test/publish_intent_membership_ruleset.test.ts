@@ -3,31 +3,31 @@ import {
   PUBLISH_INTENT_KINDS,
   reviewPublishIntent,
   sanitizePublishIntentMetadata,
-} from "../src/federation/publish_intent.js";
-import type { PublishIntentDescriptor } from "../src/federation/publish_intent.js";
+} from "../src/os/_legacy_prototype/federation/publish_intent.js";
+import type { PublishIntentDescriptor } from "../src/os/_legacy_prototype/federation/publish_intent.js";
 import {
   MEMBERSHIP_PLAN_KINDS,
   reviewMembershipPlan,
   sanitizeMembershipPlanMetadata,
-} from "../src/creator/membership.js";
-import type { MembershipPlanDescriptor } from "../src/creator/membership.js";
+} from "../src/os/commerce/creator/membership.js";
+import type { MembershipPlanDescriptor } from "../src/os/commerce/creator/membership.js";
 import {
   renderCommunityRulePreview,
   renderCommunityRulesPreviewPage,
   SAMPLE_COMMUNITY_RULES,
-} from "../src/render/community_rules_preview.js";
+} from "../src/os/_legacy_prototype/render/community_rules_preview.js";
 import {
   handleRequest,
   isCommunityRulesPreviewEnabled,
-} from "../src/worker.js";
+} from "../src/os/_legacy_prototype/worker.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import publishIntentSource from "../src/federation/publish_intent.ts?raw";
+import publishIntentSource from "../src/os/_legacy_prototype/federation/publish_intent.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import membershipSource from "../src/creator/membership.ts?raw";
+import membershipSource from "../src/os/commerce/creator/membership.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import communityRulesPreviewSource from "../src/render/community_rules_preview.ts?raw";
+import communityRulesPreviewSource from "../src/os/_legacy_prototype/render/community_rules_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const boundarySources = [publishIntentSource, membershipSource].join("\n");
 const previewSource = communityRulesPreviewSource as string;

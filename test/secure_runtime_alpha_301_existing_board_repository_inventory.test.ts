@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_301_existing_board_repository_inventory.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import threadQuerySource from "../src/query/thread_query.ts?raw";
+import threadQuerySource from "../src/os/_legacy_prototype/query/thread_query.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageTypesSource from "../src/storage/types.ts?raw";
+import storageTypesSource from "../src/os/core/storage/types.ts?raw";
 
 /**
  * Secure Runtime Alpha 301 -- "Existing Board Repository / Index / Feed

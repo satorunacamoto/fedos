@@ -17,8 +17,8 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { createFedosDesktopConversationUiPresentationBoundary } from "../src/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
-import { createFedosDesktopRenderer } from "../src/desktop/renderer/fedos_desktop_renderer.js";
+import { createFedosDesktopConversationUiPresentationBoundary } from "../src/os/messenger/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
+import { createFedosDesktopRenderer } from "../src/os/messenger/desktop/renderer/fedos_desktop_renderer.js";
 import { StubVerifiedFedosDeviceRegistrationAuthority } from "./support/stub_verified_fedos_device_registration_authority.js";
 
 const ACCOUNT_A = { authority: "nostr", publicIdentifier: "npub-account-a", identityId: null };

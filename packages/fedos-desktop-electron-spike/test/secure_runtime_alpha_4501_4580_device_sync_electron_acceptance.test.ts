@@ -41,8 +41,8 @@ const repoRoot = process.cwd();
 const packageDir = `${repoRoot}/packages/fedos-desktop-electron-spike`;
 const mainCjsPath = `${packageDir}/dist/fedos_electron_badge_main.cjs`;
 const electronBinPath = `${packageDir}/node_modules/electron/dist/electron.exe`;
-const rootDistEventBridgePath = `${repoRoot}/dist/device/sync_events/fedos_device_sync_event_bridge.js`;
-const rootDistWiringPath = `${repoRoot}/dist/desktop/runtime/fedos_desktop_device_sync_presentation_wiring.js`;
+const rootDistEventBridgePath = `${repoRoot}/dist/os/messenger/device/sync_events/fedos_device_sync_event_bridge.js`;
+const rootDistWiringPath = `${repoRoot}/dist/os/messenger/desktop/runtime/fedos_desktop_device_sync_presentation_wiring.js`;
 
 let spawnedElectronPid: number | undefined;
 function killSpawnedElectronIfAny(): void {

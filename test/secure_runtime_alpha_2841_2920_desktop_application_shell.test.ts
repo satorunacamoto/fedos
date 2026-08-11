@@ -17,8 +17,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
-import { createFedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
+import { createFedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
 
 const dirs: string[] = [];
 function freshConfig(): FedosDesktopRuntimeConfig {

@@ -12,20 +12,20 @@ import { mkdtempSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
-import { assembleFedosConversationRuntimeDependencies } from "../src/conversation/runtime/fedos_conversation_runtime_assembly.js";
-import { createFedosConversationRuntime } from "../src/conversation/runtime/fedos_conversation_runtime.js";
-import { FedosPrivateConversationConstructionCoordinator } from "../src/conversation/construction/fedos_private_conversation_construction_coordinator.js";
-import { InMemoryFedosConversationDraftPersistence } from "../src/conversation/construction/in_memory_fedos_conversation_draft_persistence.js";
-import { InMemoryFedosConversationConstructionCoordinationPersistence } from "../src/conversation/construction/coordination/in_memory_fedos_conversation_construction_coordination_persistence.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationCapabilityAuthority } from "../src/conversation/capability/in_memory_fedos_conversation_capability_authority.js";
-import { AnonymousLocalFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
-import { UnavailableFedosConversationEncryptionReadinessAuthority } from "../src/conversation/readiness/fedos_conversation_encryption_readiness_authority.js";
-import { FedosSecureRandomConstructionIdGenerator } from "../src/conversation/construction/fedos_private_conversation_construction_coordinator.js";
+import { assembleFedosConversationRuntimeDependencies } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.js";
+import { createFedosConversationRuntime } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";
+import { FedosPrivateConversationConstructionCoordinator } from "../src/os/messenger/conversations/construction/fedos_private_conversation_construction_coordinator.js";
+import { InMemoryFedosConversationDraftPersistence } from "../src/os/messenger/conversations/construction/in_memory_fedos_conversation_draft_persistence.js";
+import { InMemoryFedosConversationConstructionCoordinationPersistence } from "../src/os/messenger/conversations/construction/coordination/in_memory_fedos_conversation_construction_coordination_persistence.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationCapabilityAuthority } from "../src/os/messenger/conversations/capability/in_memory_fedos_conversation_capability_authority.js";
+import { AnonymousLocalFedosConversationCreatorIdentityAuthority } from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
+import { UnavailableFedosConversationEncryptionReadinessAuthority } from "../src/os/messenger/conversations/readiness/fedos_conversation_encryption_readiness_authority.js";
+import { FedosSecureRandomConstructionIdGenerator } from "../src/os/messenger/conversations/construction/fedos_private_conversation_construction_coordinator.js";
 import {
   FedosSecureRandomCapabilityIdGenerator,
   FedosSecureRandomCapabilitySecretGenerator,
-} from "../src/conversation/runtime/fedos_conversation_capability_generators.js";
+} from "../src/os/messenger/conversations/runtime/fedos_conversation_capability_generators.js";
 
 const clock = () => 1_700_001_000;
 

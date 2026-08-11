@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   FedosSecureRandomBoardRuntimeIdGenerator,
   type FedosBoardRuntimeIdGenerator,
-} from "../src/board/runtime/fedos_board_runtime_id_generator.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/runtime/fedos_board_runtime_id_generator.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 626 ("ID Authority Decision") -- Stage 6 of the
@@ -45,6 +46,6 @@ describe("Secure Runtime Alpha 626 -- ID Authority Decision", () => {
 
   it("5. adds no new production dependency -- package.json still carries exactly two, unchanged", () => {
     const parsed = JSON.parse(packageJsonSource) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 });

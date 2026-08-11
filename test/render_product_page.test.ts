@@ -5,9 +5,9 @@ import {
   renderProductDirectory,
   renderProductNotFound,
   renderProductPage,
-} from "../src/render/product.js";
-import type { ProductAsset } from "../src/commerce/directory.js";
-import type { AccessDecision, Product } from "../src/commerce/types.js";
+} from "../src/os/_legacy_prototype/render/product.js";
+import type { ProductAsset } from "../src/os/commerce/catalog/directory.js";
+import type { AccessDecision, Product } from "../src/os/commerce/catalog/types.js";
 
 function product(overrides: Partial<Product> = {}): Product {
   return {

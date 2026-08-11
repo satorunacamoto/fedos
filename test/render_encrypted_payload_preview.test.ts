@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   renderEncryptedPayloadPreview,
   renderEncryptedPayloadPreviewPage,
-} from "../src/render/encrypted_payload_preview.js";
-import type { PayloadPreviewDescriptor } from "../src/storage/encrypted_payload.js";
+} from "../src/os/_legacy_prototype/render/encrypted_payload_preview.js";
+import type { PayloadPreviewDescriptor } from "../src/os/core/storage/encrypted_payload.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import previewSource from "../src/render/encrypted_payload_preview.ts?raw";
+import previewSource from "../src/os/_legacy_prototype/render/encrypted_payload_preview.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 // Strips `/** ... */` and `//` comment lines before scanning — this
 // file's own doc comments legitimately name "payment"/"buyer"/

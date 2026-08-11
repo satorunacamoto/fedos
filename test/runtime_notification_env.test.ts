@@ -3,15 +3,15 @@ import {
   createRuntime,
   selectNotificationBridge,
   resolveNotificationDefaultChannel,
-} from "../src/runtime/create_runtime.js";
-import type { RuntimeEnv } from "../src/runtime/types.js";
+} from "../src/os/_legacy_prototype/runtime/create_runtime.js";
+import type { RuntimeEnv } from "../src/os/_legacy_prototype/runtime/types.js";
 import {
   NoopNotificationBridge,
   PlaceholderNotificationBridge,
 } from "../src/notification/noop_notification.js";
 import type { NotificationBridge } from "../src/notification/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 describe("Stage 42 — Notification runtime env selection", () => {
   it("1. no env -> NoopNotificationBridge", () => {

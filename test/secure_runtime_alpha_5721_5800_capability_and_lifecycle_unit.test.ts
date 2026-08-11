@@ -11,16 +11,16 @@
  */
 import { describe, it, expect } from "vitest";
 import { RealFedosNostrSigningAuthority, createStandaloneSchnorrSigner } from "./support/real_fedos_nostr_signing_authority.js";
-import { generateFedosDeviceSigningKeypair } from "../src/device/crypto/fedos_device_signing_keypair.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+import { generateFedosDeviceSigningKeypair } from "../src/os/messenger/device/crypto/fedos_device_signing_keypair.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 import {
   isWellFormedFedosRatchetPeerCapabilityEntry,
   isKnownFedosRatchetPeerCapabilityRoute,
   isKnownFedosRatchetLifecycleCapability,
   FEDOS_RATCHET_PEER_CAPABILITY_MAX_ENTRIES,
-} from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
+} from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
 import {
   canonicalSerializeFedosRatchetPeerCapabilityAdvertisementContent,
   isWellFormedFedosRatchetPeerCapabilityAdvertisementV1,
@@ -28,29 +28,29 @@ import {
   encodeFedosRatchetPeerCapabilityAdvertisementV1,
   FEDOS_RATCHET_PEER_CAPABILITY_ADVERTISEMENT_DEVICE_SIGNATURE_PREFIX,
   type FedosRatchetPeerCapabilityAdvertisementV1,
-} from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_advertisement.js";
+} from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_advertisement.js";
 import {
   isWellFormedFedosRatchetPeerLifecycleFact,
-} from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
+} from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_lifecycle_notification.js";
 import {
   authorizeFedosRatchetPeerCapabilityContent,
   verifyFedosRatchetPeerCapabilityAccountAuthorization,
   createFedosRatchetPeerCapabilityDeviceSignature,
   verifyFedosRatchetPeerCapabilityDeviceSignature,
   evaluateFedosRatchetPeerCapabilityEvidence,
-} from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
+} from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_authentication.js";
 import {
   isWellFormedFedosRatchetPeerCapabilityControlPayload,
   decodeFedosRatchetPeerCapabilityControlPayloadFromContent,
   encodeFedosRatchetPeerCapabilityControlPayload,
-} from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
-import { evaluateFedosRatchetPeerCapabilityAcceptance } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_policy.js";
-import { recommendFedosRatchetPeerSessionAction } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_session_action_recommendation.js";
-import { computeFedosRatchetPeerCapabilitySafeStatus } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js";
-import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../src/conversation/ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
-import { FedosRatchetPeerCapabilityOutboundCoordinator } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_outbound_coordinator.js";
-import { FedosRatchetPeerCapabilityInboundCoordinator } from "../src/conversation/ratchet/peer_capability/fedos_ratchet_peer_capability_inbound_coordinator.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
+} from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_control_payload.js";
+import { evaluateFedosRatchetPeerCapabilityAcceptance } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_acceptance_policy.js";
+import { recommendFedosRatchetPeerSessionAction } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_session_action_recommendation.js";
+import { computeFedosRatchetPeerCapabilitySafeStatus } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js";
+import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../src/os/messenger/conversations/ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
+import { FedosRatchetPeerCapabilityOutboundCoordinator } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_outbound_coordinator.js";
+import { FedosRatchetPeerCapabilityInboundCoordinator } from "../src/os/messenger/conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_inbound_coordinator.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 
 const CONVERSATION_ID = "conv-1" as FedosConversationId;
 

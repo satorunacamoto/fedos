@@ -17,17 +17,6 @@
  * real Rust/WASM core lands, it drops in behind `FedosCoreCrypto` here.
  */
 
-import type {
-  FedosCoreCapability,
-  FedosCoreCrypto,
-  FedosCoreDecision,
-  FedosCoreDecryptRequest,
-  FedosCoreDeriveKeyRequest,
-  FedosCoreEncryptRequest,
-  FedosCoreRandomBytesRequest,
-  FedosCoreStatus,
-} from "./types.js";
-
 export type {
   FedosCoreAeadAlgorithm,
   FedosCoreCapability,
@@ -71,65 +60,13 @@ export type {
  * placeholder capabilities as labels of FUTURE intent, but every operation is
  * denied — nothing runs, nothing is generated, nothing is stored. This is the
  * drop-in stand-in until a real Rust/WASM core implements `FedosCoreCrypto`.
+ *
+ * Architecture Dependency Closure arc — moved to its own leaf file,
+ * `./placeholder_core.ts`, so `wasm_loader.ts` (which needs to construct
+ * this class) does not have to import this barrel file back, which used to
+ * be this package's one real (runtime-level) file-to-file import cycle.
+ * Re-exported here unchanged — this package's public import surface
+ * (`@nostr-window/fedos-core-rust`) still exports both names exactly as
+ * before.
  */
-export class PlaceholderFedosCoreCrypto implements FedosCoreCrypto {
-  constructor() {
-    // Does nothing: no Rust/WASM loaded, no key/seed created, no RNG seeded.
-  }
-
-  getStatus(): FedosCoreStatus {
-    return {
-      state: "unavailable",
-      reason: "no FedOS Rust/WASM crypto core is present (placeholder only)",
-    };
-  }
-
-  getCapabilities(): readonly FedosCoreCapability[] {
-    // Labels of future intent only — none is implemented or safe in this stage.
-    return [
-      "rust_core_placeholder",
-      "aead_placeholder",
-      "kdf_placeholder",
-      "random_placeholder",
-      "nip44_placeholder",
-    ];
-  }
-
-  async randomBytes(
-    _request: FedosCoreRandomBytesRequest,
-  ): Promise<FedosCoreDecision> {
-    return this.#deny("random-bytes generation");
-  }
-
-  async deriveKey(
-    _request: FedosCoreDeriveKeyRequest,
-  ): Promise<FedosCoreDecision> {
-    return this.#deny("key derivation");
-  }
-
-  async encrypt(_request: FedosCoreEncryptRequest): Promise<FedosCoreDecision> {
-    return this.#deny("encryption");
-  }
-
-  async decrypt(_request: FedosCoreDecryptRequest): Promise<FedosCoreDecision> {
-    return this.#deny("decryption");
-  }
-
-  /**
-   * Build a denied/unavailable decision. Reads nothing from the request,
-   * derives nothing, and stores nothing. The `operation` label is a fixed,
-   * non-sensitive string — never request handles or secret material.
-   */
-  #deny(operation: string): FedosCoreDecision {
-    return {
-      allowed: false,
-      state: "unavailable",
-      reason: `no FedOS crypto core is present (${operation} not performed)`,
-    };
-  }
-}
-
-/** Creates a fresh placeholder core. Constructing it does nothing. */
-export function createFedosCoreCrypto(): PlaceholderFedosCoreCrypto {
-  return new PlaceholderFedosCoreCrypto();
-}
+export { PlaceholderFedosCoreCrypto, createFedosCoreCrypto } from "./placeholder_core.js";

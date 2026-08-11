@@ -5,13 +5,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { InMemoryFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
-import { AppendOnlyFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
-import type { FedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/fedos_conversation_capability_persistence.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { AppendOnlyFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/append_only_fedos_conversation_capability_persistence.js";
+import type { FedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/fedos_conversation_capability_persistence.js";
 import type {
   FedosPersistedConversationCapabilityIssuedEventV1,
   FedosPersistedConversationCapabilityRedeemedEventV1,
-} from "../src/conversation/capability/persistence/fedos_persisted_conversation_capability_v1.js";
+} from "../src/os/messenger/conversations/capability/persistence/fedos_persisted_conversation_capability_v1.js";
 
 function issuedEvent(capabilityId: string, conversationId: string): FedosPersistedConversationCapabilityIssuedEventV1 {
   return {

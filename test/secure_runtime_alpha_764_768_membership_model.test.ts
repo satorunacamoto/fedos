@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { FEDOS_CONVERSATION_ROLES } from "../src/conversation/membership/fedos_conversation_role.js";
-import { FEDOS_CONVERSATION_MEMBERSHIP_STATES } from "../src/conversation/membership/fedos_conversation_membership_state.js";
-import { toFedosConversationMembershipId } from "../src/conversation/membership/fedos_conversation_membership_id.js";
-import { isFedosConversationMembershipTransitionAllowed } from "../src/conversation/membership/fedos_conversation_membership_transition.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { validateFedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference_validator.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
+import { FEDOS_CONVERSATION_ROLES } from "../src/os/messenger/conversations/membership/fedos_conversation_role.js";
+import { FEDOS_CONVERSATION_MEMBERSHIP_STATES } from "../src/os/messenger/conversations/membership/fedos_conversation_membership_state.js";
+import { toFedosConversationMembershipId } from "../src/os/messenger/conversations/membership/fedos_conversation_membership_id.js";
+import { isFedosConversationMembershipTransitionAllowed } from "../src/os/messenger/conversations/membership/fedos_conversation_membership_transition.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { validateFedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference_validator.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 const conversationId = toFedosConversationId(toFedosBoardId("board-a")!, toFedosThreadId("thread-a")!);
 const alice = validateFedosConversationParticipantReference({ authority: "nostr", publicIdentifier: "npub1alice", identityId: null })!;

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_333_desktop_host_state_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import stateSource from "../src/desktop/host/fedos_desktop_host_state.ts?raw";
-import type { FedosDesktopHostState } from "../src/desktop/host/fedos_desktop_host_state.js";
+import stateSource from "../src/os/messenger/desktop/host/fedos_desktop_host_state.ts?raw";
+import type { FedosDesktopHostState } from "../src/os/messenger/desktop/host/fedos_desktop_host_state.js";
 
 /**
  * Secure Runtime Alpha 333 -- "Desktop Host State Model": Stage 3 of

@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_258_moderation_deletion_boundary.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import moderationModuleSource from "../src/board/fedos_board_moderation.ts?raw";
+import moderationModuleSource from "../src/os/messenger/board/fedos_board_moderation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import postModuleSource from "../src/board/fedos_board_post.ts?raw";
+import postModuleSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 import {
   FEDOS_BOARD_MODERATION_STATES,
   FEDOS_BOARD_MODERATION_REASON_CODES,
   type FedosBoardModerationRecord,
-} from "../src/board/fedos_board_moderation.js";
+} from "../src/os/messenger/board/fedos_board_moderation.js";
 
 function codeOnly(source: string): string {
   return source

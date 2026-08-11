@@ -1,15 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
-import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/runtime/create_runtime.js";
+import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { createCryptoLoaderFacade } from "../src/runtime/fedos_crypto_loader_facade.js";
 import { FedosRuntimeCryptoProvider } from "../src/runtime/fedos_runtime_crypto_provider.js";
 import { runtimeCryptoActivationStatus } from "../src/runtime/runtime_crypto_diagnostics.js";
 import { workerCryptoActivationStatus } from "../src/runtime/worker_crypto_diagnostics.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import facadeSource from "../src/runtime/fedos_crypto_loader_facade.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -198,7 +198,13 @@ describe("FedOS Runtime initializeCrypto Prototype reaches the Crypto Loader Fac
     const files = (
       import.meta as unknown as { glob: (pattern: string) => Record<string, unknown> }
     ).glob("../src/runtime/fedos_*.ts");
-    expect(Object.keys(files).length).toBe(57);
+    // Secure Runtime Alpha 050-052 later added a 57th, fedos_runtime_identity.ts;
+    // the Nostr Consolidation Plan, Step 5 / architecture cycle detector
+    // baseline reduction later added a 58th and 59th,
+    // fedos_internal_rust_call_shape.ts and fedos_crypto_loader_backend_kind.ts
+    // (see each file's own header) -- all later, separate exceptions, same
+    // reasoning as the chain named in this test's own title.
+    expect(Object.keys(files).length).toBe(59);
   });
 
   it("14. repeated calls stay identical, and multiple independent runtimes agree", () => {

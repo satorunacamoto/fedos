@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   FEDOS_CONVERSATION_PARTICIPANT_AUTHORITIES,
   type FedosConversationParticipantReference,
-} from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+} from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
 import {
   FEDOS_CONVERSATION_PARTICIPANT_PUBLIC_IDENTIFIER_MAX_LENGTH,
   validateFedosConversationParticipantReference,
-} from "../src/conversation/membership/fedos_conversation_participant_reference_validator.js";
+} from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference_validator.js";
 
 describe("Secure Runtime Alpha 762-763 -- Participant Reference Decision and Validation", () => {
   it("1. every known authority validates", () => {

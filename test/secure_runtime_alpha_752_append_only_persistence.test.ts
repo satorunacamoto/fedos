@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import implementationSource from "../src/conversation/persistence/append_only_fedos_conversation_persistence.ts?raw";
+import implementationSource from "../src/os/messenger/conversations/persistence/append_only_fedos_conversation_persistence.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync, mkdtempSync, rmSync, appendFileSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
@@ -8,10 +8,10 @@ import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
-import { AppendOnlyFedosConversationPersistence } from "../src/conversation/persistence/append_only_fedos_conversation_persistence.js";
-import type { FedosConversationPersistence } from "../src/conversation/persistence/fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
+import { AppendOnlyFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/append_only_fedos_conversation_persistence.js";
+import type { FedosConversationPersistence } from "../src/os/messenger/conversations/persistence/fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/os/messenger/conversations/persistence/fedos_persisted_conversation_record_v1.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 
 function codeOnlyLines(source: string): string {
   return source

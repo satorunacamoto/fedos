@@ -6,13 +6,13 @@ import {
   canPost,
   canModerate,
   canAdmin,
-} from "../src/community/policy.js";
+} from "../src/os/_legacy_prototype/community/policy.js";
 import type {
   ChannelSpace,
   CommunitySpace,
   GroupSpace,
   Space,
-} from "../src/community/types.js";
+} from "../src/os/_legacy_prototype/community/types.js";
 
 const OWNER = "owner".padEnd(64, "0");
 const ADMIN = "admin".padEnd(64, "0");

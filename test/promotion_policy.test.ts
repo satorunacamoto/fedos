@@ -4,8 +4,8 @@ import {
   canShowPromotion,
   filterPromotionContext,
   resolvePlacement,
-} from "../src/promotion/policy.js";
-import type { PromotionRequest } from "../src/promotion/types.js";
+} from "../src/os/_legacy_prototype/promotion/policy.js";
+import type { PromotionRequest } from "../src/os/_legacy_prototype/promotion/types.js";
 
 const VIEWER = "a".repeat(64);
 

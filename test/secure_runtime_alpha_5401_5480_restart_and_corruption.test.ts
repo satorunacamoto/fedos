@@ -5,17 +5,17 @@ import { mkdtempSync, rmSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { AppendOnlyFedosDeletionExecutionPersistence } from "../src/conversation/deletion/append_only_fedos_deletion_execution_persistence.js";
-import { FedosPayloadRetentionAuthority } from "../src/conversation/retention/fedos_payload_retention_authority.js";
-import { InMemoryFedosPayloadRetentionPersistence } from "../src/conversation/retention/in_memory_fedos_payload_retention_persistence.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import { toFedosConversationPayloadId } from "../src/conversation/payload_storage/fedos_conversation_payload_id.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { assessFedosLocalPayloadDeletion } from "../src/conversation/deletion/fedos_deletion_assessment.js";
-import { buildFedosLocalPayloadDeletionPlan } from "../src/conversation/deletion/fedos_deletion_plan.js";
-import { executeFedosLocalPayloadDeletionPlan } from "../src/conversation/deletion/fedos_deletion_execution_coordinator.js";
-import type { FedosPersistedDeletionExecutionRecordV1 } from "../src/conversation/deletion/fedos_persisted_deletion_execution_record_v1.js";
+import { AppendOnlyFedosDeletionExecutionPersistence } from "../src/os/messenger/conversations/deletion/append_only_fedos_deletion_execution_persistence.js";
+import { FedosPayloadRetentionAuthority } from "../src/os/messenger/conversations/retention/fedos_payload_retention_authority.js";
+import { InMemoryFedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_payload_retention_persistence.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { toFedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { assessFedosLocalPayloadDeletion } from "../src/os/messenger/conversations/deletion/fedos_deletion_assessment.js";
+import { buildFedosLocalPayloadDeletionPlan } from "../src/os/messenger/conversations/deletion/fedos_deletion_plan.js";
+import { executeFedosLocalPayloadDeletionPlan } from "../src/os/messenger/conversations/deletion/fedos_deletion_execution_coordinator.js";
+import type { FedosPersistedDeletionExecutionRecordV1 } from "../src/os/messenger/conversations/deletion/fedos_persisted_deletion_execution_record_v1.js";
 
 /**
  * Secure Runtime Alpha 5401-5480 -- Phase L: restart-safe idempotency,

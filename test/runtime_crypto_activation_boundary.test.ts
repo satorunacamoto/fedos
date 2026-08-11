@@ -15,7 +15,7 @@ import {
 } from "../src/runtime/runtime_crypto_config.js";
 import { buildRuntimeCryptoProvider } from "../src/runtime/runtime_crypto_bridge.js";
 import { runtimeCryptoActivationStatus } from "../src/runtime/runtime_crypto_diagnostics.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import registrySource from "../src/runtime/runtime_crypto_registry.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -27,11 +27,11 @@ import cryptoProviderSource from "../src/runtime/crypto_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -48,6 +48,7 @@ import messageKeySource from "../packages/fedos-core-rust/src/crypto/message_key
 import nip44WirePayloadSource from "../packages/fedos-core-rust/src/crypto/nip44_wire_payload.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import activationDocSource from "../docs/runtime_crypto_activation.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 257–264 — "Runtime Opt-in Crypto Bridge (Non-Operational)":
@@ -408,8 +409,7 @@ describe("Runtime opt-in crypto bridge, non-operational (Stage 257-264)", () => 
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
-    expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("17. AppRuntime.crypto/RuntimeOverrides.runtimeCryptoProvider are wired exactly once, and runtime_status.ts's twelve-component list is unaffected", () => {

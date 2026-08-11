@@ -5,12 +5,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error same as above.
 import { join } from "node:path";
-import { InMemoryFedosIdentityTransitionPeerObservationPersistence } from "../src/conversation/identity_transition/peer_integration/persistence/in_memory_fedos_identity_transition_peer_observation_persistence.js";
-import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../src/conversation/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
-import type { FedosIdentityTransitionPeerObservationPersistence } from "../src/conversation/identity_transition/peer_integration/persistence/fedos_identity_transition_peer_observation_persistence.js";
-import type { FedosIdentityTransitionPeerObservationV1 } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
-import { isFedosIdentityTransitionPeerObservationSuperseded } from "../src/conversation/identity_transition/peer_integration/fedos_identity_transition_peer_observation_conflict_detection.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+import { InMemoryFedosIdentityTransitionPeerObservationPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/persistence/in_memory_fedos_identity_transition_peer_observation_persistence.js";
+import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
+import type { FedosIdentityTransitionPeerObservationPersistence } from "../src/os/messenger/conversations/identity_transition/peer_integration/persistence/fedos_identity_transition_peer_observation_persistence.js";
+import type { FedosIdentityTransitionPeerObservationV1 } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_peer_observation.js";
+import { isFedosIdentityTransitionPeerObservationSuperseded } from "../src/os/messenger/conversations/identity_transition/peer_integration/fedos_identity_transition_peer_observation_conflict_detection.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 const OLD_ACCOUNT: FedosDeviceBindingAccountRef = { authority: "nostr", publicIdentifier: "a".repeat(64), identityId: null };
 

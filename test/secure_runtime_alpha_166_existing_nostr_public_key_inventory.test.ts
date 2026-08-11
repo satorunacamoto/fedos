@@ -10,15 +10,16 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrTypesSource from "../src/nostr/types.ts?raw";
+import nostrTypesSource from "../src/os/messenger/adapters/nostr/protocol/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrCryptoSource from "../src/nostr/crypto.ts?raw";
+import nostrCryptoSource from "../src/os/messenger/adapters/nostr/protocol/crypto.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nobleSignatureSource from "../src/nostr/noble_signature.ts?raw";
+import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 166 -- "Existing Nostr Public Key Inventory": Stage 1
@@ -117,6 +118,6 @@ describe("Secure Runtime Alpha 166 -- Existing Nostr Public Key Inventory", () =
     expect(cargoTomlSource).not.toMatch(/secure_runtime_alpha_166/);
     expect(packageJsonSource).not.toMatch(/secure_runtime_alpha_166/);
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 });

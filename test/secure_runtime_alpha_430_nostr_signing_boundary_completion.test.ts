@@ -6,9 +6,9 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosDesktopHostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import fedosDesktopHostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrEventIdVerifierSource from "../src/desktop/nostr_event_id_verifier.ts?raw";
+import nostrEventIdVerifierSource from "../src/os/messenger/desktop/nostr_event_id_verifier.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 

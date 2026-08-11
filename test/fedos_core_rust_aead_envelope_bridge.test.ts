@@ -9,9 +9,9 @@ import cryptoModSource from "../packages/fedos-core-rust/src/crypto.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import bridgeSource from "../packages/fedos-core-rust/src/crypto/aead_envelope_bridge.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Stage 161–163 — the internal AEAD ↔ ciphertext-envelope bridge.

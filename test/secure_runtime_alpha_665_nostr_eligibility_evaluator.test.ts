@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { evaluateFedosOutboundEligibility } from "../src/board/runtime/eligibility/fedos_outbound_eligibility_evaluator.js";
-import { FEDOS_CONVERSATION_POLICY_PUBLIC_V1 } from "../src/board/runtime/policy/fedos_conversation_policy.js";
-import type { FedosPublicAuthorResolution } from "../src/board/runtime/identity/fedos_public_author_authority.js";
-import { anonymousLocalAuthorReference } from "../src/board/runtime/fedos_board_runtime_author_authority.js";
+import { evaluateFedosOutboundEligibility } from "../src/os/messenger/board/runtime/eligibility/fedos_outbound_eligibility_evaluator.js";
+import { FEDOS_CONVERSATION_POLICY_PUBLIC_V1 } from "../src/os/messenger/board/runtime/policy/fedos_conversation_policy.js";
+import type { FedosPublicAuthorResolution } from "../src/os/messenger/board/runtime/identity/fedos_public_author_authority.js";
+import { anonymousLocalAuthorReference } from "../src/os/messenger/board/runtime/fedos_board_runtime_author_authority.js";
 
 const resolvedNostr: FedosPublicAuthorResolution = {
   outcome: "resolved",

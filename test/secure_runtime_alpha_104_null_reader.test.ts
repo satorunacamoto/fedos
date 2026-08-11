@@ -1,26 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { NullPublicIdentityReader } from "../src/desktop/null_public_identity_reader.js";
-import { createDesktopApplication } from "../src/desktop/create_desktop_application.js";
+import { NullPublicIdentityReader } from "../src/os/messenger/desktop/null_public_identity_reader.js";
+import { createDesktopApplication } from "../src/os/messenger/desktop/create_desktop_application.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_104_null_reader.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nullPublicIdentityReaderSource from "../src/desktop/null_public_identity_reader.ts?raw";
+import nullPublicIdentityReaderSource from "../src/os/messenger/desktop/null_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import desktopApplicationSource from "../src/desktop/desktop_application.ts?raw";
+import desktopApplicationSource from "../src/os/messenger/desktop/desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createDesktopApplicationSource from "../src/desktop/create_desktop_application.ts?raw";
+import createDesktopApplicationSource from "../src/os/messenger/desktop/create_desktop_application.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrPublicIdentityReaderSource from "../src/desktop/nostr_public_identity_reader.ts?raw";
+import nostrPublicIdentityReaderSource from "../src/os/messenger/desktop/nostr_public_identity_reader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopIdentityProviderSource from "../src/identity/fedos_noop_identity_provider.ts?raw";
+import noopIdentityProviderSource from "../src/os/core/identity/fedos_noop_identity_provider.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import fedosRuntimeIdentitySource from "../src/runtime/fedos_runtime_identity.ts?raw";
+import fedosRuntimeIdentitySource from "../src/os/core/identity/fedos_runtime_identity.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /**
  * Secure Runtime Alpha 104 -- "Null Reader": Stage 4 of the Public

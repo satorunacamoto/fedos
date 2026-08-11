@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/desktop/runtime/fedos_desktop_runtime.ts?raw";
+import runtimeSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runConfigSource from "../src/desktop/runtime/fedos_desktop_runtime_config.ts?raw";
+import runConfigSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runMainSource from "../src/desktop/runtime/run_fedos_desktop_runtime.ts?raw";
+import runMainSource from "../src/os/messenger/desktop/runtime/run_fedos_desktop_runtime.ts?raw";
 
 /**
  * Secure Runtime Alpha 616 -- "No Worker Coupling Guard": Stage 16 of

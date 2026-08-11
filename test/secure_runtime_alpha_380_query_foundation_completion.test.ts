@@ -6,17 +6,18 @@ import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import repositorySource from "../src/board/repository/fedos_board_repository.ts?raw";
+import repositorySource from "../src/os/messenger/board/repository/fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistenceSource from "../src/board/persistence/fedos_board_persistence.ts?raw";
+import persistenceSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
-import { FedosBoardQuery } from "../src/board/query/fedos_board_query.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import type { FedosBoardId, FedosThreadId } from "../src/board/fedos_board_identifiers.js";
+import { FedosBoardQuery } from "../src/os/messenger/board/query/fedos_board_query.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import type { FedosBoardId, FedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function normalize(source: string): string {
   return source.replace(/\s+/g, " ");
@@ -85,7 +86,7 @@ describe("Secure Runtime Alpha 380 -- Canonical Board Query Foundation Completio
 
   it("7. Regression: package.json dependency count remains unchanged at 2, no bin field", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
     expect(pkg.bin).toBeUndefined();
   });
 

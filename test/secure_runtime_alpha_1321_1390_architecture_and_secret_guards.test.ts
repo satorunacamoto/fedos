@@ -11,23 +11,24 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationCoordinatorSource from "../src/conversation/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
+import activationCoordinatorSource from "../src/os/messenger/conversations/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptionCoordinatorSource from "../src/conversation/encryption/fedos_conversation_encryption_coordinator.ts?raw";
+import encryptionCoordinatorSource from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptionCoordinatorSource from "../src/conversation/encryption/fedos_conversation_decryption_coordinator.ts?raw";
+import decryptionCoordinatorSource from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import participantResolverSource from "../src/conversation/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
+import participantResolverSource from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupGenerationSource from "../src/conversation/group/fedos_group_generation.ts?raw";
+import groupGenerationSource from "../src/os/messenger/conversations/group/fedos_group_generation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupDirectPathSource from "../src/conversation/group/fedos_group_direct_path.ts?raw";
+import groupDirectPathSource from "../src/os/messenger/conversations/group/fedos_group_direct_path.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupMessageSource from "../src/conversation/group/fedos_group_message.ts?raw";
+import groupMessageSource from "../src/os/messenger/conversations/group/fedos_group_message.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import groupFanoutDeliverySource from "../src/conversation/group/fedos_group_fanout_delivery.ts?raw";
+import groupFanoutDeliverySource from "../src/os/messenger/conversations/group/fedos_group_fanout_delivery.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
+import { assertFedosRootDependencyInvariant, assertFedosRootDevDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 function allFilesUnder(dir: string, extensions: readonly string[]): string[] {
   const entries = readdirSync(dir, { withFileTypes: true }) as Array<{ name: string; isDirectory(): boolean }>;
@@ -93,8 +94,8 @@ describe("Alpha 1321-1390 -- architecture guards (Alpha 1380/1385)", () => {
 
   it("7. package.json still carries exactly two production dependencies, and no devDependency changed either -- no new dependency introduced by this Arc", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
-    expect(Object.keys(parsed.devDependencies).sort()).toEqual(["@cloudflare/workers-types", "typescript", "vitest"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
+    assertFedosRootDevDependencyInvariant(parsed.devDependencies);
   });
 
   it("8. packages/fedos-core-rust/src is untouched -- no group/fanout reference anywhere in the Rust crate", () => {

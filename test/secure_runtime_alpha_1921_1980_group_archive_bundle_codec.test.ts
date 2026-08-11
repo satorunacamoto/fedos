@@ -12,17 +12,17 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
-import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/conversation/archive/fedos_conversation_archive_schema_version.js";
-import type { FedosConversationArchiveBundleV1 } from "../src/conversation/archive/fedos_conversation_archive_bundle.js";
-import type { FedosConversationArchiveGroupSectionV1 } from "../src/conversation/archive/fedos_conversation_archive_group_section.js";
+import { FEDOS_CONVERSATION_ARCHIVE_SCHEMA_VERSION } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_schema_version.js";
+import type { FedosConversationArchiveBundleV1 } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_bundle.js";
+import type { FedosConversationArchiveGroupSectionV1 } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_group_section.js";
 import {
   serializeFedosConversationArchiveBundleToBytes,
   deserializeFedosConversationArchiveBundleFromBytes,
-} from "../src/conversation/archive/fedos_conversation_archive_bundle_codec.js";
-import { computeFedosConversationArchiveContentHash } from "../src/conversation/archive/fedos_conversation_archive_integrity.js";
-import { buildFedosConversationArchiveManifest, deserializeFedosConversationArchiveManifest } from "../src/conversation/archive/fedos_conversation_archive_manifest_codec.js";
-import { toFedosGroupGenerationId } from "../src/conversation/group/fedos_group_generation.js";
-import { toFedosGroupDirectPathId } from "../src/conversation/group/fedos_group_direct_path.js";
+} from "../src/os/messenger/conversations/archive/fedos_conversation_archive_bundle_codec.js";
+import { computeFedosConversationArchiveContentHash } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_integrity.js";
+import { buildFedosConversationArchiveManifest, deserializeFedosConversationArchiveManifest } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_manifest_codec.js";
+import { toFedosGroupGenerationId } from "../src/os/messenger/conversations/group/fedos_group_generation.js";
+import { toFedosGroupDirectPathId } from "../src/os/messenger/conversations/group/fedos_group_direct_path.js";
 
 const GROUP_CONVERSATION_ID = "board-a::group-thread-1";
 const CHILD_CONVERSATION_ID_1 = "board-a::child-thread-1";

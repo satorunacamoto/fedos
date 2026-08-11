@@ -29,11 +29,11 @@ import {
   buildFedosPrivateTransportUnsignedEventRequest,
   parseFedosPrivateTransportEventDescriptor,
   FEDOS_PRIVATE_TRANSPORT_MARKER_TAG,
-} from "../src/conversation/transport/fedos_conversation_transport_event.js";
-import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/conversation/delivery/nostr/fedos_private_nostr_delivery_mode.js";
-import { isWellFormedFedosNostrUnsignedEventRequest } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosConversationMessageEnvelope } from "../src/conversation/envelope/fedos_conversation_message_envelope.js";
-import type { FedosEventDescriptor } from "../src/desktop/fedos_event_descriptor.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_event.js";
+import { FEDOS_PRIVATE_NOSTR_DELIVERY_KIND } from "../src/os/messenger/adapters/nostr/conversation_delivery/fedos_private_nostr_delivery_mode.js";
+import { isWellFormedFedosNostrUnsignedEventRequest } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosConversationMessageEnvelope } from "../src/os/messenger/conversations/envelope/fedos_conversation_message_envelope.js";
+import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_event_descriptor.js";
 
 const COUNTERPARTY_PUBKEY = "b".repeat(64);
 const LOCAL_PUBKEY = "a".repeat(64);

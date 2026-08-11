@@ -100,7 +100,13 @@
  *     constructed anywhere in this file.
  */
 
-import type { FedosCryptoLoaderBackendKind } from "./fedos_crypto_loader_backend.js";
+// Nostr Consolidation Plan, Step 5 / architecture cycle detector baseline
+// reduction — sourced from the dedicated `fedos_crypto_loader_backend_kind.ts`
+// (not `fedos_crypto_loader_backend.ts`, which calls INTO this file — see
+// that shape file's own header for why importing back from here would
+// close a cycle). `fedos_crypto_loader_backend.ts` re-exports the
+// identical type unchanged, so this is a zero-behavior-change redirect.
+import type { FedosCryptoLoaderBackendKind } from "./fedos_crypto_loader_backend_kind.js";
 import { createWasmBackend } from "./fedos_wasm_backend.js";
 import { createCryptoBackendResolver } from "./fedos_crypto_backend_resolver.js";
 

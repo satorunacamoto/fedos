@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activationCoordinatorSource from "../../../src/conversation/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
+import activationCoordinatorSource from "../../../src/os/messenger/conversations/activation/fedos_conversation_direct_activation_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../../../src/conversation/runtime/fedos_conversation_runtime.ts?raw";
+import runtimeSource from "../../../src/os/messenger/conversations/runtime/fedos_conversation_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import directMessagingSource from "../../../src/conversation/messaging/fedos_conversation_direct_messaging_coordinator.ts?raw";
+import directMessagingSource from "../../../src/os/messenger/conversations/messaging/fedos_conversation_direct_messaging_coordinator.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import policyAxesSource from "../../../src/conversation/construction/fedos_private_conversation_policy.ts?raw";
+import policyAxesSource from "../../../src/os/messenger/conversations/construction/fedos_private_conversation_policy.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import membershipTransitionSource from "../../../src/conversation/membership/fedos_conversation_membership_transition.ts?raw";
+import membershipTransitionSource from "../../../src/os/messenger/conversations/membership/fedos_conversation_membership_transition.ts?raw";
 
 /**
  * Private Group Pairwise Fanout review -- architecture boundary invariants.

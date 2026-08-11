@@ -5,10 +5,10 @@ import {
   buildSearchPlacement,
   buildSpacePlacement,
   buildThreadPlacement,
-} from "../src/promotion/bridge.js";
-import type { GroupChat } from "../src/chat/types.js";
-import type { Product } from "../src/commerce/types.js";
-import type { CommunitySpace } from "../src/community/types.js";
+} from "../src/os/_legacy_prototype/promotion/bridge.js";
+import type { GroupChat } from "../src/os/_legacy_prototype/chat/types.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
+import type { CommunitySpace } from "../src/os/_legacy_prototype/community/types.js";
 
 const OWNER = "a".repeat(64);
 

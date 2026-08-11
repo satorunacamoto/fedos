@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_355_append_only_reading.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import implementationSource from "../src/board/persistence/append_only_fedos_board_persistence.ts?raw";
+import implementationSource from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 // @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
@@ -10,9 +10,9 @@ import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
-import { AppendOnlyFedosBoardPersistence } from "../src/board/persistence/append_only_fedos_board_persistence.js";
-import { serializeFedosBoardPost } from "../src/board/persistence/fedos_board_post_codec.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import { AppendOnlyFedosBoardPersistence } from "../src/os/messenger/board/persistence/append_only_fedos_board_persistence.js";
+import { serializeFedosBoardPost } from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 let dir: string | undefined;
 afterEach(() => {

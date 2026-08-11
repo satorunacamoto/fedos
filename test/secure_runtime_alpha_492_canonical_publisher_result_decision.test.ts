@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { isFedosOutboundPublishResult } from "../src/board/publish/fedos_outbound_publish_result.js";
-import type { FedosOutboundPublishResult } from "../src/board/publish/fedos_outbound_publish_result.js";
+import { isFedosOutboundPublishResult } from "../src/os/messenger/board/publish/fedos_outbound_publish_result.js";
+import type { FedosOutboundPublishResult } from "../src/os/messenger/board/publish/fedos_outbound_publish_result.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_492_canonical_publisher_result_decision.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import source from "../src/board/publish/fedos_outbound_publish_result.ts?raw";
+import source from "../src/os/messenger/board/publish/fedos_outbound_publish_result.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxPublisherSource from "../src/board/outbox/fedos_board_outbox_publisher.ts?raw";
+import outboxPublisherSource from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.ts?raw";
 
 describe("Secure Runtime Alpha 492 -- Canonical Publisher Result Decision", () => {
   it("accepted requires a non-null, non-empty externalReference", () => {

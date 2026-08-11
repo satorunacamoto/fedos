@@ -5,24 +5,24 @@ import { mkdtempSync, rmSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
-import { InMemoryFedosConversationPersistence } from "../src/conversation/persistence/in_memory_fedos_conversation_persistence.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { toFedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import { toFedosBoardId, toFedosThreadId } from "../src/board/fedos_board_identifiers.js";
-import { toFedosConversationEnvelopeId } from "../src/conversation/envelope/fedos_conversation_envelope_id.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
+import { toFedosConversationEnvelopeId } from "../src/os/messenger/conversations/envelope/fedos_conversation_envelope_id.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
 import {
   FedosNobleTestNostrSigningAuthority,
   fedosTestSecretKeyFromSeed,
   signFedosDeletionRequestRecordV1,
-} from "../src/conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosDeletionRequestRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_request_record.js";
-import { validateFedosDeletionRequestRecordV1Structure } from "../src/conversation/deletion_request/fedos_deletion_request_validation.js";
-import { assessFedosDeletionRequestAuthorization } from "../src/conversation/deletion_request/fedos_deletion_request_authorization_assessment.js";
-import { AppendOnlyFedosDeletionRequestStatePersistence } from "../src/conversation/deletion_request/append_only_fedos_deletion_request_state_persistence.js";
-import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/conversation/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
-import { isFedosDeletionAcknowledgementRecordHonest, isWellFormedFedosDeletionAcknowledgementRecordV1 } from "../src/conversation/deletion_request/fedos_deletion_acknowledgement_record.js";
+} from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_signing.js";
+import type { FedosDeletionRequestRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_record.js";
+import { validateFedosDeletionRequestRecordV1Structure } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_validation.js";
+import { assessFedosDeletionRequestAuthorization } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_authorization_assessment.js";
+import { AppendOnlyFedosDeletionRequestStatePersistence } from "../src/os/messenger/conversations/deletion_request/append_only_fedos_deletion_request_state_persistence.js";
+import type { FedosPersistedDeletionRequestStateRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_persisted_deletion_request_state_record_v1.js";
+import { isFedosDeletionAcknowledgementRecordHonest, isWellFormedFedosDeletionAcknowledgementRecordV1 } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_acknowledgement_record.js";
 
 /**
  * Secure Runtime Alpha 5641-5720 -- Phase P failure matrix, covering the

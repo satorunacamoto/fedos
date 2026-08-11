@@ -110,6 +110,12 @@ import { pathToFileURL } from "node:url";
 import { FedosElectronNotificationAdapter } from "./fedos_electron_notification_adapter.js";
 import { FedosElectronTrayAdapter } from "./fedos_electron_tray_adapter.js";
 import { FedosElectronBadgeAdapter, type FedosElectronBadgeTrayMenuItemLike } from "./fedos_electron_badge_adapter.js";
+import {
+  FEDOS_COMMERCE_DEMO_PRODUCTS,
+  FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA,
+  fedosCommerceDemoMerchantLabel,
+  type FedosCommerceDemoProduct,
+} from "./fedos_electron_beta_commerce_demo_catalog.js";
 
 const APP_ID = "com.fedos.desktop.beta";
 const APP_VERSION = "0.1.0-beta.1";
@@ -482,60 +488,89 @@ interface RootModules {
   readonly fedosDesktopTrayMenuItems: (disabled?: ReadonlySet<string>) => readonly FedosElectronBadgeTrayMenuItemLike[];
   readonly WebSocketRelay: new (url: string, factory: (url: string) => Promise<unknown>) => RelayLike;
   readonly createNodeWebSocketRelaySocketFactory: () => (url: string) => Promise<unknown>;
+  /**
+   * Commerce Reachable Catalog + Product Surface Phase 1 -- the real
+   * `os/commerce` domain's `listViewableProducts()`, loaded exactly like
+   * every other module in this function (compiled `dist/`, dynamic
+   * `import()`). Deliberately the ONLY `os/commerce` export this main
+   * process consumes: no `PaymentProvider`, no `PlaceholderPaymentProvider`,
+   * no `ingestCallback` -- Phase 1 is read-only catalog discovery only,
+   * see `fedos_electron_beta_commerce_demo_catalog.cts`'s own header.
+   */
+  readonly Commerce: {
+    readonly listViewableProducts: (
+      products: readonly FedosCommerceDemoProduct[],
+      actorPubkey?: string,
+      grants?: readonly unknown[],
+    ) => readonly FedosCommerceDemoProduct[];
+  };
 }
 
 async function loadRootModules(): Promise<RootModules> {
-  const attestation = (await import(distUrl("desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
+  const attestation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
     createElectronMainHostAttestation: RootModules["createElectronMainHostAttestation"];
   };
-  const activation = (await import(distUrl("desktop", "production_activation", "fedos_production_profile_activation.js"))) as {
+  const activation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_profile_activation.js"))) as {
     activateFedosProductionProfileMasterSeed: RootModules["activateFedosProductionProfileMasterSeed"];
   };
-  const signer = (await import(distUrl("desktop", "production_activation", "fedos_production_nostr_signing_authority.js"))) as {
+  const signer = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_nostr_signing_authority.js"))) as {
     FedosProductionNostrSigningAuthority: RootModules["NostrSigningAuthority"];
   };
-  const paths = (await import(distUrl("desktop", "onboarding", "fedos_local_profile_paths.js"))) as {
+  const paths = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_local_profile_paths.js"))) as {
     planFedosLocalProfilePaths: RootModules["planFedosLocalProfilePaths"];
     ensureFedosLocalProfileDirectories: RootModules["ensureFedosLocalProfileDirectories"];
   };
-  const profilePersistence = (await import(distUrl("desktop", "onboarding", "fedos_local_profile_persistence.js"))) as {
+  const profilePersistence = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_local_profile_persistence.js"))) as {
     FileFedosLocalProfilePersistence: RootModules["ProfilePersistence"];
   };
   const sealedPersistence = (await import(distUrl("runtime", "master_seed", "fedos_sealed_master_seed_envelope_persistence.js"))) as {
     FileFedosSealedMasterSeedEnvelopePersistence: RootModules["SealedSeedPersistence"];
   };
-  const coordinator = (await import(distUrl("desktop", "onboarding", "fedos_profile_initialization_coordinator.js"))) as {
+  const coordinator = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_profile_initialization_coordinator.js"))) as {
     FedosProfileInitializationCoordinator: RootModules["Coordinator"];
   };
-  const secret = (await import(distUrl("desktop", "onboarding", "fedos_profile_unlock_secret.js"))) as {
+  const secret = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_profile_unlock_secret.js"))) as {
     FedosProfileUnlockSecret: RootModules["UnlockSecret"];
   };
-  const settingsController = (await import(distUrl("desktop", "settings", "fedos_desktop_settings_controller.js"))) as {
+  const settingsController = (await import(distUrl("os", "messenger", "desktop", "settings", "fedos_desktop_settings_controller.js"))) as {
     createFileBackedFedosDesktopSettingsController: RootModules["createFileBackedSettingsController"];
   };
-  const assembly = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_application_assembly.js"))) as {
+  const assembly = (await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_application_assembly.js"))) as {
     FedosDesktopBetaApplicationAssembly: RootModules["BetaApplicationAssembly"];
   };
+  // NOT migrated with its siblings above: this one file has an unrelated,
+  // uncommitted, in-progress edit from a different arc on this branch and was
+  // deliberately left at its original path -- see the Messenger migration
+  // Stage 6 commit message and fedos_desktop_beta_release_configuration.ts's
+  // own note.
   const capabilityManifest = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_capability_manifest.js"))) as {
     fedosDesktopBetaCapabilityManifestV1: RootModules["betaCapabilityManifestV1"];
   };
-  const releaseConfiguration = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_release_configuration.js"))) as {
+  const releaseConfiguration = (await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_release_configuration.js"))) as {
     fedosDesktopBetaReleaseConfigurationV1: RootModules["betaReleaseConfigurationV1"];
   };
-  const limitations = (await import(distUrl("desktop", "beta", "fedos_desktop_beta_limitations.js"))) as {
+  const limitations = (await import(distUrl("os", "messenger", "desktop", "beta", "fedos_desktop_beta_limitations.js"))) as {
     fedosDesktopBetaLimitationsV1: RootModules["betaLimitationsV1"];
   };
   const deviceSyncEventBridgeModule = (await import(distUrl("device", "sync_events", "fedos_device_sync_event_bridge.js"))) as {
     FedosDeviceSyncEventBridge: RootModules["DeviceSyncEventBridge"];
   };
-  const websocketRelay = (await import(distUrl("desktop", "websocket_relay.js"))) as {
+  const websocketRelay = (await import(distUrl("os", "messenger", "desktop", "websocket_relay.js"))) as {
     WebSocketRelay: RootModules["WebSocketRelay"];
   };
-  const websocketRelaySocketFactory = (await import(distUrl("desktop", "node_websocket_relay_socket_factory.js"))) as {
+  const websocketRelaySocketFactory = (await import(distUrl("os", "messenger", "desktop", "node_websocket_relay_socket_factory.js"))) as {
     createNodeWebSocketRelaySocketFactory: RootModules["createNodeWebSocketRelaySocketFactory"];
   };
-  const trayTypes = (await import(distUrl("desktop", "tray", "fedos_desktop_tray_types.js"))) as {
+  const trayTypes = (await import(distUrl("os", "messenger", "desktop", "tray", "fedos_desktop_tray_types.js"))) as {
     fedosDesktopTrayMenuItems: RootModules["fedosDesktopTrayMenuItems"];
+  };
+  // Commerce Reachable Catalog + Product Surface Phase 1 -- first-ever
+  // production caller of `createCommerce()`'s barrel (`src/os/commerce/index.ts`,
+  // newly added to `tsconfig.beta-runtime.json`'s include list this arc).
+  // Only `listViewableProducts` is taken from it -- see `RootModules.Commerce`'s
+  // own header for why nothing payment-shaped is imported.
+  const commerce = (await import(distUrl("os", "commerce", "index.js"))) as {
+    listViewableProducts: RootModules["Commerce"]["listViewableProducts"];
   };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
@@ -556,6 +591,7 @@ async function loadRootModules(): Promise<RootModules> {
     fedosDesktopTrayMenuItems: trayTypes.fedosDesktopTrayMenuItems,
     WebSocketRelay: websocketRelay.WebSocketRelay,
     createNodeWebSocketRelaySocketFactory: websocketRelaySocketFactory.createNodeWebSocketRelaySocketFactory,
+    Commerce: { listViewableProducts: commerce.listViewableProducts },
   };
 }
 
@@ -1487,6 +1523,62 @@ async function handleAppDeviceSyncStatus() {
   return shell.deviceSyncStatus();
 }
 
+// ---------------------------------------------------------------------
+// Commerce Reachable Catalog + Product Surface Phase 1.
+//
+// Deliberately independent of `requireShell()`/`requireModules()`'s own
+// profile-lifecycle gating: Commerce catalog discovery does not require an
+// unlocked profile, a Coordinator, or a Runtime -- it only needs `modules`
+// (loaded once, unconditionally, in `loadRootModules()`). This is what
+// "0 expected network contact" and "Commerce reachable even before a
+// profile exists" both cash out to structurally.
+//
+// Read-only. No `PaymentProvider` is constructed or reachable from either
+// handler -- see this file's own `RootModules.Commerce` field comment and
+// `docs/commerce/PRODUCT-SURFACE-AUDIT.md`'s Phase 1 regression guard.
+// ---------------------------------------------------------------------
+
+function commerceViewableDemoProducts(): readonly FedosCommerceDemoProduct[] {
+  return requireModules().Commerce.listViewableProducts(FEDOS_COMMERCE_DEMO_PRODUCTS, "", []);
+}
+
+async function handleCommerceCatalogList() {
+  const products = commerceViewableDemoProducts();
+  return {
+    outcome: "ok",
+    products: products.map((product) => ({
+      id: product.id,
+      title: product.title,
+      priceCents: product.priceCents,
+      currency: product.currency,
+      merchantLabel: fedosCommerceDemoMerchantLabel(product.creatorPubkey),
+      status: product.status,
+      hasImage: Object.prototype.hasOwnProperty.call(FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA, product.id),
+    })),
+  };
+}
+
+async function handleCommerceProductDetail(payload: unknown) {
+  const productId = (payload as { productId?: unknown } | null)?.productId;
+  if (!isBoundedString(productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+  const product = commerceViewableDemoProducts().find((candidate) => candidate.id === productId);
+  if (product === undefined) return { outcome: "not-found", reason: "no such product" };
+  const media = FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA[product.id] ?? null;
+  return {
+    outcome: "ok",
+    product: {
+      id: product.id,
+      title: product.title,
+      description: product.description ?? "",
+      priceCents: product.priceCents,
+      currency: product.currency,
+      merchantLabel: fedosCommerceDemoMerchantLabel(product.creatorPubkey),
+      status: product.status,
+      media: media === null ? null : { dataUri: media.dataUri, mimeType: media.mimeType, altText: media.altText },
+    },
+  };
+}
+
 /**
  * Secure Runtime Alpha 8041-8120 — see `BoundaryLike`'s own updated header
  * comment: `identityTransitionList()`/its Controller-built inbox item never
@@ -1810,6 +1902,11 @@ function registerIpcHandlers(): void {
   // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
   ipcMain.handle("fedos-app:settings-load", async () => handleAppSettingsLoad());
   ipcMain.handle("fedos-app:relay-status", async () => handleAppRelayStatus());
+  // Commerce Reachable Catalog + Product Surface Phase 1 -- exactly one
+  // new, bounded IPC channel family. Read-only; never gated on shell/
+  // profile readiness (see the handlers' own header comment).
+  ipcMain.handle("fedos-app:commerce-catalog-list", async () => handleCommerceCatalogList());
+  ipcMain.handle("fedos-app:commerce-product-detail", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductDetail(payload));
 }
 
 // ---------------------------------------------------------------------

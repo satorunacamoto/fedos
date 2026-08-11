@@ -22,14 +22,14 @@
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import { serializeForId } from "../../src/nostr/event.js";
-import type { FedosNostrWireEvent } from "../../src/desktop/fedos_nostr_wire_event.js";
+import { serializeForId } from "../../src/os/messenger/adapters/nostr/protocol/event.js";
+import type { FedosNostrWireEvent } from "../../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 import {
   isWellFormedFedosNostrUnsignedEventRequest,
   type FedosNostrSigningAuthority,
   type FedosNostrUnsignedEventRequest,
-} from "../../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosNostrSigningPublicIdentity } from "../../src/nostr/sign/fedos_nostr_signing_public_identity.js";
+} from "../../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosNostrSigningPublicIdentity } from "../../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_public_identity.js";
 
 export class RealFedosNostrSigningAuthority implements FedosNostrSigningAuthority {
   readonly #secretKeysByAccountIndex = new Map<number, Uint8Array>();

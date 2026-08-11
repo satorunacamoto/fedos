@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_285_atproto_body_mapping.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import adapterModuleSource from "../src/board/atproto/fedos_atproto_board_adapter.ts?raw";
+import adapterModuleSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 import {
   mapValidatedAtprotoPostToBoardPostInput,
   validateAtprotoBoardPost,
-} from "../src/board/atproto/fedos_atproto_board_adapter.js";
-import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/board/fedos_board_post_validator.js";
-import type { FedosValidatedAtprotoPost } from "../src/board/atproto/fedos_validated_atproto_post.js";
+} from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.js";
+import { FEDOS_BOARD_POST_MAX_BODY_LENGTH } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import type { FedosValidatedAtprotoPost } from "../src/os/messenger/board/atproto/fedos_validated_atproto_post.js";
 
 function codeOnly(source: string): string {
   return source

@@ -4,8 +4,8 @@ import {
   type RelaySocketEvent,
   type RelaySocketEventType,
   type RelaySocketLike,
-} from "../src/nostr/ws_relay.js";
-import type { NostrEvent } from "../src/nostr/types.js";
+} from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
+import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 
 function event(idChar: string): NostrEvent {
   return {

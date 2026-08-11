@@ -1,22 +1,22 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardRuntimeSource from "../../../src/board/runtime/fedos_board_runtime.ts?raw";
+import boardRuntimeSource from "../../../src/os/messenger/board/runtime/fedos_board_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import commandTypesSource from "../../../src/board/runtime/fedos_board_runtime_command_types.ts?raw";
+import commandTypesSource from "../../../src/os/messenger/board/runtime/fedos_board_runtime_command_types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import authorAuthoritySource from "../../../src/board/runtime/fedos_board_runtime_author_authority.ts?raw";
+import authorAuthoritySource from "../../../src/os/messenger/board/runtime/fedos_board_runtime_author_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboundEligibilitySource from "../../../src/board/runtime/fedos_board_runtime_outbound_eligibility.ts?raw";
+import outboundEligibilitySource from "../../../src/os/messenger/board/runtime/fedos_board_runtime_outbound_eligibility.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../../../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../../../src/os/messenger/board/fedos_board_post.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import moderationSource from "../../../src/board/fedos_board_moderation.ts?raw";
+import moderationSource from "../../../src/os/messenger/board/fedos_board_moderation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identifiersSource from "../../../src/board/fedos_board_identifiers.ts?raw";
+import identifiersSource from "../../../src/os/messenger/board/fedos_board_identifiers.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPersistenceSource from "../../../src/board/persistence/fedos_board_persistence.ts?raw";
+import boardPersistenceSource from "../../../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import outboxTypesSource from "../../../src/board/outbox/fedos_board_outbox_types.ts?raw";
+import outboxTypesSource from "../../../src/os/messenger/board/outbox/fedos_board_outbox_types.ts?raw";
 // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync, readFileSync } from "node:fs";
 

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_303_in_memory_board_repository.md?raw";
-import { InMemoryFedosBoardRepository } from "../src/board/repository/in_memory_fedos_board_repository.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import { InMemoryFedosBoardRepository } from "../src/os/messenger/board/repository/in_memory_fedos_board_repository.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 const INPUT: FedosBoardPostInput = {
   id: "post-1",

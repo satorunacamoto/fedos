@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
+import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Private Message Envelope and Encryption Activation V1 review --
@@ -165,7 +166,7 @@ describe("Private Message Envelope V1 review -- specification consistency", () =
 
   it("15. package.json still carries exactly two production dependencies -- no new dependency introduced", () => {
     const parsed = JSON.parse(packageJsonSource as string) as { dependencies: Record<string, string> };
-    expect(Object.keys(parsed.dependencies).sort()).toEqual(["@noble/curves", "@noble/hashes"]);
+    assertFedosRootDependencyInvariant(parsed.dependencies);
   });
 
   it("16. no doc in this review assigns itself, or the Arc it recommends, an Alpha number", () => {

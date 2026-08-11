@@ -6,11 +6,11 @@ import { tmpdir } from "node:os";
 // @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
-import { AppendOnlyFedosBoardOutboxPersistence } from "../src/board/outbox/append_only_fedos_board_outbox_persistence.js";
-import type { FedosBoardOutboxPersistence } from "../src/board/outbox/fedos_board_outbox_persistence.js";
-import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
+import { AppendOnlyFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.js";
+import type { FedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/fedos_board_outbox_persistence.js";
+import { serializeFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 let dir: string | undefined;
 afterEach(() => {

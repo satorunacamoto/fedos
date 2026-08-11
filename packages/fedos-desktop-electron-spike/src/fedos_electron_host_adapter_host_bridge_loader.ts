@@ -29,7 +29,7 @@ interface FedosElectronHostBridgeModule {
  * (three directories up: `packages/<name>/` -> `packages/` -> repo root).
  */
 export function fedosElectronHostBridgeCompiledPath(packageDir: string): string {
-  return join(packageDir, "..", "..", "dist", "desktop", "host_boundary", "fedos_desktop_host_bridge.js");
+  return join(packageDir, "..", "..", "dist", "os", "messenger", "desktop", "host_boundary", "fedos_desktop_host_bridge.js");
 }
 
 export async function fedosElectronLoadHostBridgeModule(packageDir: string): Promise<FedosElectronHostBridgeModule> {

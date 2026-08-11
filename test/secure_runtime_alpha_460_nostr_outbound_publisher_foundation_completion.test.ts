@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { FedosRelayNostrBoardPublisher } from "../src/board/publish/nostr/fedos_relay_nostr_board_publisher.js";
-import type { FedosNostrBoardPublisher } from "../src/board/publish/nostr/fedos_nostr_board_publisher.js";
-import { NullRelay } from "../src/desktop/null_relay.js";
+import { FedosRelayNostrBoardPublisher } from "../src/os/messenger/board/publish/nostr/fedos_relay_nostr_board_publisher.js";
+import type { FedosNostrBoardPublisher } from "../src/os/messenger/board/publish/nostr/fedos_nostr_board_publisher.js";
+import { NullRelay } from "../src/os/messenger/desktop/null_relay.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_460_nostr_outbound_publisher_foundation_completion.md?raw";
 

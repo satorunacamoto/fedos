@@ -149,8 +149,8 @@ realSuite("Alpha 8121-8200 -- Security Finding 2 (6873d24f): double-submit guard
   });
 
   it("structural: the disable-while-in-flight guard is a UX safety net only -- the REAL authoritative boundary remains the Controller's own #actionInFlight (Security Finding 3), never a claim that the renderer guard alone is sufficient", () => {
-    const identityControllerSource = readFileSync(join(repoRoot, "src/desktop/presentation/identity_transition/fedos_identity_transition_controller.ts"), "utf8");
-    const deletionControllerSource = readFileSync(join(repoRoot, "src/desktop/presentation/deletion_request/fedos_deletion_request_controller.ts"), "utf8");
+    const identityControllerSource = readFileSync(join(repoRoot, "src/os/messenger/desktop/presentation/identity_transition/fedos_identity_transition_controller.ts"), "utf8");
+    const deletionControllerSource = readFileSync(join(repoRoot, "src/os/messenger/desktop/presentation/deletion_request/fedos_deletion_request_controller.ts"), "utf8");
     expect(identityControllerSource).toMatch(/#actionInFlight/);
     expect(deletionControllerSource).toMatch(/#actionInFlight/);
   });

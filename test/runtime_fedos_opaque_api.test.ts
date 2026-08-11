@@ -24,9 +24,9 @@ import runtimeDiagnosticsSource from "../src/runtime/runtime_crypto_diagnostics.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerDiagnosticsSource from "../src/runtime/worker_crypto_diagnostics.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -35,6 +35,7 @@ import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import opaqueApiDocSource from "../docs/runtime_fedos_opaque_api.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 321–328 — "FedOS Opaque API Internal Wiring (Blocked before
@@ -168,7 +169,7 @@ describe("FedOS opaque API internal wiring, blocked before Rust (Stage 321-328)"
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("15. public API unchanged -- FedosRuntimeCryptoProvider still satisfies RuntimeCryptoProvider exactly", async () => {

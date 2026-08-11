@@ -21,9 +21,9 @@ import runtimeBridgeSource from "../src/runtime/runtime_crypto_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import workerBridgeSource from "../src/runtime/worker_crypto_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -36,6 +36,7 @@ import implementationDocSource from "../docs/runtime_fedos_provider_implementati
 import activationPolicyDocSource from "../docs/runtime_crypto_activation_policy.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import threatModelDocSource from "../docs/runtime_crypto_threat_model.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 305–312 — "FedOS Provider Implementation Readiness (Shape Only)":
@@ -168,7 +169,7 @@ describe("FedOS provider implementation readiness, shape only (Stage 305-312)", 
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("14. docs record that the flag is still false, real crypto still doesn't run, and Worker/Nostr/Relay remain unconnected", () => {

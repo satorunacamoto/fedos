@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { FEDOS_DELETION_TARGETS, isFedosDeletionTarget } from "../src/conversation/deletion/fedos_deletion_target.js";
-import { FEDOS_DELETION_OPERATIONS, isFedosDeletionOperation } from "../src/conversation/deletion/fedos_deletion_operation.js";
-import { FEDOS_DELETION_EVIDENCE_LEVELS, isFedosDeletionEvidence } from "../src/conversation/deletion/fedos_deletion_evidence.js";
-import { FEDOS_DELETION_STATUSES, isFedosDeletionStatus, fedosDeletionStatusFromPayloadDeletionMeaning } from "../src/conversation/deletion/fedos_deletion_status.js";
+import { FEDOS_DELETION_TARGETS, isFedosDeletionTarget } from "../src/os/messenger/conversations/deletion/fedos_deletion_target.js";
+import { FEDOS_DELETION_OPERATIONS, isFedosDeletionOperation } from "../src/os/messenger/conversations/deletion/fedos_deletion_operation.js";
+import { FEDOS_DELETION_EVIDENCE_LEVELS, isFedosDeletionEvidence } from "../src/os/messenger/conversations/deletion/fedos_deletion_evidence.js";
+import { FEDOS_DELETION_STATUSES, isFedosDeletionStatus, fedosDeletionStatusFromPayloadDeletionMeaning } from "../src/os/messenger/conversations/deletion/fedos_deletion_status.js";
 import {
   getFedosDeletionCapabilityDescriptor,
   resolveFedosDeletionCapabilityDescriptor,
-} from "../src/conversation/deletion/fedos_deletion_capability_descriptor.js";
-import { FEDOS_PAYLOAD_DELETION_MEANINGS } from "../src/conversation/retention/fedos_payload_retention_state.js";
+} from "../src/os/messenger/conversations/deletion/fedos_deletion_capability_descriptor.js";
+import { FEDOS_PAYLOAD_DELETION_MEANINGS } from "../src/os/messenger/conversations/retention/fedos_payload_retention_state.js";
 
 describe("Secure Runtime Alpha 5401-5480 -- closed target vocabulary", () => {
   it("1. every target is a distinct string, no duplicates", () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { PersistedFedosBoardRepository } from "../src/board/persistence/persisted_fedos_board_repository.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { validateFedosBoardPost } from "../src/board/fedos_board_post_validator.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { PersistedFedosBoardRepository } from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { validateFedosBoardPost } from "../src/os/messenger/board/fedos_board_post_validator.js";
 
 /**
  * Secure Runtime Alpha 557 -- "State Machine Contradiction

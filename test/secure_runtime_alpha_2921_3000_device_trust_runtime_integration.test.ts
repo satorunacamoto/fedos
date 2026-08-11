@@ -13,19 +13,19 @@ import {
   revokeFedosDeviceBinding,
   isFedosDeviceTrustTransitionAllowed,
   isFedosDeviceBindingTrusted,
-} from "../src/device/fedos_device_binding.js";
-import { UnavailableFedosDeviceRegistrationAuthority } from "../src/device/unavailable_fedos_device_registration_authority.js";
-import { PersistedFedosDeviceTrustAuthority } from "../src/device/persistence/persisted_fedos_device_trust_authority.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/device/persistence/append_only_fedos_device_registry_persistence.js";
+} from "../src/os/messenger/device/fedos_device_binding.js";
+import { UnavailableFedosDeviceRegistrationAuthority } from "../src/os/messenger/device/unavailable_fedos_device_registration_authority.js";
+import { PersistedFedosDeviceTrustAuthority } from "../src/os/messenger/device/persistence/persisted_fedos_device_trust_authority.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
 import { reviewFedosSyncRecordForJournal } from "../src/sync/fedos_sync_record_allowlist.js";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { restoreFedosConversationArchiveBundle } from "../src/conversation/archive/fedos_conversation_archive_restore.js";
-import { InMemoryFedosConversationPersistence } from "../src/conversation/persistence/in_memory_fedos_conversation_persistence.js";
-import { InMemoryFedosConversationMembershipPersistence } from "../src/conversation/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
-import { InMemoryFedosConversationCapabilityPersistence } from "../src/conversation/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
-import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/conversation/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { restoreFedosConversationArchiveBundle } from "../src/os/messenger/conversations/archive/fedos_conversation_archive_restore.js";
+import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
+import { InMemoryFedosConversationMembershipPersistence } from "../src/os/messenger/conversations/membership/persistence/in_memory_fedos_conversation_membership_persistence.js";
+import { InMemoryFedosConversationCapabilityPersistence } from "../src/os/messenger/conversations/capability/persistence/in_memory_fedos_conversation_capability_persistence.js";
+import { InMemoryFedosConversationMessageEnvelopePersistence } from "../src/os/messenger/conversations/envelope/persistence/in_memory_fedos_conversation_message_envelope_persistence.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
 import { StubVerifiedFedosDeviceRegistrationAuthority } from "./support/stub_verified_fedos_device_registration_authority.js";
 
 const ACCOUNT_A = { authority: "nostr", publicIdentifier: "npub-account-a", identityId: null };

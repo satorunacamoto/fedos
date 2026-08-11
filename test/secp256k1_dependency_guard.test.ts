@@ -14,15 +14,15 @@ import guardModuleSource from "../packages/fedos-core-rust/src/crypto/secp256k1_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import dependencyAdoptionDoc from "../docs/nip44_dependency_adoption.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import storageTypesSource from "../src/storage/types.ts?raw";
+import storageTypesSource from "../src/os/core/storage/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopStorageSource from "../src/storage/noop_storage.ts?raw";
+import noopStorageSource from "../src/os/core/storage/noop_storage.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import federationTypesSource from "../src/federation/types.ts?raw";
+import federationTypesSource from "../src/os/_legacy_prototype/federation/types.ts?raw";
 
 /**
  * Stage 194–197 — "secp256k1 dependency adoption + capability/diagnostics

@@ -24,11 +24,11 @@ import { join } from "node:path";
 // @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
-import { createFedosDesktopConversationUiPresentationBoundary } from "../src/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
-import { createFedosDesktopRenderer } from "../src/desktop/renderer/fedos_desktop_renderer.js";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
+import { createFedosDesktopConversationUiPresentationBoundary } from "../src/os/messenger/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
+import { createFedosDesktopRenderer } from "../src/os/messenger/desktop/renderer/fedos_desktop_renderer.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
 import { StubVerifiedFedosDeviceRegistrationAuthority } from "./support/stub_verified_fedos_device_registration_authority.js";
-import { fedosDeviceManagementTruncateList } from "../src/desktop/presentation/device_management/fedos_device_management_presentation_limits.js";
+import { fedosDeviceManagementTruncateList } from "../src/os/messenger/desktop/presentation/device_management/fedos_device_management_presentation_limits.js";
 
 const ACCOUNT_A = { authority: "nostr", publicIdentifier: "npub-account-a", identityId: null };
 const ABANDONMENT_POLICY = { maxAttempts: 3, laterDelaySeconds: 60 };

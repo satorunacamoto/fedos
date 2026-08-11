@@ -14,13 +14,14 @@
     "typecheck:electron": "npm run typecheck --prefix packages/fedos-desktop-electron-spike",
     "typecheck": "npm run typecheck:core && npm run typecheck:electron",
     "test": "vitest run",
+    "test:current": "vitest run --config vitest.current.config.ts",
     "test:watch": "vitest",
     "build:wasm": "cargo build --manifest-path packages/fedos-core-rust/Cargo.toml --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir packages/fedos-core-rust/pkg packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm",
     "build:wasm:manifest": "node scripts/generate_wasm_artifact_manifest.mjs",
     "build:production-wasm": "node scripts/build_production_wasm_artifact.mjs",
     "build:runtime": "tsc -p tsconfig.runtime.json",
     "build:unlock-runtime": "tsc -p tsconfig.unlock-runtime.json",
-    "start:runtime": "npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js",
+    "start:runtime": "npm run build:runtime && node dist/os/messenger/desktop/runtime/run_fedos_desktop_runtime.js",
     "build:host-bridge": "tsc -p tsconfig.host-bridge.json",
     "build:settings-host-bridge": "tsc -p tsconfig.settings-host-bridge.json",
     "build:beta-runtime": "tsc -p tsconfig.beta-runtime.json",
@@ -36,15 +37,18 @@
     "start:electron-badge": "npm run start:badge --prefix packages/fedos-desktop-electron-spike",
     "start:electron-unlock": "npm run start:unlock --prefix packages/fedos-desktop-electron-spike",
     "start:electron-settings": "npm run start:settings --prefix packages/fedos-desktop-electron-spike",
-    "start:electron-beta": "npm run start:beta --prefix packages/fedos-desktop-electron-spike"
+    "start:electron-beta": "npm run start:beta --prefix packages/fedos-desktop-electron-spike",
+    "trust:issuer": "tsc -p tsconfig.trust-issuer.json && node scripts/fedos_trust_issuer_cli.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",
+    "@types/qrcode": "^1.5.6",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",
-    "@noble/hashes": "^2.2.0"
+    "@noble/hashes": "^2.2.0",
+    "qrcode": "^1.5.4"
   }
 }

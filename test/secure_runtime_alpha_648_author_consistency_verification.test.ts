@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { NostrPublicIdentityReader } from "../src/desktop/nostr_public_identity_reader.js";
-import { StaticNostrPublicIdentitySource } from "../src/desktop/static_nostr_public_identity_source.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { FedosDesktopPublicAuthorAuthority } from "../src/board/runtime/identity/fedos_desktop_public_author_authority.js";
-import { StaticFedosPublicAuthorAuthority } from "../src/board/runtime/identity/static_fedos_public_author_authority.js";
-import type { CreatePublicThreadCommand, ReplyToPublicThreadCommand } from "../src/board/runtime/fedos_board_runtime_command_types.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { NostrPublicIdentityReader } from "../src/os/messenger/desktop/nostr_public_identity_reader.js";
+import { StaticNostrPublicIdentitySource } from "../src/os/messenger/desktop/static_nostr_public_identity_source.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { FedosDesktopPublicAuthorAuthority } from "../src/os/messenger/board/runtime/identity/fedos_desktop_public_author_authority.js";
+import { StaticFedosPublicAuthorAuthority } from "../src/os/messenger/board/runtime/identity/static_fedos_public_author_authority.js";
+import type { CreatePublicThreadCommand, ReplyToPublicThreadCommand } from "../src/os/messenger/board/runtime/fedos_board_runtime_command_types.js";
 
 async function readyHostWithIdentity(publicIdentifier: string): Promise<FedosDesktopHost> {
   const host = new FedosDesktopHost({

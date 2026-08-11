@@ -26,37 +26,37 @@ import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
 
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import type { FedosDesktopRuntimeConfig } from "../src/desktop/runtime/fedos_desktop_runtime_config.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import type { FedosDesktopRuntimeConfig } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.js";
 import { StubVerifiedFedosDeviceRegistrationAuthority } from "./support/stub_verified_fedos_device_registration_authority.js";
-import { FedosDeviceSyncEventBridge } from "../src/device/sync_events/fedos_device_sync_event_bridge.js";
-import type { FedosDeviceSyncAttemptFn } from "../src/device/sync_scheduler/fedos_device_sync_attempt.js";
-import type { FedosDeviceSyncAttemptOutcomeCode } from "../src/device/sync_scheduler/fedos_device_sync_retry_policy.js";
+import { FedosDeviceSyncEventBridge } from "../src/os/messenger/device/sync_events/fedos_device_sync_event_bridge.js";
+import type { FedosDeviceSyncAttemptFn } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_attempt.js";
+import type { FedosDeviceSyncAttemptOutcomeCode } from "../src/os/messenger/device/sync_scheduler/fedos_device_sync_retry_policy.js";
 import {
   FedosDesktopDeviceSyncPresentationWiring,
   type FedosDeviceSyncNotificationSink,
   type FedosDeviceSyncTrayStatusSink,
-} from "../src/desktop/runtime/fedos_desktop_device_sync_presentation_wiring.js";
+} from "../src/os/messenger/desktop/runtime/fedos_desktop_device_sync_presentation_wiring.js";
 
-import { createFedosDesktopConversationUiPresentationBoundary } from "../src/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
-import { StaticFedosConversationCreatorIdentityAuthority } from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
+import { createFedosDesktopConversationUiPresentationBoundary } from "../src/os/messenger/desktop/presentation/fedos_desktop_conversation_ui_presentation_boundary.js";
+import { StaticFedosConversationCreatorIdentityAuthority } from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
 import type {
   FedosConversationEncryptionAuthority,
   FedosConversationEncryptionRequest,
   FedosConversationEncryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_encryption_authority.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_encryption_authority.js";
 import type {
   FedosConversationDecryptionAuthority,
   FedosConversationDecryptionRequest,
   FedosConversationDecryptionResult,
-} from "../src/conversation/encryption/fedos_conversation_decryption_authority.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
-import { FedosDesktopBadgeCoordinator, type FedosDesktopBadgeRegistryView } from "../src/desktop/badge/fedos_desktop_badge_coordinator.js";
-import type { FedosDesktopBadgePort } from "../src/desktop/badge/fedos_desktop_badge_port.js";
-import type { FedosDesktopBadgeView } from "../src/desktop/badge/fedos_desktop_badge_types.js";
-import { FedosDesktopNotificationCoordinator } from "../src/desktop/notification/fedos_desktop_notification_coordinator.js";
-import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/desktop/notification/fedos_desktop_notification_port.js";
-import type { FedosDesktopNotificationView } from "../src/desktop/notification/fedos_desktop_notification_types.js";
+} from "../src/os/messenger/conversations/encryption/fedos_conversation_decryption_authority.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
+import { FedosDesktopBadgeCoordinator, type FedosDesktopBadgeRegistryView } from "../src/os/messenger/desktop/badge/fedos_desktop_badge_coordinator.js";
+import type { FedosDesktopBadgePort } from "../src/os/messenger/desktop/badge/fedos_desktop_badge_port.js";
+import type { FedosDesktopBadgeView } from "../src/os/messenger/desktop/badge/fedos_desktop_badge_types.js";
+import { FedosDesktopNotificationCoordinator } from "../src/os/messenger/notifications/fedos_desktop_notification_coordinator.js";
+import type { FedosDesktopNotificationPort, FedosDesktopNotificationDeliveryResult } from "../src/os/messenger/notifications/fedos_desktop_notification_port.js";
+import type { FedosDesktopNotificationView } from "../src/os/messenger/notifications/fedos_desktop_notification_types.js";
 
 // ---------------------------------------------------------------------
 // Real, total, inspectable Port fakes (never a mock library) -- mirrors

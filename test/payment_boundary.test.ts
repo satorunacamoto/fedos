@@ -1,23 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { NoopPaymentProvider, PlaceholderPaymentProvider } from "../src/payment/noop_payment.js";
+import { NoopPaymentProvider, PlaceholderPaymentProvider } from "../src/os/commerce/payment/noop_payment.js";
 import {
   canRequestPaymentForProduct,
   paymentDecisionToGrant,
   productToPaymentRequest,
-} from "../src/payment/commerce_bridge.js";
-import type { PaymentDecision, PaymentRequest } from "../src/payment/types.js";
-import type { Product } from "../src/commerce/types.js";
+} from "../src/os/commerce/payment/commerce_bridge.js";
+import type { PaymentDecision, PaymentRequest } from "../src/os/commerce/payment/types.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
 // Source-level checks: prove no real transport import and no runtime/worker auto-wire.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import paymentTypesSource from "../src/payment/types.ts?raw";
+import paymentTypesSource from "../src/os/commerce/payment/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import noopPaymentSource from "../src/payment/noop_payment.ts?raw";
+import noopPaymentSource from "../src/os/commerce/payment/noop_payment.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import commerceBridgeSource from "../src/payment/commerce_bridge.ts?raw";
+import commerceBridgeSource from "../src/os/commerce/payment/commerce_bridge.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 const paymentSources = [paymentTypesSource, noopPaymentSource, commerceBridgeSource].join("\n");
 
@@ -87,7 +87,11 @@ describe("PlaceholderPaymentProvider", () => {
   it("accepts a policy-clean request as accepted_placeholder", async () => {
     const provider = new PlaceholderPaymentProvider();
     const decision = await provider.requestPayment(request());
-    expect(decision).toEqual({
+    // paymentId is an opaque, provider-assigned identity (BTCPay-readiness) --
+    // asserted separately rather than pinned to an exact string.
+    expect(typeof decision.paymentId).toBe("string");
+    expect(decision.paymentId?.length).toBeGreaterThan(0);
+    expect(decision).toMatchObject({
       allowed: true,
       status: "accepted_placeholder",
       rail: "manual_placeholder",

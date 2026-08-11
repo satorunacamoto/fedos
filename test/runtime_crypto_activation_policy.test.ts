@@ -36,6 +36,7 @@ import packageJsonSource from "../package.json?raw";
 import activationPolicyDocSource from "../docs/runtime_crypto_activation_policy.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import threatModelDocSource from "../docs/runtime_crypto_threat_model.md?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Stage 289–296 — "Activation Policy (Fail-Closed)":
@@ -208,7 +209,7 @@ describe("Runtime/Worker crypto activation policy, fail-closed (Stage 289-296)",
     expect(depLines.length).toBe(11);
 
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("15. docs/runtime_crypto_activation_policy.md and docs/runtime_crypto_threat_model.md exist and state the fail-closed guarantee", () => {

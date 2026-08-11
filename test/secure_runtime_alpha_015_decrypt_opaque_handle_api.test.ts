@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 // This project's tsconfig.json carries no `@types/node`; declared
 // ambient here the same way `fedos_runtime_prototype_execution.ts` itself does.
 declare const process: { env: { NODE_ENV?: string; [key: string]: string | undefined } };
-import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/runtime/create_runtime.js";
+import { createRuntime, createRuntimeInitializeCryptoResult } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 import { runtimeCapabilities } from "../src/runtime/fedos_runtime_prototype_execution.js";
 import { randomBytes } from "../src/runtime/fedos_runtime_random_bytes.js";
 import { generateAeadKey } from "../src/runtime/fedos_runtime_aead_key_generation.js";
@@ -14,9 +14,9 @@ import designDocSource from "../docs/secure_runtime_alpha_015_decrypt_opaque_han
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import encryptDesignDocSource from "../docs/secure_runtime_alpha_014_encrypt_opaque_handle_api.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import decryptServiceSource from "../src/runtime/fedos_runtime_decrypt.ts?raw";
+import decryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_decrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import encryptServiceSource from "../src/runtime/fedos_runtime_encrypt.ts?raw";
+import encryptServiceSource from "../src/os/core/vault/wasm/fedos_runtime_encrypt.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import keyGenerationServiceSource from "../src/runtime/fedos_runtime_aead_key_generation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
@@ -24,13 +24,13 @@ import randomBytesServiceSource from "../src/runtime/fedos_runtime_random_bytes.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import runtimeIntegrationSource from "../src/runtime/fedos_runtime_prototype_execution.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeTypesSource from "../src/runtime/types.ts?raw";
+import runtimeTypesSource from "../src/os/_legacy_prototype/runtime/types.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import wasmLoaderSource from "../src/runtime/fedos_wasm_loader.ts?raw";
+import wasmLoaderSource from "../src/os/core/vault/wasm/fedos_wasm_loader.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import libRsSource from "../packages/fedos-core-rust/src/lib.rs?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.

@@ -4,39 +4,40 @@ import designDocSource from "../docs/secure_runtime_alpha_320_board_persistence_
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import relaySource from "../src/desktop/fedos_relay.ts?raw";
+import relaySource from "../src/os/messenger/desktop/fedos_relay.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import createRuntimeSource from "../src/runtime/create_runtime.ts?raw";
+import createRuntimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import nostrAdapterSource from "../src/board/fedos_board_nostr_adapter.ts?raw";
+import nostrAdapterSource from "../src/os/messenger/board/fedos_board_nostr_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import activityPubAdapterSource from "../src/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
+import activityPubAdapterSource from "../src/os/messenger/board/activitypub/fedos_activitypub_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import atprotoAdapterSource from "../src/board/atproto/fedos_atproto_board_adapter.ts?raw";
+import atprotoAdapterSource from "../src/os/messenger/board/atproto/fedos_atproto_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sessionAdapterSource from "../src/board/session/fedos_session_board_adapter.ts?raw";
+import sessionAdapterSource from "../src/os/messenger/board/session/fedos_session_board_adapter.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import repositorySource from "../src/board/repository/fedos_board_repository.ts?raw";
+import repositorySource from "../src/os/messenger/board/repository/fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import inMemoryRepositorySource from "../src/board/repository/in_memory_fedos_board_repository.ts?raw";
+import inMemoryRepositorySource from "../src/os/messenger/board/repository/in_memory_fedos_board_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sourceIndexSource from "../src/board/repository/fedos_board_source_index.ts?raw";
+import sourceIndexSource from "../src/os/messenger/board/repository/fedos_board_source_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardIndexSource from "../src/board/repository/fedos_board_index.ts?raw";
+import boardIndexSource from "../src/os/messenger/board/repository/fedos_board_index.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import feedSource from "../src/board/repository/fedos_board_feed.ts?raw";
+import feedSource from "../src/os/messenger/board/repository/fedos_board_feed.ts?raw";
 
-import * as recordModule from "../src/board/persistence/fedos_persisted_board_post_v1.js";
-import * as codecModule from "../src/board/persistence/fedos_board_post_codec.js";
-import * as portModule from "../src/board/persistence/fedos_board_persistence.js";
-import * as inMemoryPersistenceModule from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import * as persistedRepositoryModule from "../src/board/persistence/persisted_fedos_board_repository.js";
-import * as hydrationModule from "../src/board/persistence/fedos_board_hydration.js";
-import { FedosBoardService } from "../src/board/repository/fedos_board_service.js";
-import { FedosBoardFeed } from "../src/board/repository/fedos_board_feed.js";
-import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/board/fedos_board_post_validator.js";
+import * as recordModule from "../src/os/messenger/board/persistence/fedos_persisted_board_post_v1.js";
+import * as codecModule from "../src/os/messenger/board/persistence/fedos_board_post_codec.js";
+import * as portModule from "../src/os/messenger/board/persistence/fedos_board_persistence.js";
+import * as inMemoryPersistenceModule from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import * as persistedRepositoryModule from "../src/os/messenger/board/persistence/persisted_fedos_board_repository.js";
+import * as hydrationModule from "../src/os/messenger/board/persistence/fedos_board_hydration.js";
+import { FedosBoardService } from "../src/os/messenger/board/repository/fedos_board_service.js";
+import { FedosBoardFeed } from "../src/os/messenger/board/repository/fedos_board_feed.js";
+import { validateFedosBoardPost, type FedosBoardPostInput } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 320 -- "Canonical Board Persistence Boundary
@@ -101,7 +102,7 @@ describe("Secure Runtime Alpha 320 -- Canonical Board Persistence Boundary Compl
 
   it("6. Regression: package.json dependency count remains unchanged at 2 across the whole Arc", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("7. Regression: Relay, Runtime, and Worker carry zero reference to src/board/persistence/", () => {

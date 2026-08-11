@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryFedosConversationPayloadStorage } from "../src/conversation/payload_storage/in_memory_fedos_conversation_payload_storage.js";
-import type { FedosConversationPayloadStorage } from "../src/conversation/payload_storage/fedos_conversation_payload_storage.js";
-import type { FedosConversationPayloadDescriptor } from "../src/conversation/payload_storage/fedos_conversation_payload_descriptor.js";
+import { InMemoryFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/in_memory_fedos_conversation_payload_storage.js";
+import type { FedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_storage.js";
+import type { FedosConversationPayloadDescriptor } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor.js";
 
 const DESCRIPTOR: FedosConversationPayloadDescriptor = {
   id: "payload-1" as any,

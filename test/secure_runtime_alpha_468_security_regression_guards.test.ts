@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import observationSource from "../src/board/observation/fedos_delivery_observation.ts?raw";
+import observationSource from "../src/os/messenger/board/observation/fedos_delivery_observation.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import codecSource from "../src/board/observation/fedos_delivery_observation_codec.ts?raw";
+import codecSource from "../src/os/messenger/board/observation/fedos_delivery_observation_codec.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistenceSource from "../src/board/observation/fedos_delivery_observation_persistence.ts?raw";
+import persistenceSource from "../src/os/messenger/board/observation/fedos_delivery_observation_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import inMemorySource from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.ts?raw";
+import inMemorySource from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import repositorySource from "../src/board/observation/fedos_delivery_observation_repository.ts?raw";
+import repositorySource from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import querySource from "../src/board/observation/fedos_delivery_observation_query.ts?raw";
+import querySource from "../src/os/messenger/board/observation/fedos_delivery_observation_query.ts?raw";
 
 /**
  * Secure Runtime Alpha 468 -- "Delivery Observation Security Regression

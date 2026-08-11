@@ -324,7 +324,7 @@ describe("Secure Runtime Alpha 4021-4100 -- root/Electron graph isolation (Phase
     expect(rootPkg.scripts["typecheck:core"]).toBe("tsc --noEmit");
     expect(rootPkg.scripts.test).toBe("vitest run");
     expect(rootPkg.scripts["build:runtime"]).toBe("tsc -p tsconfig.runtime.json");
-    expect(rootPkg.scripts["start:runtime"]).toBe("npm run build:runtime && node dist/desktop/runtime/run_fedos_desktop_runtime.js");
+    expect(rootPkg.scripts["start:runtime"]).toBe("npm run build:runtime && node dist/os/messenger/desktop/runtime/run_fedos_desktop_runtime.js");
     expect(rootPkg.scripts.typecheck).toBe("npm run typecheck:core && npm run typecheck:electron");
     expect(rootPkg.scripts["typecheck:electron"]).toBeDefined();
     expect(rootPkg.scripts["build:electron-spike"]).toBeDefined();

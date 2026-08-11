@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { FedosDesktopHost } from "../src/desktop/host/fedos_desktop_host.js";
-import { DesktopApplication } from "../src/desktop/desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../src/board/persistence/in_memory_fedos_board_persistence.js";
-import { validateFedosBoardPost } from "../src/board/fedos_board_post_validator.js";
-import { hydrateFedosConversations } from "../src/conversation/fedos_conversation_hydration.js";
-import { InMemoryFedosConversationPersistence } from "../src/conversation/persistence/in_memory_fedos_conversation_persistence.js";
-import type { FedosPersistedConversationRecordV1 } from "../src/conversation/persistence/fedos_persisted_conversation_record_v1.js";
+import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";
+import { DesktopApplication } from "../src/os/messenger/desktop/desktop_application.js";
+import { InMemoryFedosBoardPersistence } from "../src/os/messenger/board/persistence/in_memory_fedos_board_persistence.js";
+import { validateFedosBoardPost } from "../src/os/messenger/board/fedos_board_post_validator.js";
+import { hydrateFedosConversations } from "../src/os/messenger/conversations/fedos_conversation_hydration.js";
+import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
+import type { FedosPersistedConversationRecordV1 } from "../src/os/messenger/conversations/persistence/fedos_persisted_conversation_record_v1.js";
 
 const RECORD: FedosPersistedConversationRecordV1 = {
   schemaVersion: 1,

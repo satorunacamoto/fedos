@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_292_normalized_session_post_model.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import postModelSource from "../src/board/session/fedos_validated_session_post.ts?raw";
-import type { FedosValidatedSessionPost } from "../src/board/session/fedos_validated_session_post.js";
+import postModelSource from "../src/os/messenger/board/session/fedos_validated_session_post.ts?raw";
+import type { FedosValidatedSessionPost } from "../src/os/messenger/board/session/fedos_validated_session_post.js";
 
 function codeOnly(source: string): string {
   return source

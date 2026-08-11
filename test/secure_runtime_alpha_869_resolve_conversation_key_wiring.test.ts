@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   FedosWasmMasterSeedAuthority,
   type FedosMasterSeedWasmLoaderBoundary,
-} from "../src/runtime/master_seed/fedos_wasm_master_seed_authority.js";
+} from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";
 import type { FedosMasterSeedAuthorityHandle } from "../src/runtime/fedos_wasm_loader.js";
 
 const COUNTERPARTY_HEX = "ab".repeat(32);

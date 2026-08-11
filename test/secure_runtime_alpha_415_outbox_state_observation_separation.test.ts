@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import designDocSource from "../docs/secure_runtime_alpha_415_outbox_state_observation_separation.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import persistenceSource from "../src/board/outbox/fedos_board_outbox_persistence.ts?raw";
+import persistenceSource from "../src/os/messenger/board/outbox/fedos_board_outbox_persistence.ts?raw";
 
 /**
  * Secure Runtime Alpha 415 -- "Outbox State and Observation

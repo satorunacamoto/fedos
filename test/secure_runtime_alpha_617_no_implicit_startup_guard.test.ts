@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 describe("Secure Runtime Alpha 617 -- No Implicit Startup Guard", () => {
   it("1. every non-indented (module-top-level) line is only an import, an interface/function declaration opener, or a brace -- no top-level statement executes anything", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const source = (await import("../src/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
+    const source = (await import("../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
     // This file is checked out with CRLF line endings on this platform
     // (see e.g. `test/secure_runtime_alpha_436_...ts`'s own note); a bare
     // `\n` split otherwise leaves a stray `"\r"` "line" for every blank
@@ -31,7 +31,7 @@ describe("Secure Runtime Alpha 617 -- No Implicit Startup Guard", () => {
 
   it("2. importing run_fedos_desktop_runtime.ts's own executable file does not itself run main() -- confirmed structurally, since main() is only ever invoked once, at the file's own bottom, guarded by nothing else", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const source = (await import("../src/desktop/runtime/run_fedos_desktop_runtime.ts?raw")).default as string;
+    const source = (await import("../src/os/messenger/desktop/runtime/run_fedos_desktop_runtime.ts?raw")).default as string;
     const codeOnly = source
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
@@ -48,7 +48,7 @@ describe("Secure Runtime Alpha 617 -- No Implicit Startup Guard", () => {
 
   it("3. no signal registration, no timer, and no Relay/WebSocket/Signing CONSTRUCTION anywhere in the testable assembly module (a string literal naming what is absent, e.g. an explanatory error message, is not a reference)", async () => {
     // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-    const source = (await import("../src/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
+    const source = (await import("../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw")).default as string;
     const codeOnly = source
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("//") && !line.trim().startsWith("*") && !line.trim().startsWith('"'))

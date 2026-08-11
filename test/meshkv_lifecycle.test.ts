@@ -3,15 +3,15 @@ import {
   MeshKVBrowserLifecycle,
   createMeshKVLifecycle,
   type MeshKVLifecycleNode,
-} from "../src/asset/meshkv_lifecycle.js";
+} from "../src/os/_legacy_prototype/asset/meshkv_lifecycle.js";
 import { MeshKV } from "../packages/meshkv/src/index.js";
 import type { MeshKVApi, MeshKVInitOptions } from "../packages/meshkv/src/index.js";
-import { createRuntime } from "../src/runtime/create_runtime.js";
+import { createRuntime } from "../src/os/_legacy_prototype/runtime/create_runtime.js";
 // Runtime / Worker sources as strings: prove the lifecycle is NOT auto-wired.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import runtimeSource from "../src/runtime/create_runtime.ts?raw";
+import runtimeSource from "../src/os/_legacy_prototype/runtime/create_runtime.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import workerSource from "../src/worker.ts?raw";
+import workerSource from "../src/os/_legacy_prototype/worker.ts?raw";
 
 /** A node that records every lifecycle call and can be told to fail a step. */
 class MockNode implements MeshKVLifecycleNode {

@@ -9,8 +9,8 @@ import {
   toFedosDirectRatchetSessionId,
   isWellFormedFedosDirectRatchetSessionId,
   type FedosDirectRatchetSessionIdComponents,
-} from "../src/conversation/ratchet/fedos_direct_ratchet_session_id.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
+} from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_id.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 
 function components(overrides: Partial<FedosDirectRatchetSessionIdComponents> = {}): FedosDirectRatchetSessionIdComponents {
   return {

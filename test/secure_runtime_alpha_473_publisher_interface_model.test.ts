@@ -4,10 +4,10 @@ import designDocSource from "../docs/secure_runtime_alpha_473_publisher_interfac
 import {
   isValidFedosBoardOutboxPublishResult,
   MockFedosBoardOutboxPublisher,
-} from "../src/board/outbox/fedos_board_outbox_publisher.js";
-import { createFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_types.js";
-import { serializeFedosBoardOutboxIntent } from "../src/board/outbox/fedos_board_outbox_codec.js";
-import { toFedosBoardPostId } from "../src/board/fedos_board_identifiers.js";
+} from "../src/os/messenger/board/outbox/fedos_board_outbox_publisher.js";
+import { createFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_types.js";
+import { serializeFedosBoardOutboxIntent } from "../src/os/messenger/board/outbox/fedos_board_outbox_codec.js";
+import { toFedosBoardPostId } from "../src/os/messenger/board/fedos_board_identifiers.js";
 
 /**
  * Secure Runtime Alpha 473 -- "Publisher Interface Model": Stage 3 of

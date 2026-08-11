@@ -3,12 +3,12 @@ import {
   buildGrantPreview,
   renderGrantPreview,
   renderGrantPreviewUnavailable,
-} from "../src/render/grant_preview.js";
-import type { GrantPreviewView } from "../src/render/grant_preview.js";
-import type { PaymentDecision } from "../src/payment/types.js";
-import type { Product } from "../src/commerce/types.js";
+} from "../src/os/_legacy_prototype/render/grant_preview.js";
+import type { GrantPreviewView } from "../src/os/_legacy_prototype/render/grant_preview.js";
+import type { PaymentDecision } from "../src/os/commerce/payment/types.js";
+import type { Product } from "../src/os/commerce/catalog/types.js";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import grantPreviewSource from "../src/render/grant_preview.ts?raw";
+import grantPreviewSource from "../src/os/_legacy_prototype/render/grant_preview.ts?raw";
 
 const BUYER = "b".repeat(64);
 

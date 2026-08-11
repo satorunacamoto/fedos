@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import hostSource from "../src/desktop/host/fedos_desktop_host.ts?raw";
+import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import boardPostSource from "../src/board/fedos_board_post.ts?raw";
+import boardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import identifiersSource from "../src/board/fedos_board_identifiers.ts?raw";
+import identifiersSource from "../src/os/messenger/board/fedos_board_identifiers.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
-import sourceSource from "../src/board/fedos_board_source.ts?raw";
+import sourceSource from "../src/os/messenger/board/fedos_board_source.ts?raw";
 
 /**
  * Secure Runtime Alpha 621 ("Application Surface Inventory") -- Stage 1

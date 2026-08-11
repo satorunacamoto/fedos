@@ -8,27 +8,27 @@
 import { describe, it, expect } from "vitest";
 import {
   DelegatingFedosConversationIdentityResolver,
-} from "../src/conversation/encryption/identity/fedos_conversation_identity_resolver.js";
+} from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_identity_resolver.js";
 import {
   MembershipFedosConversationParticipantResolver,
-} from "../src/conversation/encryption/identity/fedos_conversation_participant_resolver.js";
+} from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_participant_resolver.js";
 import {
   FixedFedosConversationLocalAccountIndexAuthority,
-} from "../src/conversation/encryption/identity/fedos_conversation_local_account_index_authority.js";
+} from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_local_account_index_authority.js";
 import {
   resolveFedosConversationCounterpartyPublicKeyHex,
-} from "../src/conversation/encryption/identity/fedos_conversation_counterparty_public_key_resolver.js";
-import { FedosConversationKeyResolver } from "../src/conversation/encryption/identity/fedos_conversation_key_resolver.js";
+} from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_counterparty_public_key_resolver.js";
+import { FedosConversationKeyResolver } from "../src/os/messenger/conversations/encryption/identity/fedos_conversation_key_resolver.js";
 import {
   AnonymousLocalFedosConversationCreatorIdentityAuthority,
   StaticFedosConversationCreatorIdentityAuthority,
   FEDOS_ANONYMOUS_LOCAL_CREATOR,
-} from "../src/conversation/construction/fedos_conversation_creator_identity_authority.js";
-import { InMemoryFedosConversationMembershipAuthority } from "../src/conversation/membership/in_memory_fedos_conversation_membership_authority.js";
-import { FedosSigningAuthorityNostrAuthorBinding } from "../src/board/runtime/identity/fedos_nostr_author_binding_authority.js";
-import type { FedosNostrSigningAuthority } from "../src/nostr/sign/fedos_nostr_signing_authority.js";
-import type { FedosConversationId } from "../src/conversation/fedos_conversation_id.js";
-import type { FedosConversationParticipantReference } from "../src/conversation/membership/fedos_conversation_participant_reference.js";
+} from "../src/os/messenger/conversations/construction/fedos_conversation_creator_identity_authority.js";
+import { InMemoryFedosConversationMembershipAuthority } from "../src/os/messenger/conversations/membership/in_memory_fedos_conversation_membership_authority.js";
+import { FedosSigningAuthorityNostrAuthorBinding } from "../src/os/messenger/board/runtime/identity/fedos_nostr_author_binding_authority.js";
+import type { FedosNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
+import type { FedosConversationParticipantReference } from "../src/os/messenger/conversations/membership/fedos_conversation_participant_reference.js";
 
 const CONVERSATION_ID = "private-draft::direct::alpha-931" as FedosConversationId;
 const ALICE_NOSTR_HEX = "a".repeat(64);

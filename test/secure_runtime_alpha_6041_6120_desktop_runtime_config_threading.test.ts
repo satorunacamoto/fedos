@@ -5,11 +5,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 // @ts-expect-error see above.
 import { join } from "node:path";
-import { startFedosDesktopRuntime } from "../src/desktop/runtime/fedos_desktop_runtime.js";
-import { FedosDesktopApplicationShell } from "../src/desktop/shell/fedos_desktop_application_shell.js";
-import { InMemoryFedosDeviceRegistryPersistence } from "../src/device/persistence/in_memory_fedos_device_registry_persistence.js";
-import { FedosNobleTestNostrSigningAuthority, fedosTestSecretKeyFromSeed } from "../src/conversation/deletion_request/fedos_deletion_request_signing.js";
-import type { FedosConversationDeletionRequestIntegrationDependencies } from "../src/conversation/runtime/fedos_conversation_runtime.js";
+import { startFedosDesktopRuntime } from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.js";
+import { FedosDesktopApplicationShell } from "../src/os/messenger/desktop/shell/fedos_desktop_application_shell.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
+import { FedosNobleTestNostrSigningAuthority, fedosTestSecretKeyFromSeed } from "../src/os/messenger/conversations/deletion_request/fedos_deletion_request_signing.js";
+import type { FedosConversationDeletionRequestIntegrationDependencies } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";
 
 /**
  * Secure Runtime Alpha 6041-6120 (FedOS Signed Deletion Request Multi-Device

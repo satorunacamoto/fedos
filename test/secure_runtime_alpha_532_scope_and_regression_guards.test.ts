@@ -82,7 +82,7 @@ describe("Secure Runtime Alpha 532 -- Scope and Regression Guards", () => {
   });
 
   it("FedosDesktopHost's public API method list is byte-for-byte unchanged", () => {
-    const hostSource = readFileSync("src/desktop/host/fedos_desktop_host.ts", "utf8");
+    const hostSource = readFileSync("src/os/messenger/desktop/host/fedos_desktop_host.ts", "utf8");
     for (const signature of [
       "startDelivery(",
       "async stopDelivery(",

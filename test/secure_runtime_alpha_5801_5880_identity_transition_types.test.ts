@@ -5,17 +5,17 @@ import {
   isKnownFedosIdentityTransitionEvidenceKind,
   isKnownFedosIdentityTransitionEvidenceStatus,
   isFedosIdentityTransitionCompromiseReason,
-} from "../src/conversation/identity_transition/fedos_identity_transition_vocabulary.js";
+} from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_vocabulary.js";
 import {
   createFedosIdentityTransitionRecordV1,
   isWellFormedFedosIdentityTransitionRecordV1,
   checkFedosIdentityTransitionTimestamps,
   encodeFedosIdentityTransitionRecordV1,
   decodeFedosIdentityTransitionRecordV1,
-} from "../src/conversation/identity_transition/fedos_identity_transition_record.js";
-import { generateFedosIdentityTransitionId, isWellFormedFedosIdentityTransitionId } from "../src/conversation/identity_transition/fedos_identity_transition_id.js";
-import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionCanonicalBody } from "../src/conversation/identity_transition/fedos_identity_transition_canonical.js";
-import type { FedosDeviceBindingAccountRef } from "../src/device/fedos_device_binding.js";
+} from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_record.js";
+import { generateFedosIdentityTransitionId, isWellFormedFedosIdentityTransitionId } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_id.js";
+import { fedosIdentityTransitionBodyHash, fedosIdentityTransitionCanonicalBody } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_canonical.js";
+import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 const OLD_PUBKEY = "a".repeat(64);
 const NEW_PUBKEY = "b".repeat(64);

@@ -1,19 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { FedosConversationTransportScheduler } from "../src/conversation/transport/fedos_conversation_transport_scheduler.js";
-import { sendFedosConversationEphemeral } from "../src/conversation/transport/fedos_conversation_ephemeral_transport.js";
-import { InMemoryFedosConversationTransportOutboxPersistence } from "../src/conversation/transport/in_memory_fedos_conversation_transport_outbox_persistence.js";
+import { FedosConversationTransportScheduler } from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_scheduler.js";
+import { sendFedosConversationEphemeral } from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_ephemeral_transport.js";
+import { InMemoryFedosConversationTransportOutboxPersistence } from "../src/os/messenger/adapters/nostr/transport/in_memory_fedos_conversation_transport_outbox_persistence.js";
 import {
   createFedosConversationTransportOutboxIntent,
-} from "../src/conversation/transport/fedos_conversation_transport_outbox_types.js";
-import { serializeFedosConversationTransportOutboxIntent } from "../src/conversation/transport/fedos_conversation_transport_outbox_codec.js";
-import { MockFedosConversationTransportPublisher } from "../src/conversation/transport/fedos_conversation_transport_publisher.js";
-import type { FedosConversationTransportPublishResult } from "../src/conversation/transport/fedos_conversation_transport_publisher.js";
-import { FedosDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_repository.js";
-import { InMemoryFedosDeliveryObservationPersistence } from "../src/board/observation/in_memory_fedos_delivery_observation_persistence.js";
-import { FedosDeliveryObservationQuery } from "../src/board/observation/fedos_delivery_observation_query.js";
-import { FedosValidatingDeliveryObservationRepository } from "../src/board/observation/fedos_delivery_observation_write_validator.js";
-import { FedosDeliveryRetryRegistry } from "../src/board/observation/fedos_delivery_retry_registry.js";
-import { toFedosDeliveryObservationSubjectId } from "../src/board/observation/fedos_delivery_observation.js";
+} from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_outbox_types.js";
+import { serializeFedosConversationTransportOutboxIntent } from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_outbox_codec.js";
+import { MockFedosConversationTransportPublisher } from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_publisher.js";
+import type { FedosConversationTransportPublishResult } from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_publisher.js";
+import { FedosDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_repository.js";
+import { InMemoryFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/in_memory_fedos_delivery_observation_persistence.js";
+import { FedosDeliveryObservationQuery } from "../src/os/messenger/board/observation/fedos_delivery_observation_query.js";
+import { FedosValidatingDeliveryObservationRepository } from "../src/os/messenger/board/observation/fedos_delivery_observation_write_validator.js";
+import { FedosDeliveryRetryRegistry } from "../src/os/messenger/board/observation/fedos_delivery_retry_registry.js";
+import { toFedosDeliveryObservationSubjectId } from "../src/os/messenger/board/observation/fedos_delivery_observation.js";
 
 const ENVELOPE_ID = "e".repeat(32) as never;
 const CONVERSATION_ID = "board-1::thread-1" as never;

@@ -5,6 +5,7 @@ import designDocSource from "../docs/secure_runtime_alpha_323_sqlite_backend_rev
 import packageJsonSource from "../package.json?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import cargoTomlSource from "../packages/fedos-core-rust/Cargo.toml?raw";
+import { assertFedosRootDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 
 /**
  * Secure Runtime Alpha 323 -- "Candidate A: SQLite Backend Review":
@@ -38,7 +39,7 @@ describe("Secure Runtime Alpha 323 -- Candidate A: SQLite Backend Review", () =>
 
   it("5. Regression: package.json dependency count remains unchanged at 2", () => {
     const pkg = JSON.parse(packageJsonSource);
-    expect(Object.keys(pkg.dependencies ?? {}).length).toBe(2);
+    assertFedosRootDependencyInvariant(pkg.dependencies);
   });
 
   it("6. the design doc confirms Worker/browser incompatibility and Windows path fragility already observed in this checkout", () => {

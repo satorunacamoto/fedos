@@ -12,8 +12,8 @@ import {
   wireMessageBytesFromBase64,
   type FedosDirectRatchetSessionInitPayloadV1,
   type FedosDirectRatchetMessagePayloadV1,
-} from "../src/conversation/delivery/nostr/nip17/fedos_direct_ratchet_nip17_payload.js";
-import { FEDOS_PRIVATE_WIRE_ROUTE_DEFAULT, type FedosPrivateWireRouteRequest } from "../src/conversation/transport/fedos_private_wire_route.js";
+} from "../src/os/messenger/adapters/nostr/conversation_delivery/nip17/fedos_direct_ratchet_nip17_payload.js";
+import { FEDOS_PRIVATE_WIRE_ROUTE_DEFAULT, type FedosPrivateWireRouteRequest } from "../src/os/messenger/adapters/nostr/transport/fedos_private_wire_route.js";
 
 const PUBKEY_A = "a".repeat(64);
 const PUBKEY_B = "b".repeat(64);

@@ -1,81 +1,10 @@
 /**
- * Secure Runtime Alpha 334 ("Desktop Host Dependency Assembly") —
- * Stage 4 of the Alpha 331–340 Desktop Host Runtime Foundation Arc.
- *
- * `createFedosDesktopHost()` mirrors `createDesktopApplication()`'s
- * own naming and scoping discipline (`../create_desktop_application.ts`,
- * Alpha 099) and `createRuntime()`'s own before it
- * (`../../runtime/create_runtime.ts`, Alpha 051): ONE clearly-named
- * function, ONE clearly-scoped responsibility — assemble a
- * `FedosDesktopHostDependencies` object and construct exactly one
- * `FedosDesktopHost` from it. It does NOT call `start()` on the
- * instance it returns, exactly as `createDesktopApplication()` never
- * calls `bootstrap()`/`start()` on ITS own returned instance.
- *
- * Both dependencies default when omitted: `desktopApplication`
- * defaults to `createDesktopApplication()`'s own unmodified default
- * construction (Alpha 099), and `boardPersistence` defaults to a
- * FRESH `InMemoryFedosBoardPersistence()`
- * (`../../board/persistence/in_memory_fedos_board_persistence.js`,
- * Alpha 316) — this Arc's own explicitly-documented in-memory-only
- * default; see `docs/secure_runtime_alpha_334_desktop_host_dependency_assembly.md`
- * §3 for why NO durable backend is selected here (Alpha 329's own
- * Option E deferral stands unmodified by this Arc). Either dependency
- * may be overridden by an explicit caller — the ONLY way a test
- * injects a fake/throwing `DesktopApplication` or a pre-populated
- * `FedosBoardPersistence` (see this Stage's own test file).
- *
- * HARD GUARDRAILS:
- *   - `createFedosDesktopHost` is the ONLY export.
- *   - This function performs NO async work of any kind — it only
- *     resolves two defaults and constructs one `FedosDesktopHost`.
- *   - It does NOT call `start()`, `stop()`, `bootstrap()`, or any
- *     hydration function on anything it constructs.
- *   - NO module-level mutable singleton exists in this file — every
- *     call constructs fresh dependencies (unless the caller supplies
- *     its own, already-constructed instances).
- *   - NO `process.env` read of any kind — Runtime Mode Authority
- *     (`../../runtime/fedos_runtime_mode_authority.ts`) is never
- *     duplicated or bypassed here.
- *   - NO filesystem path selection, NO `p2p/` import, NO reference to
- *     `src/worker.ts` or `src/runtime/create_runtime.ts`.
+ * @deprecated Compatibility shim -- import from "../../os/messenger/desktop/host/create_fedos_desktop_host.js" instead. See docs/architecture/COMPATIBILITY-FACADE-LIFECYCLE.md.
+ * Shim — physically moved to `src/os/messenger/desktop/host/create_fedos_desktop_host.ts`
+ * (FedOS Messenger physical migration, Stage 6, mapping rule 9; see
+ * `docs/architecture/MESSENGER-MIGRATION-MAPPING.md` and
+ * `docs/architecture/MESSENGER-MIGRATION-STAGING.md`). Kept here so any
+ * not-yet-updated importer elsewhere in the repo keeps resolving and
+ * compiling.
  */
-
-import { createDesktopApplication } from "../create_desktop_application.js";
-import { InMemoryFedosBoardPersistence } from "../../board/persistence/in_memory_fedos_board_persistence.js";
-import { FedosDesktopHost, type FedosDesktopHostDependencies } from "./fedos_desktop_host.js";
-
-/**
- * Alpha 419 (Alpha 411–420 Canonical Board Durable Outbox Foundation
- * Arc): `dependencies.outboxPersistence` is passed straight through,
- * UNMODIFIED, to `FedosDesktopHost`'s own constructor, which is the
- * SOLE place that resolves its default (a fresh
- * `InMemoryFedosBoardOutboxPersistence()`) when omitted -- this
- * function does not duplicate that default, matching this file's own
- * existing "one clearly-scoped responsibility" discipline.
- */
-
-/**
- * Alpha 507 (Alpha 501-520 Durable Delivery Observation Wiring & Host
- * Delivery Lifecycle Arc): `dependencies.publisher`/
- * `dependencies.observationRepository`/`dependencies.deliveryIntervalMs`
- * are passed straight through, UNMODIFIED, to `FedosDesktopHost`'s own
- * constructor -- the SOLE place that resolves each one's own default
- * (Alpha 502/503) when omitted -- mirroring this function's own
- * existing `outboxPersistence` discipline (Alpha 419) exactly; this
- * function does not duplicate any of the three defaults.
- */
-export function createFedosDesktopHost(
-  dependencies: Partial<FedosDesktopHostDependencies> = {},
-): FedosDesktopHost {
-  const desktopApplication = dependencies.desktopApplication ?? createDesktopApplication();
-  const boardPersistence = dependencies.boardPersistence ?? new InMemoryFedosBoardPersistence();
-  return new FedosDesktopHost({
-    desktopApplication,
-    boardPersistence,
-    outboxPersistence: dependencies.outboxPersistence,
-    publisher: dependencies.publisher,
-    observationRepository: dependencies.observationRepository,
-    deliveryIntervalMs: dependencies.deliveryIntervalMs,
-  });
-}
+export * from "../../os/messenger/desktop/host/create_fedos_desktop_host.js";
