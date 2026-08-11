@@ -2349,11 +2349,27 @@ byId<HTMLButtonElement>("commerce-detail-back").addEventListener("click", () => 
   showAppScreen("commerce");
   void refreshCommerceCatalogList();
 });
+// "input" listened alongside "change" -- the real UI only ever fires "change"
+// (a native <select>'s own event), but the existing AUTOTEST_MODE=ui-script
+// harness's "fill" step (`fedos_electron_beta_main.cts`) only ever dispatches
+// "input" when scripting a value change, matching every OTHER scripted field
+// in this file (text inputs/textareas do fire "input" natively). Listening
+// to both costs nothing extra for a real user (a real <select> never fires
+// "input" on its own) and makes this control scriptable the same way every
+// other form control in this file already is, with no harness change.
 byId<HTMLSelectElement>("commerce-acting-as").addEventListener("change", (e) => {
   setCommerceActingAs((e.target as HTMLSelectElement).value);
   void refreshCommerceCatalogList();
 });
+byId<HTMLSelectElement>("commerce-acting-as").addEventListener("input", (e) => {
+  setCommerceActingAs((e.target as HTMLSelectElement).value);
+  void refreshCommerceCatalogList();
+});
 byId<HTMLSelectElement>("commerce-merchant-acting-as").addEventListener("change", (e) => {
+  setCommerceActingAs((e.target as HTMLSelectElement).value);
+  void refreshCommerceMerchantScreen();
+});
+byId<HTMLSelectElement>("commerce-merchant-acting-as").addEventListener("input", (e) => {
   setCommerceActingAs((e.target as HTMLSelectElement).value);
   void refreshCommerceMerchantScreen();
 });
@@ -2407,6 +2423,20 @@ byId<HTMLButtonElement>("device-pairing-complete-submit").addEventListener("clic
 // Settings.
 byId<HTMLButtonElement>("settings-relay-add").addEventListener("click", onSettingsRelayAdd);
 byId<HTMLButtonElement>("settings-save").addEventListener("click", () => void onSettingsSave());
+
+// Commerce E2E Completion arc -- populate BOTH "Acting as" selectors once,
+// unconditionally, at startup (never lazily only-on-first-visit). Fixes a
+// real latent robustness gap: each selector was previously populated only
+// inside its OWN screen's first refresh (`refreshCommerceCatalogList()`/
+// `refreshCommerceMerchantScreen()`), so `setCommerceActingAs()`'s direct
+// `.value = pubkey` assignment on the OTHER, not-yet-visited screen's
+// selector would silently no-op (a <select> with zero <option> elements
+// cannot take an arbitrary value) -- harmless for a real user (they can
+// only ever interact with whichever selector is currently visible), but a
+// real inconsistency in `commerceActingAsPubkey`'s reflected DOM state
+// regardless of whether a human notices it.
+populateCommerceActorSelect("commerce-acting-as");
+populateCommerceActorSelect("commerce-merchant-acting-as");
 
 void refreshFromStatus();
 })();

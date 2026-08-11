@@ -612,7 +612,7 @@ interface CommerceOrderActionLike {
   readonly [key: string]: unknown;
 }
 interface CommerceOrderTransitionResultLike {
-  readonly outcome: "transitioned" | "rejected";
+  readonly ok: boolean;
   readonly order?: CommerceOrderLike;
   readonly reason?: string;
   readonly code?: string;
@@ -663,6 +663,7 @@ interface CommercePaymentLedgerLike {
 }
 interface CommerceDeliveryActorLike {
   readonly kind: "merchant" | "customer" | "delivery_evidence";
+  readonly pubkey?: string;
 }
 interface CommerceDeliveryRecordLike {
   readonly id: string;
@@ -2078,7 +2079,7 @@ async function handleCommerceOrderCreate(payload: unknown) {
     { kind: "customer", pubkey: body.buyerPubkey },
     Math.floor(Date.now() / 1000),
   );
-  if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
+  if (!result.ok || result.order === undefined) return { outcome: "rejected", reason: result.reason };
   commerceState().orders.save(result.order);
   return { outcome: "ok", order: commerceOrderDto(result.order) };
 }
@@ -2101,7 +2102,7 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
   }
   const m = requireModules();
   const result = m.Commerce.applyOrderAction(order, action as CommerceOrderActionLike, Math.floor(Date.now() / 1000));
-  if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
+  if (!result.ok || result.order === undefined) return { outcome: "rejected", reason: result.reason };
   orders.save(result.order);
   if (actionType === "fulfill") {
     // Commerce E2E Completion arc (coordinator) -- a successful "fulfill" on
@@ -2120,7 +2121,7 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
     if (delivery === undefined) {
       const created = m.Commerce.createDelivery(
         { id: generateCommerceOrderId(), orderId: result.order.id, buyerPubkey: result.order.buyerPubkey, sellerPubkey: result.order.sellerPubkey, orderPaymentConfirmed: true },
-        { kind: "merchant" },
+        { kind: "merchant", pubkey: result.order.sellerPubkey },
         now,
       );
       if (created.ok && created.delivery !== undefined) {
@@ -2131,7 +2132,7 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
     if (delivery !== undefined) {
       const started = m.Commerce.applyDeliveryAction(
         delivery,
-        { type: "start_fulfillment", actor: { kind: "merchant" }, claim: { deliveryId: delivery.id, orderId: result.order.id, claimedAt: now } },
+        { type: "start_fulfillment", actor: { kind: "merchant", pubkey: result.order.sellerPubkey }, claim: { deliveryId: delivery.id, orderId: result.order.id, claimedAt: now } },
         now,
       );
       if (started.ok && started.delivery !== undefined) state.deliveries.save(started.delivery);
@@ -2209,7 +2210,7 @@ async function handleCommercePaymentSimulate(payload: unknown) {
     evidence: { orderId: order.id, paymentId: body.paymentId, status: "settled", observedAt: evidence.observedAt },
   };
   const result = m.Commerce.applyOrderAction(order, paymentEvidenceAction as CommerceOrderActionLike, Math.floor(Date.now() / 1000));
-  if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
+  if (!result.ok || result.order === undefined) return { outcome: "rejected", reason: result.reason };
   state.orders.save(result.order);
   return { outcome: "ok", order: commerceOrderDto(result.order) };
 }
@@ -2261,7 +2262,7 @@ async function handleCommerceDeliveryAcknowledgeReceipt(payload: unknown) {
 
   const orderEvidence = { orderId: order.id, deliveryId: delivery.id, status: "delivered" as const, observedAt: now, reason: "customer acknowledged receipt" };
   const orderResult = m.Commerce.applyOrderAction(order, { type: "confirm_delivery", actor: { kind: "delivery_evidence" }, evidence: orderEvidence } as CommerceOrderActionLike, now);
-  if (orderResult.outcome !== "transitioned" || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
+  if (!orderResult.ok || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
   state.orders.save(orderResult.order);
 
   return { outcome: "ok", order: commerceOrderDto(orderResult.order), delivery: commerceDeliveryDto(deliveryResult.delivery) };
@@ -2280,12 +2281,12 @@ async function handleCommerceOrderComplete(payload: unknown) {
   const m = requireModules();
 
   const orderResult = m.Commerce.applyOrderAction(order, { type: "complete", actor: { kind: actorKind, pubkey: body.actorPubkey } } as CommerceOrderActionLike, now);
-  if (orderResult.outcome !== "transitioned" || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
+  if (!orderResult.ok || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
   state.orders.save(orderResult.order);
 
   const delivery = state.deliveries.findByOrderId(body.orderId);
   if (delivery !== undefined) {
-    const deliveryResult = m.Commerce.applyDeliveryAction(delivery, { type: "acknowledge", actor: { kind: actorKind } }, now);
+    const deliveryResult = m.Commerce.applyDeliveryAction(delivery, { type: "acknowledge", actor: { kind: actorKind, pubkey: body.actorPubkey } }, now);
     if (deliveryResult.ok && deliveryResult.delivery !== undefined) state.deliveries.save(deliveryResult.delivery);
   }
   return { outcome: "ok", order: commerceOrderDto(orderResult.order) };
