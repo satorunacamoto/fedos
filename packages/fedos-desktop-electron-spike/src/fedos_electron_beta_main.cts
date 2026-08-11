@@ -345,6 +345,35 @@ interface MasterSeedAuthorityLike {
    * contract exactly (`src/os/core/vault/wasm/fedos_master_seed_authority.ts`).
    */
   resolveCommerceMediaKey?(): Promise<unknown>;
+  /**
+   * FedOS Commerce FINAL P1 Closure (coordinator, shared foundation) --
+   * present (as real, callable functions) on the SAME canonical production
+   * `FedosProductionMasterSeedAuthority` this Coordinator already
+   * activates -- it implements `SealingAuthorityPort`
+   * (`src/os/core/ports/sealing_authority_port.ts`) alongside its own
+   * `FedosMasterSeedAuthority` contract, exactly like
+   * `resolveCommerceMediaKey?` above. OPTIONAL for the same reason: this
+   * structural "Like" interface is also satisfied by other,
+   * non-sealing-capable callers elsewhere in this file's own type graph.
+   * Reused (not reinvented) by
+   * `src/os/core/vault/wasm/fedos_sealed_signing_key_store.ts` to seal the
+   * Persona Epoch identity keypair and the Receipt-issuer keypair at rest
+   * -- see that file's own header for the full design.
+   */
+  sealDirectRatchetSecret?(
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    secretBytes: Uint8Array,
+  ): Promise<string | null>;
+  restoreDirectRatchetSecret?(
+    localDeviceRef: string,
+    remoteDeviceRef: string,
+    conversationId: string,
+    generation: number,
+    sealedBlob: string,
+  ): Promise<Uint8Array | null>;
 }
 /**
  * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- structural mirror

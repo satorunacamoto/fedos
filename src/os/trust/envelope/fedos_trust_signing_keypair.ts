@@ -43,6 +43,21 @@ export class FedosTrustSigningKeypair {
     return new FedosTrustSigningKeypair(schnorr.utils.randomSecretKey());
   }
 
+  /**
+   * FedOS Commerce FINAL P1 Closure — the seam a durable sealed-key-custody
+   * caller uses to generate raw secret material it can seal at rest BEFORE
+   * ever constructing an opaque `FedosTrustSigningKeypair` instance (this
+   * class's own instances never expose their secret — see the file header
+   * — so a caller sealing a FRESH key at rest needs the raw bytes first).
+   * Returns the exact same kind of CSPRNG-random secret `generate()`
+   * itself uses internally; this is not a new source of randomness, only
+   * a way to reach it before wrapping it in the opaque class. See
+   * `src/os/core/vault/wasm/fedos_sealed_signing_key_store.ts`.
+   */
+  static generateSecretKeyBytesForSealedCustody(): Uint8Array {
+    return schnorr.utils.randomSecretKey();
+  }
+
   /** Loads a keypair from raw 32-byte secret material — the seam an offline
    * issuer CLI uses to load an operator-supplied key. Callers are
    * responsible for how `secretKeyBytes` was obtained; this class never
