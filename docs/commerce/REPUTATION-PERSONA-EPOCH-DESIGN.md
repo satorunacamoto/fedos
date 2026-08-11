@@ -1,6 +1,34 @@
 # Reputation / Persona Epoch / Trust-QR Integration — Design (Agent R)
 
-**Status: DESIGN + TYPE-ONLY SCAFFOLDING. Nothing described here is wired into `createCommerce()`, `loadRootModules()`, or any shipping UI.** Every claim below about "what exists today" was verified by direct code inspection at this design's own base commit, `13a8852b` ("Merge Commerce Reachable Catalog Phase 1 (+ E2E audit) into Commerce E2E Completion arc base"), on `arc/fedos-commerce-e2e-completion-agent-r`. See [FEDOS-COMMERCE-END-TO-END.md](FEDOS-COMMERCE-END-TO-END.md) and [COMMERCE-GAP-CLASSIFICATION.md](COMMERCE-GAP-CLASSIFICATION.md) for the audit this design responds to (Gap #8 "Commerce↔Trust zero wiring" and Gap #13 "QR unused in commerce").
+**STATUS UPDATE (FedOS Commerce FINAL Closure Mega-Arc, Agent R):** the five
+files below are still exactly what they were — the DESIGN layer (payload
+shapes, validity/allowlist checks, the `disclosure_layers.ts` projection
+function) — and remain accurate as written. What was "DESIGN + TYPE-ONLY
+SCAFFOLDING" at the bottom of this document is now backed by REAL runtime
+code in the same directory: `persona_epoch_signing_keypair.ts` (real
+signing keys), `trade_ref_digest.ts` (real salted digests),
+`attestation_canonical_bytes.ts` + `attestation_sign_verify.ts` (real
+canonical-bytes + Schnorr sign/verify, including tamper/wrong-signer
+detection), `persona_epoch_registry.ts` (real epoch creation, rollover, and
+signed carry-over), `trade_completion_attestation_store.ts` (real
+duplicate/trade-reuse rejection), `reputation_issuance.ts` (the real gate:
+an attestation can only be minted for an `Order` that a real
+`OrderRepository` reports as `"completed"`, reached only through
+`order_state_machine.ts`'s own guarded transitions — never a bare claim),
+`persona_board_query.ts` + `ui/persona_board_controller.ts` (a real,
+renderer-safe read-only Persona Board query/controller). Still **NOT**
+wired into `createCommerce()`, `loadRootModules()`, or any shipping
+Electron UI — that remains the coordinator's central-integration job (see
+each new file's own header for its specific TODO). Sybil resistance is
+still explicitly NOT claimed anywhere (an attestation proves "a configured
+counterparty signed this," never "this is a unique real trading partner");
+epoch carry-over is still explicitly LINKABLE, never claimed unlinkable.
+See `test/commerce_reputation_signing.test.ts` and
+`test/commerce_reputation_issuance.test.ts` for the real, passing test
+evidence (tamper/wrong-signer/duplicate/self-rating/expired-epoch/rollover/
+Sybil-documentation cases).
+
+**Original status at design time: DESIGN + TYPE-ONLY SCAFFOLDING. Nothing described here is wired into `createCommerce()`, `loadRootModules()`, or any shipping UI.** Every claim below about "what exists today" was verified by direct code inspection at this design's own base commit, `13a8852b` ("Merge Commerce Reachable Catalog Phase 1 (+ E2E audit) into Commerce E2E Completion arc base"), on `arc/fedos-commerce-e2e-completion-agent-r`. See [FEDOS-COMMERCE-END-TO-END.md](FEDOS-COMMERCE-END-TO-END.md) and [COMMERCE-GAP-CLASSIFICATION.md](COMMERCE-GAP-CLASSIFICATION.md) for the audit this design responds to (Gap #8 "Commerce↔Trust zero wiring" and Gap #13 "QR unused in commerce").
 
 ## What this design produces
 
