@@ -23,9 +23,9 @@
  * `MediaStorePutRequest` — by design, per that Port's own header,
  * classification-awareness lives ONE layer up, in
  * `./product_media_encryption.ts`/`./product_media_types.ts`. This file
- * mirrors that same separation, but ALSO exposes two small,
- * domain-specific convenience methods beyond the bare `MediaStorePort`
- * surface — `putProtected()`/`putPublic()` — so a caller cannot
+ * mirrors that same separation, but ALSO exposes small, domain-specific
+ * convenience methods beyond the bare `MediaStorePort` surface —
+ * `putProtected()`/`putPublic()`/`getProtected()` — so a caller cannot
  * accidentally hand this adapter plaintext for protected media the way a
  * bare `put()` call always could. `putProtected()` is the ENFORCEMENT
  * MECHANISM this arc's brief asks for ("a protected-classified put is
@@ -37,10 +37,34 @@
  * skips the encryption step. If encryption is unavailable/fails, it
  * returns `{ outcome: "failed" }` (an existing `MediaStorePutResult`
  * outcome — no new outcome invented) and `put()` is never called at all.
- * `putProtected()`/`putPublic()` are plain additive methods on this
- * class, not part of the `MediaStorePort` interface itself — the Port's
- * own shape is unchanged (`media_store_port.ts` is not modified by this
- * arc).
+ * `getProtected()` (Commerce FINAL Closure arc, Agent M) is the read-side
+ * mirror: it ALWAYS runs the fetched bytes through the injected
+ * `ProductMediaDecryptionPort` and never returns ciphertext mislabeled as
+ * plaintext. `putProtected()`/`putPublic()`/`getProtected()` are plain
+ * additive methods on this class, not part of the `MediaStorePort`
+ * interface itself — the Port's own shape is unchanged
+ * (`media_store_port.ts` is not modified by this arc).
+ *
+ * DEFAULT ENCRYPTION/DECRYPTION (Commerce FINAL Closure arc, Agent M):
+ * `encryption`/`decryption` now default to the REAL
+ * `WasmProductMediaEncryption`/`WasmProductMediaDecryption` adapters
+ * (`./wasm_product_media_encryption.ts`/`./wasm_product_media_decryption.ts`)
+ * rather than to the permanently-`null` `UnavailableProductMediaEncryption`/
+ * `UnavailableProductMediaDecryption` (`./product_media_encryption.ts`/
+ * `./product_media_decryption.ts`). This is a SAFE, additive change:
+ * both real adapters fail closed to `null` exactly like the `Unavailable*`
+ * pair whenever no real, unlocked `FedosMasterSeedAuthority` is supplied
+ * (the default, zero-argument case — see `WasmProductMediaEncryption`'s
+ * own header) — there is still, and will never be, a code path that
+ * silently downgrades protected media to plaintext. What changes is that
+ * a caller who explicitly injects the app's real, already-unlocked,
+ * SHARED `FedosMasterSeedAuthority` instance (mirroring
+ * `fedos_conversation_production_crypto_authority_factory.ts`'s own
+ * "one Authority instance, shared across every Authority that needs it"
+ * pattern — a genuine composition-root responsibility, out of scope for
+ * this file/arc to perform itself) now gets REAL encryption/decryption
+ * from the ordinary, un-overridden constructor default, with no need to
+ * separately know about or import either Wasm adapter class themselves.
  *
  * SYNCHRONOUS PORT, AND WHY THIS ADAPTER STAYS SYNCHRONOUS TOO: every
  * `MediaStorePort` method (`put`/`get`/`exists`/`remove`/`metadata`) is a
@@ -72,9 +96,11 @@ import { computeCommerceMediaContentHash, verifyCommerceMediaContentAddress } fr
 import {
   contentAddressPublicMedia,
   encryptThenContentAddressProtectedMedia,
-  UnavailableProductMediaEncryption,
   type ProductMediaEncryptionPort,
 } from "./product_media_encryption.js";
+import { WasmProductMediaEncryption } from "./wasm_product_media_encryption.js";
+import type { ProductMediaDecryptionPort } from "./product_media_decryption.js";
+import { WasmProductMediaDecryption } from "./wasm_product_media_decryption.js";
 import type {
   MediaObject,
   MediaObjectMetadata,
@@ -181,18 +207,36 @@ export class IpfsMediaStore implements MediaStorePort {
   readonly #maxPayloadByteLength: number;
   readonly #supportedContentTypes: ReadonlySet<string>;
   readonly #encryption: ProductMediaEncryptionPort;
+  readonly #decryption: ProductMediaDecryptionPort;
   readonly #networkProfile: NetworkProfile;
   readonly #now: () => number;
   /** Local metadata index, keyed by CID — the transport itself only knows bytes, never our descriptor shape. Mirrors `LocalMediaStore`'s own `#objects` map, minus the bytes (the transport already holds those). */
   readonly #index = new Map<string, StoredEntryMetadata>();
 
+  /**
+   * Commerce FINAL Closure arc (Agent M) — `encryption`/`decryption` now
+   * DEFAULT to the REAL `WasmProductMediaEncryption`/`WasmProductMediaDecryption`
+   * adapters (`./wasm_product_media_encryption.ts`/
+   * `./wasm_product_media_decryption.ts`), no longer to
+   * `UnavailableProductMediaEncryption`. See this file's own header
+   * ("ENCRYPT-FIRST FOR PROTECTED MEDIA") for the enforcement mechanism
+   * this does not change, and `WasmProductMediaEncryption`'s own header
+   * for exactly what this default does and does not achieve on its own
+   * (still fails closed absent a real, unlocked, injected
+   * `FedosMasterSeedAuthority` — never a plaintext downgrade either way).
+   * `decryption` is a NEW parameter this arc adds, appended LAST so every
+   * pre-existing positional call site (including this arc's own
+   * predecessor's tests, which pass up to `networkProfile` positionally)
+   * keeps meaning exactly what it meant before.
+   */
   constructor(
     transport: IpfsTransport,
     maxPayloadByteLength: number,
     supportedContentTypes: readonly string[],
-    encryption: ProductMediaEncryptionPort = new UnavailableProductMediaEncryption(),
+    encryption: ProductMediaEncryptionPort = new WasmProductMediaEncryption(),
     networkProfile: NetworkProfile = "direct",
     now: () => number = Date.now,
+    decryption: ProductMediaDecryptionPort = new WasmProductMediaDecryption(),
   ) {
     this.#transport = transport;
     this.#maxPayloadByteLength = maxPayloadByteLength;
@@ -200,6 +244,7 @@ export class IpfsMediaStore implements MediaStorePort {
     this.#encryption = encryption;
     this.#networkProfile = networkProfile;
     this.#now = now;
+    this.#decryption = decryption;
   }
 
   /**
@@ -325,5 +370,28 @@ export class IpfsMediaStore implements MediaStorePort {
   putPublic(plaintext: Uint8Array, contentType: string): MediaStorePutResult {
     contentAddressPublicMedia(plaintext); // computed for symmetry/documentation of intent only -- put() derives its own checksum identically.
     return this.put({ bytes: plaintext, contentType });
+  }
+
+  /**
+   * Commerce FINAL Closure arc (Agent M) — the decrypt-direction
+   * counterpart to `putProtected()`. Fetches `key` through the ORDINARY
+   * `get()` path first — meaning the exact same defensive
+   * content-address re-check (this file's own header) already runs on
+   * the fetched CIPHERTEXT bytes before this method ever hands them to
+   * `#decryption` — then decrypts. Returns `null` (never throws) if the
+   * object is missing/unavailable/tampered (same as a bare `get()`
+   * miss), OR if decryption itself fails for any reason (wrong key,
+   * wrong domain, tampered ciphertext despite passing the content-address
+   * check, crypto unavailable). Never returns ciphertext mislabeled as
+   * plaintext, and never partially decrypts.
+   */
+  async getProtected(key: string): Promise<Uint8Array | null> {
+    const stored = this.get(key);
+    if (stored === null) return null;
+    try {
+      return await this.#decryption.decrypt(stored.bytes);
+    } catch {
+      return null;
+    }
   }
 }
