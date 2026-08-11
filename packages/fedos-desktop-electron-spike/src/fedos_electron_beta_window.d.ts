@@ -147,6 +147,65 @@ interface FedosCommerceProductDetailResult {
   readonly product?: FedosCommerceProductDetail;
 }
 
+/** Commerce E2E Completion arc — Merchant Product CRUD / Order / local Payment simulator shapes. */
+interface FedosCommerceMerchantProduct {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly priceCents: number;
+  readonly currency: string;
+  readonly status: string;
+  readonly visibility: string;
+  readonly creatorPubkey: string;
+  readonly merchantLabel: string;
+}
+
+interface FedosCommerceMerchantProductsListResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly products?: readonly FedosCommerceMerchantProduct[];
+}
+
+interface FedosCommerceProductMutationResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly product?: FedosCommerceMerchantProduct;
+}
+
+interface FedosCommerceOrder {
+  readonly id: string;
+  readonly productId: string;
+  readonly buyerPubkey: string;
+  readonly sellerPubkey: string;
+  readonly status: string;
+  readonly quantity: number;
+  readonly unitPriceCents: number;
+  readonly currency: string;
+  readonly totalCents: number;
+  readonly paymentId: string | null;
+  readonly deliveryId: string | null;
+}
+
+interface FedosCommerceOrderResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly order?: FedosCommerceOrder;
+}
+
+interface FedosCommerceOrdersListResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly orders?: readonly FedosCommerceOrder[];
+}
+
+interface FedosCommercePaymentRequestResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly paymentId?: string;
+  readonly amountCents?: number;
+  readonly currency?: string;
+}
+
 interface FedosAppBridge {
   readonly conversationsList: () => Promise<FedosAppCommandResult>;
   readonly conversationOpen: (conversationId: string) => Promise<FedosAppCommandResult>;
@@ -189,6 +248,29 @@ interface FedosAppBridge {
   /** Commerce Reachable Catalog + Product Surface Phase 1 — read-only. */
   readonly commerceCatalogList: () => Promise<FedosCommerceCatalogListResult>;
   readonly commerceProductDetail: (productId: string) => Promise<FedosCommerceProductDetailResult>;
+  /** Commerce E2E Completion arc — Merchant Product CRUD + Order + local Payment simulator. */
+  readonly commerceMerchantProductsList: (actorPubkey: string) => Promise<FedosCommerceMerchantProductsListResult>;
+  readonly commerceProductCreate: (
+    actorPubkey: string,
+    input: { readonly title: string; readonly description?: string; readonly priceCents: number; readonly currency: string },
+  ) => Promise<FedosCommerceProductMutationResult>;
+  readonly commerceProductUpdate: (
+    actorPubkey: string,
+    productId: string,
+    patch: { readonly title?: string; readonly description?: string; readonly priceCents?: number; readonly currency?: string },
+  ) => Promise<FedosCommerceProductMutationResult>;
+  readonly commerceProductPublish: (actorPubkey: string, productId: string) => Promise<FedosCommerceProductMutationResult>;
+  readonly commerceProductUnpublish: (actorPubkey: string, productId: string) => Promise<FedosCommerceProductMutationResult>;
+  readonly commerceOrderCreate: (buyerPubkey: string, productId: string, quantity?: number) => Promise<FedosCommerceOrderResult>;
+  readonly commerceOrderSubmit: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>;
+  readonly commerceOrderCancel: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>;
+  readonly commerceOrderAccept: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>;
+  readonly commerceOrderReject: (orderId: string, actorPubkey: string, reason?: string) => Promise<FedosCommerceOrderResult>;
+  readonly commerceOrderFulfill: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>;
+  readonly commerceOrdersListMine: (actorPubkey: string) => Promise<FedosCommerceOrdersListResult>;
+  readonly commerceOrdersListIncoming: (actorPubkey: string) => Promise<FedosCommerceOrdersListResult>;
+  readonly commercePaymentRequest: (orderId: string) => Promise<FedosCommercePaymentRequestResult>;
+  readonly commercePaymentSimulate: (orderId: string, paymentId: string) => Promise<FedosCommerceOrderResult>;
 }
 
 interface Window {

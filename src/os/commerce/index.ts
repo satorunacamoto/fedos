@@ -43,6 +43,12 @@
  *     by path, matching how `./catalog/policy.js` itself is not barreled
  *     either.
  *
+ * Commerce E2E Completion arc (coordinator integration gate) adds:
+ *   - The full `./order/index.js` barrel (Agent O's own scoped barrel),
+ *     re-exported here so the composition root can construct a
+ *     `LocalOrderRepository` and drive `applyOrderAction()`/`createOrder()`
+ *     the same way it already does for `LocalProductRepository`.
+ *
  * BOUNDARY CHECK (re-verify after any future edit to this file): `os/commerce`
  * must never import `os/messenger` (old or new location), and no
  * Telegram/BTCPay SDK specifier may leak outside its own reserved adapter
@@ -140,6 +146,50 @@ export {
   type SettlementTransitionRecord,
 } from "./payment/state_machine.js";
 export { computeHmacSha256Hex, verifyHmacSha256Hex } from "./payment/callback_verification.js";
+
+export {
+  ORDER_STATUSES,
+  TERMINAL_ORDER_STATUSES,
+  applyOrderAction,
+  createOrder,
+  getAvailableActions,
+  isTerminalOrderStatus,
+  LocalOrderRepository,
+  buildCreateOrderDraft,
+  buildCustomerOrderStatusViewModel,
+  buildMerchantIncomingOrdersViewModel,
+  buildMerchantOrderDetailViewModel,
+  buildOrderReviewViewModel,
+  describeOrderStatus,
+  CustomerOrderController,
+  MerchantOrderController,
+  type CreateOrderInput,
+  type DeliveryStatus,
+  type Order,
+  type OrderAction,
+  type OrderActionType,
+  type OrderActor,
+  type OrderActorKind,
+  type OrderDeliveryEvidence,
+  type OrderHistoryActionType,
+  type OrderPaymentEvidence,
+  type OrderRejectionCode,
+  type OrderStatus,
+  type OrderTransitionRecord,
+  type OrderTransitionResult,
+  // NOTE: `order/order_types.ts` also defines a local `PaymentStatus`
+  // placeholder (Agent O never imported the real one from `./payment/types.js`
+  // — see that file's own header). Aliased here to avoid colliding with the
+  // real `PaymentStatus` already exported above from `./payment/types.js`.
+  type PaymentStatus as OrderPlaceholderPaymentStatus,
+  type OrderRepository,
+  type CreateOrderDraftResult,
+  type MerchantIncomingOrdersViewModel,
+  type MerchantOrderDetailViewModel,
+  type MerchantOrderSummary,
+  type OrderReviewViewModel,
+  type OrderStatusViewModel,
+} from "./order/index.js";
 
 export type {
   MarketplaceProvider,

@@ -68,8 +68,21 @@ export class LocalProductRepository implements ProductRepositoryPort {
   readonly #products = new Map<string, Product>();
   readonly #generateId: () => string;
 
-  constructor(generateId: () => string = generateFedosProductId) {
+  /**
+   * `initialProducts` (Commerce E2E Completion arc, coordinator integration
+   * gate) — OPTIONAL composition-time seed, mirroring `InMemoryProductDirectory`'s
+   * own existing constructor-array convention (`./directory.ts`). Inserted
+   * directly by `.id` — NOT routed through `create()` — so a caller can seed
+   * exact, pre-existing ids/status (e.g. the Phase 1 demo catalog's
+   * `"aurora-study"` etc., already `active`) without their random-id/
+   * `status: "draft"`-only behavior. Composition-root use only; nothing
+   * about this changes `create()`'s own behavior for a real new product.
+   */
+  constructor(generateId: () => string = generateFedosProductId, initialProducts: readonly Product[] = []) {
     this.#generateId = generateId;
+    for (const product of initialProducts) {
+      this.#products.set(product.id, product);
+    }
   }
 
   create(actorPubkey: string, input: CreateProductInput): ProductRepositoryMutationResult {

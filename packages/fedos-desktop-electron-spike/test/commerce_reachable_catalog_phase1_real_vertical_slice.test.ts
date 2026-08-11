@@ -16,7 +16,9 @@
  *   - Product Detail renders a REAL `<img>` for the one product with
  *     media, and the safe initials fallback (no `<img>` at all) for a
  *     product without media.
- *   - "Ordering not available yet" is present; no Buy control exists.
+ *   - A real, bounded "Create Order" control exists on Product Detail
+ *     (Commerce E2E Completion arc widened this deliberately) — never a
+ *     Buy/Purchase/Checkout/"Mark as Paid" shortcut.
  *   - Returning to Conversations still works (Messenger regression).
  *
  * Skips itself with a clear message if the real `pkg/` WASM artifact or
@@ -145,7 +147,7 @@ realSuite("Commerce Reachable Catalog Phase 1 -- REAL packaged Beta Electron pro
         { action: "read", selector: "#commerce-detail-price" }, // 16
         { action: "read", selector: "#commerce-detail-merchant" }, // 17
         { action: "read", selector: "#commerce-detail-description" }, // 18
-        { action: "read", selector: ".commerce-unavailable-pill" }, // 19
+        { action: "read", selector: "#commerce-order-create-submit" }, // 19 -- Commerce E2E Completion arc: the real Create Order control (Phase 1's disabled pill is gone by design)
         { action: "click", selector: "#commerce-detail-back" }, // 20
         { action: "wait", ms: 300 }, // 21
         { action: "read", selector: ".app-screen.active#app-screen-commerce" }, // 22 -- back on the catalog
@@ -185,11 +187,12 @@ realSuite("Commerce Reachable Catalog Phase 1 -- REAL packaged Beta Electron pro
       expect(readAt(run, 16)).toBe("18.00 USD");
       expect(readAt(run, 17)).toBe("Sold by Northlight Studio");
       expect(readAt(run, 18)).toMatch(/violet-to-amber gradient/);
-      expect(readAt(run, 19)).toBe("Ordering not available yet");
-      // No Buy/Order/Purchase/Checkout control anywhere in this run's output.
+      expect(readAt(run, 19)).toBe("Create Order"); // the real, bounded Order control -- see this arc's header note above
+      // No instant-purchase/mark-as-paid control anywhere in this run's output -- Create Order is real and expected, a bare Buy/Purchase/Checkout shortcut is not.
       expect(run.output).not.toMatch(/>Buy</i);
       expect(run.output).not.toMatch(/>Purchase</i);
       expect(run.output).not.toMatch(/>Checkout</i);
+      expect(run.output).not.toMatch(/>Mark as [Pp]aid</);
 
       readAt(run, 22); // Back on the Commerce catalog.
 

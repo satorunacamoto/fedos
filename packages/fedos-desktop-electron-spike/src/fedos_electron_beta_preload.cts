@@ -40,6 +40,11 @@ const MAX_PAIRING_ENVELOPE_CHARS = 8192;
 const MAX_SEARCH_QUERY_CHARS = 256;
 /** Secure Runtime Alpha 7321-7400 — a real filesystem path for Archive export/import. */
 const MAX_ARCHIVE_PATH_CHARS = 4096;
+/** Commerce E2E Completion arc — mirrors `fedos_electron_beta_main.cts`'s own identical constants exactly (bounds are enforced independently on both sides of the IPC boundary, same discipline as every other bound in this file). */
+const MAX_PRODUCT_TITLE_CHARS = 200;
+const MAX_PRODUCT_DESCRIPTION_CHARS = 4000;
+const MAX_CURRENCY_CHARS = 8;
+const MAX_ORDER_REJECTION_REASON_CHARS = 500;
 
 function boundedString(value: unknown, max: number): string {
   return typeof value === "string" ? value.slice(0, max) : "";
@@ -189,6 +194,61 @@ const fedosApp: FedosAppBridge = Object.freeze({
   // same bounded-string discipline as every method above.
   commerceCatalogList: () => ipcRenderer.invoke("fedos-app:commerce-catalog-list"),
   commerceProductDetail: (productId: string) => ipcRenderer.invoke("fedos-app:commerce-product-detail", { productId: boundedString(productId, MAX_ID_CHARS) }),
+  // Commerce E2E Completion arc (coordinator integration gate) -- Merchant
+  // Product CRUD + Order + local Payment simulator. SAME bounded-string
+  // discipline as every method above; no method here accepts a raw
+  // "mark as paid" flag, an order status string, or a payment-evidence
+  // shape from the renderer -- `commercePaymentSimulate` sends only
+  // `orderId`/`paymentId`, main process alone decides evidence and status.
+  commerceMerchantProductsList: (actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-merchant-products-list", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceProductCreate: (actorPubkey: string, input: { title: string; description?: string; priceCents: number; currency: string }) =>
+    ipcRenderer.invoke("fedos-app:commerce-product-create", {
+      actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS),
+      title: boundedString(input?.title, MAX_PRODUCT_TITLE_CHARS),
+      description: input?.description === undefined ? undefined : boundedString(input.description, MAX_PRODUCT_DESCRIPTION_CHARS),
+      priceCents: typeof input?.priceCents === "number" ? input.priceCents : -1,
+      currency: boundedString(input?.currency, MAX_CURRENCY_CHARS),
+    }),
+  commerceProductUpdate: (actorPubkey: string, productId: string, patch: { title?: string; description?: string; priceCents?: number; currency?: string }) =>
+    ipcRenderer.invoke("fedos-app:commerce-product-update", {
+      actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS),
+      productId: boundedString(productId, MAX_ID_CHARS),
+      title: patch?.title === undefined ? undefined : boundedString(patch.title, MAX_PRODUCT_TITLE_CHARS),
+      description: patch?.description === undefined ? undefined : boundedString(patch.description, MAX_PRODUCT_DESCRIPTION_CHARS),
+      priceCents: patch?.priceCents,
+      currency: patch?.currency === undefined ? undefined : boundedString(patch.currency, MAX_CURRENCY_CHARS),
+    }),
+  commerceProductPublish: (actorPubkey: string, productId: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-product-publish", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS), productId: boundedString(productId, MAX_ID_CHARS) }),
+  commerceProductUnpublish: (actorPubkey: string, productId: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-product-unpublish", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS), productId: boundedString(productId, MAX_ID_CHARS) }),
+  commerceOrderCreate: (buyerPubkey: string, productId: string, quantity?: number) =>
+    ipcRenderer.invoke("fedos-app:commerce-order-create", {
+      buyerPubkey: boundedString(buyerPubkey, MAX_ID_CHARS),
+      productId: boundedString(productId, MAX_ID_CHARS),
+      quantity: typeof quantity === "number" ? quantity : undefined,
+    }),
+  commerceOrderSubmit: (orderId: string, actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-order-submit", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceOrderCancel: (orderId: string, actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-order-cancel", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceOrderAccept: (orderId: string, actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-order-accept", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceOrderReject: (orderId: string, actorPubkey: string, reason?: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-order-reject", {
+      orderId: boundedString(orderId, MAX_ID_CHARS),
+      actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS),
+      reason: reason === undefined ? undefined : boundedString(reason, MAX_ORDER_REJECTION_REASON_CHARS),
+    }),
+  commerceOrderFulfill: (orderId: string, actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-order-fulfill", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceOrdersListMine: (actorPubkey: string) => ipcRenderer.invoke("fedos-app:commerce-orders-list-mine", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceOrdersListIncoming: (actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-orders-list-incoming", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commercePaymentRequest: (orderId: string) => ipcRenderer.invoke("fedos-app:commerce-payment-request", { orderId: boundedString(orderId, MAX_ID_CHARS) }),
+  commercePaymentSimulate: (orderId: string, paymentId: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-payment-simulate", { orderId: boundedString(orderId, MAX_ID_CHARS), paymentId: boundedString(paymentId, MAX_ID_CHARS) }),
 });
 
 contextBridge.exposeInMainWorld("fedosProfile", fedosProfile);

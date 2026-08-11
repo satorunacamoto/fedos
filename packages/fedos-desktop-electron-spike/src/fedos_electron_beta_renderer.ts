@@ -36,6 +36,8 @@ type AppScreenName =
   | "chat"
   | "commerce"
   | "commerce-detail"
+  | "commerce-order"
+  | "commerce-merchant"
   | "search"
   | "archive"
   | "devices"
@@ -122,6 +124,21 @@ function showError(elementId: string, result: { readonly outcome: string; readon
 
 function clearError(elementId: string): void {
   byId(elementId).textContent = "";
+}
+
+/**
+ * Commerce E2E Completion arc — Commerce/Order/Payment handlers return a
+ * specific, developer-authored `reason` string for their `"rejected"`/
+ * `"invalid-input"`/`"not-found"`/`"forbidden"` outcomes (e.g. `"actor kind
+ * \"customer\" is not authorized to perform \"confirm_payment\""`), unlike
+ * `describeOutcome()`'s generic Phase N vocabulary above. Every such
+ * `reason` is already documented at its source as a safe, non-secret,
+ * developer-facing explanation (see `PaymentDecision.reason`'s own header:
+ * "Never echoes secret/card/wallet content") — safe to render directly.
+ * Falls back to `describeOutcome()` only when no `reason` was supplied.
+ */
+function showCommerceError(elementId: string, result: { readonly outcome: string; readonly reason?: string }): void {
+  byId(elementId).textContent = result.reason !== undefined && result.reason.length > 0 ? result.reason : describeOutcome(result.outcome);
 }
 
 // ---------------------------------------------------------------------
@@ -215,6 +232,8 @@ function showAppScreen(name: AppScreenName): void {
     chat: "nav-conversations",
     commerce: "nav-commerce",
     "commerce-detail": "nav-commerce",
+    "commerce-order": "nav-commerce",
+    "commerce-merchant": "nav-commerce-merchant",
     search: "nav-search",
     archive: "nav-archive",
     devices: "nav-devices",
@@ -507,6 +526,8 @@ async function onChatSend(): Promise<void> {
 // ---------------------------------------------------------------------
 
 let commerceCatalogCache: readonly FedosCommerceCatalogListItem[] = [];
+/** Set by `openCommerceProduct()`, read by `onCommerceOrderCreateSubmit()` — the id of whichever product Product Detail currently shows (mirrors `currentConversationId`'s own module-state convention above). */
+let currentCommerceDetailProductId: string | null = null;
 
 /** The ONLY scheme this renderer will ever hand to an `<img src>` — see this section's own header. */
 function isSafeCommerceImageDataUri(value: string): boolean {
@@ -587,21 +608,25 @@ function renderCommerceCatalogList(): void {
 }
 
 async function refreshCommerceCatalogList(): Promise<void> {
+  populateCommerceActorSelect("commerce-acting-as");
   clearError("commerce-error");
   const result = await window.fedosApp.commerceCatalogList();
   if (result.outcome !== "ok") {
     showError("commerce-error", result);
     commerceCatalogCache = [];
     renderCommerceCatalogList();
-    return;
+  } else {
+    commerceCatalogCache = result.products ?? [];
+    renderCommerceCatalogList();
   }
-  commerceCatalogCache = result.products ?? [];
-  renderCommerceCatalogList();
+  void refreshCommerceMyOrdersList();
 }
 
 async function openCommerceProduct(productId: string): Promise<void> {
+  currentCommerceDetailProductId = productId;
   showAppScreen("commerce-detail");
   clearError("commerce-detail-error");
+  clearError("commerce-order-create-error");
   byId("commerce-detail-title").textContent = "Loading…";
   byId("commerce-detail-media-area").textContent = "";
   byId("commerce-detail-price").textContent = "";
@@ -626,6 +651,326 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
   byId("commerce-detail-merchant").textContent = `Sold by ${product.merchantLabel}`;
   byId("commerce-detail-status").textContent = `Status: ${product.status}`;
   byId("commerce-detail-description").textContent = product.description;
+  const isCustomer = COMMERCE_DEMO_ACTORS.find((a) => a.pubkey === commerceActingAsPubkey)?.role === "customer";
+  byId("commerce-detail-order-form").toggleAttribute("hidden", !isCustomer);
+  byId("commerce-detail-order-unavailable-note").toggleAttribute("hidden", isCustomer);
+}
+
+// ---------------------------------------------------------------------
+// Commerce E2E Completion arc — Merchant Product CRUD, Order, local
+// Payment simulator.
+//
+// Demo actor identity: this ordinary (non-acceptance-mode) build has no
+// multi-account/persona-switch UI anywhere else in the product — a single
+// Electron process represents one local identity. To let ONE local session
+// walk through the full documented tabletop (Bob Merchant + Alice
+// Customer) without a second running instance, this section adds a
+// LOCAL-ONLY, LOUDLY-labeled "Acting as" demo selector — never presented
+// as a real multi-identity/account-switching feature, never touching
+// `window.fedosProfile`'s real single local profile. The three pubkeys
+// below are the SAME synthetic values `fedos_electron_beta_commerce_demo_catalog.ts`
+// already used for its two merchant personas (`"a".repeat(64)`/`"b".repeat(64)`)
+// plus one new synthetic customer persona (`"c".repeat(64)`) — this file
+// cannot `import` that module (see this file's own header), so the values
+// are restated here, structurally identical.
+// ---------------------------------------------------------------------
+
+const COMMERCE_DEMO_ACTORS: readonly { readonly pubkey: string; readonly label: string; readonly role: "customer" | "merchant" }[] = [
+  { pubkey: "c".repeat(64), label: "Customer — Alice (demo)", role: "customer" },
+  { pubkey: "a".repeat(64), label: "Merchant — Northlight Studio (demo)", role: "merchant" },
+  { pubkey: "b".repeat(64), label: "Merchant — Riverbend Makerspace (demo)", role: "merchant" },
+];
+
+let commerceActingAsPubkey: string = COMMERCE_DEMO_ACTORS[0]?.pubkey ?? "";
+
+function populateCommerceActorSelect(selectId: string): void {
+  const select = byId<HTMLSelectElement>(selectId);
+  select.textContent = "";
+  for (const actor of COMMERCE_DEMO_ACTORS) {
+    const option = document.createElement("option");
+    option.value = actor.pubkey;
+    option.textContent = actor.label;
+    select.appendChild(option);
+  }
+  select.value = commerceActingAsPubkey;
+}
+
+/** Keeps the Commerce screen's and Merchant screen's selectors mirrored to ONE shared demo identity — see this section's own header for why two selectors exist at all (both screens need the control visible without cross-navigating). */
+function setCommerceActingAs(pubkey: string): void {
+  commerceActingAsPubkey = pubkey;
+  byId<HTMLSelectElement>("commerce-acting-as").value = pubkey;
+  byId<HTMLSelectElement>("commerce-merchant-acting-as").value = pubkey;
+}
+
+let currentCommerceOrder: FedosCommerceOrder | null = null;
+let currentCommercePendingPayment: { readonly paymentId: string; readonly amountCents: number; readonly currency: string } | null = null;
+
+function commerceOrderSummaryText(order: FedosCommerceOrder): string {
+  return `${order.quantity} × ${formatCommercePrice(order.unitPriceCents, order.currency)} = ${formatCommercePrice(order.totalCents, order.currency)}`;
+}
+
+function renderCommerceOrderScreen(): void {
+  const order = currentCommerceOrder;
+  clearError("commerce-order-error");
+  clearError("commerce-order-payment-error");
+  if (order === null) return;
+  byId("commerce-order-id").textContent = `Order ${order.id}`;
+  const statusText = byId("commerce-order-status-text");
+  statusText.textContent = order.status;
+  statusText.className = `commerce-order-status commerce-order-status-${order.status}`;
+  byId("commerce-order-summary").textContent = commerceOrderSummaryText(order);
+
+  const isBuyer = commerceActingAsPubkey === order.buyerPubkey;
+  const isSeller = commerceActingAsPubkey === order.sellerPubkey;
+
+  byId("commerce-order-review-actions").toggleAttribute("hidden", !(order.status === "created" && isBuyer));
+  byId("commerce-order-merchant-actions").toggleAttribute("hidden", !(order.status === "submitted" && isSeller));
+  const showsPaymentActions = order.status === "accepted" && isBuyer;
+  byId("commerce-order-payment-actions").toggleAttribute("hidden", !showsPaymentActions);
+  if (!showsPaymentActions) currentCommercePendingPayment = null;
+  byId("commerce-order-payment-pending").toggleAttribute("hidden", currentCommercePendingPayment === null);
+  if (currentCommercePendingPayment !== null) {
+    byId("commerce-order-payment-id").textContent = currentCommercePendingPayment.paymentId;
+    byId("commerce-order-payment-amount").textContent = formatCommercePrice(currentCommercePendingPayment.amountCents, currentCommercePendingPayment.currency);
+  }
+  byId("commerce-order-paid-banner").toggleAttribute("hidden", !["paid", "fulfilling", "delivered", "completed"].includes(order.status));
+  byId("commerce-order-fulfill-actions").toggleAttribute("hidden", !(order.status === "paid" && isSeller));
+
+  byId("commerce-order-history").textContent = `Product ${order.productId} — buyer ${order.buyerPubkey.slice(0, 8)}… — seller ${order.sellerPubkey.slice(0, 8)}…`;
+}
+
+function openCommerceOrderScreen(order: FedosCommerceOrder): void {
+  currentCommerceOrder = order;
+  currentCommercePendingPayment = null;
+  showAppScreen("commerce-order");
+  renderCommerceOrderScreen();
+}
+
+async function onCommerceOrderCreateSubmit(): Promise<void> {
+  clearError("commerce-order-create-error");
+  const productId = currentCommerceDetailProductId;
+  const quantityRaw = byId<HTMLInputElement>("commerce-order-quantity").value;
+  const quantity = Number.parseInt(quantityRaw, 10);
+  if (productId === null) {
+    showCommerceError("commerce-order-create-error", { outcome: "invalid-input", reason: "no product selected" });
+    return;
+  }
+  const result = await window.fedosApp.commerceOrderCreate(commerceActingAsPubkey, productId, Number.isFinite(quantity) ? quantity : undefined);
+  if (result.outcome !== "ok" || result.order === undefined) {
+    showCommerceError("commerce-order-create-error", result);
+    return;
+  }
+  openCommerceOrderScreen(result.order);
+}
+
+async function onCommerceOrderActionClick(
+  action: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>,
+  errorElementId: string,
+): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  clearError(errorElementId);
+  const result = await action(currentCommerceOrder.id, commerceActingAsPubkey);
+  if (result.outcome !== "ok" || result.order === undefined) {
+    showCommerceError(errorElementId, result);
+    return;
+  }
+  currentCommerceOrder = result.order;
+  renderCommerceOrderScreen();
+  void refreshCommerceMyOrdersList();
+}
+
+async function onCommerceOrderRejectClick(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  clearError("commerce-order-error");
+  const reason = byId<HTMLInputElement>("commerce-order-reject-reason").value;
+  const result = await window.fedosApp.commerceOrderReject(currentCommerceOrder.id, commerceActingAsPubkey, reason.length > 0 ? reason : undefined);
+  if (result.outcome !== "ok" || result.order === undefined) {
+    showCommerceError("commerce-order-error", result);
+    return;
+  }
+  currentCommerceOrder = result.order;
+  renderCommerceOrderScreen();
+}
+
+async function onCommercePaymentRequestClick(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  clearError("commerce-order-payment-error");
+  const result = await window.fedosApp.commercePaymentRequest(currentCommerceOrder.id);
+  if (result.outcome !== "ok" || result.paymentId === undefined || result.amountCents === undefined || result.currency === undefined) {
+    showCommerceError("commerce-order-payment-error", result);
+    return;
+  }
+  currentCommercePendingPayment = { paymentId: result.paymentId, amountCents: result.amountCents, currency: result.currency };
+  renderCommerceOrderScreen();
+}
+
+/**
+ * The renderer sends ONLY `orderId`/`paymentId` — never a status, never a
+ * `verification`/evidence shape (see `fedos_electron_beta_preload.cts`'s
+ * own `commercePaymentSimulate` bound-string signature: two id strings,
+ * nothing else can travel over this channel). The main process alone
+ * decides the outcome — this button can request a simulated settlement,
+ * it cannot dictate what that settlement says.
+ */
+async function onCommercePaymentSimulateClick(): Promise<void> {
+  if (currentCommerceOrder === null || currentCommercePendingPayment === null) return;
+  clearError("commerce-order-payment-error");
+  const result = await window.fedosApp.commercePaymentSimulate(currentCommerceOrder.id, currentCommercePendingPayment.paymentId);
+  if (result.outcome !== "ok" || result.order === undefined) {
+    showCommerceError("commerce-order-payment-error", result);
+    return;
+  }
+  currentCommerceOrder = result.order;
+  currentCommercePendingPayment = null;
+  renderCommerceOrderScreen();
+  void refreshCommerceMyOrdersList();
+}
+
+function renderCommerceMyOrdersList(orders: readonly FedosCommerceOrder[]): void {
+  const list = byId("commerce-my-orders-list");
+  list.textContent = "";
+  if (orders.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No orders yet.";
+    list.appendChild(li);
+    return;
+  }
+  for (const order of orders) {
+    const li = document.createElement("li");
+    const title = document.createElement("div");
+    title.textContent = `Order ${order.id.slice(0, 12)}… — ${order.status}`;
+    li.appendChild(title);
+    const summary = document.createElement("div");
+    summary.className = "muted";
+    summary.textContent = commerceOrderSummaryText(order);
+    li.appendChild(summary);
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.textContent = "Open";
+    openBtn.addEventListener("click", () => openCommerceOrderScreen(order));
+    li.appendChild(openBtn);
+    list.appendChild(li);
+  }
+}
+
+async function refreshCommerceMyOrdersList(): Promise<void> {
+  const result = await window.fedosApp.commerceOrdersListMine(commerceActingAsPubkey);
+  renderCommerceMyOrdersList(result.outcome === "ok" ? result.orders ?? [] : []);
+}
+
+// --- Merchant screen: My Products + Create Product + Incoming Orders ---
+
+function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTMLLIElement {
+  const li = document.createElement("li");
+  const title = document.createElement("div");
+  title.textContent = `${product.title} — ${product.status}`;
+  li.appendChild(title);
+  const price = document.createElement("div");
+  price.className = "commerce-price";
+  price.textContent = formatCommercePrice(product.priceCents, product.currency);
+  li.appendChild(price);
+  const publishBtn = document.createElement("button");
+  publishBtn.type = "button";
+  const isPublished = product.status === "active";
+  publishBtn.textContent = isPublished ? "Unpublish" : "Publish";
+  publishBtn.addEventListener("click", () => void onCommerceProductPublishToggle(product.id, !isPublished));
+  li.appendChild(publishBtn);
+  return li;
+}
+
+async function onCommerceProductPublishToggle(productId: string, publish: boolean): Promise<void> {
+  clearError("commerce-merchant-products-error");
+  const result = publish
+    ? await window.fedosApp.commerceProductPublish(commerceActingAsPubkey, productId)
+    : await window.fedosApp.commerceProductUnpublish(commerceActingAsPubkey, productId);
+  if (result.outcome !== "ok") {
+    showCommerceError("commerce-merchant-products-error", result);
+    return;
+  }
+  void refreshCommerceMerchantProductsList();
+  void refreshCommerceCatalogList();
+}
+
+async function refreshCommerceMerchantProductsList(): Promise<void> {
+  clearError("commerce-merchant-products-error");
+  const result = await window.fedosApp.commerceMerchantProductsList(commerceActingAsPubkey);
+  const list = byId("commerce-merchant-products-list");
+  list.textContent = "";
+  if (result.outcome !== "ok") {
+    showCommerceError("commerce-merchant-products-error", result);
+    return;
+  }
+  const products = result.products ?? [];
+  if (products.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No products yet — create one below.";
+    list.appendChild(li);
+    return;
+  }
+  for (const product of products) list.appendChild(commerceMerchantProductRow(product));
+}
+
+async function onCommerceMerchantCreateSubmit(): Promise<void> {
+  clearError("commerce-merchant-create-error");
+  const title = byId<HTMLInputElement>("commerce-merchant-create-title").value;
+  const description = byId<HTMLTextAreaElement>("commerce-merchant-create-description").value;
+  const priceCents = Number.parseInt(byId<HTMLInputElement>("commerce-merchant-create-price").value, 10);
+  const currency = byId<HTMLInputElement>("commerce-merchant-create-currency").value;
+  const result = await window.fedosApp.commerceProductCreate(commerceActingAsPubkey, {
+    title,
+    description: description.length > 0 ? description : undefined,
+    priceCents: Number.isFinite(priceCents) ? priceCents : -1,
+    currency,
+  });
+  if (result.outcome !== "ok") {
+    showCommerceError("commerce-merchant-create-error", result);
+    return;
+  }
+  clearField("commerce-merchant-create-title");
+  clearField("commerce-merchant-create-description");
+  byId<HTMLInputElement>("commerce-merchant-create-price").value = "0";
+  void refreshCommerceMerchantProductsList();
+}
+
+function commerceMerchantOrderRow(order: FedosCommerceOrder): HTMLLIElement {
+  const li = document.createElement("li");
+  const title = document.createElement("div");
+  title.textContent = `Order ${order.id.slice(0, 12)}… — ${order.status}`;
+  li.appendChild(title);
+  const summary = document.createElement("div");
+  summary.className = "muted";
+  summary.textContent = commerceOrderSummaryText(order);
+  li.appendChild(summary);
+  const openBtn = document.createElement("button");
+  openBtn.type = "button";
+  openBtn.textContent = "Open";
+  openBtn.addEventListener("click", () => openCommerceOrderScreen(order));
+  li.appendChild(openBtn);
+  return li;
+}
+
+async function refreshCommerceMerchantOrdersList(): Promise<void> {
+  clearError("commerce-merchant-orders-error");
+  const result = await window.fedosApp.commerceOrdersListIncoming(commerceActingAsPubkey);
+  const list = byId("commerce-merchant-orders-list");
+  list.textContent = "";
+  if (result.outcome !== "ok") {
+    showCommerceError("commerce-merchant-orders-error", result);
+    return;
+  }
+  const orders = result.orders ?? [];
+  if (orders.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No incoming orders yet.";
+    list.appendChild(li);
+    return;
+  }
+  for (const order of orders) list.appendChild(commerceMerchantOrderRow(order));
+}
+
+async function refreshCommerceMerchantScreen(): Promise<void> {
+  populateCommerceActorSelect("commerce-merchant-acting-as");
+  await Promise.all([refreshCommerceMerchantProductsList(), refreshCommerceMerchantOrdersList()]);
 }
 
 // ---------------------------------------------------------------------
@@ -1902,6 +2247,10 @@ byId<HTMLButtonElement>("nav-commerce").addEventListener("click", () => {
   showAppScreen("commerce");
   void refreshCommerceCatalogList();
 });
+byId<HTMLButtonElement>("nav-commerce-merchant").addEventListener("click", () => {
+  showAppScreen("commerce-merchant");
+  void refreshCommerceMerchantScreen();
+});
 byId<HTMLButtonElement>("nav-search").addEventListener("click", () => showAppScreen("search"));
 byId<HTMLButtonElement>("nav-archive").addEventListener("click", () => {
   showAppScreen("archive");
@@ -1940,6 +2289,37 @@ byId<HTMLButtonElement>("commerce-detail-back").addEventListener("click", () => 
   showAppScreen("commerce");
   void refreshCommerceCatalogList();
 });
+byId<HTMLSelectElement>("commerce-acting-as").addEventListener("change", (e) => {
+  setCommerceActingAs((e.target as HTMLSelectElement).value);
+  void refreshCommerceCatalogList();
+});
+byId<HTMLSelectElement>("commerce-merchant-acting-as").addEventListener("change", (e) => {
+  setCommerceActingAs((e.target as HTMLSelectElement).value);
+  void refreshCommerceMerchantScreen();
+});
+byId<HTMLButtonElement>("commerce-order-create-submit").addEventListener("click", () => void onCommerceOrderCreateSubmit());
+byId<HTMLButtonElement>("commerce-order-back").addEventListener("click", () => {
+  currentCommerceOrder = null;
+  currentCommercePendingPayment = null;
+  showAppScreen("commerce");
+  void refreshCommerceCatalogList();
+});
+byId<HTMLButtonElement>("commerce-order-submit-btn").addEventListener("click", () =>
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderSubmit(id, actor), "commerce-order-error"),
+);
+byId<HTMLButtonElement>("commerce-order-cancel-btn").addEventListener("click", () =>
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderCancel(id, actor), "commerce-order-error"),
+);
+byId<HTMLButtonElement>("commerce-order-accept-btn").addEventListener("click", () =>
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderAccept(id, actor), "commerce-order-error"),
+);
+byId<HTMLButtonElement>("commerce-order-reject-btn").addEventListener("click", () => void onCommerceOrderRejectClick());
+byId<HTMLButtonElement>("commerce-order-fulfill-btn").addEventListener("click", () =>
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderFulfill(id, actor), "commerce-order-error"),
+);
+byId<HTMLButtonElement>("commerce-order-payment-request-btn").addEventListener("click", () => void onCommercePaymentRequestClick());
+byId<HTMLButtonElement>("commerce-order-payment-simulate-btn").addEventListener("click", () => void onCommercePaymentSimulateClick());
+byId<HTMLButtonElement>("commerce-merchant-create-submit").addEventListener("click", () => void onCommerceMerchantCreateSubmit());
 
 // Search.
 byId<HTMLButtonElement>("search-submit").addEventListener("click", () => void onSearchSubmit());

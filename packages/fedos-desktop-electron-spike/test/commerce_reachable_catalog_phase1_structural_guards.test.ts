@@ -2,22 +2,41 @@
  * Commerce Reachable Catalog + Product Surface, Phase 1 — structural
  * guards, proving by direct source inspection (never narrative claim
  * alone, mirrors `secure_runtime_alpha_8041_8120_structural_guards.test.ts`'s
- * own established convention) that:
+ * own established convention).
+ *
+ * UPDATED (Commerce E2E Completion arc, coordinator integration gate):
+ * Phase 1 was deliberately read-only-catalog-only; tests 2/3/4/6/8/9/17
+ * below encoded that exact boundary as "never Order/Payment/PaymentProvider
+ * reachable at all". This arc's own explicit, sanctioned mission is to
+ * widen that boundary safely — Order and a LOUDLY-labeled TEST/LOCAL
+ * `DeterministicLocalPaymentProvider` (never `PlaceholderPaymentProvider`,
+ * never `ingestCallback`) are now real and reachable. Those 7 tests are
+ * updated below to assert the NEW correct boundary rather than deleted —
+ * every original safety property (no unauthenticated settlement path, no
+ * PAID forgeable by a bare claim, bounded validated IPC, reachable without
+ * a profile) is re-asserted in its new, still-real form:
  *
  *   - `createCommerce()`'s barrel is genuinely wired into the real
  *     composition root (`loadRootModules()`), via the compiled `dist/`
  *     graph like every other module, not a parallel app.
- *   - The new IPC channel family is bounded (exactly 2 channels), reuses
- *     the existing `fedos-app:*` validation discipline, and is never
- *     gated on a Coordinator/Shell (Commerce must be reachable even
- *     before a profile exists).
- *   - Nothing payment-shaped is ever imported/constructed/reachable from
- *     this new slice — the dormant, unauthenticated
- *     `PlaceholderPaymentProvider.ingestCallback()` stays exactly as
- *     unreachable as the prior audit found it.
+ *   - The full `fedos-app:commerce-*` IPC channel family is bounded and
+ *     enumerated exactly, reuses the existing `fedos-app:*` validation
+ *     discipline, and is never gated on a Coordinator/Shell (Commerce must
+ *     be reachable even before a profile exists).
+ *   - `PlaceholderPaymentProvider`/`ingestCallback` — the historically
+ *     unauthenticated settlement path — is never imported/constructed/
+ *     reachable from this slice. The one payment provider THIS slice can
+ *     reach, `DeterministicLocalPaymentProvider`, is the loudly-labeled
+ *     TEST/LOCAL simulator (`payment/local_simulator.ts`'s own header),
+ *     never a real rail, and the preload channel it's exposed through
+ *     accepts only two opaque id strings — never a status/evidence shape
+ *     the renderer could use to dictate an outcome.
  *   - Media rendering never uses `innerHTML`, never accepts an unsafe
  *     scheme, and always has a safe fallback.
- *   - No "Buy"/"Order" control exists; the disabled state is explicit.
+ *   - No "Buy Now"/instant-purchase control or "Mark as Paid" control
+ *     exists anywhere — a real "Create Order" control now does (by
+ *     design), but every path to PAID still requires the local simulator's
+ *     own explicit two-step request→simulate flow, never a single click.
  *   - The pre-existing Messenger UI/IPC vocabulary is untouched.
  */
 import { describe, it, expect } from "vitest";
@@ -48,34 +67,74 @@ describe("Commerce Reachable Catalog Phase 1 -- composition root wiring", () => 
     expect(tsconfig).toMatch(/"src\/os\/commerce\/index\.ts"/);
   });
 
-  it("2. loadRootModules() dynamically imports the real os/commerce barrel and takes ONLY listViewableProducts from it -- never a PaymentProvider/PlaceholderPaymentProvider/createCommerce call inside main.cts itself", () => {
+  it("2. loadRootModules() dynamically imports the real os/commerce barrel and takes ONLY the Commerce E2E Completion arc's own explicitly-widened name set -- never PlaceholderPaymentProvider/ingestCallback/createCommerce/marketplace inside main.cts itself", () => {
     const source = stripComments(read(MAIN_PATH));
     expect(source).toMatch(/distUrl\("os", "commerce", "index\.js"\)/);
     expect(source).toMatch(/listViewableProducts:\s*RootModules\["Commerce"\]\["listViewableProducts"\]/);
-    // The commerce dynamic-import block's destructured shape names only listViewableProducts.
-    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,200}?)\};/);
+    // The commerce dynamic-import block's destructured shape names exactly the arc's own widened, reviewed set.
+    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,900}?)\};/);
     expect(importBlockMatch, source).not.toBeNull();
-    expect(importBlockMatch![1]).toMatch(/listViewableProducts/);
-    expect(importBlockMatch![1]).not.toMatch(/[Pp]ayment/);
-    expect(importBlockMatch![1]).not.toMatch(/createCommerce/);
+    const importBlock = importBlockMatch![1];
+    for (const name of ["listViewableProducts", "LocalProductRepository", "LocalOrderRepository", "createOrder", "applyOrderAction", "DeterministicLocalPaymentProvider", "PaymentSettlementLedger"]) {
+      expect(importBlock, `expected commerce import block to name ${name}`).toMatch(new RegExp(name));
+    }
+    expect(importBlock).not.toMatch(/PlaceholderPaymentProvider/);
+    expect(importBlock).not.toMatch(/ingestCallback/);
+    expect(importBlock).not.toMatch(/createCommerce/);
+    expect(importBlock).not.toMatch(/marketplace/i);
   });
 
-  it("3. RootModules.Commerce exposes ONLY listViewableProducts -- no payments/marketplace field", () => {
+  it("3. RootModules.Commerce exposes exactly the Commerce E2E Completion arc's own reviewed name set -- no PlaceholderPaymentProvider/marketplace field, never the raw createCommerce() factory", () => {
     const source = stripComments(read(MAIN_PATH));
-    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,300}?)\};\s*\n\}/);
+    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,1400}?)\n  \};\n\}/);
     expect(fieldMatch, source).not.toBeNull();
-    expect(fieldMatch![1]).toMatch(/listViewableProducts/);
-    expect(fieldMatch![1]).not.toMatch(/payments|marketplace|PaymentProvider/i);
+    const field = fieldMatch![1];
+    for (const name of ["listViewableProducts", "LocalProductRepository", "LocalOrderRepository", "createOrder", "applyOrderAction", "DeterministicLocalPaymentProvider", "PaymentSettlementLedger"]) {
+      expect(field, `expected RootModules.Commerce to declare ${name}`).toMatch(new RegExp(name));
+    }
+    expect(field).not.toMatch(/marketplace|PlaceholderPaymentProvider/i);
+    expect(field).not.toMatch(/:\s*new\s*\([^)]*\)\s*=>\s*Commerce\b/); // never the raw createCommerce() factory type
   });
 });
 
 describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
-  it("4. exactly two new fedos-app:commerce-* channels are registered, unconditionally (never gated on ACCEPTANCE_MODE_ENABLED)", () => {
+  it("4. exactly the Commerce E2E Completion arc's own reviewed set of fedos-app:commerce-* channels are registered, unconditionally (never gated on ACCEPTANCE_MODE_ENABLED), and none outside that set exists", () => {
     const source = stripComments(read(MAIN_PATH));
     const channelMatches = source.match(/ipcMain\.handle\("fedos-app:commerce-[a-z-]+",/g) ?? [];
-    expect(channelMatches.length).toBe(2);
+    const EXPECTED_CHANNELS = [
+      "commerce-catalog-list",
+      "commerce-product-detail",
+      "commerce-merchant-products-list",
+      "commerce-product-create",
+      "commerce-product-update",
+      "commerce-product-publish",
+      "commerce-product-unpublish",
+      "commerce-order-create",
+      "commerce-order-submit",
+      "commerce-order-cancel",
+      "commerce-order-accept",
+      "commerce-order-reject",
+      "commerce-order-fulfill",
+      "commerce-orders-list-mine",
+      "commerce-orders-list-incoming",
+      "commerce-payment-request",
+      "commerce-payment-simulate",
+    ];
+    expect(channelMatches.length).toBe(EXPECTED_CHANNELS.length);
+    for (const channel of EXPECTED_CHANNELS) {
+      expect(source, `expected channel ${channel} to be registered`).toMatch(new RegExp(`ipcMain\\.handle\\("fedos-app:${channel}",`));
+    }
     expect(source).toMatch(/ipcMain\.handle\("fedos-app:commerce-catalog-list",\s*async \(\)\s*=>\s*handleCommerceCatalogList\(\)\);/);
     expect(source).toMatch(/ipcMain\.handle\("fedos-app:commerce-product-detail",\s*async \([^)]*\)\s*=>\s*handleCommerceProductDetail\(payload\)\);/);
+    // None of these registrations sits inside an `if (ACCEPTANCE_MODE_ENABLED)` block -- re-verified
+    // structurally (not just "not gated" by absence of the word) by confirming every commerce
+    // registration line, sliced out of the full registration function, has no enclosing acceptance guard
+    // between it and the nearest preceding top-level statement.
+    for (const channel of EXPECTED_CHANNELS) {
+      const idx = source.indexOf(`"fedos-app:${channel}"`);
+      const precedingSlice = source.slice(Math.max(0, idx - 400), idx);
+      expect(precedingSlice, `expected ${channel} registration to not be inside an ACCEPTANCE_MODE_ENABLED guard`).not.toMatch(/if \(ACCEPTANCE_MODE_ENABLED\)\s*\{[^}]*$/);
+    }
   });
 
   it("5. the product-detail handler bounds/validates productId the same way every other fedos-app:* handler does (isBoundedString + MAX_ID_LENGTH), never trusts an unvalidated payload field", () => {
@@ -87,15 +146,22 @@ describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
     expect(handlerBody).toMatch(/return \{ outcome: "invalid-input"/);
   });
 
-  it("6. neither Commerce handler is gated on requireShell()/requireBoundary() -- Commerce discovery must be reachable even before any profile exists (0 network/profile dependency)", () => {
+  it("6. neither read-only Commerce handler is gated on requireShell()/requireBoundary() -- Commerce discovery must be reachable even before any profile exists (0 network/profile dependency); commerceState() itself is equally ungated", () => {
     const source = stripComments(read(MAIN_PATH));
-    const sectionMatch = source.match(/\/\/ Commerce Reachable Catalog[\s\S]*?function renderCommerceProductDetail/);
-    // (renderCommerceProductDetail is renderer-only; guard against an accidental over-match by re-slicing to just the main.cts handler section instead.)
-    const mainSection = source.slice(source.indexOf("function commerceViewableDemoProducts"), source.indexOf("async function handleCommerceProductDetail") + 800);
+    const mainSection = source.slice(source.indexOf("function commerceMerchantLabelFor"), source.indexOf("async function handleCommerceProductDetail") + 800);
     expect(mainSection).not.toMatch(/requireShell\(\)/);
     expect(mainSection).not.toMatch(/requireBoundary\(\)/);
-    expect(mainSection).toMatch(/requireModules\(\)\.Commerce\.listViewableProducts/);
-    void sectionMatch;
+    // Commerce E2E Completion arc: catalog now reads through the live, mutable
+    // repository (`commerceState().products.listPublished()`) rather than the static
+    // array directly -- `listPublished()` itself applies the SAME real
+    // `listViewableProducts()` domain policy internally (`local_product_repository.ts`).
+    expect(mainSection).toMatch(/commerceState\(\)\.products\.listPublished\(\)/);
+    const stateFnStart = source.indexOf("function commerceState(): {");
+    expect(stateFnStart, source).toBeGreaterThanOrEqual(0);
+    const stateFnBody = source.slice(stateFnStart, source.indexOf("\n}\n", stateFnStart) + 3);
+    expect(stateFnBody).not.toMatch(/requireShell\(\)/);
+    expect(stateFnBody).not.toMatch(/requireBoundary\(\)/);
+    expect(stateFnBody).toMatch(/requireModules\(\)/);
   });
 });
 
@@ -106,15 +172,29 @@ describe("Commerce Reachable Catalog Phase 1 -- dormant payment callback stays u
     expect(source).not.toMatch(/ingestCallback/);
   });
 
-  it("8. no IPC channel anywhere in main.cts has 'payment' in its name", () => {
+  it("8. exactly two payment-named IPC channels exist, both routed through the TEST/LOCAL simulator + PaymentSettlementLedger -- never a raw provider-agnostic 'ingestCallback' passthrough channel", () => {
     const source = stripComments(read(MAIN_PATH));
     const paymentChannels = source.match(/ipcMain\.handle\("[^"]*payment[^"]*"/gi) ?? [];
-    expect(paymentChannels).toEqual([]);
+    expect(paymentChannels.sort()).toEqual([
+      'ipcMain.handle("fedos-app:commerce-payment-request"',
+      'ipcMain.handle("fedos-app:commerce-payment-simulate"',
+    ].sort());
+    expect(source).toMatch(/async function handleCommercePaymentRequest[\s\S]{0,900}?state\.payments\.requestPayment/);
+    expect(source).toMatch(/async function handleCommercePaymentSimulate[\s\S]{0,1400}?state\.payments\.simulateSettlement/);
+    expect(source).toMatch(/async function handleCommercePaymentSimulate[\s\S]{0,1800}?state\.ledger\.apply/);
+    expect(source).not.toMatch(/ingestCallback/);
   });
 
-  it("9. the preload bridge never exposes a payment-shaped method", () => {
+  it("9. the preload bridge's two payment-shaped methods accept ONLY opaque orderId/paymentId strings -- never a status/evidence/verification field the renderer could use to dictate an outcome", () => {
     const source = stripComments(read(PRELOAD_PATH));
-    expect(source).not.toMatch(/payment/i);
+    const requestMatch = source.match(/commercePaymentRequest:\s*\([^)]*\)\s*=>[\s\S]{0,200}?\)/);
+    expect(requestMatch, source).not.toBeNull();
+    expect(requestMatch![0]).toMatch(/orderId: string/);
+    expect(requestMatch![0]).not.toMatch(/status|evidence|verification|outcome|paid/i);
+    const simulateMatch = source.match(/commercePaymentSimulate:\s*\([^)]*\)\s*=>[\s\S]{0,250}?\)/);
+    expect(simulateMatch, source).not.toBeNull();
+    expect(simulateMatch![0]).toMatch(/orderId: string, paymentId: string/);
+    expect(simulateMatch![0]).not.toMatch(/status|evidence|verification|outcome|paid/i);
   });
 
   it("10. the demo catalog module imports nothing from os/commerce/payment -- Phase 1's demo data is catalog-only", () => {
@@ -177,17 +257,25 @@ describe("Commerce Reachable Catalog Phase 1 -- media safety", () => {
   });
 });
 
-describe("Commerce Reachable Catalog Phase 1 -- no fake ordering control", () => {
-  it("17. the product detail screen never contains a Buy/Order/Purchase/Checkout button -- only the explicit disabled-state pill", () => {
+describe("Commerce E2E Completion arc -- real Order control, but no fake instant-purchase/mark-as-paid control anywhere", () => {
+  it("17. the product detail screen's ONLY commerce action is a real, bounded 'Create Order' control -- no 'Buy Now'/instant-purchase button, and PAID is never one click away from Product Detail", () => {
     const html = read(HTML_PATH);
-    const detailSection = html.slice(html.indexOf('id="app-screen-commerce-detail"'), html.indexOf('id="app-screen-search"'));
+    const detailSection = html.slice(html.indexOf('id="app-screen-commerce-detail"'), html.indexOf('id="app-screen-commerce-order"'));
     expect(detailSection).not.toMatch(/>Buy</i);
-    expect(detailSection).not.toMatch(/>Order</i);
+    expect(detailSection).not.toMatch(/>Buy Now</i);
     expect(detailSection).not.toMatch(/>Purchase</i);
     expect(detailSection).not.toMatch(/>Checkout</i);
-    expect(detailSection).toMatch(/commerce-unavailable-pill">Ordering not available yet</);
-    // the pill is a <span>, never a <button> -- never an interactive-looking disabled control.
-    expect(detailSection).toMatch(/<span class="commerce-unavailable-pill">/);
+    expect(detailSection).not.toMatch(/pay|paid/i);
+    // Exactly one real, bounded control: Create Order.
+    expect(detailSection).toMatch(/id="commerce-order-create-submit"[^>]*>Create Order</);
+  });
+
+  it("18b. no control anywhere in the whole page lets the renderer directly claim/mark an order PAID -- 'Simulate Payment' is the ONLY payment-adjacent control, and it is loudly labeled TEST/LOCAL, never a bare 'Mark as Paid' checkbox/button", () => {
+    const html = read(HTML_PATH);
+    expect(html).not.toMatch(/>Mark as [Pp]aid</);
+    expect(html).not.toMatch(/type="checkbox"[^>]*>\s*Paid/i);
+    expect(html).toMatch(/id="commerce-order-payment-simulate-btn"[^>]*>Simulate Payment \(TEST\/LOCAL\)/);
+    expect(html).toMatch(/commerce-sim-pill">NOT REAL MONEY</);
   });
 });
 

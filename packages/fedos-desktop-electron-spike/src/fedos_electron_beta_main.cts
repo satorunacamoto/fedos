@@ -107,6 +107,7 @@ import { app, BrowserWindow, ipcMain, dialog, type IpcMainInvokeEvent } from "el
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { pathToFileURL } from "node:url";
+import { randomBytes as nodeRandomBytes } from "node:crypto";
 import { FedosElectronNotificationAdapter } from "./fedos_electron_notification_adapter.js";
 import { FedosElectronTrayAdapter } from "./fedos_electron_tray_adapter.js";
 import { FedosElectronBadgeAdapter, type FedosElectronBadgeTrayMenuItemLike } from "./fedos_electron_badge_adapter.js";
@@ -157,6 +158,11 @@ const ACCEPTANCE_MODE_ENABLED = AUTOTEST_MODE === "acceptance";
 const MAX_LABEL_CHARS = 128;
 const MAX_SECRET_BYTES = 1024;
 const MAX_ID_LENGTH = 512;
+/** Commerce E2E Completion arc — bounds for the new Merchant Product CRUD / Order IPC surface. Same discipline as every bound above: sized for the field, never generous "just in case". */
+const MAX_PRODUCT_TITLE_CHARS = 200;
+const MAX_PRODUCT_DESCRIPTION_CHARS = 4000;
+const MAX_CURRENCY_CHARS = 8;
+const MAX_ORDER_REJECTION_REASON_CHARS = 500;
 /** Secure Runtime Alpha 7001-7080 — same bound class as `MAX_LABEL_CHARS` above, sized for a real chat message body rather than a short label. */
 const MAX_MESSAGE_BODY_CHARS = 8192;
 /** Secure Runtime Alpha 7001-7080 — a real Device-pairing encoded request/approval string is larger than an id but still bounded (JSON envelope + one signature + one public key, never unbounded). */
@@ -492,10 +498,18 @@ interface RootModules {
    * Commerce Reachable Catalog + Product Surface Phase 1 -- the real
    * `os/commerce` domain's `listViewableProducts()`, loaded exactly like
    * every other module in this function (compiled `dist/`, dynamic
-   * `import()`). Deliberately the ONLY `os/commerce` export this main
-   * process consumes: no `PaymentProvider`, no `PlaceholderPaymentProvider`,
-   * no `ingestCallback` -- Phase 1 is read-only catalog discovery only,
-   * see `fedos_electron_beta_commerce_demo_catalog.cts`'s own header.
+   * `import()`). Read-only catalog discovery.
+   *
+   * Commerce E2E Completion arc (coordinator integration gate) widens this
+   * to the real, mutable Merchant Product CRUD + Order + local Payment
+   * simulator surface -- still every field loaded from the SAME compiled
+   * `os/commerce/index.js` barrel, still zero network/storage dependency
+   * inside the domain itself (`LocalProductRepository`/`LocalOrderRepository`
+   * are in-process only; THIS main process is the only thing that holds
+   * them, module-scope, for its own lifetime -- see the `commerceProductRepo`
+   * etc. state below). Constructors are typed as `new (...) => X` so
+   * `new modules.Commerce.LocalProductRepository(...)` produces a real,
+   * checked instance -- never `any`.
    */
   readonly Commerce: {
     readonly listViewableProducts: (
@@ -503,7 +517,129 @@ interface RootModules {
       actorPubkey?: string,
       grants?: readonly unknown[],
     ) => readonly FedosCommerceDemoProduct[];
+    readonly LocalProductRepository: new (
+      generateId?: () => string,
+      initialProducts?: readonly CommerceProductLike[],
+    ) => CommerceProductRepositoryLike;
+    readonly LocalOrderRepository: new () => CommerceOrderRepositoryLike;
+    readonly createOrder: (input: CommerceCreateOrderInputLike, actor: CommerceOrderActorLike, now: number) => CommerceOrderTransitionResultLike;
+    readonly applyOrderAction: (order: CommerceOrderLike, action: CommerceOrderActionLike, now: number) => CommerceOrderTransitionResultLike;
+    readonly DeterministicLocalPaymentProvider: new (options: { readonly acknowledgeTestOnly: true; readonly runtimeProfile?: string }) => CommerceLocalPaymentProviderLike;
+    readonly PaymentSettlementLedger: new () => CommercePaymentLedgerLike;
   };
+}
+
+/** Structural mirrors of the real `os/commerce` types (`Product`, `Order`, `PaymentEvidence`, ...) -- same discipline as `FedosCommerceDemoProduct` above: this file never `import type`s from `src/os/commerce/**` (only the compiled runtime, dynamically), so every shape it touches is re-declared here, structurally, once. */
+interface CommerceProductLike {
+  readonly id: string;
+  readonly kind: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly creatorPubkey: string;
+  readonly priceCents: number;
+  readonly currency: string;
+  readonly status: string;
+  readonly visibility: string;
+  readonly linkedSpaceIds: readonly string[];
+  readonly linkedEventIds: readonly string[];
+  readonly assetIds: readonly string[];
+  readonly stock?: number;
+}
+interface CommerceProductMutationResultLike {
+  readonly outcome: "ok" | "not-found" | "forbidden" | "invalid-input";
+  readonly product?: CommerceProductLike;
+  readonly reason?: string;
+}
+interface CommerceProductRepositoryLike {
+  create(actorPubkey: string, input: Record<string, unknown>): CommerceProductMutationResultLike;
+  update(actorPubkey: string, productId: string, patch: Record<string, unknown>): CommerceProductMutationResultLike;
+  publish(actorPubkey: string, productId: string): CommerceProductMutationResultLike;
+  unpublish(actorPubkey: string, productId: string): CommerceProductMutationResultLike;
+  get(id: string): CommerceProductLike | undefined;
+  list(): readonly CommerceProductLike[];
+  listOwnedByMerchant(actorPubkey: string): readonly CommerceProductLike[];
+  listPublished(): readonly CommerceProductLike[];
+}
+interface CommerceOrderActorLike {
+  readonly kind: "customer" | "merchant" | "payment_evidence" | "delivery_evidence";
+  readonly pubkey?: string;
+}
+interface CommerceOrderLike {
+  readonly id: string;
+  readonly productId: string;
+  readonly buyerPubkey: string;
+  readonly sellerPubkey: string;
+  readonly status: string;
+  readonly quantity: number;
+  readonly unitPriceCents: number;
+  readonly currency: string;
+  readonly paymentId?: string;
+  readonly deliveryId?: string;
+  readonly history: readonly { readonly from: string | null; readonly to: string; readonly at: number }[];
+  readonly [key: string]: unknown;
+}
+interface CommerceCreateOrderInputLike {
+  readonly id: string;
+  readonly productId: string;
+  readonly sellerPubkey: string;
+  readonly unitPriceCents: number;
+  readonly currency: string;
+  readonly quantity?: number;
+}
+interface CommerceOrderActionLike {
+  readonly type: string;
+  readonly actor: CommerceOrderActorLike;
+  readonly [key: string]: unknown;
+}
+interface CommerceOrderTransitionResultLike {
+  readonly outcome: "transitioned" | "rejected";
+  readonly order?: CommerceOrderLike;
+  readonly reason?: string;
+  readonly code?: string;
+}
+interface CommerceOrderRepositoryLike {
+  save(order: CommerceOrderLike): void;
+  findById(id: string): CommerceOrderLike | undefined;
+  list(): readonly CommerceOrderLike[];
+  listByBuyer(buyerPubkey: string): readonly CommerceOrderLike[];
+  listBySeller(sellerPubkey: string): readonly CommerceOrderLike[];
+}
+interface CommercePaymentEvidenceLike {
+  readonly paymentId: string;
+  readonly productId: string;
+  readonly orderId?: string;
+  readonly observedAt: number;
+  readonly status: string;
+  readonly reason?: string;
+  readonly verification?: { readonly source: string; readonly authoritative: boolean };
+}
+interface CommerceLocalPaymentProviderLike {
+  requestPayment(request: { readonly productId: string; readonly orderId?: string; readonly buyerPubkey?: string; readonly amountCents: number; readonly currency: string; readonly expiresAt?: number }): Promise<{
+    readonly allowed: boolean;
+    readonly status: string;
+    readonly reason: string;
+    readonly productId: string;
+    readonly orderId?: string;
+    readonly paymentId?: string;
+    readonly expiresAt?: number;
+  }>;
+  simulateSettlement(paymentId: string, outcome: "settled" | "failed" | "expired" | "refunded"): Promise<CommercePaymentEvidenceLike>;
+}
+interface CommerceSettlementStateLike {
+  readonly paymentId: string;
+  readonly orderId: string;
+  readonly productId: string;
+  readonly status: string;
+}
+interface CommerceSettlementApplyResultLike {
+  readonly state: CommerceSettlementStateLike;
+  readonly outcome: "transitioned" | "rejected" | "noop";
+  readonly reason?: string;
+}
+interface CommercePaymentLedgerLike {
+  bind(paymentId: string, orderId: string, productId: string, createdAt?: number): CommerceSettlementStateLike;
+  get(paymentId: string): CommerceSettlementStateLike | undefined;
+  apply(evidence: CommercePaymentEvidenceLike, expectedOrderId: string): CommerceSettlementApplyResultLike;
 }
 
 async function loadRootModules(): Promise<RootModules> {
@@ -567,10 +703,17 @@ async function loadRootModules(): Promise<RootModules> {
   // Commerce Reachable Catalog + Product Surface Phase 1 -- first-ever
   // production caller of `createCommerce()`'s barrel (`src/os/commerce/index.ts`,
   // newly added to `tsconfig.beta-runtime.json`'s include list this arc).
-  // Only `listViewableProducts` is taken from it -- see `RootModules.Commerce`'s
-  // own header for why nothing payment-shaped is imported.
+  // Commerce E2E Completion arc (coordinator integration gate) widens the
+  // set of names taken from the SAME already-whitelisted barrel -- no new
+  // tsconfig entry needed, `os/commerce/index.js` was already the include.
   const commerce = (await import(distUrl("os", "commerce", "index.js"))) as {
     listViewableProducts: RootModules["Commerce"]["listViewableProducts"];
+    LocalProductRepository: RootModules["Commerce"]["LocalProductRepository"];
+    LocalOrderRepository: RootModules["Commerce"]["LocalOrderRepository"];
+    createOrder: RootModules["Commerce"]["createOrder"];
+    applyOrderAction: RootModules["Commerce"]["applyOrderAction"];
+    DeterministicLocalPaymentProvider: RootModules["Commerce"]["DeterministicLocalPaymentProvider"];
+    PaymentSettlementLedger: RootModules["Commerce"]["PaymentSettlementLedger"];
   };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
@@ -591,7 +734,15 @@ async function loadRootModules(): Promise<RootModules> {
     fedosDesktopTrayMenuItems: trayTypes.fedosDesktopTrayMenuItems,
     WebSocketRelay: websocketRelay.WebSocketRelay,
     createNodeWebSocketRelaySocketFactory: websocketRelaySocketFactory.createNodeWebSocketRelaySocketFactory,
-    Commerce: { listViewableProducts: commerce.listViewableProducts },
+    Commerce: {
+      listViewableProducts: commerce.listViewableProducts,
+      LocalProductRepository: commerce.LocalProductRepository,
+      LocalOrderRepository: commerce.LocalOrderRepository,
+      createOrder: commerce.createOrder,
+      applyOrderAction: commerce.applyOrderAction,
+      DeterministicLocalPaymentProvider: commerce.DeterministicLocalPaymentProvider,
+      PaymentSettlementLedger: commerce.PaymentSettlementLedger,
+    },
   };
 }
 
@@ -615,6 +766,53 @@ let badgeAdapter: FedosElectronBadgeAdapter | null = null;
 let inFlight = false;
 let shutdownInitiated = false;
 let trayCreated = false;
+
+// ---------------------------------------------------------------------
+// Commerce E2E Completion arc — in-memory Commerce state for this Electron
+// process's lifetime only. NOT persisted across restarts (a durable
+// adapter is a future arc — same "0 storage dependency at this layer"
+// posture Phase 1 already established for the read-only catalog). Lazily
+// constructed on first use so Commerce stays reachable even before a
+// profile exists (unchanged Phase 1 property — see `commerceState()`
+// below), never gated on `requireBoundary()`/`requireShell()`.
+// ---------------------------------------------------------------------
+let commerceProductRepo: CommerceProductRepositoryLike | null = null;
+let commerceOrderRepo: CommerceOrderRepositoryLike | null = null;
+let commercePaymentProvider: CommerceLocalPaymentProviderLike | null = null;
+let commercePaymentLedger: CommercePaymentLedgerLike | null = null;
+
+/**
+ * Lazily constructs (once) and returns the process's Commerce state,
+ * seeding `commerceProductRepo` with the EXACT Phase 1 demo products
+ * (same ids/status — `LocalProductRepository`'s `initialProducts` seeds by
+ * `.id` directly, never through `create()`) so existing Phase 1 catalog
+ * behavior is unchanged, while making the catalog now backed by a real,
+ * mutable repository a Merchant can create/edit/publish/unpublish
+ * against. `commercePaymentProvider` is the LOUDLY-labeled TEST/LOCAL
+ * simulator (`acknowledgeTestOnly: true`) — never a real payment rail;
+ * see `RootModules.Commerce`'s own header.
+ */
+function commerceState(): {
+  readonly products: CommerceProductRepositoryLike;
+  readonly orders: CommerceOrderRepositoryLike;
+  readonly payments: CommerceLocalPaymentProviderLike;
+  readonly ledger: CommercePaymentLedgerLike;
+} {
+  const m = requireModules();
+  if (commerceProductRepo === null) {
+    commerceProductRepo = new m.Commerce.LocalProductRepository(undefined, FEDOS_COMMERCE_DEMO_PRODUCTS as unknown as CommerceProductLike[]);
+  }
+  if (commerceOrderRepo === null) {
+    commerceOrderRepo = new m.Commerce.LocalOrderRepository();
+  }
+  if (commercePaymentProvider === null) {
+    commercePaymentProvider = new m.Commerce.DeterministicLocalPaymentProvider({ acknowledgeTestOnly: true });
+  }
+  if (commercePaymentLedger === null) {
+    commercePaymentLedger = new m.Commerce.PaymentSettlementLedger();
+  }
+  return { products: commerceProductRepo, orders: commerceOrderRepo, payments: commercePaymentProvider, ledger: commercePaymentLedger };
+}
 
 function requireModules(): RootModules {
   if (modules === null) throw new Error("fedos-beta: root modules not loaded");
@@ -1533,17 +1731,34 @@ async function handleAppDeviceSyncStatus() {
 // "0 expected network contact" and "Commerce reachable even before a
 // profile exists" both cash out to structurally.
 //
-// Read-only. No `PaymentProvider` is constructed or reachable from either
-// handler -- see this file's own `RootModules.Commerce` field comment and
-// `docs/commerce/PRODUCT-SURFACE-AUDIT.md`'s Phase 1 regression guard.
+// Commerce E2E Completion arc (coordinator integration gate) widens the
+// catalog from the static `FEDOS_COMMERCE_DEMO_PRODUCTS` array to
+// `commerceState().products.listPublished()` -- a REAL, mutable
+// `LocalProductRepository` seeded with those exact same products (same
+// ids/status, see `commerceState()`'s own header), so Phase 1's 3 demo
+// products render byte-identically, while a Merchant's own
+// create->publish now ALSO appears here (`listPublished()` already
+// applies the same `listViewableProducts()` filter internally). Merchant
+// CRUD (`handleCommerceMerchant*` below) is the first `os/commerce`
+// surface this main process can actually MUTATE -- still zero network
+// contact, zero real payment reachable from any handler in this section.
 // ---------------------------------------------------------------------
 
-function commerceViewableDemoProducts(): readonly FedosCommerceDemoProduct[] {
-  return requireModules().Commerce.listViewableProducts(FEDOS_COMMERCE_DEMO_PRODUCTS, "", []);
+function commerceMerchantLabelFor(creatorPubkey: string): string {
+  return fedosCommerceDemoMerchantLabel(creatorPubkey);
+}
+
+function commerceProductMediaFor(productId: string): { readonly dataUri: string; readonly mimeType: string; readonly altText: string } | null {
+  // Scoping decision (Commerce E2E Completion arc): a newly Merchant-created
+  // product has no wired path to a real image yet (that needs the
+  // MediaStore/IPC surface -- Wave B's Agent I lane, not this pass). It
+  // renders the SAME safe missing-image fallback every un-imaged Phase 1
+  // demo product already renders -- never a fake/placeholder photo.
+  return FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA[productId] ?? null;
 }
 
 async function handleCommerceCatalogList() {
-  const products = commerceViewableDemoProducts();
+  const products = commerceState().products.listPublished();
   return {
     outcome: "ok",
     products: products.map((product) => ({
@@ -1551,9 +1766,9 @@ async function handleCommerceCatalogList() {
       title: product.title,
       priceCents: product.priceCents,
       currency: product.currency,
-      merchantLabel: fedosCommerceDemoMerchantLabel(product.creatorPubkey),
+      merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
       status: product.status,
-      hasImage: Object.prototype.hasOwnProperty.call(FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA, product.id),
+      hasImage: commerceProductMediaFor(product.id) !== null,
     })),
   };
 }
@@ -1561,9 +1776,9 @@ async function handleCommerceCatalogList() {
 async function handleCommerceProductDetail(payload: unknown) {
   const productId = (payload as { productId?: unknown } | null)?.productId;
   if (!isBoundedString(productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
-  const product = commerceViewableDemoProducts().find((candidate) => candidate.id === productId);
+  const product = commerceState().products.listPublished().find((candidate) => candidate.id === productId);
   if (product === undefined) return { outcome: "not-found", reason: "no such product" };
-  const media = FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA[product.id] ?? null;
+  const media = commerceProductMediaFor(product.id);
   return {
     outcome: "ok",
     product: {
@@ -1572,11 +1787,280 @@ async function handleCommerceProductDetail(payload: unknown) {
       description: product.description ?? "",
       priceCents: product.priceCents,
       currency: product.currency,
-      merchantLabel: fedosCommerceDemoMerchantLabel(product.creatorPubkey),
+      merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
       status: product.status,
       media: media === null ? null : { dataUri: media.dataUri, mimeType: media.mimeType, altText: media.altText },
     },
   };
+}
+
+// ---------------------------------------------------------------------
+// Merchant Product CRUD (Commerce E2E Completion arc).
+//
+// `actorPubkey` always travels explicitly with every call, never inferred
+// from "currently selected" state (Secure Runtime Alpha 8121-8200's own
+// established discipline for exactly this class of bug) -- the renderer's
+// demo "acting as" selector (see `fedos_electron_beta_renderer.ts`) is the
+// ONLY source of it, and `LocalProductRepository` re-derives+checks
+// `canEditProduct()` on every mutating call regardless of what the
+// renderer claims.
+// ---------------------------------------------------------------------
+
+function commerceProductDto(product: CommerceProductLike) {
+  return {
+    id: product.id,
+    title: product.title,
+    description: product.description ?? "",
+    priceCents: product.priceCents,
+    currency: product.currency,
+    status: product.status,
+    visibility: product.visibility,
+    creatorPubkey: product.creatorPubkey,
+    merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
+  };
+}
+
+async function handleCommerceMerchantProductsList(payload: unknown) {
+  const actorPubkey = (payload as { actorPubkey?: unknown } | null)?.actorPubkey;
+  if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  const products = commerceState().products.listOwnedByMerchant(actorPubkey);
+  return { outcome: "ok", products: products.map(commerceProductDto) };
+}
+
+async function handleCommerceProductCreate(payload: unknown) {
+  const body = payload as { actorPubkey?: unknown; title?: unknown; description?: unknown; priceCents?: unknown; currency?: unknown } | null;
+  if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (!isBoundedString(body.title, MAX_PRODUCT_TITLE_CHARS) || body.title.trim().length === 0) {
+    return { outcome: "invalid-input", reason: "malformed title" };
+  }
+  if (typeof body.priceCents !== "number" || !Number.isInteger(body.priceCents) || body.priceCents < 0) {
+    return { outcome: "invalid-input", reason: "priceCents must be a non-negative integer" };
+  }
+  if (!isBoundedString(body.currency, MAX_CURRENCY_CHARS) || body.currency.trim().length === 0) {
+    return { outcome: "invalid-input", reason: "malformed currency" };
+  }
+  const description = isBoundedString(body.description, MAX_PRODUCT_DESCRIPTION_CHARS) ? body.description : undefined;
+  const result = commerceState().products.create(body.actorPubkey, {
+    kind: "other",
+    title: body.title,
+    description,
+    priceCents: body.priceCents,
+    currency: body.currency,
+    visibility: "public",
+    linkedSpaceIds: [],
+    linkedEventIds: [],
+    assetIds: [],
+  });
+  if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
+  return { outcome: "ok", product: commerceProductDto(result.product) };
+}
+
+async function handleCommerceProductUpdate(payload: unknown) {
+  const body = payload as { actorPubkey?: unknown; productId?: unknown; title?: unknown; description?: unknown; priceCents?: unknown; currency?: unknown } | null;
+  if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+  const patch: Record<string, unknown> = {};
+  if (body.title !== undefined) {
+    if (!isBoundedString(body.title, MAX_PRODUCT_TITLE_CHARS)) return { outcome: "invalid-input", reason: "malformed title" };
+    patch.title = body.title;
+  }
+  if (body.description !== undefined) {
+    if (!isBoundedString(body.description, MAX_PRODUCT_DESCRIPTION_CHARS)) return { outcome: "invalid-input", reason: "malformed description" };
+    patch.description = body.description;
+  }
+  if (body.priceCents !== undefined) {
+    if (typeof body.priceCents !== "number" || !Number.isInteger(body.priceCents) || body.priceCents < 0) {
+      return { outcome: "invalid-input", reason: "priceCents must be a non-negative integer" };
+    }
+    patch.priceCents = body.priceCents;
+  }
+  if (body.currency !== undefined) {
+    if (!isBoundedString(body.currency, MAX_CURRENCY_CHARS)) return { outcome: "invalid-input", reason: "malformed currency" };
+    patch.currency = body.currency;
+  }
+  const result = commerceState().products.update(body.actorPubkey, body.productId, patch);
+  if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
+  return { outcome: "ok", product: commerceProductDto(result.product) };
+}
+
+async function handleCommerceProductPublish(payload: unknown, publish: boolean) {
+  const body = payload as { actorPubkey?: unknown; productId?: unknown } | null;
+  if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+  const repo = commerceState().products;
+  const result = publish ? repo.publish(body.actorPubkey, body.productId) : repo.unpublish(body.actorPubkey, body.productId);
+  if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
+  return { outcome: "ok", product: commerceProductDto(result.product) };
+}
+
+// ---------------------------------------------------------------------
+// Order + Payment (Commerce E2E Completion arc).
+//
+// CORE INVARIANT, enforced structurally, not by convention: the ONLY
+// caller anywhere in this file that constructs an
+// `{ kind: "payment_evidence" }` actor is `handleCommercePaymentSimulate`
+// below, and ONLY after `commercePaymentLedger.apply()` -- itself only
+// ever fed evidence this same process's OWN `DeterministicLocalPaymentProvider`
+// produced -- reports `outcome: "transitioned"`. No IPC handler anywhere
+// accepts an actor kind, or a raw "mark as paid" boolean, from the
+// renderer. See `order_state_machine.ts`'s own module doc for the
+// domain-level half of this guarantee (re-checks actor kind against an
+// allowlist independent of any caller-suppliable flag).
+// ---------------------------------------------------------------------
+
+function commerceOrderDto(order: CommerceOrderLike) {
+  return {
+    id: order.id,
+    productId: order.productId,
+    buyerPubkey: order.buyerPubkey,
+    sellerPubkey: order.sellerPubkey,
+    status: order.status,
+    quantity: order.quantity,
+    unitPriceCents: order.unitPriceCents,
+    currency: order.currency,
+    totalCents: order.unitPriceCents * order.quantity,
+    paymentId: order.paymentId ?? null,
+    deliveryId: order.deliveryId ?? null,
+  };
+}
+
+function generateCommerceOrderId(): string {
+  // Same convention as `generateFedosProductId()` (`product_id.ts`) --
+  // random 128-bit lower-hex -- but a composition-root-local generator
+  // rather than importing Agent O's file, matching `RootModules.Commerce`'s
+  // established "no `import type` from `src/os/commerce/**`" discipline for
+  // this file. `randomBytes` is Node's own built-in, already a transitive
+  // dependency of Electron's runtime -- no new package.
+  return nodeRandomBytes(16).toString("hex");
+}
+
+async function handleCommerceOrderCreate(payload: unknown) {
+  const body = payload as { buyerPubkey?: unknown; productId?: unknown; quantity?: unknown } | null;
+  if (!isBoundedString(body?.buyerPubkey, MAX_ID_LENGTH) || body.buyerPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed buyerPubkey" };
+  }
+  if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+  const quantity = body.quantity === undefined ? 1 : body.quantity;
+  if (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1) {
+    return { outcome: "invalid-input", reason: "quantity must be a positive integer" };
+  }
+  const product = commerceState().products.listPublished().find((candidate) => candidate.id === body.productId);
+  if (product === undefined) return { outcome: "not-found", reason: "no such published product" };
+
+  const m = requireModules();
+  const result = m.Commerce.createOrder(
+    { id: generateCommerceOrderId(), productId: product.id, sellerPubkey: product.creatorPubkey, unitPriceCents: product.priceCents, currency: product.currency, quantity },
+    { kind: "customer", pubkey: body.buyerPubkey },
+    Math.floor(Date.now() / 1000),
+  );
+  if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
+  commerceState().orders.save(result.order);
+  return { outcome: "ok", order: commerceOrderDto(result.order) };
+}
+
+/** Shared by submit/accept/reject/fulfill/cancel -- every action here is a bare customer/merchant claim (`actor.kind` is always `"customer"` or `"merchant"`, NEVER `"payment_evidence"`/`"delivery_evidence"`), so `order_state_machine.ts`'s own actor-kind allowlist rejects any attempt to reach `paid`/`delivered` through this path structurally, independent of this handler's own logic. */
+async function handleCommerceOrderAction(payload: unknown, actionType: "submit" | "accept" | "reject" | "cancel" | "fulfill", actorKind: "customer" | "merchant") {
+  const body = payload as { orderId?: unknown; actorPubkey?: unknown; reason?: unknown } | null;
+  if (!isBoundedString(body?.orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
+  if (!isBoundedString(body.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  const orders = commerceState().orders;
+  const order = orders.findById(body.orderId);
+  if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+
+  const action: Record<string, unknown> = { type: actionType, actor: { kind: actorKind, pubkey: body.actorPubkey } };
+  if (actionType === "reject" && body.reason !== undefined) {
+    if (!isBoundedString(body.reason, MAX_ORDER_REJECTION_REASON_CHARS)) return { outcome: "invalid-input", reason: "malformed reason" };
+    action.reason = body.reason;
+  }
+  const m = requireModules();
+  const result = m.Commerce.applyOrderAction(order, action as CommerceOrderActionLike, Math.floor(Date.now() / 1000));
+  if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
+  orders.save(result.order);
+  return { outcome: "ok", order: commerceOrderDto(result.order) };
+}
+
+async function handleCommerceOrdersListMine(payload: unknown) {
+  const actorPubkey = (payload as { actorPubkey?: unknown } | null)?.actorPubkey;
+  if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  return { outcome: "ok", orders: commerceState().orders.listByBuyer(actorPubkey).map(commerceOrderDto) };
+}
+
+async function handleCommerceOrdersListIncoming(payload: unknown) {
+  const actorPubkey = (payload as { actorPubkey?: unknown } | null)?.actorPubkey;
+  if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  return { outcome: "ok", orders: commerceState().orders.listBySeller(actorPubkey).map(commerceOrderDto) };
+}
+
+async function handleCommercePaymentRequest(payload: unknown) {
+  const orderId = (payload as { orderId?: unknown } | null)?.orderId;
+  if (!isBoundedString(orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
+  const state = commerceState();
+  const order = state.orders.findById(orderId);
+  if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+  if (order.status !== "accepted") return { outcome: "rejected", reason: `order must be "accepted" before a payment request can be made (currently "${order.status}")` };
+
+  const decision = await state.payments.requestPayment({
+    productId: order.productId,
+    orderId: order.id,
+    buyerPubkey: order.buyerPubkey,
+    amountCents: order.unitPriceCents * order.quantity,
+    currency: order.currency,
+  });
+  if (!decision.allowed || decision.paymentId === undefined) return { outcome: "rejected", reason: decision.reason };
+  state.ledger.bind(decision.paymentId, order.id, order.productId);
+  return { outcome: "ok", paymentId: decision.paymentId, amountCents: order.unitPriceCents * order.quantity, currency: order.currency, reason: decision.reason };
+}
+
+/**
+ * The ONLY place in this file that can move an Order to `"paid"`. Two
+ * independent authoritative-evidence checks stack here: (1) this process's
+ * own `DeterministicLocalPaymentProvider.simulateSettlement()` is the ONLY
+ * producer of the `PaymentEvidence` fed into `commercePaymentLedger.apply()`
+ * (never a renderer-supplied evidence object -- the renderer sends only
+ * `orderId`/`paymentId`, never a `verification`/`status` field, see
+ * `fedos_electron_beta_preload.cts`), and (2) `commercePaymentLedger.apply()`
+ * itself re-derives `PaymentEvidence.verification.source` against
+ * `payment/state_machine.ts`'s own allowlist before transitioning. Only
+ * once BOTH agree does this handler construct the
+ * `{ kind: "payment_evidence" }` order actor.
+ */
+async function handleCommercePaymentSimulate(payload: unknown) {
+  const body = payload as { orderId?: unknown; paymentId?: unknown } | null;
+  if (!isBoundedString(body?.orderId, MAX_ID_LENGTH) || !isBoundedString(body.paymentId, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed orderId/paymentId" };
+  }
+  const state = commerceState();
+  const order = state.orders.findById(body.orderId);
+  if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+
+  const evidence = await state.payments.simulateSettlement(body.paymentId, "settled");
+  const applied = state.ledger.apply(evidence, order.id);
+  if (applied.outcome !== "transitioned") return { outcome: "rejected", reason: applied.reason ?? `settlement ledger: ${applied.outcome}` };
+
+  const m = requireModules();
+  const paymentEvidenceAction: Record<string, unknown> = {
+    type: "confirm_payment",
+    actor: { kind: "payment_evidence" },
+    evidence: { orderId: order.id, paymentId: body.paymentId, status: "settled", observedAt: evidence.observedAt },
+  };
+  const result = m.Commerce.applyOrderAction(order, paymentEvidenceAction as CommerceOrderActionLike, Math.floor(Date.now() / 1000));
+  if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
+  state.orders.save(result.order);
+  return { outcome: "ok", order: commerceOrderDto(result.order) };
 }
 
 /**
@@ -1907,6 +2391,25 @@ function registerIpcHandlers(): void {
   // profile readiness (see the handlers' own header comment).
   ipcMain.handle("fedos-app:commerce-catalog-list", async () => handleCommerceCatalogList());
   ipcMain.handle("fedos-app:commerce-product-detail", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductDetail(payload));
+  // Commerce E2E Completion arc (coordinator integration gate) — Merchant
+  // Product CRUD + Order + local Payment simulator. Same bounded, named-
+  // channel, single-purpose-handler discipline as every other `fedos-app:*`
+  // registration in this function.
+  ipcMain.handle("fedos-app:commerce-merchant-products-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceMerchantProductsList(payload));
+  ipcMain.handle("fedos-app:commerce-product-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductCreate(payload));
+  ipcMain.handle("fedos-app:commerce-product-update", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductUpdate(payload));
+  ipcMain.handle("fedos-app:commerce-product-publish", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductPublish(payload, true));
+  ipcMain.handle("fedos-app:commerce-product-unpublish", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductPublish(payload, false));
+  ipcMain.handle("fedos-app:commerce-order-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderCreate(payload));
+  ipcMain.handle("fedos-app:commerce-order-submit", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "submit", "customer"));
+  ipcMain.handle("fedos-app:commerce-order-cancel", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "cancel", "customer"));
+  ipcMain.handle("fedos-app:commerce-order-accept", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "accept", "merchant"));
+  ipcMain.handle("fedos-app:commerce-order-reject", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "reject", "merchant"));
+  ipcMain.handle("fedos-app:commerce-order-fulfill", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "fulfill", "merchant"));
+  ipcMain.handle("fedos-app:commerce-orders-list-mine", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrdersListMine(payload));
+  ipcMain.handle("fedos-app:commerce-orders-list-incoming", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrdersListIncoming(payload));
+  ipcMain.handle("fedos-app:commerce-payment-request", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePaymentRequest(payload));
+  ipcMain.handle("fedos-app:commerce-payment-simulate", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePaymentSimulate(payload));
 }
 
 // ---------------------------------------------------------------------
