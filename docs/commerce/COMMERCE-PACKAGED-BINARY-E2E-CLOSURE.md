@@ -134,7 +134,19 @@ rather than guessing further.
 ## Evidence gathered (this arc, live, this session)
 
 - NSIS installer: `packages/fedos-desktop-electron-spike/dist-package-beta/FedOS-Desktop-Beta-Setup-0.1.0-beta.1.exe`
-  (not committed — `.gitignore`d build output; hash recorded below)
+  (not committed — `.gitignore`d build output).
+  Final build (including this arc's own `FEDOS_BETA_UI_STEP_LOG_FILE`/
+  checkpoint harness-evidence fix), built from commit `ab4354e9af773cea4507fcfccbe8773dc2edb366`
+  on `arc/fedos-commerce-final-closure-agent-x`:
+  - installer SHA-256: `d3fc0d98d7d39fe4aadcf7586ade56826c3153a5800a0293fc9afb2eb8032d49`
+  - `win-unpacked\FedOS Desktop Beta.exe` SHA-256: `788655e478f291f6ae128f8f633d231b47e0153e187bc18ffee8ab43555c004d`
+  - `Get-AuthenticodeSignature`: `NotSigned` (confirms the correction above)
+  Note: the evidence file linked below was captured against an EARLIER
+  build in this same session (before the checkpoint-logging addition),
+  built from the same HEAD content prior to that specific addition — its
+  hashes will not match the two above; both builds share the same proven
+  process-identity methodology, only the checkpoint instrumentation
+  differs.
 - Built from worktree HEAD commit (plus this arc's own harness-evidence
   commit) — see the final commit hash in this arc's own PR/commit history.
 - Real NSIS **silent, custom-directory** install (`/S /D=<isolated temp dir>`)
