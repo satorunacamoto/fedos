@@ -563,7 +563,14 @@ realSuite("FedOS Commerce End-to-End -- REAL electron-builder-packaged Beta bina
       if (liveProcessInfo !== null) {
         expect(liveProcessInfo.ParentProcessId, "the spawned packaged binary's OS-reported parent PID must be THIS test process").toBe(process.pid);
         if (liveProcessInfo.ExecutablePath !== null) {
-          expect(liveProcessInfo.ExecutablePath.toLowerCase()).toBe(launchExePath.toLowerCase());
+          // Path-separator normalization (coordinator, live-run finding):
+          // `launchExePath` is built with forward slashes in this file
+          // (e.g. the `win-unpacked` fallback branch joins with `/`), but
+          // Windows' own `Win32_Process.ExecutablePath` always reports
+          // native backslashes -- a real path is the SAME path regardless
+          // of separator style, so compare both sides normalized to `\`.
+          const normalizeWindowsPath = (p: string): string => p.toLowerCase().replace(/\//g, "\\");
+          expect(normalizeWindowsPath(liveProcessInfo.ExecutablePath)).toBe(normalizeWindowsPath(launchExePath));
           const liveHash = sha256OfFile(liveProcessInfo.ExecutablePath);
           record(`sha256 of the ACTUALLY-RUNNING executable (re-read from the live ExecutablePath while running): ${liveHash}`);
           expect(liveHash, "the actually-running executable's own bytes must match the pre-launch on-disk hash").toBe(launchExeSha256Before);

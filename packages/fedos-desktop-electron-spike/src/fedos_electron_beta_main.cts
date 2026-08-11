@@ -3551,7 +3551,18 @@ app.whenReady().then(async () => {
     console.log("fedos-beta: host started");
     logCheckpoint("host-started");
   } catch (err) {
-    console.error("fedos-beta: startup failed", err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("fedos-beta: startup failed", message);
+    // Commerce Durability arc (coordinator, live-run finding) -- the
+    // packaged binary MUST launch with `stdio: "ignore"` (Part 1 of
+    // `docs/commerce/COMMERCE-PACKAGED-BINARY-E2E-CLOSURE.md`), which
+    // silently discards this exact `console.error` on every real boot
+    // failure -- previously making a startup CRASH indistinguishable from
+    // a slow/hung app to any harness watching only for the
+    // `FEDOS_BETA_UI_STEP_LOG_FILE` checkpoint stream. Best-effort, never
+    // read/written on a real production launch (empty `UI_STEP_LOG_FILE`
+    // by default, same gating as `logCheckpoint()` itself).
+    logCheckpoint(`startup-failed:${message.slice(0, 200)}`);
     app.quit();
     return;
   }

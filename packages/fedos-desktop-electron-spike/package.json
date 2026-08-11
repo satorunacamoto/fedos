@@ -8,6 +8,11 @@
     "electron": "^43.1.1",
     "electron-builder": "^26.15.3"
   },
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "qrcode": "^1.5.4"
+  },
   "scripts": {
     "ensure-electron-binary": "node scripts/ensure_electron_binary.mjs",
     "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.test.json",

@@ -11,14 +11,13 @@
     "dist/fedos_electron_beta_renderer.js",
     "dist/fedos_electron_beta_page.html",
     "package.json",
+    "node_modules/**/*",
     "!**/*.map",
-    "!node_modules/**/*",
     "!src/**/*",
     "!test/**/*"
   ],
   "extraMetadata": {
     "main": "dist/fedos_electron_beta_main.cjs",
-    "dependencies": {},
     "scripts": {}
   },
   "extraFiles": [
