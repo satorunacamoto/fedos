@@ -155,6 +155,65 @@ const AUTOTEST_SECRET = process.env.FEDOS_BETA_AUTOTEST_SECRET ?? "";
  */
 const ACCEPTANCE_MODE_ENABLED = AUTOTEST_MODE === "acceptance";
 
+/**
+ * FedOS Commerce FINAL Closure (Agent X) — packaged-binary acceptance
+ * reachability fix. Root cause (reproduced live, not guessed): when this
+ * package's own `electron-builder`-packaged Windows executable (the
+ * renamed/resource-edited copy of `electron.exe` that `npm run
+ * package:beta`/NSIS install produce — NOT the raw `node_modules/electron`
+ * dev binary) is launched with its stdout/stderr handles redirected to
+ * ANY non-NUL target (an anonymous pipe, a real file, or an inherited
+ * console handle — all three reproduced), the process never completes
+ * Chromium's multi-process bootstrap (zero GPU/utility child processes
+ * ever spawn, confirmed via live process-tree inspection over 40s) and
+ * never calls back into this file's own code at all — so EVERY
+ * `console.log`-based signal (`FEDOS_ELECTRON_BETA_UI_STEP_JSON`, the
+ * `ui-script`/`acceptance` step markers) and even the disk-based
+ * screenshot writer are equally unreachable, matching exactly what the
+ * Commerce E2E Completion arc's own "known limitation" observed. Only
+ * `stdio: "ignore"` (true NUL, no redirection at all — confirmed live,
+ * matches a plain `Start-Process`/double-click launch) lets the packaged
+ * binary proceed normally. This is an environment/Chromium-sandbox
+ * interaction with inherited stdio handles, not a bug in this file's own
+ * logic — no `app.isPackaged` branch exists anywhere near this code, and
+ * the SAME `AUTOTEST_MODE=ui-script` loop below already works perfectly
+ * against the dev-launched binary under IDENTICAL pipe-redirected stdio.
+ * Since a harness driving the packaged binary MUST therefore use
+ * `stdio: "ignore"` (no stdout/stderr capture is possible), it needs a
+ * disk-based evidence channel that does not depend on being able to
+ * observe this process's own stdout at all — this env var opts into
+ * exactly that, additively, alongside (never replacing) the existing
+ * console marker every other caller (including the dev-launch test
+ * `commerce_e2e_full_happy_path_real_electron.test.ts`) already reads.
+ * Empty by default; a real production launch never sets it (confirmed:
+ * `scripts/run_electron_builder_package_beta.mjs`/`scripts/build_release.mjs`
+ * launch nothing and set no env vars at packaging time — this is read
+ * only at RUNTIME, by whoever spawns the already-built exe, exactly like
+ * every other `FEDOS_ELECTRON_BETA_*`/`FEDOS_BETA_*` test-only override
+ * in this file).
+ */
+const UI_STEP_LOG_FILE = process.env.FEDOS_BETA_UI_STEP_LOG_FILE ?? "";
+
+/**
+ * FedOS Commerce FINAL Closure (Agent X) — same disk-mirror idiom as
+ * `UI_STEP_LOG_FILE` above, for a handful of coarse LIFECYCLE checkpoints
+ * (never step-level detail) so a harness running under `stdio: "ignore"`
+ * (the only mode that reliably reaches the packaged binary at all — see
+ * `UI_STEP_LOG_FILE`'s own doc comment) can pinpoint WHICH phase a run is
+ * in without any console access. No-op unless `UI_STEP_LOG_FILE` is set;
+ * failures are swallowed (best-effort diagnostic only, never masks or
+ * replaces a real assertion).
+ */
+function logCheckpoint(label: string): void {
+  if (UI_STEP_LOG_FILE.length === 0) return;
+  try {
+    fs.mkdirSync(path.dirname(UI_STEP_LOG_FILE), { recursive: true });
+    fs.appendFileSync(UI_STEP_LOG_FILE, `FEDOS_ELECTRON_BETA_CHECKPOINT:${label}:${Date.now()}\n`);
+  } catch {
+    /* best-effort only */
+  }
+}
+
 const MAX_LABEL_CHARS = 128;
 const MAX_SECRET_BYTES = 1024;
 const MAX_ID_LENGTH = 512;
@@ -2753,6 +2812,7 @@ app.whenReady().then(async () => {
     registerIpcHandlers();
     mainWindow = createBetaWindow();
     console.log("fedos-beta: host started");
+    logCheckpoint("host-started");
   } catch (err) {
     console.error("fedos-beta: startup failed", err instanceof Error ? err.message : String(err));
     app.quit();
@@ -2887,13 +2947,24 @@ app.whenReady().then(async () => {
     // technique every Electron UI test harness (Spectron/Playwright) uses,
     // not a new capability exposed TO the page.
     void (async () => {
+      logCheckpoint("ui-script-iife-start");
       const window = mainWindow;
       if (window === null) {
+        logCheckpoint("ui-script-no-window");
         await performCleanShutdown();
         return;
       }
+      logCheckpoint(`ui-script-have-window-isLoadingMainFrame=${String(window.webContents.isLoadingMainFrame())}`);
       if (window.webContents.isLoadingMainFrame()) {
         await new Promise<void>((resolve) => window.webContents.once("did-finish-load", () => resolve()));
+      }
+      logCheckpoint("ui-script-page-loaded");
+      if (UI_STEP_LOG_FILE.length > 0) {
+        try {
+          fs.mkdirSync(path.dirname(UI_STEP_LOG_FILE), { recursive: true });
+        } catch (mkdirErr) {
+          console.error("fedos-beta: ui-script step log dir create failed", mkdirErr instanceof Error ? mkdirErr.message : String(mkdirErr));
+        }
       }
       try {
         const scriptRaw = process.env.FEDOS_BETA_UI_SCRIPT ?? "[]";
@@ -3004,7 +3075,18 @@ app.whenReady().then(async () => {
               `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; return { outcome: "ok", value: ${as === "value" ? "el.value" : "el.textContent"} }; })()`,
             );
           }
-          console.log(`FEDOS_ELECTRON_BETA_UI_STEP_JSON:${JSON.stringify({ index: i, action: step.action, selector, result })}`);
+          const stepLine = `FEDOS_ELECTRON_BETA_UI_STEP_JSON:${JSON.stringify({ index: i, action: step.action, selector, result })}`;
+          console.log(stepLine);
+          if (UI_STEP_LOG_FILE.length > 0) {
+            // See `UI_STEP_LOG_FILE`'s own doc comment above -- best-effort,
+            // additive disk mirror of the exact same line, never a second
+            // source of truth (same string, same content, same order).
+            try {
+              fs.appendFileSync(UI_STEP_LOG_FILE, stepLine + "\n");
+            } catch (fileErr) {
+              console.error("fedos-beta: ui-script step log file write failed", fileErr instanceof Error ? fileErr.message : String(fileErr));
+            }
+          }
         }
       } catch (err) {
         console.error("fedos-beta: ui-script error", err instanceof Error ? err.message : String(err));
