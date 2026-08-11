@@ -139,6 +139,8 @@ interface FedosCommerceProductDetail {
   readonly merchantLabel: string;
   readonly status: string;
   readonly media: FedosCommerceProductMedia | null;
+  /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- the seller's real pubkey, used by the renderer's Seller Reputation panel to call `commercePersonaBoardQuery`. */
+  readonly creatorPubkey: string;
 }
 
 interface FedosCommerceProductDetailResult {
@@ -233,6 +235,46 @@ interface FedosCommerceReceiptIssueResult {
   readonly verifyStatus?: string;
 }
 
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's
+ * read-only Persona Board view. Mirrors `PersonaBoardPublicView`/
+ * `PersonaBoardAuthorizedView` structurally (`src/os/commerce/reputation/disclosure_layers.ts`)
+ * -- this renderer only ever receives the `"PUBLIC"` layer (see
+ * `commercePersonaBoardQuery`'s own preload/main doc comments), so every
+ * field here is one that layer actually carries.
+ */
+interface FedosCommercePersonaBoardView {
+  readonly layer: string;
+  readonly epochId: string;
+  readonly verifiedTradeCountBucket?: string;
+  readonly primaryCategory?: string;
+  readonly attestationRefs: readonly string[];
+}
+
+interface FedosCommercePersonaBoardVerificationState {
+  readonly epochKnown: boolean;
+  readonly epochCurrentlyValid: boolean;
+  readonly totalStoredAttestations: number;
+  readonly validSignatureAttestations: number;
+  readonly rejectedSignatureAttestations: number;
+}
+
+interface FedosCommercePersonaBoardQueryResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly view?: FedosCommercePersonaBoardView;
+  readonly verificationState?: FedosCommercePersonaBoardVerificationState;
+}
+
+/** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's NetworkProfile Settings surface. Real exported literal names from `src/os/commerce/catalog/network_profile.ts`. */
+type FedosCommerceNetworkProfile = "local-only" | "direct" | "tor-optional";
+
+interface FedosCommerceNetworkProfileResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly profile?: FedosCommerceNetworkProfile;
+}
+
 interface FedosAppBridge {
   readonly conversationsList: () => Promise<FedosAppCommandResult>;
   readonly conversationOpen: (conversationId: string) => Promise<FedosAppCommandResult>;
@@ -302,6 +344,11 @@ interface FedosAppBridge {
   readonly commerceDeliveryAcknowledgeReceipt: (orderId: string, actorPubkey: string) => Promise<FedosCommerceDeliveryAcknowledgeResult>;
   readonly commerceOrderComplete: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>;
   readonly commerceReceiptIssue: (orderId: string) => Promise<FedosCommerceReceiptIssueResult>;
+  /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's read-only Persona Board query, always the "PUBLIC" disclosure layer. */
+  readonly commercePersonaBoardQuery: (subjectPubkey: string) => Promise<FedosCommercePersonaBoardQueryResult>;
+  /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface. */
+  readonly commerceNetworkProfileGet: () => Promise<FedosCommerceNetworkProfileResult>;
+  readonly commerceNetworkProfileSet: (profile: FedosCommerceNetworkProfile) => Promise<FedosCommerceNetworkProfileResult>;
 }
 
 interface Window {

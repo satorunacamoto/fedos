@@ -145,6 +145,27 @@ export type {
   MediaStorePutResult,
 } from "./catalog/media_store_port.js";
 
+// FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
+// pass) -- `IpfsMediaStore` (Agent M's own lane, plus the earlier Commerce
+// E2E Completion arc groundwork) is now genuinely composed by the Electron
+// composition root (`fedos_electron_beta_main.cts`'s own `commerceMediaStoreFor()`),
+// so it belongs in this barrel now, following this file's own established
+// "add barrels where safe" instruction. `WasmProductMediaEncryption`/
+// `WasmProductMediaDecryption` are barreled alongside it -- the composition
+// root needs both constructors to inject the app's real, shared
+// `FedosMasterSeedAuthority` instance (see those two files' own headers for
+// the fail-closed-until-injected discipline this barrel does not change).
+export { IpfsMediaStore, InMemoryIpfsTransport, type IpfsTransport } from "./catalog/ipfs_media_store.js";
+export { WasmProductMediaEncryption, type WasmProductMediaEncryptionDeps } from "./catalog/wasm_product_media_encryption.js";
+export { WasmProductMediaDecryption, type WasmProductMediaDecryptionDeps } from "./catalog/wasm_product_media_decryption.js";
+export {
+  UnavailableProductMediaEncryption,
+  contentAddressPublicMedia,
+  encryptThenContentAddressProtectedMedia,
+  type ProductMediaEncryptionPort,
+} from "./catalog/product_media_encryption.js";
+export { UnavailableProductMediaDecryption, type ProductMediaDecryptionPort } from "./catalog/product_media_decryption.js";
+
 export type {
   PaymentProvider,
   PaymentProviderStatus,

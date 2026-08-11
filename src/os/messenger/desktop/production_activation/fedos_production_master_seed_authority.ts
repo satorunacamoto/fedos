@@ -138,6 +138,40 @@ export class FedosProductionMasterSeedAuthority implements FedosMasterSeedAuthor
   }
 
   /**
+   * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
+   * pass) — the missing thin wrapper `resolveConversationKey()` above
+   * already establishes the pattern for: `resolve_commerce_media_key` is a
+   * real, tested, unconditional (not `#[cfg]`-gated) method on the SAME
+   * Rust `FedosMasterSeedAuthority` struct `#handle` already wraps
+   * (`packages/fedos-core-rust/src/lib.rs`'s own
+   * `resolve_commerce_media_key`, added by the Commerce E2E Completion
+   * arc), so exposing it here needs no new WASM export and no new
+   * cryptography — only this call-through, mirroring
+   * `encryptNip44Wire()`'s own exact optional-method discipline (the
+   * method is declared optional on `FedosMasterSeedAuthorityHandle`
+   * because `fedos_wasm_master_seed_authority.ts`'s dev-only loader gates
+   * it independently; this production authority never went through that
+   * dev-only gate to begin with — it reaches `#handle` directly, exactly
+   * like every other method on this class). Without this method, the
+   * REAL, already-activated production Master Seed Authority this app's
+   * Coordinator holds would have no `resolveCommerceMediaKey` at all, so
+   * `WasmProductMediaEncryption`/`WasmProductMediaDecryption`
+   * (`src/os/commerce/catalog/`) would keep failing closed to `null` even
+   * once genuinely injected with a real, unlocked authority — this is the
+   * one piece that makes that injection actually load-bearing.
+   */
+  async resolveCommerceMediaKey(): Promise<AeadKeyHandle | null> {
+    const h = this.#ensure();
+    if (!h || typeof h.resolve_commerce_media_key !== "function") return null;
+    try {
+      const value = h.resolve_commerce_media_key();
+      return (value ?? null) as AeadKeyHandle | null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Secure Runtime Alpha 6841-6920 — `FedosDirectRatchetSealingAuthority`.
    * Seals opaque `secretBytes` at rest under a key bound to the full
    * Direct Ratchet session-identity tuple, through the SAME `#handle`

@@ -216,6 +216,9 @@
           <p class="muted" id="commerce-detail-status"></p>
           <p id="commerce-detail-description"></p>
 
+          <h3>Seller Reputation</h3>
+          <p class="muted" id="commerce-detail-reputation-summary"></p>
+
           <div id="commerce-detail-order-form">
             <h3>Create Order</h3>
             <label for="commerce-order-quantity">Quantity</label>
@@ -465,6 +468,21 @@
 
           <p class="muted">Relay changes require a restart of this application to take effect. Nothing is applied until you press Save.</p>
           <button id="settings-save" type="button">Save settings</button>
+
+          <fieldset>
+            <legend>Commerce Nostr Publication (experimental)</legend>
+            <p class="warn">Optional. Publishing Commerce listings to Nostr makes them visible to relay operators and anyone else observing the relay. Local Only (the default) never reaches the network.</p>
+            <div id="commerce-network-profile-error" class="error" role="alert"></div>
+            <div id="commerce-network-profile-report" role="status" aria-live="polite" class="muted"></div>
+            <label for="commerce-network-profile-select">Network Profile</label>
+            <select id="commerce-network-profile-select">
+              <option value="local-only">Local Only — never publish to Nostr</option>
+              <option value="direct">Nostr Optional — direct connection</option>
+              <option value="tor-optional">Serverless Privacy — prefer Tor routing when available</option>
+            </select>
+            <p class="muted">This setting is not persisted across restarts in this Beta — it resets to Local Only every launch.</p>
+            <button id="commerce-network-profile-save" type="button">Save for this session</button>
+          </fieldset>
 
           <h3>Feedback</h3>
           <p class="muted">Please report bugs and feedback through whatever channel the maintainers of this pilot currently designate for that purpose — see this repository's own <code>SECURITY.md</code> for how to report a security issue specifically.</p>

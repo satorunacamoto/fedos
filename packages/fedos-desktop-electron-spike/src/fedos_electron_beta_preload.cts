@@ -255,6 +255,19 @@ const fedosApp: FedosAppBridge = Object.freeze({
   commerceOrderComplete: (orderId: string, actorPubkey: string) =>
     ipcRenderer.invoke("fedos-app:commerce-order-complete", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
   commerceReceiptIssue: (orderId: string) => ipcRenderer.invoke("fedos-app:commerce-receipt-issue", { orderId: boundedString(orderId, MAX_ID_CHARS) }),
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's
+  // read-only Persona Board query. Same bounded-string discipline as every
+  // method above; the renderer never selects a disclosure layer -- the
+  // main process always queries "PUBLIC" (see `handleCommercePersonaBoardQuery`).
+  commercePersonaBoardQuery: (subjectPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-persona-board-query", { subjectPubkey: boundedString(subjectPubkey, MAX_ID_CHARS) }),
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's
+  // minimal NetworkProfile Settings surface (view/select only -- no
+  // arbitrary string reaches main; `commerceNetworkProfileSet` sends only
+  // one of the three real `NetworkProfile` literal values).
+  commerceNetworkProfileGet: () => ipcRenderer.invoke("fedos-app:commerce-network-profile-get"),
+  commerceNetworkProfileSet: (profile: "local-only" | "direct" | "tor-optional") =>
+    ipcRenderer.invoke("fedos-app:commerce-network-profile-set", { profile }),
 });
 
 contextBridge.exposeInMainWorld("fedosProfile", fedosProfile);

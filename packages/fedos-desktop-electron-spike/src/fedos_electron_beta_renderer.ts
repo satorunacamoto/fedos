@@ -633,6 +633,7 @@ async function openCommerceProduct(productId: string): Promise<void> {
   byId("commerce-detail-merchant").textContent = "";
   byId("commerce-detail-status").textContent = "";
   byId("commerce-detail-description").textContent = "";
+  byId("commerce-detail-reputation-summary").textContent = "";
   const result = await window.fedosApp.commerceProductDetail(productId);
   if (result.outcome !== "ok" || result.product === undefined) {
     byId("commerce-detail-title").textContent = "Product";
@@ -654,6 +655,33 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
   const isCustomer = COMMERCE_DEMO_ACTORS.find((a) => a.pubkey === commerceActingAsPubkey)?.role === "customer";
   byId("commerce-detail-order-form").toggleAttribute("hidden", !isCustomer);
   byId("commerce-detail-order-unavailable-note").toggleAttribute("hidden", isCustomer);
+  void renderCommerceSellerReputation(product.creatorPubkey);
+}
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- minimal read-only
+ * Seller Reputation panel: pseudonymous persona id, coarse verified-trade
+ * bucket, coarse primary category, and verification state. Always queries
+ * the "PUBLIC" disclosure layer (the preload/main bridge never accepts a
+ * layer argument from this renderer -- see `commercePersonaBoardQuery`'s
+ * own doc comments). A pubkey with no reputation history yet (the common
+ * case for every demo product's first order) renders a plain, honest
+ * "no history yet" message -- never a fabricated zero/empty board.
+ */
+async function renderCommerceSellerReputation(creatorPubkey: string): Promise<void> {
+  const el = byId("commerce-detail-reputation-summary");
+  el.textContent = "Loading reputation…";
+  const result = await window.fedosApp.commercePersonaBoardQuery(creatorPubkey);
+  if (result.outcome !== "ok" || result.view === undefined) {
+    el.textContent = "No reputation history on record for this seller yet.";
+    return;
+  }
+  const view = result.view;
+  const bucket = view.verifiedTradeCountBucket ?? "unknown";
+  const category = view.primaryCategory ?? "no category on record";
+  const epochLabel = view.epochId.length > 12 ? `${view.epochId.slice(0, 12)}…` : view.epochId;
+  const validity = result.verificationState?.epochCurrentlyValid === true ? "currently valid" : "not currently valid";
+  el.textContent = `Persona ${epochLabel} — ${bucket} verified trades — mostly ${category} — persona epoch ${validity}. Reputation is pseudonymous, self-reported by trading counterparties, and not a guarantee of identity or Sybil resistance.`;
 }
 
 // ---------------------------------------------------------------------
@@ -1846,6 +1874,39 @@ async function refreshSettings(): Promise<void> {
   clearError("settings-error");
   byId("settings-report").textContent = "";
   await reloadSettingsData();
+  await refreshCommerceNetworkProfile();
+}
+
+// ---------------------------------------------------------------------
+// FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal
+// NetworkProfile Settings surface. Deliberately independent of
+// `SettingsDescriptor`/`onSettingsSave()` above -- this is in-memory,
+// per-process main-process state (see `commerceNetworkProfile`'s own doc
+// comment in `fedos_electron_beta_main.cts`), not part of the persisted
+// Settings file, so it gets its own small load/save pair rather than
+// folding into the existing Settings save flow.
+// ---------------------------------------------------------------------
+
+async function refreshCommerceNetworkProfile(): Promise<void> {
+  clearError("commerce-network-profile-error");
+  const result = await window.fedosApp.commerceNetworkProfileGet();
+  if (result.outcome !== "ok" || result.profile === undefined) {
+    showError("commerce-network-profile-error", result);
+    return;
+  }
+  byId<HTMLSelectElement>("commerce-network-profile-select").value = result.profile;
+}
+
+async function onCommerceNetworkProfileSave(): Promise<void> {
+  clearError("commerce-network-profile-error");
+  byId("commerce-network-profile-report").textContent = "";
+  const value = byId<HTMLSelectElement>("commerce-network-profile-select").value as FedosCommerceNetworkProfile;
+  const result = await window.fedosApp.commerceNetworkProfileSet(value);
+  if (result.outcome !== "ok") {
+    showError("commerce-network-profile-error", result);
+    return;
+  }
+  byId("commerce-network-profile-report").textContent = "Saved for this session. Resets to Local Only on the next launch.";
 }
 
 function onSettingsRelayAdd(): void {
@@ -2423,6 +2484,8 @@ byId<HTMLButtonElement>("device-pairing-complete-submit").addEventListener("clic
 // Settings.
 byId<HTMLButtonElement>("settings-relay-add").addEventListener("click", onSettingsRelayAdd);
 byId<HTMLButtonElement>("settings-save").addEventListener("click", () => void onSettingsSave());
+// FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface.
+byId<HTMLButtonElement>("commerce-network-profile-save").addEventListener("click", () => void onCommerceNetworkProfileSave());
 
 // Commerce E2E Completion arc -- populate BOTH "Acting as" selectors once,
 // unconditionally, at startup (never lazily only-on-first-visit). Fixes a

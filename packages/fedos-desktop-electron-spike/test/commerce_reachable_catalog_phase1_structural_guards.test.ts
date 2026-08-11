@@ -133,6 +133,12 @@ describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
       "commerce-delivery-acknowledge-receipt",
       "commerce-order-complete",
       "commerce-receipt-issue",
+      // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's
+      // read-only Persona Board query and Agent N's minimal NetworkProfile
+      // Settings surface, added by this arc's own central-integration pass.
+      "commerce-persona-board-query",
+      "commerce-network-profile-get",
+      "commerce-network-profile-set",
     ];
     expect(channelMatches.length).toBe(EXPECTED_CHANNELS.length);
     for (const channel of EXPECTED_CHANNELS) {

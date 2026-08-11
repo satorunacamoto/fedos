@@ -318,6 +318,31 @@ interface CoordinatorLike {
 }
 interface MasterSeedAuthorityLike {
   clear(): Promise<void>;
+  /**
+   * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
+   * pass) -- present (as a real, callable function) on the canonical
+   * production `FedosProductionMasterSeedAuthority` this Coordinator
+   * already activates (see that class's own Commerce FINAL Closure
+   * doc comment); OPTIONAL here purely because this structural "Like"
+   * interface is also satisfied by other, non-Commerce-aware callers
+   * elsewhere in this file's own type graph. Returns an opaque handle
+   * (never a raw key byte), or `null` on any failure -- fails closed,
+   * mirrors `FedosMasterSeedAuthority.resolveCommerceMediaKey`'s own
+   * contract exactly (`src/os/core/vault/wasm/fedos_master_seed_authority.ts`).
+   */
+  resolveCommerceMediaKey?(): Promise<unknown>;
+}
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- structural mirror
+ * of `FedosNostrSigningAuthority` (`src/os/messenger/adapters/nostr/protocol/sign/`),
+ * satisfied at runtime by the SAME `FedosProductionNostrSigningAuthority`
+ * instance `buildFreshCoordinator()` already constructs for Direct
+ * Ratchet/Conversation Transport -- never a second signer, never a second
+ * Master Seed reach.
+ */
+interface NostrSigningAuthorityLike {
+  signEvent(request: unknown): Promise<unknown>;
+  publicIdentityForAccount(accountIndex: number): Promise<{ readonly publicKeyHex: string } | null>;
 }
 type Activation =
   | { readonly outcome: "activated"; readonly masterSeedAuthority: MasterSeedAuthorityLike; readonly appId: string }
@@ -606,6 +631,77 @@ interface RootModules {
     readonly FedosTrustSigningKeypair: { readonly generate: () => { readonly publicKeyHex: string } };
     readonly createSingleIssuerFedosTrustPolicy: (options: { readonly issuerId: string; readonly keys: readonly { readonly keyId: string; readonly publicKeyHex: string }[] }) => unknown;
   };
+  /**
+   * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
+   * pass) -- Agent R's `os/commerce/reputation/index.ts` (its own scoped
+   * barrel, mirroring `./order/index.ts`'s convention -- NOT re-exported
+   * from the top-level `os/commerce/index.ts` barrel, since Reputation is
+   * additive/optional the same way Nostr publication is). Loaded exactly
+   * like `Commerce`/`Trust` above -- compiled `dist/`, dynamic `import()`.
+   */
+  readonly Reputation: {
+    readonly LocalPersonaEpochRegistry: new () => CommercePersonaEpochRegistryLike;
+    readonly LocalTradeCompletionAttestationStore: new () => CommerceTradeCompletionAttestationStoreLike;
+    readonly createPersonaEpoch: (
+      validFrom: number,
+      validUntil: number,
+      predecessorEpochId?: string,
+    ) => { readonly epoch: CommercePersonaEpochLike; readonly keypair: CommercePersonaEpochSigningKeypairLike };
+    readonly issueTradeCompletionAttestation: (
+      deps: { readonly orderRepository: CommerceOrderRepositoryLike; readonly store: CommerceTradeCompletionAttestationStoreLike },
+      request: Record<string, unknown>,
+      now: number,
+    ) => CommerceIssueTradeCompletionAttestationResultLike;
+    readonly queryPersonaBoardView: (
+      subjectEpochId: string,
+      layer: "PUBLIC" | "PSEUDONYMOUS_PROOF" | "AUTHORIZED",
+      registry: CommercePersonaEpochRegistryLike,
+      store: CommerceTradeCompletionAttestationStoreLike,
+      asOf: number,
+    ) => CommercePersonaBoardQueryResultLike | undefined;
+  };
+  /**
+   * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent M's real
+   * `WasmProductMediaEncryption`/`WasmProductMediaDecryption` adapters plus
+   * `IpfsMediaStore` itself, all now barreled from `os/commerce/index.ts`
+   * (see that file's own Commerce FINAL Closure header addition).
+   */
+  readonly Media: {
+    readonly IpfsMediaStore: new (
+      transport: unknown,
+      maxPayloadByteLength: number,
+      supportedContentTypes: readonly string[],
+      encryption?: unknown,
+      networkProfile?: string,
+      now?: () => number,
+      decryption?: unknown,
+    ) => CommerceMediaStoreLike;
+    readonly InMemoryIpfsTransport: new (options?: { readonly simulateOffline?: boolean }) => unknown;
+    readonly WasmProductMediaEncryption: new (authority?: unknown) => unknown;
+    readonly WasmProductMediaDecryption: new (authority?: unknown) => unknown;
+  };
+  /**
+   * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's
+   * outbound Port + real Nostr adapter transport, and the inbound
+   * read-model + real verifying bridge. NOT part of `os/commerce/index.ts`'s
+   * public barrel (that file's own header explicitly leaves this decision
+   * to the coordinator's own composition-root wiring) -- loaded here via
+   * explicit `tsconfig.beta-runtime.json` entries for the four files this
+   * needs, the same "explicit whitelist, one entry per reachable file"
+   * discipline that file already documents for every other module in this
+   * function.
+   */
+  readonly CommerceNostr: {
+    readonly CommerceNostrEventPortImpl: new (transport: CommerceNostrTransportLike, networkProfile?: string) => CommerceNostrEventPortLike;
+    readonly RealCommerceNostrEventTransport: new (options: {
+      readonly signingAuthority: unknown;
+      readonly relayPublisher: unknown;
+      readonly accountIndex: number;
+    }) => CommerceNostrTransportLike;
+    readonly CommerceNostrProductReadModel: new () => CommerceNostrReadModelLike;
+    readonly verifyAndBuildInboundCommerceNostrEnvelope: (event: unknown, options?: unknown) => Promise<unknown>;
+    readonly WebSocketRelayPublisher: new (url: string, options: { readonly factory: (url: string) => Promise<unknown> }) => unknown;
+  };
 }
 
 /** Structural mirrors of the real `os/commerce` types (`Product`, `Order`, `PaymentEvidence`, ...) -- same discipline as `FedosCommerceDemoProduct` above: this file never `import type`s from `src/os/commerce/**` (only the compiled runtime, dynamically), so every shape it touches is re-declared here, structurally, once. */
@@ -757,6 +853,83 @@ interface CommerceDeliveryRepositoryLike {
   findByOrderId(orderId: string): CommerceDeliveryRecordLike | undefined;
 }
 
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
+ * pass) -- structural mirrors of `os/commerce/reputation/`'s real shapes,
+ * same "never `import type` from `src/os/commerce/**`" discipline as every
+ * other `*Like` interface in this file.
+ */
+interface CommercePersonaEpochLike {
+  readonly epochId: string;
+  readonly epochKeyPublicHex: string;
+  readonly validFrom: number;
+  readonly validUntil: number;
+  readonly predecessorEpochId?: string;
+}
+interface CommercePersonaEpochSigningKeypairLike {
+  readonly publicKeyHex: string;
+}
+interface CommercePersonaEpochRegistryLike {
+  register(epoch: CommercePersonaEpochLike): void;
+  findById(epochId: string): CommercePersonaEpochLike | undefined;
+  isCurrentlyValid(epochId: string, atTimeUnixSeconds: number): boolean;
+}
+interface CommerceTradeCompletionAttestationStoreLike {
+  hasAttestedOrder(orderId: string, attestorRealPubkey: string): boolean;
+  findBySubjectEpochId(subjectEpochId: string): readonly unknown[];
+}
+interface CommerceIssueTradeCompletionAttestationResultLike {
+  readonly ok: boolean;
+  readonly code?: string;
+  readonly reason?: string;
+}
+interface CommercePersonaBoardViewLike {
+  readonly layer: string;
+  readonly epochId: string;
+  readonly epochKeyPublicHex?: string;
+  readonly verifiedTradeCountBucket?: string;
+  readonly verifiedTradeCount?: number;
+  readonly primaryCategory?: string;
+  readonly attestationRefs: readonly string[];
+}
+interface CommercePersonaBoardQueryResultLike {
+  readonly view: CommercePersonaBoardViewLike;
+  readonly verificationState: {
+    readonly epochKnown: boolean;
+    readonly epochCurrentlyValid: boolean;
+    readonly totalStoredAttestations: number;
+    readonly validSignatureAttestations: number;
+    readonly rejectedSignatureAttestations: number;
+  };
+}
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- structural mirror
+ * of `IpfsMediaStore`'s own public surface. This main process only ever
+ * constructs and holds an instance (proving Agent M's real Master Seed
+ * Authority injection makes it genuinely live) -- no IPC channel calls any
+ * method on it this pass, so only the shape needed to construct/introspect
+ * it is declared.
+ */
+interface CommerceMediaStoreLike {
+  readonly [key: string]: unknown;
+}
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- structural mirrors
+ * of `os/commerce/events/`'s real shapes.
+ */
+interface CommerceNostrTransportLike {
+  send(draft: unknown): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+}
+interface CommerceNostrEventPortLike {
+  publish(draft: unknown): Promise<{ readonly outcome: string; readonly reason: string; readonly eventId?: string }>;
+}
+interface CommerceNostrReadModelLike {
+  ingest(envelope: unknown): { readonly outcome: string; readonly reason: string; readonly productId?: string };
+  getProduct(productId: string): unknown;
+}
+
 async function loadRootModules(): Promise<RootModules> {
   const attestation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
     createElectronMainHostAttestation: RootModules["createElectronMainHostAttestation"];
@@ -845,6 +1018,51 @@ async function loadRootModules(): Promise<RootModules> {
     FedosTrustSigningKeypair: RootModules["Trust"]["FedosTrustSigningKeypair"];
     createSingleIssuerFedosTrustPolicy: RootModules["Trust"]["createSingleIssuerFedosTrustPolicy"];
   };
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's own
+  // scoped reputation barrel (`os/commerce/reputation/index.js`), loaded
+  // exactly like `Commerce`/`Trust` above.
+  const reputation = (await import(distUrl("os", "commerce", "reputation", "index.js"))) as {
+    LocalPersonaEpochRegistry: RootModules["Reputation"]["LocalPersonaEpochRegistry"];
+    LocalTradeCompletionAttestationStore: RootModules["Reputation"]["LocalTradeCompletionAttestationStore"];
+    createPersonaEpoch: RootModules["Reputation"]["createPersonaEpoch"];
+    issueTradeCompletionAttestation: RootModules["Reputation"]["issueTradeCompletionAttestation"];
+    queryPersonaBoardView: RootModules["Reputation"]["queryPersonaBoardView"];
+  };
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent M's real
+  // media adapters, now barreled from `os/commerce/index.js` (the SAME
+  // already-whitelisted `Commerce` barrel loaded above) -- no new tsconfig
+  // entry needed for these three.
+  const commerceMedia = (await import(distUrl("os", "commerce", "index.js"))) as {
+    IpfsMediaStore: RootModules["Media"]["IpfsMediaStore"];
+    InMemoryIpfsTransport: RootModules["Media"]["InMemoryIpfsTransport"];
+    WasmProductMediaEncryption: RootModules["Media"]["WasmProductMediaEncryption"];
+    WasmProductMediaDecryption: RootModules["Media"]["WasmProductMediaDecryption"];
+  };
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's
+  // outbound Port + real Nostr adapter transport (two explicit
+  // `tsconfig.beta-runtime.json` entries) and the inbound read-model + real
+  // verifying bridge (two more) -- see `RootModules["CommerceNostr"]`'s own
+  // doc comment for why these are not part of the public `os/commerce`
+  // barrel.
+  const commerceNostrOutbound = (await import(distUrl("os", "commerce", "events", "commerce_nostr_event_port.js"))) as {
+    CommerceNostrEventPortImpl: RootModules["CommerceNostr"]["CommerceNostrEventPortImpl"];
+  };
+  const commerceNostrTransportBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_event_bridge.js")
+  )) as {
+    RealCommerceNostrEventTransport: RootModules["CommerceNostr"]["RealCommerceNostrEventTransport"];
+  };
+  const commerceNostrReadModel = (await import(distUrl("os", "commerce", "events", "commerce_nostr_event_read_model.js"))) as {
+    CommerceNostrProductReadModel: RootModules["CommerceNostr"]["CommerceNostrProductReadModel"];
+  };
+  const commerceNostrInboundBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_inbound_event_bridge.js")
+  )) as {
+    verifyAndBuildInboundCommerceNostrEnvelope: RootModules["CommerceNostr"]["verifyAndBuildInboundCommerceNostrEnvelope"];
+  };
+  const commerceNostrRelayPublisher = (await import(distUrl("os", "messenger", "adapters", "nostr", "protocol", "publish.js"))) as {
+    WebSocketRelayPublisher: RootModules["CommerceNostr"]["WebSocketRelayPublisher"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
@@ -884,6 +1102,26 @@ async function loadRootModules(): Promise<RootModules> {
       FedosTrustSigningKeypair: trust.FedosTrustSigningKeypair,
       createSingleIssuerFedosTrustPolicy: trust.createSingleIssuerFedosTrustPolicy,
     },
+    Reputation: {
+      LocalPersonaEpochRegistry: reputation.LocalPersonaEpochRegistry,
+      LocalTradeCompletionAttestationStore: reputation.LocalTradeCompletionAttestationStore,
+      createPersonaEpoch: reputation.createPersonaEpoch,
+      issueTradeCompletionAttestation: reputation.issueTradeCompletionAttestation,
+      queryPersonaBoardView: reputation.queryPersonaBoardView,
+    },
+    Media: {
+      IpfsMediaStore: commerceMedia.IpfsMediaStore,
+      InMemoryIpfsTransport: commerceMedia.InMemoryIpfsTransport,
+      WasmProductMediaEncryption: commerceMedia.WasmProductMediaEncryption,
+      WasmProductMediaDecryption: commerceMedia.WasmProductMediaDecryption,
+    },
+    CommerceNostr: {
+      CommerceNostrEventPortImpl: commerceNostrOutbound.CommerceNostrEventPortImpl,
+      RealCommerceNostrEventTransport: commerceNostrTransportBridge.RealCommerceNostrEventTransport,
+      CommerceNostrProductReadModel: commerceNostrReadModel.CommerceNostrProductReadModel,
+      verifyAndBuildInboundCommerceNostrEnvelope: commerceNostrInboundBridge.verifyAndBuildInboundCommerceNostrEnvelope,
+      WebSocketRelayPublisher: commerceNostrRelayPublisher.WebSocketRelayPublisher,
+    },
   };
 }
 
@@ -901,6 +1139,19 @@ let activeAssembly: AssemblyLike | null = null;
 let activeViewerParticipant: ParticipantRefLike | null = null;
 /** Secure Runtime Alpha 8121-8200 — the real, currently-configured Relay instances this Runtime's own Coordinator constructed (`secureRuntimeBundleConfig()`, unmodified), kept here ONLY so the ordinary UI can honestly report per-Relay connectivity (Phase K "show offline/retry state") — never a second Relay set, never a new connection, just a read-only reference to what already exists. Empty until a real relay is configured and a profile is unlocked. */
 let activeRelays: readonly RelayLike[] = [];
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
+ * pass) -- the SAME real, process-lifetime `FedosMasterSeedAuthority`
+ * instance `buildFreshCoordinator()` already constructs and hands to this
+ * Coordinator's own Runtime, retained here (set/cleared alongside
+ * `activeCoordinator` at the exact same points) so `commerceMediaStoreFor()`
+ * below can inject it into `WasmProductMediaEncryption`/
+ * `WasmProductMediaDecryption` -- never a second, separately-generated,
+ * unauthenticated Master Seed Authority instance for Commerce media.
+ */
+let activeMasterSeedAuthority: MasterSeedAuthorityLike | null = null;
+/** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- the SAME real Nostr signing authority `buildFreshCoordinator()` already constructs (see `NostrSigningAuthorityLike`'s own doc comment), retained for `commerceNostrOutboundPortFor()` below. */
+let activeNostrSigningAuthority: NostrSigningAuthorityLike | null = null;
 const notificationAdapter = new FedosElectronNotificationAdapter();
 const trayAdapter = new FedosElectronTrayAdapter();
 let badgeAdapter: FedosElectronBadgeAdapter | null = null;
@@ -991,6 +1242,262 @@ function commerceReceiptSigningState(): { readonly issuerId: string; readonly ke
   return { issuerId: COMMERCE_RECEIPT_ISSUER_ID, keypair: commerceReceiptKeypair, policy: commerceReceiptPolicy };
 }
 
+// ---------------------------------------------------------------------
+// FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Reputation /
+// Persona Epoch composition (Agent R's central-integration TODOs).
+//
+// Same lazy, process-lifetime, in-memory singleton pattern as
+// `commerceState()` above -- a real `LocalPersonaEpochRegistry` +
+// `LocalTradeCompletionAttestationStore`, constructed once, never
+// persisted across restarts (same posture as every other Commerce
+// repository this file already owns).
+//
+// PSEUDONYM MAPPING: `os/commerce/reputation`'s own domain layer
+// deliberately holds no mapping from a real pubkey to a `PersonaEpoch`
+// (`persona_epoch_registry.ts`'s own header) -- that binding is this
+// coordinator's job. `commercePersonaEpochByPubkey` below is that mapping,
+// scoped to this demo/pilot build: ONE persona epoch is lazily minted per
+// real pubkey the first time it is needed (either by an order completing,
+// or by an explicit Persona Board query for a pubkey that already has
+// one), never re-derived from key material -- exactly the "free to
+// generate, no Sybil resistance" property `attestation_types.ts`'s own
+// header documents and warns a UI must never contradict.
+// ---------------------------------------------------------------------
+
+let commercePersonaEpochRegistry: CommercePersonaEpochRegistryLike | null = null;
+let commerceAttestationStore: CommerceTradeCompletionAttestationStoreLike | null = null;
+/** real pubkey -> that pubkey's own lazily-minted Persona Epoch + signing keypair. */
+const commercePersonaEpochByPubkey = new Map<
+  string,
+  { readonly epoch: CommercePersonaEpochLike; readonly keypair: CommercePersonaEpochSigningKeypairLike }
+>();
+/** A Persona Epoch's validity window -- one year, chosen as a reasonable pilot-scale default; not itself a Reputation domain-layer decision (see `persona_epoch.ts`'s own validity-window shape, which takes any caller-supplied window). */
+const COMMERCE_PERSONA_EPOCH_VALIDITY_SECONDS = 60 * 60 * 24 * 365;
+
+function commerceReputationState(): { readonly registry: CommercePersonaEpochRegistryLike; readonly store: CommerceTradeCompletionAttestationStoreLike } {
+  const m = requireModules();
+  if (commercePersonaEpochRegistry === null) {
+    commercePersonaEpochRegistry = new m.Reputation.LocalPersonaEpochRegistry();
+  }
+  if (commerceAttestationStore === null) {
+    commerceAttestationStore = new m.Reputation.LocalTradeCompletionAttestationStore();
+  }
+  return { registry: commercePersonaEpochRegistry, store: commerceAttestationStore };
+}
+
+/**
+ * Looks up (or, when `createIfAbsent`, lazily mints and registers) the
+ * Persona Epoch standing in for `realPubkey`. Returns `undefined` when
+ * absent and `createIfAbsent` is `false` -- the read-only Persona Board
+ * query path (`handleCommercePersonaBoardQuery`) never fabricates a
+ * "no history yet" epoch just because someone asked about it; only a real
+ * completed order (`issueReputationAttestationsForCompletedOrderNonFatal`)
+ * mints one.
+ */
+function commercePersonaEpochForPubkey(
+  realPubkey: string,
+  createIfAbsent: boolean,
+): { readonly epoch: CommercePersonaEpochLike; readonly keypair: CommercePersonaEpochSigningKeypairLike } | undefined {
+  const existing = commercePersonaEpochByPubkey.get(realPubkey);
+  if (existing !== undefined) return existing;
+  if (!createIfAbsent) return undefined;
+  const m = requireModules();
+  const now = Math.floor(Date.now() / 1000);
+  const created = m.Reputation.createPersonaEpoch(now, now + COMMERCE_PERSONA_EPOCH_VALIDITY_SECONDS);
+  commerceReputationState().registry.register(created.epoch);
+  const entry = { epoch: created.epoch, keypair: created.keypair };
+  commercePersonaEpochByPubkey.set(realPubkey, entry);
+  return entry;
+}
+
+/** Coarse, non-authoritative mapping from a Product's own `kind` to a `TradeCompletionCategory` -- a coordinator-level display/bucketing decision, not a Reputation domain-layer rule (that domain never models `Product.kind` at all, by design -- see `attestation_types.ts`'s header on why the category label is deliberately coarser than a real product kind). */
+function commerceReputationCategoryForProductKind(kind: string): "digital_good" | "physical_good" | "service" | "other" {
+  switch (kind) {
+    case "pdf":
+    case "zip":
+    case "template":
+    case "software":
+    case "link":
+      return "digital_good";
+    default:
+      return "other";
+  }
+}
+
+/**
+ * Issues REAL, signed `TradeCompletionAttestation`s for BOTH parties of a
+ * just-completed order (buyer attests seller, seller attests buyer) --
+ * Agent R's own "wire attestation issuance into the real order-completion
+ * path" TODO. NON-FATAL / BEST-EFFORT relative to the underlying Commerce
+ * transaction: this function is `async` but the ENTIRE body is one
+ * `try`/`catch` that never rethrows and never returns anything the caller
+ * must check -- a rejected/failed attestation (e.g. a duplicate reissue
+ * after a retried IPC call) never blocks, rolls back, or corrupts the
+ * Order/Payment/Delivery state that already committed before this is
+ * called. See `handleCommerceOrderComplete()`'s own call site.
+ */
+async function issueReputationAttestationsForCompletedOrderNonFatal(order: CommerceOrderLike, now: number): Promise<void> {
+  try {
+    const m = requireModules();
+    const state = commerceState();
+    const { store } = commerceReputationState();
+    const buyer = commercePersonaEpochForPubkey(order.buyerPubkey, true);
+    const seller = commercePersonaEpochForPubkey(order.sellerPubkey, true);
+    if (buyer === undefined || seller === undefined) return;
+    const product = state.products.get(order.productId);
+    const category = commerceReputationCategoryForProductKind(product?.kind ?? "other");
+    const deps = { orderRepository: state.orders, store };
+    m.Reputation.issueTradeCompletionAttestation(
+      deps,
+      {
+        orderId: order.id,
+        attestorRole: "buyer",
+        attestorRealPubkey: order.buyerPubkey,
+        attestorEpoch: buyer.epoch,
+        attestorSigningKeypair: buyer.keypair,
+        subjectEpoch: seller.epoch,
+        category,
+        outcome: "completed_as_agreed",
+      },
+      now,
+    );
+    m.Reputation.issueTradeCompletionAttestation(
+      deps,
+      {
+        orderId: order.id,
+        attestorRole: "seller",
+        attestorRealPubkey: order.sellerPubkey,
+        attestorEpoch: seller.epoch,
+        attestorSigningKeypair: seller.keypair,
+        subjectEpoch: buyer.epoch,
+        category,
+        outcome: "completed_as_agreed",
+      },
+      now,
+    );
+  } catch (err) {
+    console.error("fedos-beta: reputation attestation issuance failed (non-fatal, Commerce completion unaffected):", err);
+  }
+}
+
+// ---------------------------------------------------------------------
+// FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Protected media
+// composition (Agent M's central-integration TODOs).
+//
+// `commerceMediaStoreFor()` constructs (and, if the shared Master Seed
+// Authority reference changes -- i.e. a lock/unlock cycle -- reconstructs)
+// ONE `IpfsMediaStore` whose `WasmProductMediaEncryption`/
+// `WasmProductMediaDecryption` are injected with the app's REAL, shared
+// `activeMasterSeedAuthority` (never a fresh, separately-constructed,
+// always-unauthenticated one). No IPC channel calls into this store this
+// pass (see this arc's own coordinator report) -- constructing it here
+// proves the wiring is genuinely live; a real product-media upload/
+// download surface remains a labeled follow-up.
+// ---------------------------------------------------------------------
+
+let commerceMediaStore: CommerceMediaStoreLike | null = null;
+/** The `activeMasterSeedAuthority` reference the current `commerceMediaStore` was built with -- reconstructed whenever this changes (e.g. `null` -> real on unlock, or real -> `null` on lock), so the store is never permanently stuck on a stale/absent authority just because Commerce was first touched before a profile was unlocked. */
+let commerceMediaStoreAuthorityRef: MasterSeedAuthorityLike | null = null;
+const COMMERCE_MEDIA_MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
+const COMMERCE_MEDIA_SUPPORTED_CONTENT_TYPES: readonly string[] = ["image/png", "image/jpeg", "application/pdf", "application/zip"];
+
+function commerceMediaStoreFor(): CommerceMediaStoreLike {
+  const m = requireModules();
+  if (commerceMediaStore === null || commerceMediaStoreAuthorityRef !== activeMasterSeedAuthority) {
+    const transport = new m.Media.InMemoryIpfsTransport();
+    const encryption = new m.Media.WasmProductMediaEncryption(activeMasterSeedAuthority ?? undefined);
+    const decryption = new m.Media.WasmProductMediaDecryption(activeMasterSeedAuthority ?? undefined);
+    commerceMediaStore = new m.Media.IpfsMediaStore(
+      transport,
+      COMMERCE_MEDIA_MAX_PAYLOAD_BYTES,
+      COMMERCE_MEDIA_SUPPORTED_CONTENT_TYPES,
+      encryption,
+      "local-only",
+      Date.now,
+      decryption,
+    );
+    commerceMediaStoreAuthorityRef = activeMasterSeedAuthority;
+  }
+  return commerceMediaStore;
+}
+
+// ---------------------------------------------------------------------
+// FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Nostr Commerce
+// publication composition (Agent N's central-integration TODOs).
+//
+// `commerceNetworkProfile` defaults to `"local-only"` (LOCAL_ONLY) --
+// Nostr publication stays unreachable (`evaluateNetworkAccess()` inside
+// `CommerceNostrEventPortImpl.publish()` refuses it unconditionally) until
+// a user EXPLICITLY changes this via the new Settings surface below. This
+// is in-memory, per-process state, NOT persisted to the Settings file --
+// a deliberate, minimal scoping decision for this pass (see this arc's own
+// coordinator report); it resets to the safe default on every relaunch.
+// ---------------------------------------------------------------------
+
+type CommerceNetworkProfileValue = "local-only" | "direct" | "tor-optional";
+const COMMERCE_NETWORK_PROFILE_VALUES: readonly CommerceNetworkProfileValue[] = ["local-only", "direct", "tor-optional"];
+let commerceNetworkProfile: CommerceNetworkProfileValue = "local-only";
+const COMMERCE_NOSTR_ACCOUNT_INDEX = 0;
+
+let commerceNostrOutboundPort: CommerceNostrEventPortLike | null = null;
+let commerceNostrOutboundPortProfileRef: CommerceNetworkProfileValue | null = null;
+let commerceNostrOutboundPortSignerRef: NostrSigningAuthorityLike | null = null;
+let commerceNostrReadModelSingleton: CommerceNostrReadModelLike | null = null;
+
+/**
+ * Lazily constructs (and rebuilds on a profile/signer change) the ONE real
+ * outbound `CommerceNostrEventPort` this process holds. When a real,
+ * unlocked Nostr signing authority and at least one configured Relay both
+ * exist, this is a genuine `RealCommerceNostrEventTransport` (real
+ * signing + real relay publish); otherwise it falls back to a transport
+ * whose `send()` always reports `accepted: false` WITHOUT ever reaching a
+ * network call or a signing call -- either way, `CommerceNostrEventPortImpl`
+ * itself still gates every `publish()` on `commerceNetworkProfile` FIRST
+ * (see that class's own header), so `"local-only"` (the default) refuses
+ * publication before the transport is ever reached, regardless of which
+ * transport this resolves to.
+ */
+function commerceNostrOutboundPortFor(): CommerceNostrEventPortLike {
+  const m = requireModules();
+  if (
+    commerceNostrOutboundPort === null ||
+    commerceNostrOutboundPortProfileRef !== commerceNetworkProfile ||
+    commerceNostrOutboundPortSignerRef !== activeNostrSigningAuthority
+  ) {
+    let transport: CommerceNostrTransportLike;
+    if (activeNostrSigningAuthority !== null && activeRelays.length > 0) {
+      const relayUrl = activeRelays[0]?.url;
+      const relayPublisher = new m.CommerceNostr.WebSocketRelayPublisher(relayUrl ?? "", {
+        factory: m.createNodeWebSocketRelaySocketFactory(),
+      });
+      transport = new m.CommerceNostr.RealCommerceNostrEventTransport({
+        signingAuthority: activeNostrSigningAuthority,
+        relayPublisher,
+        accountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+      });
+    } else {
+      // No unlocked signer and/or no configured Relay -- an honestly
+      // inert transport (never reached while `commerceNetworkProfile` is
+      // `"local-only"` anyway; kept safe even if a caller flips the
+      // profile without a Relay configured).
+      transport = { send: async () => ({ accepted: false, eventId: "", message: "no signer/relay configured" }) };
+    }
+    commerceNostrOutboundPort = new m.CommerceNostr.CommerceNostrEventPortImpl(transport, commerceNetworkProfile);
+    commerceNostrOutboundPortProfileRef = commerceNetworkProfile;
+    commerceNostrOutboundPortSignerRef = activeNostrSigningAuthority;
+  }
+  return commerceNostrOutboundPort;
+}
+
+/** Lazily constructs the ONE real, transport-agnostic inbound read-model this process holds -- purely local/in-memory, no dependency on a signer or Relay (see `CommerceNostrProductReadModel`'s own header: nothing in this process currently subscribes to a relay's inbound event stream and feeds it here -- that real subscription loop is an explicit follow-up, not built this pass). */
+function commerceNostrReadModelFor(): CommerceNostrReadModelLike {
+  const m = requireModules();
+  if (commerceNostrReadModelSingleton === null) {
+    commerceNostrReadModelSingleton = new m.CommerceNostr.CommerceNostrProductReadModel();
+  }
+  return commerceNostrReadModelSingleton;
+}
+
 function requireModules(): RootModules {
   if (modules === null) throw new Error("fedos-beta: root modules not loaded");
   return modules;
@@ -1055,7 +1562,19 @@ function refreshTrayMenu(): void {
  * accepted `runtime-restart` UX this repository already reports), before
  * these subsystems activate.
  */
-async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; masterSeedAuthority: MasterSeedAuthorityLike; eventBridge: DeviceSyncEventBridgeLike } | null> {
+async function buildFreshCoordinator(): Promise<{
+  coordinator: CoordinatorLike;
+  masterSeedAuthority: MasterSeedAuthorityLike;
+  eventBridge: DeviceSyncEventBridgeLike;
+  /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- the SAME real
+   * Nostr signing authority `secureRuntimeBundleConfig()` already threads
+   * into Direct Ratchet/Conversation Transport below, additionally
+   * returned here so a successful create/unlock can retain it as
+   * `activeNostrSigningAuthority` -- the one collaborator
+   * `RealCommerceNostrEventTransport` needs that this function already
+   * constructs but previously never surfaced past its own local scope. */
+  signer: NostrSigningAuthorityLike;
+} | null> {
   const m = requireModules();
   const attestation = m.createElectronMainHostAttestation({ appId: APP_ID, appVersion: APP_VERSION });
   const activation = await m.activateFedosProductionProfileMasterSeed({
@@ -1068,7 +1587,7 @@ async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; 
     return null;
   }
   const masterSeedAuthority = activation.masterSeedAuthority;
-  const signer = new m.NostrSigningAuthority(masterSeedAuthority);
+  const signer = new m.NostrSigningAuthority(masterSeedAuthority) as NostrSigningAuthorityLike;
   const paths = m.planFedosLocalProfilePaths(dataDir());
   if (paths === null) return null;
   m.ensureFedosLocalProfileDirectories(paths);
@@ -1093,7 +1612,7 @@ async function buildFreshCoordinator(): Promise<{ coordinator: CoordinatorLike; 
     deviceSyncAttemptFn: eventBridge.wrapAttemptFn(),
     ...secureRuntimeBundle,
   });
-  return { coordinator, masterSeedAuthority, eventBridge };
+  return { coordinator, masterSeedAuthority, eventBridge, signer };
 }
 
 /**
@@ -1308,6 +1827,17 @@ async function handleCreate(payload: unknown) {
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
+      activeMasterSeedAuthority = built.masterSeedAuthority;
+      activeNostrSigningAuthority = built.signer;
+      // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- forces
+      // `commerceMediaStoreFor()` to (re)construct NOW, against the real
+      // authority/signer just activated above, rather than waiting for a
+      // first caller that may never come this session -- proves the real
+      // Master Seed Authority injection (and the outbound Nostr Port's
+      // real signer/relay wiring) is genuinely live immediately on every
+      // successful create/unlock, not merely "would be live if called".
+      commerceMediaStoreFor();
+      commerceNostrOutboundPortFor();
       await attachPresentationLayer(assembly);
       return readyResult(result.value);
     }
@@ -1342,6 +1872,17 @@ async function handleUnlock(payload: unknown) {
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
+      activeMasterSeedAuthority = built.masterSeedAuthority;
+      activeNostrSigningAuthority = built.signer;
+      // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- forces
+      // `commerceMediaStoreFor()` to (re)construct NOW, against the real
+      // authority/signer just activated above, rather than waiting for a
+      // first caller that may never come this session -- proves the real
+      // Master Seed Authority injection (and the outbound Nostr Port's
+      // real signer/relay wiring) is genuinely live immediately on every
+      // successful create/unlock, not merely "would be live if called".
+      commerceMediaStoreFor();
+      commerceNostrOutboundPortFor();
       await attachPresentationLayer(assembly);
       return readyResult(result.value);
     }
@@ -1364,6 +1905,8 @@ async function handleLock() {
     activeAssembly = null;
     activeViewerParticipant = null;
     activeRelays = [];
+    activeMasterSeedAuthority = null;
+    activeNostrSigningAuthority = null;
     if (assembly !== null) await assembly.shutdown();
     await coordinator.lock();
     if (badgeAdapter !== null) {
@@ -1492,6 +2035,8 @@ async function performCleanShutdown(): Promise<void> {
     activeAssembly = null;
     activeViewerParticipant = null;
     activeRelays = [];
+    activeMasterSeedAuthority = null;
+    activeNostrSigningAuthority = null;
     try {
       if (assembly !== null) await assembly.shutdown();
       await coordinator.lock();
@@ -1965,6 +2510,14 @@ async function handleCommerceProductDetail(payload: unknown) {
       priceCents: product.priceCents,
       currency: product.currency,
       merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
+      // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- additive
+      // field, needed by the renderer's new Seller Reputation panel to
+      // query `fedos-app:commerce-persona-board-query` for this product's
+      // seller. Never a secret -- `creatorPubkey` is already exposed
+      // (indirectly, via `merchantLabel`'s own lookup) and is the same
+      // pubkey every Order this product produces already carries as
+      // `sellerPubkey`.
+      creatorPubkey: product.creatorPubkey,
       status: product.status,
       media: media === null ? null : { dataUri: media.dataUri, mimeType: media.mimeType, altText: media.altText },
     },
@@ -2066,6 +2619,51 @@ async function handleCommerceProductUpdate(payload: unknown) {
   return { outcome: "ok", product: commerceProductDto(result.product) };
 }
 
+const COMMERCE_NOSTR_PRODUCT_KIND_MIRROR_VALUES: readonly string[] = ["pdf", "zip", "template", "software", "link", "other"];
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- the ONE real
+ * caller of `commerceNostrOutboundPortFor()` this pass wires: publishing
+ * (or unpublishing) a product ALSO attempts a real, best-effort Nostr
+ * announcement. Entirely NON-FATAL relative to the local Commerce
+ * transaction that already committed before this is called (mirrors
+ * `issueReputationAttestationsForCompletedOrderNonFatal()`'s own
+ * discipline exactly) -- and, while `commerceNetworkProfile` stays at its
+ * safe `"local-only"` default, this never reaches a network call at all
+ * (`CommerceNostrEventPortImpl.publish()`'s own `evaluateNetworkAccess()`
+ * gate refuses it before the transport is ever touched).
+ */
+async function publishCommerceNostrProductEventNonFatal(product: CommerceProductLike, isPublish: boolean, now: number): Promise<void> {
+  try {
+    const port = commerceNostrOutboundPortFor();
+    const productKind = COMMERCE_NOSTR_PRODUCT_KIND_MIRROR_VALUES.includes(product.kind) ? product.kind : "other";
+    const draft = isPublish
+      ? {
+          category: "product-publication" as const,
+          formatVersion: 1 as const,
+          productId: product.id,
+          productKind,
+          title: product.title,
+          description: product.description,
+          creatorPubkey: product.creatorPubkey,
+          priceCents: product.priceCents,
+          currency: product.currency,
+          status: "active" as const,
+          publishedAt: now,
+        }
+      : {
+          category: "product-update" as const,
+          formatVersion: 1 as const,
+          productId: product.id,
+          status: "archived" as const,
+          updatedAt: now,
+        };
+    await port.publish(draft);
+  } catch (err) {
+    console.error("fedos-beta: Nostr Commerce publication attempt failed (non-fatal, local Commerce state unaffected):", err);
+  }
+}
+
 async function handleCommerceProductPublish(payload: unknown, publish: boolean) {
   const body = payload as { actorPubkey?: unknown; productId?: unknown } | null;
   if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
@@ -2075,6 +2673,7 @@ async function handleCommerceProductPublish(payload: unknown, publish: boolean) 
   const repo = commerceState().products;
   const result = publish ? repo.publish(body.actorPubkey, body.productId) : repo.unpublish(body.actorPubkey, body.productId);
   if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
+  await publishCommerceNostrProductEventNonFatal(result.product, publish, Math.floor(Date.now() / 1000));
   return { outcome: "ok", product: commerceProductDto(result.product) };
 }
 
@@ -2348,7 +2947,61 @@ async function handleCommerceOrderComplete(payload: unknown) {
     const deliveryResult = m.Commerce.applyDeliveryAction(delivery, { type: "acknowledge", actor: { kind: actorKind, pubkey: body.actorPubkey } }, now);
     if (deliveryResult.ok && deliveryResult.delivery !== undefined) state.deliveries.save(deliveryResult.delivery);
   }
+
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator, Agent R's own
+  // "wire attestation issuance into the real order-completion path" TODO)
+  // -- AFTER the real Order (and, if present, Delivery) state has already
+  // committed above. Awaited (so a test can observe it deterministically)
+  // but wrapped in its own total try/catch (see that function's own doc
+  // comment) -- a reputation-issuance failure can only ever be logged
+  // here, never surfaced as this call's own `outcome`, never able to
+  // revert `orderResult.order` having already been saved.
+  await issueReputationAttestationsForCompletedOrderNonFatal(orderResult.order, now);
+
   return { outcome: "ok", order: commerceOrderDto(orderResult.order) };
+}
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's
+ * read-only Persona Board query, exposed exactly per that domain layer's
+ * own TODO: always the `"PUBLIC"` disclosure layer (never `PSEUDONYMOUS_PROOF`/
+ * `"AUTHORIZED"` -- WHO gets a wider layer is an access-control decision
+ * this pass deliberately does not make; see `persona_board_query.ts`'s own
+ * header). Never fabricates a "no history" view for a pubkey this process
+ * has genuinely never seen (`commercePersonaEpochForPubkey(..., false)`
+ * only looks up, never creates).
+ */
+async function handleCommercePersonaBoardQuery(payload: unknown) {
+  const subjectPubkey = (payload as { subjectPubkey?: unknown } | null)?.subjectPubkey;
+  if (!isBoundedString(subjectPubkey, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed subjectPubkey" };
+  const entry = commercePersonaEpochForPubkey(subjectPubkey, false);
+  if (entry === undefined) return { outcome: "not-found", reason: "no persona/reputation history on record for this pubkey yet" };
+  const m = requireModules();
+  const { registry, store } = commerceReputationState();
+  const now = Math.floor(Date.now() / 1000);
+  const result = m.Reputation.queryPersonaBoardView(entry.epoch.epochId, "PUBLIC", registry, store, now);
+  if (result === undefined) return { outcome: "not-found", reason: "epoch not registered" };
+  return { outcome: "ok", view: result.view, verificationState: result.verificationState };
+}
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal
+ * Settings surface: view/select the `NetworkProfile` gating Nostr Commerce
+ * publication. In-memory only this pass (see `commerceNetworkProfile`'s
+ * own doc comment) -- resets to the safe `"local-only"` default on every
+ * relaunch, never silently turning Nostr on by default.
+ */
+async function handleCommerceNetworkProfileGet() {
+  return { outcome: "ok", profile: commerceNetworkProfile };
+}
+
+async function handleCommerceNetworkProfileSet(payload: unknown) {
+  const profile = (payload as { profile?: unknown } | null)?.profile;
+  if (typeof profile !== "string" || !(COMMERCE_NETWORK_PROFILE_VALUES as readonly string[]).includes(profile)) {
+    return { outcome: "invalid-input", reason: `profile must be one of ${COMMERCE_NETWORK_PROFILE_VALUES.join(", ")}` };
+  }
+  commerceNetworkProfile = profile as CommerceNetworkProfileValue;
+  return { outcome: "ok", profile: commerceNetworkProfile };
 }
 
 /**
@@ -2744,6 +3397,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-app:commerce-delivery-acknowledge-receipt", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceDeliveryAcknowledgeReceipt(payload));
   ipcMain.handle("fedos-app:commerce-order-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderComplete(payload));
   ipcMain.handle("fedos-app:commerce-receipt-issue", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptIssue(payload));
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's read-only Persona Board query.
+  ipcMain.handle("fedos-app:commerce-persona-board-query", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePersonaBoardQuery(payload));
+  // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface.
+  ipcMain.handle("fedos-app:commerce-network-profile-get", async () => handleCommerceNetworkProfileGet());
+  ipcMain.handle("fedos-app:commerce-network-profile-set", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceNetworkProfileSet(payload));
 }
 
 // ---------------------------------------------------------------------
