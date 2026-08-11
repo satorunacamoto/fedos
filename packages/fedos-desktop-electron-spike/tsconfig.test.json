@@ -2,7 +2,22 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": "."
+    // FedOS Commerce FINAL P1 Closure arc (Agent T) -- widened from "." to
+    // "../.." (the monorepo root) because
+    // `commerce_e2e_restart_persistence_real_electron.test.ts` and
+    // `commerce_e2e_sealed_key_corruption_real_electron.test.ts` are the
+    // FIRST files under this package's own `test/` to statically import
+    // repo-root `src/os/**` modules directly (to decode/cross-verify real
+    // signed receipt envelopes and construct the real
+    // `DurableSealedSigningKeyStore` against real on-disk files, reusing
+    // production code rather than re-implementing it) -- every such
+    // transitively-imported file must be "under rootDir" for a `noEmit`
+    // program, even though nothing here is ever emitted. `noEmit: true`
+    // above means this ONLY affects `npm run typecheck` (this package's own
+    // `tsconfig.json`, used by the real `build`/`package:beta` scripts,
+    // still uses its own unchanged `rootDir: "src"`) -- zero build-output
+    // impact.
+    "rootDir": "../.."
   },
   "include": ["src", "test"]
 }
