@@ -218,7 +218,7 @@ describe("NIP-44 wire compatibility gap clarification + wire skeleton (Stage 209
 
   it("14. the crate's public pub fn surface is unchanged at twenty-seven — no public API addition", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map((m) => m[1]);
-    expect(pubFnNames.length).toBe(69);    for (const name of pubFnNames) {
+    expect(pubFnNames.length).toBe(70);    for (const name of pubFnNames) {
       if (name === "encrypt_nip44_wire" || name === "decrypt_nip44_wire") continue;
       expect(name.toLowerCase()).not.toContain("nip44");
       expect(name.toLowerCase()).not.toContain("wire");

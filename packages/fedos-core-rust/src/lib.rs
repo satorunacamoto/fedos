@@ -3549,6 +3549,14 @@ mod kdf_core {
         /// class gets its own label, the same reason every other domain
         /// here has its own.
         DirectRatchetSealing,
+        /// Commerce E2E Completion arc — protected Product Media's own
+        /// key-derivation domain (Application Root → Commerce Media key).
+        /// No counterparty/ECDH concept (matches `Storage`'s shape, not
+        /// `Conversation`'s) — a plain per-profile HKDF derivation from
+        /// the Application Root. See `AeadAadDomain::CommerceMedia`
+        /// (`crypto/aead_internal.rs`) for the AEAD-layer half of this
+        /// domain separation.
+        CommerceMedia,
         /// Reserved for this module's own tests / future test-only fixtures
         /// — never used by production call sites.
         TestOnly,
@@ -3573,6 +3581,7 @@ mod kdf_core {
                 HkdfDomain::ATProto => b"fedos-hkdf-salt-atproto-v1",
                 HkdfDomain::Wallet => b"fedos-hkdf-salt-wallet-v1",
                 HkdfDomain::DirectRatchetSealing => b"fedos-hkdf-salt-direct-ratchet-sealing-v1",
+                HkdfDomain::CommerceMedia => b"fedos-hkdf-salt-commerce-media-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-salt-test-only-v1",
             }
         }
@@ -3591,6 +3600,7 @@ mod kdf_core {
                 HkdfDomain::ATProto => b"fedos-hkdf-info-atproto-v1",
                 HkdfDomain::Wallet => b"fedos-hkdf-info-wallet-v1",
                 HkdfDomain::DirectRatchetSealing => b"fedos-hkdf-info-direct-ratchet-sealing-v1",
+                HkdfDomain::CommerceMedia => b"fedos-hkdf-info-commerce-media-v1",
                 HkdfDomain::TestOnly => b"fedos-hkdf-info-test-only-v1",
             }
         }
@@ -3775,6 +3785,7 @@ mod kdf_core {
                 HkdfDomain::Session,
                 HkdfDomain::ATProto,
                 HkdfDomain::Wallet,
+                HkdfDomain::CommerceMedia,
                 HkdfDomain::TestOnly,
             ] {
                 let decision = derive_secret_handle_internal(&input, domain);
@@ -3863,9 +3874,11 @@ mod kdf_core {
         /// `ATProto`, and `Wallet` (three more), for TEN variants total —
         /// renamed and re-verified against the CURRENT state. Secure
         /// Runtime Alpha 5401-5480 adds an ELEVENTH, `DirectRatchetSealing`
-        /// — re-verified again against the CURRENT state.
+        /// — re-verified again against the CURRENT state. Commerce E2E
+        /// Completion arc adds a TWELFTH, `CommerceMedia` — re-verified
+        /// again against the CURRENT state.
         #[test]
-        fn hkdf_domain_has_no_variant_other_than_the_eleven_specified() {
+        fn hkdf_domain_has_no_variant_other_than_the_twelve_specified() {
             let domain = HkdfDomain::TestOnly;
             match domain {
                 HkdfDomain::RootKey => {}
@@ -3878,6 +3891,7 @@ mod kdf_core {
                 HkdfDomain::ATProto => {}
                 HkdfDomain::Wallet => {}
                 HkdfDomain::DirectRatchetSealing => {}
+                HkdfDomain::CommerceMedia => {}
                 HkdfDomain::TestOnly => {}
             }
         }
@@ -4246,6 +4260,22 @@ mod master_root {
         /// below (Stage 1016/1017, Secure Runtime Alpha 151/152). Returns
         /// `None` after `clear()`.
         fn expose_bytes_for_internal_protocol_root_derivation(&self) -> Option<[u8; 32]> {
+            self.inner.expose_bytes_for_internal_derivation()
+        }
+
+        /// Commerce E2E Completion arc — a SECOND, separately-named
+        /// accessor exposing the SAME real 32-byte Application Root, for
+        /// the sole reviewed use of
+        /// [`derive_commerce_media_key_bytes_from_master_seed_internal`]
+        /// below. Product Media has no counterparty and is not itself a
+        /// federated protocol (unlike Nostr/Session/ATProto/Wallet), so it
+        /// derives directly from the Application Root rather than through
+        /// a `FedosProtocolRootHandle` — mirroring this module's own
+        /// established "each distinct reviewed caller gets its own
+        /// narrowly-named accessor" discipline rather than reusing
+        /// `expose_bytes_for_internal_protocol_root_derivation`. Returns
+        /// `None` after `clear()`.
+        fn expose_bytes_for_internal_commerce_media_key_derivation(&self) -> Option<[u8; 32]> {
             self.inner.expose_bytes_for_internal_derivation()
         }
     }
@@ -5915,6 +5945,67 @@ mod master_root {
         let conversation_key_bytes = conversation_key.expose_bytes_for_internal_message_key_derivation();
         conversation_key.clear();
         conversation_key_bytes
+    }
+
+    /// Commerce E2E Completion arc — protected Product Media's own AEAD
+    /// key derivation. Follows `AeadAadDomain::Storage`'s STRUCTURAL shape
+    /// (no counterparty, no ratchet session — closer to Storage than
+    /// Conversation), not [`derive_conversation_key_bytes_from_master_seed_internal`]'s
+    /// ECDH step: `Identity Root -> Application Root ->
+    /// derive_secret_handle_internal(application_root, HkdfDomain::CommerceMedia)`,
+    /// stopping ONE level shallower than the Nostr/Session/ATProto/Wallet
+    /// Protocol Root chain (Product Media is not itself a federated
+    /// protocol identity). Deliberately takes NO `account_index` — unlike
+    /// [`derive_conversation_key_bytes_from_master_seed_internal`]'s
+    /// account-indexed Nostr secret key step, neither `derive_identity_root_internal`
+    /// nor `derive_application_root_internal` (the two steps this function
+    /// actually uses) are themselves parameterized by an account index
+    /// anywhere in this crate — a single Application Root exists per
+    /// unlocked profile. Threading an unused `account_index` parameter
+    /// through purely to mirror `resolve_conversation_key`'s own call
+    /// shape would be dead, misleading plumbing; this function's own
+    /// public caller ([`FedosMasterSeedAuthority::resolve_commerce_media_key`])
+    /// omits it for the same reason.
+    ///
+    /// Every intermediate root/key handle is `clear()`-ed immediately
+    /// after its own single use, the SAME discipline every function in
+    /// this module already follows. `None` on ANY failure at ANY step —
+    /// fail closed, never a panic.
+    pub(crate) fn derive_commerce_media_key_bytes_from_master_seed_internal(
+        master_seed: &FedosMasterSeedHandle,
+    ) -> Option<[u8; 32]> {
+        let identity_decision = derive_identity_root_internal(master_seed);
+        if identity_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut identity_root = identity_decision.output?;
+
+        let application_decision = derive_application_root_internal(&identity_root);
+        identity_root.clear();
+        if application_decision.status != RootDerivationStatus::Success {
+            return None;
+        }
+        let mut application_root = application_decision.output?;
+
+        let application_root_bytes = application_root.expose_bytes_for_internal_commerce_media_key_derivation();
+        application_root.clear();
+        let mut application_root_bytes = application_root_bytes?;
+
+        let mut transient_input = SecretHandle::new_from_32_bytes_for_internal_use(
+            SecretHandleKind::HkdfInputMaterial,
+            application_root_bytes,
+        );
+        application_root_bytes.zeroize();
+        let decision = derive_secret_handle_internal(&transient_input, HkdfDomain::CommerceMedia);
+        transient_input.clear();
+
+        match decision.status {
+            HkdfStatus::Ready => {
+                let output_handle = decision.output?;
+                output_handle.expose_bytes_for_internal_derivation()
+            }
+            HkdfStatus::InvalidInput | HkdfStatus::InternalFailure => None,
+        }
     }
 
     /// Secure Runtime Alpha 1761–1840 ("NIP-17 Rumor Seal Gift Wrap
@@ -10990,7 +11081,10 @@ pub enum FedosAeadAlgorithm {
 /// Stage 1009 (Secure Runtime Alpha 014) adds a wasm_bindgen annotation,
 /// same reasoning as `FedosAeadAlgorithm` above. Declaration order fixes the
 /// wire discriminant: `RootKey = 0`, `Identity = 1`, `Storage = 2`,
-/// `Conversation = 3`, `TestOnly = 4`.
+/// `Conversation = 3`, `TestOnly = 4`. Commerce E2E Completion arc adds
+/// `CommerceMedia = 5` — purely additive, appended after the last existing
+/// variant (never inserted between existing ones), so every prior
+/// discriminant is unchanged.
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FedosAeadAadDomain {
@@ -10999,6 +11093,7 @@ pub enum FedosAeadAadDomain {
     Storage,
     Conversation,
     TestOnly,
+    CommerceMedia,
 }
 
 /// The one reviewed conversion point from the public algorithm label to
@@ -11028,6 +11123,9 @@ fn fedos_aead_aad_domain_to_internal(
             crate::crypto::aead_internal::AeadAadDomain::Conversation
         }
         FedosAeadAadDomain::TestOnly => crate::crypto::aead_internal::AeadAadDomain::TestOnly,
+        FedosAeadAadDomain::CommerceMedia => {
+            crate::crypto::aead_internal::AeadAadDomain::CommerceMedia
+        }
     }
 }
 
@@ -11579,6 +11677,9 @@ fn fedos_aead_aad_domain_matches_envelope(
         ) | (
             FedosAeadAadDomain::TestOnly,
             crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::TestOnly
+        ) | (
+            FedosAeadAadDomain::CommerceMedia,
+            crate::crypto::ciphertext_envelope::AeadEnvelopeAadDomain::CommerceMedia
         )
     )
 }
@@ -12527,6 +12628,33 @@ impl FedosMasterSeedAuthority {
         let inner = secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
             secret_handle::SecretHandleKind::AeadKeyMaterial,
             conversation_key_bytes,
+        );
+        Some(AeadKeyHandle {
+            inner: FedosAeadKeyHandle { inner },
+        })
+    }
+
+    /// Commerce E2E Completion arc — protected Product Media's own key
+    /// resolution, mirroring [`FedosMasterSeedAuthority::resolve_conversation_key`]'s
+    /// shape (holds no Master Seed of its own; borrows this Authority's,
+    /// via the SAME `with_master_seed` helper) but calling
+    /// `master_root::derive_commerce_media_key_bytes_from_master_seed_internal`
+    /// instead — see that function's own doc comment for why no
+    /// `account_index`/counterparty parameter exists here. The returned
+    /// [`AeadKeyHandle`] is immediately usable with the EXISTING,
+    /// UNCHANGED [`encrypt_aead`]/[`decrypt_aead`] under
+    /// `FedosAeadAadDomain::CommerceMedia` — this function adds no new
+    /// AEAD call, no new algorithm, and no new nonce policy.
+    ///
+    /// `None` on ANY failure: no Master Seed held, or any internal
+    /// derivation step failing. Never panics.
+    pub fn resolve_commerce_media_key(&self) -> Option<AeadKeyHandle> {
+        let key_bytes = self.with_master_seed(|handle| {
+            crate::master_root::derive_commerce_media_key_bytes_from_master_seed_internal(handle)
+        })?;
+        let inner = secret_handle::SecretHandle::new_from_32_bytes_for_internal_use(
+            secret_handle::SecretHandleKind::AeadKeyMaterial,
+            key_bytes,
         );
         Some(AeadKeyHandle {
             inner: FedosAeadKeyHandle { inner },
@@ -14432,6 +14560,95 @@ mod master_seed_authority_tests {
             .is_none());
     }
 
+    // -- Commerce E2E Completion arc -- `resolve_commerce_media_key` tests --
+    // Mirrors `resolve_conversation_key`'s own test set immediately above,
+    // minus every counterparty/account-index-specific case (this function
+    // takes neither -- see its own doc comment for why).
+
+    #[test]
+    fn resolve_commerce_media_key_fails_closed_on_an_empty_authority() {
+        let authority = FedosMasterSeedAuthority::new();
+        assert!(authority.resolve_commerce_media_key().is_none());
+    }
+
+    #[test]
+    fn resolve_commerce_media_key_succeeds_and_round_trips_through_encrypt_aead() {
+        let authority = generated_authority();
+        let key = authority
+            .resolve_commerce_media_key()
+            .expect("must resolve");
+        let plaintext = b"protected product media plaintext";
+        let sealed = encrypt_aead(&key, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::CommerceMedia, plaintext)
+            .expect("must encrypt");
+        let opened = decrypt_aead(&key, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::CommerceMedia, &sealed)
+            .expect("must decrypt");
+        assert_eq!(opened, plaintext);
+    }
+
+    #[test]
+    fn resolve_commerce_media_key_is_deterministic_for_the_same_authority() {
+        let authority = generated_authority();
+        let first = authority
+            .resolve_commerce_media_key()
+            .expect("must resolve");
+        let second = authority
+            .resolve_commerce_media_key()
+            .expect("must resolve");
+
+        // Handles are opaque -- determinism is proven functionally: a
+        // plaintext sealed under the FIRST handle must open under the
+        // SECOND, and vice versa.
+        let plaintext = b"determinism check";
+        let sealed_with_first = encrypt_aead(&first, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::CommerceMedia, plaintext)
+            .expect("must encrypt");
+        let opened_with_second = decrypt_aead(&second, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::CommerceMedia, &sealed_with_first)
+            .expect("must decrypt");
+        assert_eq!(opened_with_second, plaintext);
+    }
+
+    #[test]
+    fn resolve_commerce_media_key_differs_across_distinct_profiles() {
+        let alice = generated_authority();
+        let bob = generated_authority();
+        let alice_key = alice.resolve_commerce_media_key().expect("must resolve");
+        let bob_key = bob.resolve_commerce_media_key().expect("must resolve");
+
+        let plaintext = b"profile separation check";
+        let sealed_by_alice = encrypt_aead(&alice_key, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::CommerceMedia, plaintext)
+            .expect("alice must encrypt");
+        assert!(decrypt_aead(&bob_key, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::CommerceMedia, &sealed_by_alice).is_none());
+    }
+
+    #[test]
+    fn resolve_commerce_media_key_is_isolated_from_the_pairwise_direct_mode_resolution_under_the_same_authority() {
+        // The SAME profile's Commerce Media key and Conversation key (for
+        // an arbitrary counterparty) must be functionally distinct keys --
+        // proving the two domains do not silently collapse to the same
+        // derived bytes despite sharing an Application Root ancestor.
+        let authority = generated_authority();
+        let counterparty = generated_authority();
+        let counterparty_hex = counterparty.public_key_hex_for_account(0).expect("must derive");
+
+        let commerce_media_key = authority
+            .resolve_commerce_media_key()
+            .expect("must resolve");
+        let conversation_key = authority
+            .resolve_conversation_key(0, counterparty_hex)
+            .expect("must resolve");
+
+        let plaintext = b"cross-domain isolation check";
+        let sealed_under_commerce_media = encrypt_aead(&commerce_media_key, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::CommerceMedia, plaintext)
+            .expect("must encrypt");
+        assert!(decrypt_aead(&conversation_key, FedosAeadAlgorithm::ChaCha20Poly1305, FedosAeadAadDomain::Conversation, &sealed_under_commerce_media).is_none());
+    }
+
+    #[test]
+    fn resolve_commerce_media_key_never_touches_a_cleared_authority() {
+        let mut authority = generated_authority();
+        authority.clear();
+        assert!(authority.resolve_commerce_media_key().is_none());
+    }
+
     // -- Secure Runtime Alpha 5401-5480 -- Direct Ratchet sealed-secret --
 
     #[test]
@@ -15900,6 +16117,41 @@ mod fedos_encrypt_decrypt_wiring {
                 algorithm,
                 &key,
                 FedosAeadAadDomain::TestOnly,
+                TEST_PLAINTEXT,
+            );
+            assert_eq!(encrypted.status, FedosEncryptStatus::Ready);
+            let envelope = encrypted
+                .envelope
+                .expect("Ready encrypt decision must carry an envelope");
+
+            let decrypted = fedos_decrypt(&key, &envelope);
+            assert_eq!(decrypted.status, FedosDecryptStatus::Ready);
+            assert_eq!(decrypted.plaintext.as_deref(), Some(TEST_PLAINTEXT));
+        }
+    }
+
+    /// Commerce E2E Completion arc — the public `fedos_encrypt`/
+    /// `fedos_decrypt` boundary round-trips under the new
+    /// `FedosAeadAadDomain::CommerceMedia` exactly like every other
+    /// domain, AND (unlike a bare round trip) also proves the declared
+    /// `aad_domain` argument is genuinely checked against the envelope's
+    /// own stored domain for this new variant specifically — a real gap
+    /// this arc found and fixed in `fedos_aead_aad_domain_matches_envelope`
+    /// (it is a `matches!` boolean check, not an exhaustive `match`, so a
+    /// missing arm would have compiled silently and always returned
+    /// `false` for CommerceMedia, making every CommerceMedia decrypt
+    /// spuriously fail closed).
+    #[test]
+    fn fedos_encrypt_then_fedos_decrypt_round_trips_under_commerce_media_domain() {
+        for algorithm in [
+            FedosAeadAlgorithm::ChaCha20Poly1305,
+            FedosAeadAlgorithm::Aes256Gcm,
+        ] {
+            let key = test_key();
+            let encrypted = fedos_encrypt(
+                algorithm,
+                &key,
+                FedosAeadAadDomain::CommerceMedia,
                 TEST_PLAINTEXT,
             );
             assert_eq!(encrypted.status, FedosEncryptStatus::Ready);

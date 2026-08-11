@@ -162,9 +162,10 @@ describe("FedOS Rust crate — internal AEAD module skeleton", () => {
       "decrypt_nip44_wire",
       "sign_nostr_event_with_fresh_ephemeral_key",
       "build_and_sign_nip17_gift_wrap",
+      "resolve_commerce_media_key",
       "previous_sending_chain_length",
     ];
-    expect(pubFnNames.length).toBe(69);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
+    expect(pubFnNames.length).toBe(70);    expect([...pubFnNames].sort()).toEqual([...expected].sort());
   });
 
   it("5. encrypt_placeholder / decrypt_placeholder (and the other four placeholders) are unchanged", () => {

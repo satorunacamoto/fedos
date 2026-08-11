@@ -245,7 +245,7 @@ describe("FedOS Rust crate — AEAD nonce helper (Stage 138)", () => {
       (m) => m[1],
     );
     expect(pubFnNames).toContain("fedos_aead_nonce_96");
-    expect(pubFnNames.length).toBe(69);    expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+fedos_aead_nonce_96_/);
+    expect(pubFnNames.length).toBe(70);    expect(testOnlyLibRs).not.toMatch(/\bpub\s+fn\s+fedos_aead_nonce_96_/);
   });
 
   it("14. Cargo.toml has no 'Stage 138' mention (Stage 147 later adds a ninth production dependency, sha2, unrelated to this stage's own topic)", () => {

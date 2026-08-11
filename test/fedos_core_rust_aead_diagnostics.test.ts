@@ -72,7 +72,7 @@ describe("FedOS Rust crate — AEAD diagnostics preview (Stage 155)", () => {
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(69);    expect(pubFnNames).not.toContain("aead_diagnostics_preview");
+    expect(pubFnNames.length).toBe(70);    expect(pubFnNames).not.toContain("aead_diagnostics_preview");
   });
 
   it("8. not connected to Runtime/Worker in any way", () => {

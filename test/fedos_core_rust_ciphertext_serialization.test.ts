@@ -187,7 +187,7 @@ describe("FedOS Rust crate — ciphertext serialization implementation + NIP-44 
     const pubFnNames = [...libRsSource.matchAll(/\bpub\s+fn\s+([a-zA-Z0-9_]+)/g)].map(
       (m) => m[1],
     );
-    expect(pubFnNames.length).toBe(69);    for (const name of pubFnNames) {
+    expect(pubFnNames.length).toBe(70);    for (const name of pubFnNames) {
       // Secure Runtime Alpha 1761-1840 Phase B/F -- see
       // KNOWN_ALPHA_869_CONVERSATION_KEY_WIRING_FNS above: real, reviewed
       // NIP-44 wire additions, not this stage's own concern.

@@ -78,6 +78,11 @@ fn aad_domain_to_envelope_domain(aad_domain: AeadAadDomain) -> Option<AeadEnvelo
         // sealed-secret path calls `aead_internal::seal_internal`/
         // `open_internal` directly and never constructs an envelope.
         AeadAadDomain::DirectRatchetSealing => None,
+        // Commerce E2E Completion arc — unlike MasterSeedSealing/DirectRatchetSealing,
+        // Product Media ciphertext DOES need to be stored/transported via the
+        // normal envelope/wire path (it is not an in-place-sealed secret), so
+        // this domain IS envelope-routed, mirroring Storage/Conversation.
+        AeadAadDomain::CommerceMedia => Some(AeadEnvelopeAadDomain::CommerceMedia),
     }
 }
 
@@ -88,6 +93,7 @@ fn envelope_domain_to_aad_domain(aad_domain: AeadEnvelopeAadDomain) -> AeadAadDo
         AeadEnvelopeAadDomain::Storage => AeadAadDomain::Storage,
         AeadEnvelopeAadDomain::Conversation => AeadAadDomain::Conversation,
         AeadEnvelopeAadDomain::TestOnly => AeadAadDomain::TestOnly,
+        AeadEnvelopeAadDomain::CommerceMedia => AeadAadDomain::CommerceMedia,
     }
 }
 
@@ -353,6 +359,40 @@ mod tests {
 
         let opened = open_decision_from_envelope_internal(&tampered_envelope, &key);
         assert_eq!(opened.status, AeadStatus::AuthenticationFailed);
+    }
+
+    #[test]
+    fn commerce_media_envelope_domain_fails_authentication_against_every_existing_domain() {
+        let key = test_key();
+        let nonce = ready_nonce();
+        let nonce_bytes = nonce.nonce.expect("Ready nonce decision must carry bytes");
+        let sealed = seal_internal(
+            AeadCipher::ChaCha20Poly1305,
+            &key,
+            &nonce,
+            AeadAadDomain::CommerceMedia,
+            TEST_PLAINTEXT,
+        );
+        let envelope =
+            envelope_from_seal_decision_internal(sealed, nonce_bytes, AeadAadDomain::CommerceMedia)
+                .expect("Ready seal decision must bridge to an envelope");
+        for other in [
+            AeadEnvelopeAadDomain::RootKey,
+            AeadEnvelopeAadDomain::Identity,
+            AeadEnvelopeAadDomain::Storage,
+            AeadEnvelopeAadDomain::Conversation,
+            AeadEnvelopeAadDomain::TestOnly,
+        ] {
+            let tampered = AeadCiphertextEnvelope::new_with_ciphertext_for_internal_use(
+                envelope.version(),
+                envelope.algorithm(),
+                envelope.nonce(),
+                other,
+                envelope.ciphertext().to_vec(),
+            );
+            let opened = open_decision_from_envelope_internal(&tampered, &key);
+            assert_eq!(opened.status, AeadStatus::AuthenticationFailed);
+        }
     }
 
     #[test]

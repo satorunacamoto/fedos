@@ -194,6 +194,7 @@ fn aad_domain_to_label(domain: AeadEnvelopeAadDomain) -> &'static str {
         AeadEnvelopeAadDomain::Storage => "storage",
         AeadEnvelopeAadDomain::Conversation => "conversation",
         AeadEnvelopeAadDomain::TestOnly => "test_only",
+        AeadEnvelopeAadDomain::CommerceMedia => "commerce_media",
     }
 }
 
@@ -204,6 +205,7 @@ fn aad_domain_from_label(label: &str) -> Option<AeadEnvelopeAadDomain> {
         "storage" => Some(AeadEnvelopeAadDomain::Storage),
         "conversation" => Some(AeadEnvelopeAadDomain::Conversation),
         "test_only" => Some(AeadEnvelopeAadDomain::TestOnly),
+        "commerce_media" => Some(AeadEnvelopeAadDomain::CommerceMedia),
         _ => None,
     }
 }
@@ -602,5 +604,11 @@ mod tests {
         assert!(base64url_decode("has space").is_none());
         assert!(base64url_decode("has\nnewline").is_none());
         assert!(base64url_decode("a").is_none()); // len % 4 == 1 is never valid
+    }
+
+    #[test]
+    fn commerce_media_domain_label_round_trips() {
+        assert_eq!(aad_domain_to_label(AeadEnvelopeAadDomain::CommerceMedia), "commerce_media");
+        assert_eq!(aad_domain_from_label("commerce_media"), Some(AeadEnvelopeAadDomain::CommerceMedia));
     }
 }

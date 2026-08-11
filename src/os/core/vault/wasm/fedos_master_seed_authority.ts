@@ -79,4 +79,15 @@ export interface FedosMasterSeedAuthority {
    * own doc comment for why.
    */
   decryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, payload: string): Promise<Uint8Array | null>;
+
+  /**
+   * Commerce E2E Completion arc — resolves protected Product Media's own
+   * AEAD key. Mirrors [`resolveConversationKey`]'s shape but with no
+   * `accountIndex`/counterparty parameter — see
+   * `FedosMasterSeedAuthorityHandle.resolve_commerce_media_key`'s own doc
+   * comment (`fedos_wasm_loader.ts`) for why. `null` on ANY failure: no
+   * Master Seed held, or an internal derivation failure. OPTIONAL — same
+   * reasoning as [`encryptNip44Wire`]'s own optionality above.
+   */
+  resolveCommerceMediaKey?(): Promise<AeadKeyHandle | null>;
 }

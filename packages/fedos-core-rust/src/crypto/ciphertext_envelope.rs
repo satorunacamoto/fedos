@@ -121,6 +121,9 @@ pub(crate) enum AeadEnvelopeAadDomain {
     Storage,
     Conversation,
     TestOnly,
+    /// Commerce E2E Completion arc — mirrors `aead_internal::AeadAadDomain::CommerceMedia`
+    /// (see that variant's own doc comment for the domain-separation rationale).
+    CommerceMedia,
 }
 
 impl AeadEnvelopeAadDomain {
@@ -131,6 +134,7 @@ impl AeadEnvelopeAadDomain {
             AeadEnvelopeAadDomain::Storage => 2,
             AeadEnvelopeAadDomain::Conversation => 3,
             AeadEnvelopeAadDomain::TestOnly => 4,
+            AeadEnvelopeAadDomain::CommerceMedia => 5,
         }
     }
 
@@ -141,6 +145,7 @@ impl AeadEnvelopeAadDomain {
             2 => Some(AeadEnvelopeAadDomain::Storage),
             3 => Some(AeadEnvelopeAadDomain::Conversation),
             4 => Some(AeadEnvelopeAadDomain::TestOnly),
+            5 => Some(AeadEnvelopeAadDomain::CommerceMedia),
             _ => None,
         }
     }

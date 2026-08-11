@@ -36,6 +36,7 @@ import {
   type FedosWasmLoaderMasterSeedRestoreSealedExecution,
   type FedosWasmLoaderMasterSeedSealExecution,
   type FedosWasmLoaderConversationKeyResolutionExecution,
+  type FedosWasmLoaderCommerceMediaKeyResolutionExecution,
   type FedosWasmLoaderDirectRatchetSecretSealExecution,
   type FedosWasmLoaderDirectRatchetSecretRestoreExecution,
   type FedosWasmLoaderNip44WireEncryptExecution,
@@ -69,6 +70,10 @@ export interface FedosMasterSeedWasmLoaderBoundary {
     accountIndex: number,
     counterpartyPublicKeyHex: string,
   ): Promise<FedosWasmLoaderConversationKeyResolutionExecution>;
+  /** OPTIONAL — same reasoning as `attemptDevOnlyEncryptNip44WireCall`'s own optionality below: several pre-existing hand-written mock boundary objects in already-passing tests implement only the original method set; requiring this one there would break those tests for no reason. */
+  attemptDevOnlyMasterSeedResolveCommerceMediaKeyCall?(
+    authority: unknown,
+  ): Promise<FedosWasmLoaderCommerceMediaKeyResolutionExecution>;
   attemptDevOnlyMasterSeedSealDirectRatchetSecretCall(
     authority: unknown,
     localDeviceRef: string,
@@ -192,6 +197,14 @@ export class FedosWasmMasterSeedAuthority implements FedosMasterSeedAuthority, S
       accountIndex,
       counterpartyPublicKeyHex,
     );
+    return result.succeeded ? result.keyHandle : null;
+  }
+
+  async resolveCommerceMediaKey(): Promise<AeadKeyHandle | null> {
+    if (!this.#loaderBoundary.attemptDevOnlyMasterSeedResolveCommerceMediaKeyCall) return null;
+    const authority = await this.#ensureConstructed();
+    if (!authority) return null;
+    const result = await this.#loaderBoundary.attemptDevOnlyMasterSeedResolveCommerceMediaKeyCall(authority);
     return result.succeeded ? result.keyHandle : null;
   }
 

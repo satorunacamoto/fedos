@@ -40,6 +40,7 @@ const AEAD_AAD_DOMAIN_DISCRIMINANTS: Readonly<Record<AeadAadDomain, number>> = {
   Storage: 2,
   Conversation: 3,
   TestOnly: 4,
+  CommerceMedia: 5,
 };
 
 function isAeadCiphertextHandleShape(value: unknown): value is AeadCiphertextHandle {

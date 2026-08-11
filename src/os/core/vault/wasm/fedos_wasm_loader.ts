@@ -1403,9 +1403,12 @@ export type AeadAlgorithm = "ChaCha20Poly1305" | "Aes256Gcm";
  * `AeadAlgorithm` above: a hand-declared TS union, mapped to
  * `FedosAeadAadDomain`'s own declaration-order discriminants
  * (`RootKey = 0`, `Identity = 1`, `Storage = 2`, `Conversation = 3`,
- * `TestOnly = 4`).
+ * `TestOnly = 4`). Commerce E2E Completion arc adds `CommerceMedia = 5`
+ * — purely additive, appended after the last existing variant, matching
+ * `FedosAeadAadDomain`'s own real declaration order (verified against the
+ * regenerated `packages/fedos-core-rust/pkg/fedos_core_rust.d.ts`).
  */
-export type AeadAadDomain = "RootKey" | "Identity" | "Storage" | "Conversation" | "TestOnly";
+export type AeadAadDomain = "RootKey" | "Identity" | "Storage" | "Conversation" | "TestOnly" | "CommerceMedia";
 
 /** PRIVATE — `AeadAlgorithm` label to `lib.rs`'s own numeric discriminant. */
 const AEAD_ALGORITHM_DISCRIMINANTS: Readonly<Record<AeadAlgorithm, number>> = {
@@ -1420,6 +1423,7 @@ const AEAD_AAD_DOMAIN_DISCRIMINANTS: Readonly<Record<AeadAadDomain, number>> = {
   Storage: 2,
   Conversation: 3,
   TestOnly: 4,
+  CommerceMedia: 5,
 };
 
 /**
@@ -1698,6 +1702,18 @@ export interface FedosMasterSeedAuthorityHandle {
     counterpartyPublicKeyHex: string,
     payload: string,
   ) => Uint8Array | undefined;
+  /**
+   * Commerce E2E Completion arc — resolves protected Product Media's own
+   * AEAD key (an opaque `AeadKeyHandle`, immediately usable with
+   * `encrypt()`/`decrypt()` under `aadDomain: "CommerceMedia"`), mirroring
+   * `resolve_conversation_key` but with no `accountIndex`/counterparty
+   * parameter — see `master_root::derive_commerce_media_key_bytes_from_master_seed_internal`'s
+   * own doc comment (Rust) for why. OPTIONAL — mirrors `encrypt_nip44_wire`'s
+   * own optionality above: not added to `isFedosMasterSeedAuthorityShape()`'s
+   * required-method checklist, so pre-existing hand-written mock
+   * authorities in already-passing tests are unaffected.
+   */
+  readonly resolve_commerce_media_key?: () => unknown;
 }
 
 /**
@@ -1824,6 +1840,22 @@ export interface FedosWasmLoaderConversationKeyResolutionExecution {
     | "DerivationFailed"
     | "InvalidHandleShape"
     | "InvalidAuthorityHandle"
+    | "NotInitialized"
+    | "CallFailed"
+    | "PrototypeStillClosed";
+}
+
+/** Commerce E2E Completion arc — `attemptDevOnlyMasterSeedResolveCommerceMediaKeyCall()`'s own result. Same shape/reasons as `FedosWasmLoaderConversationKeyResolutionExecution` above, minus the counterparty-specific cases (this call takes no counterparty). */
+export interface FedosWasmLoaderCommerceMediaKeyResolutionExecution {
+  readonly attempted: boolean;
+  readonly succeeded: boolean;
+  readonly keyHandle: AeadKeyHandle | null;
+  readonly reason:
+    | "Succeeded"
+    | "DerivationFailed"
+    | "InvalidHandleShape"
+    | "InvalidAuthorityHandle"
+    | "MethodUnavailable"
     | "NotInitialized"
     | "CallFailed"
     | "PrototypeStillClosed";
@@ -2105,6 +2137,7 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
 
   /** Secure Runtime Alpha 869 — most recent `attemptDevOnlyMasterSeedResolveConversationKeyCall()` result, or `null` before it has ever been called. Read via `masterSeedResolveConversationKeyExecution()`. */
   #masterSeedResolveConversationKeyExecution: FedosWasmLoaderConversationKeyResolutionExecution | null = null;
+  #masterSeedResolveCommerceMediaKeyExecution: FedosWasmLoaderCommerceMediaKeyResolutionExecution | null = null;
 
   /** Secure Runtime Alpha 5401-5480 — most recent `attemptDevOnlyMasterSeedSealDirectRatchetSecretCall()` result, or `null` before it has ever been called. Read via `directRatchetSecretSealExecution()`. */
   #directRatchetSecretSealExecution: FedosWasmLoaderDirectRatchetSecretSealExecution | null = null;
@@ -2551,6 +2584,11 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
   /** Secure Runtime Alpha 869 — read-only accessor for `#masterSeedResolveConversationKeyExecution`. */
   masterSeedResolveConversationKeyExecution(): FedosWasmLoaderConversationKeyResolutionExecution | null {
     return this.#masterSeedResolveConversationKeyExecution;
+  }
+
+  /** Commerce E2E Completion arc — read-only accessor for `#masterSeedResolveCommerceMediaKeyExecution`. */
+  masterSeedResolveCommerceMediaKeyExecution(): FedosWasmLoaderCommerceMediaKeyResolutionExecution | null {
+    return this.#masterSeedResolveCommerceMediaKeyExecution;
   }
 
   /** Secure Runtime Alpha 5401-5480 — read-only accessor for `#directRatchetSecretSealExecution`. */
@@ -3747,6 +3785,67 @@ export class FedosWasmLoaderSkeleton implements FedosWasmLoader {
       }
     }
     this.#masterSeedResolveConversationKeyExecution = result;
+    return result;
+  }
+
+  /**
+   * Commerce E2E Completion arc — PUBLIC, ASYNC. Calls
+   * `authority.resolve_commerce_media_key()` — protected Product Media's
+   * own key resolution. Mirrors
+   * `attemptDevOnlyMasterSeedResolveConversationKeyCall()` immediately
+   * above (same artifact/dev-gate/readiness/import/init checks, same
+   * `isFedosMasterSeedAuthorityShape()` validation, same `isAeadKeyHandleShape()`
+   * return-value validation), with two differences: no
+   * `accountIndex`/counterparty parameters (this call takes none — see
+   * `FedosMasterSeedAuthorityHandle.resolve_commerce_media_key`'s own doc
+   * comment for why), and an extra `"MethodUnavailable"` fail-closed
+   * reason for a real, structurally-valid authority that simply never
+   * implements this OPTIONAL method (a pre-existing hand-written mock, or
+   * a not-yet-upgraded real authority) — distinct from `"CallFailed"`
+   * (method exists but threw) and `"InvalidAuthorityHandle"` (not even a
+   * real authority shape).
+   */
+  async attemptDevOnlyMasterSeedResolveCommerceMediaKeyCall(
+    authority: unknown,
+  ): Promise<FedosWasmLoaderCommerceMediaKeyResolutionExecution> {
+    const artifactCheck = this.#generatedArtifactCheckResult;
+    const devGate = this.#devOnlyGateEvaluation;
+    const readiness = this.#importReadiness;
+    const importResult = this.#importExecution;
+    const module = this.#jsGlueModule;
+    const wasmInit = this.#wasmInitialization;
+
+    let result: FedosWasmLoaderCommerceMediaKeyResolutionExecution;
+    if (!artifactCheck || !devGate || !readiness || !importResult || !wasmInit) {
+      result = { attempted: false, succeeded: false, keyHandle: null, reason: "PrototypeStillClosed" };
+    } else if (
+      !artifactCheck.artifactsExist ||
+      !devGate.developmentAllowed ||
+      !readiness.ready ||
+      !importResult.succeeded ||
+      !module ||
+      !wasmInit.succeeded
+    ) {
+      result = { attempted: false, succeeded: false, keyHandle: null, reason: "NotInitialized" };
+    } else if (!isFedosMasterSeedAuthorityShape(authority)) {
+      result = { attempted: true, succeeded: false, keyHandle: null, reason: "InvalidAuthorityHandle" };
+    } else if (typeof authority.resolve_commerce_media_key !== "function") {
+      result = { attempted: true, succeeded: false, keyHandle: null, reason: "MethodUnavailable" };
+    } else {
+      try {
+        const value: unknown = authority.resolve_commerce_media_key();
+        if (isAeadKeyHandleShape(value)) {
+          result = { attempted: true, succeeded: true, keyHandle: value, reason: "Succeeded" };
+        } else if (value === undefined) {
+          result = { attempted: true, succeeded: false, keyHandle: null, reason: "DerivationFailed" };
+        } else {
+          result = { attempted: true, succeeded: false, keyHandle: null, reason: "InvalidHandleShape" };
+        }
+      } catch {
+        result = { attempted: true, succeeded: false, keyHandle: null, reason: "CallFailed" };
+      }
+    }
+    this.#masterSeedResolveCommerceMediaKeyExecution = result;
     return result;
   }
 

@@ -217,7 +217,7 @@ describe("FedOS Rust crate — public algorithm policy metadata (Stage 106)", ()
     ]) {
       expect(pubFnNames).toContain(fn);
     }
-    expect(pubFnNames.length).toBe(69);  });
+    expect(pubFnNames.length).toBe(70);  });
 
   it("13. the design doc exists and names all three types", () => {
     expect(policyDocSource.length).toBeGreaterThan(0);

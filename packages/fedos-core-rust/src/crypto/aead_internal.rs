@@ -96,6 +96,16 @@ pub(crate) enum AeadAadDomain {
     /// key reuse. Deliberately its own domain, never a reuse of
     /// `Storage`/`Conversation`.
     DirectRatchetSealing,
+    /// Commerce E2E Completion arc — the Commerce/Product Media domain:
+    /// binds a sealed product-media ciphertext to exactly this purpose,
+    /// so it can never be swapped for, or confused with, a ciphertext
+    /// sealed under any OTHER domain even under an (implausible)
+    /// accidental key reuse. Deliberately its own domain, not a reuse of
+    /// `Storage`/`Conversation` — Product Media has no conversation, no
+    /// counterparty, and no ratchet session (closer structurally to
+    /// `Storage`), but is its own secret CLASS and gets its own label,
+    /// same reasoning as every domain above it.
+    CommerceMedia,
 }
 
 impl AeadAadDomain {
@@ -115,6 +125,7 @@ impl AeadAadDomain {
             AeadAadDomain::TestOnly => b"fedos-aead-aad-test-only-v1",
             AeadAadDomain::MasterSeedSealing => b"fedos-aead-aad-master-seed-sealing-v1",
             AeadAadDomain::DirectRatchetSealing => b"fedos-aead-aad-direct-ratchet-sealing-v1",
+            AeadAadDomain::CommerceMedia => b"fedos-aead-aad-commerce-media-v1",
         }
     }
 }
@@ -473,6 +484,40 @@ mod tests {
             );
             assert_eq!(opened.status, AeadStatus::AuthenticationFailed);
             assert!(opened.plaintext.is_none());
+        }
+    }
+
+    #[test]
+    fn commerce_media_domain_is_isolated_from_every_other_domain() {
+        const ALL_DOMAINS: [AeadAadDomain; 8] = [
+            AeadAadDomain::RootKey,
+            AeadAadDomain::Identity,
+            AeadAadDomain::Storage,
+            AeadAadDomain::Conversation,
+            AeadAadDomain::TestOnly,
+            AeadAadDomain::MasterSeedSealing,
+            AeadAadDomain::DirectRatchetSealing,
+            AeadAadDomain::CommerceMedia,
+        ];
+        for algorithm in [AeadCipher::ChaCha20Poly1305, AeadCipher::Aes256Gcm] {
+            let key = test_key();
+            let nonce = ready_nonce();
+            let sealed = seal_internal(
+                algorithm, &key, &nonce, AeadAadDomain::CommerceMedia, TEST_PLAINTEXT,
+            );
+            let ciphertext = sealed.ciphertext.expect("Ready seal must carry ciphertext");
+            for &other_domain in ALL_DOMAINS.iter().filter(|d| **d != AeadAadDomain::CommerceMedia) {
+                let opened = open_internal(algorithm, &key, &nonce, other_domain, &ciphertext);
+                assert_eq!(
+                    opened.status,
+                    AeadStatus::AuthenticationFailed,
+                    "CommerceMedia ciphertext must not authenticate under {other_domain:?}"
+                );
+            }
+            // And the reverse: sealed under CommerceMedia opens ONLY under CommerceMedia.
+            let reopened = open_internal(algorithm, &key, &nonce, AeadAadDomain::CommerceMedia, &ciphertext);
+            assert_eq!(reopened.status, AeadStatus::Ready);
+            assert_eq!(reopened.plaintext.as_deref(), Some(TEST_PLAINTEXT));
         }
     }
 
