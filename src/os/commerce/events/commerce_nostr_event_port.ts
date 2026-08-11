@@ -59,12 +59,47 @@
  * `CommerceNostrEventSubscriptionPort` (or similar) with its own explicit
  * inbound duplicate/replay guard before any Commerce code ever consumes an
  * inbound Nostr event.
+ *
+ * FEDOS FINAL Closure Mega-Arc (Wave, Agent N) update — the inbound half of
+ * that gap is now closed: see `./commerce_nostr_event_read_model.ts`
+ * (transport-agnostic inbound consumer/read-model, this same directory) and
+ * `../catalog/adapters/nostr/commerce_inbound_event_bridge.ts` (the real
+ * signature-verifying bridge from a signed `NostrEvent` into that read
+ * model's input shape). This Port itself remains publish-side only.
+ *
+ * NETWORK PROFILE GATING (this same wave) — Nostr publication is now
+ * explicitly gated by this repo's existing `NetworkProfile` seam
+ * (`../catalog/network_profile.ts`, already real, tested code — reused
+ * here rather than inventing a new mode enum, per this wave's own
+ * instruction to derive names from the existing architecture). The
+ * constructor's second parameter selects the profile; `publish()` calls
+ * `evaluateNetworkAccess(profile, true)` (publishing always "requires
+ * network") immediately after draft validation and BEFORE the dedup guard
+ * or the transport are ever touched — a `"local-only"` profile means
+ * `transport.send()` is never reachable, full stop. Conceptual mapping to
+ * this wave's brief (`LOCAL_ONLY` / `NOSTR_OPTIONAL` / `SERVERLESS_PRIVACY`):
+ *   - `"local-only"`  == `LOCAL_ONLY`        — Nostr publish always refused.
+ *   - `"direct"`      == `NOSTR_OPTIONAL`    — Nostr publish permitted, no
+ *     Tor routing preference (this Port's own default, matching
+ *     `IpfsMediaStore`'s existing `networkProfile: NetworkProfile =
+ *     "direct"` default convention).
+ *   - `"tor-optional"` == `SERVERLESS_PRIVACY` — Nostr publish permitted,
+ *     AND a future real transport should prefer routing it through Tor
+ *     (`prefersTorTransport()`). As `network_profile.ts`'s own header
+ *     insists: this is a transport-ROUTING preference, never an anonymity
+ *     guarantee — this Port makes no anonymity claim by selecting it, and
+ *     neither may any future caller.
+ * Nostr remains strictly OPTIONAL under every profile: Commerce itself
+ * (`create_commerce.ts`) never constructs or requires a
+ * `CommerceNostrEventPort` at all, so "no profile selected"/"profile is
+ * local-only" is exactly as safe as this Port not existing.
  */
 
 import {
   isWellFormedCommerceNostrEventDraft,
   type CommerceNostrEventDraft,
 } from "./commerce_nostr_event_drafts.js";
+import { evaluateNetworkAccess, type NetworkProfile } from "../catalog/network_profile.js";
 
 // ---------------------------------------------------------------------------
 // Transport seam (implemented by a fake for every test in this wave, and by
@@ -103,7 +138,12 @@ export interface CommerceNostrEventTransport {
 // Port
 // ---------------------------------------------------------------------------
 
-export type CommerceNostrPublishOutcome = "published" | "duplicate" | "rejected" | "transport-error";
+export type CommerceNostrPublishOutcome =
+  | "published"
+  | "duplicate"
+  | "rejected"
+  | "transport-error"
+  | "network-disabled";
 
 export interface CommerceNostrPublishResult {
   readonly outcome: CommerceNostrPublishOutcome;
@@ -154,16 +194,38 @@ function canonicalizeValue(value: unknown): unknown {
  */
 export class CommerceNostrEventPortImpl implements CommerceNostrEventPort {
   readonly #transport: CommerceNostrEventTransport;
+  readonly #networkProfile: NetworkProfile;
   /** content key -> event id of the first successful publish. */
   readonly #publishedByContentKey = new Map<string, string>();
 
-  constructor(transport: CommerceNostrEventTransport) {
+  /**
+   * `networkProfile` defaults to `"direct"` — matching
+   * `IpfsMediaStore`'s own existing default (`../catalog/ipfs_media_store.ts`)
+   * — so existing callers that construct this Port with only a transport
+   * see unchanged behavior. Pass `"local-only"` to make Nostr publication
+   * unconditionally unreachable (`LOCAL_ONLY`), or `"tor-optional"` to mark
+   * a future real transport's routing preference (`SERVERLESS_PRIVACY`).
+   * See this file's header for the full mapping and its caveats.
+   */
+  constructor(transport: CommerceNostrEventTransport, networkProfile: NetworkProfile = "direct") {
     this.#transport = transport;
+    this.#networkProfile = networkProfile;
+  }
+
+  /** The profile this Port instance was constructed with. Introspection
+   * only — not part of the `CommerceNostrEventPort` interface. */
+  get networkProfile(): NetworkProfile {
+    return this.#networkProfile;
   }
 
   async publish(draft: CommerceNostrEventDraft): Promise<CommerceNostrPublishResult> {
     if (!isWellFormedCommerceNostrEventDraft(draft)) {
       return { outcome: "rejected", reason: "draft failed field-safety validation" };
+    }
+
+    const networkDecision = evaluateNetworkAccess(this.#networkProfile, true);
+    if (!networkDecision.allowed) {
+      return { outcome: "network-disabled", reason: networkDecision.reason };
     }
 
     const contentKey = canonicalizeCommerceNostrEventDraft(draft);

@@ -56,6 +56,40 @@
  *     arc's own instruction) and not wired into the Electron composition
  *     root this pass; import it directly by path if/when that changes.
  *
+ * FedOS Commerce FINAL Closure Mega-Arc (Agent N) adds, still under
+ * `./events/` and still deliberately NOT re-exported here for the same
+ * "optional, not yet activated" reason above — the coordinator's own
+ * future composition-root wiring is the right place to decide whether/how
+ * to surface these:
+ *   - `./events/commerce_nostr_event_port.js`'s `CommerceNostrEventPortImpl`
+ *     now takes an explicit `NetworkProfile` (`./catalog/network_profile.js`
+ *     — already barreled? no, also imported directly by path today) so
+ *     Nostr publication can be gated `"local-only"` (LOCAL_ONLY, always
+ *     refused), `"direct"` (NOSTR_OPTIONAL, the default), or
+ *     `"tor-optional"` (SERVERLESS_PRIVACY, a future transport's own
+ *     routing preference only — never an anonymity claim).
+ *   - `./events/commerce_nostr_event_read_model.js`'s
+ *     `CommerceNostrProductReadModel` — the SUBSCRIBE/inbound counterpart
+ *     `commerce_nostr_event_port.ts`'s own header previously flagged as
+ *     unbuilt. Transport-agnostic; consumes an
+ *     `InboundCommerceNostrEnvelope`.
+ *   - `./catalog/adapters/nostr/commerce_inbound_event_bridge.js`'s
+ *     `verifyAndBuildInboundCommerceNostrEnvelope()` — the real
+ *     `NobleSignatureVerifier`-backed bridge from a signed `NostrEvent`
+ *     into that read model's input shape (reserved adapter directory,
+ *     same as the pre-existing outbound `commerce_event_bridge.ts`).
+ * TODO (coordinator): if/when Nostr publication is activated, wire a real
+ * `RealCommerceNostrEventTransport` (`./catalog/adapters/nostr/
+ * commerce_event_bridge.ts`, pre-existing) into a `CommerceNostrEventPort`
+ * for outbound, and `verifyAndBuildInboundCommerceNostrEnvelope()` +
+ * `CommerceNostrProductReadModel` for inbound, from the Electron
+ * composition root — plus a user-visible Settings control for the
+ * `NetworkProfile` (LOCAL_ONLY / NOSTR_OPTIONAL / SERVERLESS_PRIVACY)
+ * itself. None of that is done by this wave; see
+ * `test/commerce_nostr_event_read_model.test.ts` and
+ * `test/commerce_inbound_event_bridge.test.ts` for the real, tested
+ * behavior available to wire up.
+ *
  * BOUNDARY CHECK (re-verify after any future edit to this file): `os/commerce`
  * must never import `os/messenger` (old or new location), and no
  * Telegram/BTCPay SDK specifier may leak outside its own reserved adapter

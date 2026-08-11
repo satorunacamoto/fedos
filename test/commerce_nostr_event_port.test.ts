@@ -11,6 +11,7 @@ import type {
   OrderCommitmentEventDraft,
   ProductPublicationEventDraft,
 } from "../src/os/commerce/events/commerce_nostr_event_drafts.js";
+import { createCommerce } from "../src/os/commerce/create_commerce.js";
 
 const HEX_A = "a".repeat(64);
 const HEX_B = "b".repeat(64);
@@ -187,5 +188,96 @@ describe("CommerceNostrEventPort: no Commerce domain state mutation (scope note)
 
     await port.publish(validProductPublication());
     expect(port.publishedCount).toBe(1);
+  });
+});
+
+describe("CommerceNostrEventPort: NetworkProfile gating (Nostr must remain strictly optional)", () => {
+  it('defaults to "direct" (NOSTR_OPTIONAL) when no profile is given — unchanged behavior for existing callers', async () => {
+    const transport = new RecordingTransport();
+    const port = new CommerceNostrEventPortImpl(transport);
+    expect(port.networkProfile).toBe("direct");
+
+    const result = await port.publish(validProductPublication());
+    expect(result.outcome).toBe("published");
+    expect(transport.calls.length).toBe(1);
+  });
+
+  it('"local-only" (LOCAL_ONLY) refuses to publish — transport.send() is NEVER called', async () => {
+    const transport = new RecordingTransport();
+    const port = new CommerceNostrEventPortImpl(transport, "local-only");
+    expect(port.networkProfile).toBe("local-only");
+
+    const result = await port.publish(validProductPublication());
+    expect(result.outcome).toBe("network-disabled");
+    expect(result.reason).toMatch(/local-only/);
+    expect(result.eventId).toBeUndefined();
+    expect(transport.calls.length).toBe(0);
+    expect(port.publishedCount).toBe(0);
+  });
+
+  it('"local-only" still validates the draft FIRST — a malformed draft is "rejected", not "network-disabled"', async () => {
+    const transport = new RecordingTransport();
+    const port = new CommerceNostrEventPortImpl(transport, "local-only");
+
+    const result = await port.publish({ nonsense: true } as unknown as CommerceNostrEventDraft);
+    expect(result.outcome).toBe("rejected");
+    expect(transport.calls.length).toBe(0);
+  });
+
+  it('"tor-optional" (SERVERLESS_PRIVACY) permits publishing, exactly like "direct"', async () => {
+    const transport = new RecordingTransport();
+    const port = new CommerceNostrEventPortImpl(transport, "tor-optional");
+
+    const result = await port.publish(validProductPublication());
+    expect(result.outcome).toBe("published");
+    expect(transport.calls.length).toBe(1);
+  });
+
+  it('a "local-only" Port never touches the dedup ledger — flipping to a permissive profile still allows a first real publish', async () => {
+    const inner = new InMemoryFakeCommerceNostrTransport();
+    const draft = validProductPublication();
+
+    const blockedPort = new CommerceNostrEventPortImpl(new RecordingTransport(inner), "local-only");
+    const blocked = await blockedPort.publish(draft);
+    expect(blocked.outcome).toBe("network-disabled");
+
+    // A second, independent Port instance (simulating the user later
+    // opting in to Nostr publication) can still publish the exact same
+    // content — the local-only Port never consumed/poisoned any shared
+    // dedup state, because there is none shared across Port instances.
+    const openPort = new CommerceNostrEventPortImpl(new RecordingTransport(inner), "direct");
+    const opened = await openPort.publish(draft);
+    expect(opened.outcome).toBe("published");
+  });
+});
+
+describe("Commerce works fully with zero Nostr relay configured or available (mandatory-optionality check)", () => {
+  it("createCommerce() with no arguments never references a CommerceNostrEventPort and remains fully usable", () => {
+    const commerce = createCommerce();
+    // No `events`/Nostr-shaped field exists anywhere on the aggregate —
+    // Commerce's real domain surface is entirely independent of this
+    // Port's existence.
+    expect(Object.keys(commerce).sort()).toEqual(["catalog", "marketplace", "payments"]);
+    expect(() => commerce.catalog.list()).not.toThrow();
+    expect(commerce.catalog.list()).toEqual([]);
+  });
+
+  it('a CommerceNostrEventPort built with networkProfile "local-only" never reaches a transport, and nothing else in Commerce degrades because of it', async () => {
+    let sendCalls = 0;
+    class NeverCalledTransport implements CommerceNostrEventTransport {
+      send(): Promise<CommerceNostrTransportSendResult> {
+        sendCalls += 1;
+        return Promise.resolve({ accepted: true, eventId: "should-not-happen", message: "" });
+      }
+    }
+    const port = new CommerceNostrEventPortImpl(new NeverCalledTransport(), "local-only");
+    const commerce = createCommerce();
+
+    const publishResult = await port.publish(validProductPublication());
+    expect(publishResult.outcome).toBe("network-disabled");
+    expect(sendCalls).toBe(0);
+
+    // Commerce's own real domain code is completely unaffected.
+    expect(commerce.catalog.list()).toEqual([]);
   });
 });
