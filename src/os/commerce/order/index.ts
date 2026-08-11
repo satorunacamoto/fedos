@@ -34,6 +34,10 @@ export {
 
 export type { OrderRepository } from "./order_repository_port.js";
 export { LocalOrderRepository } from "./local_order_repository.js";
+// Commerce Durability arc (Agent D) -- durable, restart-surviving sibling
+// of `LocalOrderRepository`, same `OrderRepository` Port, backed by an
+// append-only NDJSON log file.
+export { DurableOrderRepository } from "./persistence/durable_order_repository.js";
 
 export {
   buildCreateOrderDraft,

@@ -257,6 +257,20 @@ function navigationLogPath(): string {
   return path.join(dataDir(), "..", "navigation.log");
 }
 
+/**
+ * Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL
+ * Closure arc (coordinator) — the ONE per-profile directory every durable
+ * Commerce NDJSON log file lives under (`<dataDir()>/commerce/<name>.ndjson`),
+ * same `FEDOS_ELECTRON_BETA_DATA_DIR`-override discipline as `dataDir()`/
+ * `settingsFilePath()` above (so tests/E2E harnesses can point this at an
+ * isolated scratch directory exactly like every other durable file this
+ * process owns). `name` is never derived from external/caller input —
+ * every call site below passes one of a small fixed set of literal names.
+ */
+function commerceDurableFilePath(name: string): string {
+  return path.join(dataDir(), "commerce", `${name}.ndjson`);
+}
+
 const rootDistDir = path.join(__dirname, "..", "..", "..", "dist");
 function distUrl(...segments: string[]): string {
   return pathToFileURL(path.join(rootDistDir, ...segments)).href;
@@ -605,12 +619,27 @@ interface RootModules {
       generateId?: () => string,
       initialProducts?: readonly CommerceProductLike[],
     ) => CommerceProductRepositoryLike;
+    /**
+     * Commerce Durability + Protected-Media Entitlement + Packaged-E2E
+     * FINAL Closure arc (coordinator) -- durable, restart-surviving
+     * siblings of the four `Local*`/`PaymentSettlementLedger` constructors
+     * above, same Ports, each backed by an append-only NDJSON log file at
+     * a caller-supplied path (see `commerceDurableFilePath()` below).
+     */
+    readonly DurableProductRepository: new (
+      filePath: string,
+      generateId?: () => string,
+      initialProducts?: readonly CommerceProductLike[],
+    ) => CommerceProductRepositoryLike;
     readonly LocalOrderRepository: new () => CommerceOrderRepositoryLike;
+    readonly DurableOrderRepository: new (filePath: string) => CommerceOrderRepositoryLike;
     readonly createOrder: (input: CommerceCreateOrderInputLike, actor: CommerceOrderActorLike, now: number) => CommerceOrderTransitionResultLike;
     readonly applyOrderAction: (order: CommerceOrderLike, action: CommerceOrderActionLike, now: number) => CommerceOrderTransitionResultLike;
     readonly DeterministicLocalPaymentProvider: new (options: { readonly acknowledgeTestOnly: true; readonly runtimeProfile?: string }) => CommerceLocalPaymentProviderLike;
     readonly PaymentSettlementLedger: new () => CommercePaymentLedgerLike;
+    readonly DurablePaymentSettlementLedger: new (filePath: string) => CommercePaymentLedgerLike;
     readonly LocalDeliveryRepository: new () => CommerceDeliveryRepositoryLike;
+    readonly DurableDeliveryRepository: new (filePath: string) => CommerceDeliveryRepositoryLike;
     readonly createDelivery: (input: CommerceCreateDeliveryInputLike, actor: CommerceDeliveryActorLike, now: number) => CommerceDeliveryTransitionResultLike;
     readonly applyDeliveryAction: (delivery: CommerceDeliveryRecordLike, action: CommerceDeliveryActionLike, now: number) => CommerceDeliveryTransitionResultLike;
     readonly issueSignedTradeReceiptProof: (payload: unknown, keys: unknown, options: unknown) => unknown;
@@ -641,7 +670,11 @@ interface RootModules {
    */
   readonly Reputation: {
     readonly LocalPersonaEpochRegistry: new () => CommercePersonaEpochRegistryLike;
+    /** Commerce Durability arc (coordinator) -- durable sibling, same shape, append-only NDJSON-backed. */
+    readonly DurablePersonaEpochRegistry: new (filePath: string) => CommercePersonaEpochRegistryLike;
     readonly LocalTradeCompletionAttestationStore: new () => CommerceTradeCompletionAttestationStoreLike;
+    /** Commerce Durability arc (coordinator) -- durable sibling; its replay-time dedupe hydration is what makes "same completed trade can't re-attest" survive a restart. */
+    readonly DurableTradeCompletionAttestationStore: new (filePath: string) => CommerceTradeCompletionAttestationStoreLike;
     readonly createPersonaEpoch: (
       validFrom: number,
       validUntil: number,
@@ -997,12 +1030,16 @@ async function loadRootModules(): Promise<RootModules> {
   const commerce = (await import(distUrl("os", "commerce", "index.js"))) as {
     listViewableProducts: RootModules["Commerce"]["listViewableProducts"];
     LocalProductRepository: RootModules["Commerce"]["LocalProductRepository"];
+    DurableProductRepository: RootModules["Commerce"]["DurableProductRepository"];
     LocalOrderRepository: RootModules["Commerce"]["LocalOrderRepository"];
+    DurableOrderRepository: RootModules["Commerce"]["DurableOrderRepository"];
     createOrder: RootModules["Commerce"]["createOrder"];
     applyOrderAction: RootModules["Commerce"]["applyOrderAction"];
     DeterministicLocalPaymentProvider: RootModules["Commerce"]["DeterministicLocalPaymentProvider"];
     PaymentSettlementLedger: RootModules["Commerce"]["PaymentSettlementLedger"];
+    DurablePaymentSettlementLedger: RootModules["Commerce"]["DurablePaymentSettlementLedger"];
     LocalDeliveryRepository: RootModules["Commerce"]["LocalDeliveryRepository"];
+    DurableDeliveryRepository: RootModules["Commerce"]["DurableDeliveryRepository"];
     createDelivery: RootModules["Commerce"]["createDelivery"];
     applyDeliveryAction: RootModules["Commerce"]["applyDeliveryAction"];
     issueSignedTradeReceiptProof: RootModules["Commerce"]["issueSignedTradeReceiptProof"];
@@ -1023,7 +1060,9 @@ async function loadRootModules(): Promise<RootModules> {
   // exactly like `Commerce`/`Trust` above.
   const reputation = (await import(distUrl("os", "commerce", "reputation", "index.js"))) as {
     LocalPersonaEpochRegistry: RootModules["Reputation"]["LocalPersonaEpochRegistry"];
+    DurablePersonaEpochRegistry: RootModules["Reputation"]["DurablePersonaEpochRegistry"];
     LocalTradeCompletionAttestationStore: RootModules["Reputation"]["LocalTradeCompletionAttestationStore"];
+    DurableTradeCompletionAttestationStore: RootModules["Reputation"]["DurableTradeCompletionAttestationStore"];
     createPersonaEpoch: RootModules["Reputation"]["createPersonaEpoch"];
     issueTradeCompletionAttestation: RootModules["Reputation"]["issueTradeCompletionAttestation"];
     queryPersonaBoardView: RootModules["Reputation"]["queryPersonaBoardView"];
@@ -1085,12 +1124,16 @@ async function loadRootModules(): Promise<RootModules> {
     Commerce: {
       listViewableProducts: commerce.listViewableProducts,
       LocalProductRepository: commerce.LocalProductRepository,
+      DurableProductRepository: commerce.DurableProductRepository,
       LocalOrderRepository: commerce.LocalOrderRepository,
+      DurableOrderRepository: commerce.DurableOrderRepository,
       createOrder: commerce.createOrder,
       applyOrderAction: commerce.applyOrderAction,
       DeterministicLocalPaymentProvider: commerce.DeterministicLocalPaymentProvider,
       PaymentSettlementLedger: commerce.PaymentSettlementLedger,
+      DurablePaymentSettlementLedger: commerce.DurablePaymentSettlementLedger,
       LocalDeliveryRepository: commerce.LocalDeliveryRepository,
+      DurableDeliveryRepository: commerce.DurableDeliveryRepository,
       createDelivery: commerce.createDelivery,
       applyDeliveryAction: commerce.applyDeliveryAction,
       issueSignedTradeReceiptProof: commerce.issueSignedTradeReceiptProof,
@@ -1104,7 +1147,9 @@ async function loadRootModules(): Promise<RootModules> {
     },
     Reputation: {
       LocalPersonaEpochRegistry: reputation.LocalPersonaEpochRegistry,
+      DurablePersonaEpochRegistry: reputation.DurablePersonaEpochRegistry,
       LocalTradeCompletionAttestationStore: reputation.LocalTradeCompletionAttestationStore,
+      DurableTradeCompletionAttestationStore: reputation.DurableTradeCompletionAttestationStore,
       createPersonaEpoch: reputation.createPersonaEpoch,
       issueTradeCompletionAttestation: reputation.issueTradeCompletionAttestation,
       queryPersonaBoardView: reputation.queryPersonaBoardView,
@@ -1160,13 +1205,17 @@ let shutdownInitiated = false;
 let trayCreated = false;
 
 // ---------------------------------------------------------------------
-// Commerce E2E Completion arc — in-memory Commerce state for this Electron
-// process's lifetime only. NOT persisted across restarts (a durable
-// adapter is a future arc — same "0 storage dependency at this layer"
-// posture Phase 1 already established for the read-only catalog). Lazily
-// constructed on first use so Commerce stays reachable even before a
-// profile exists (unchanged Phase 1 property — see `commerceState()`
-// below), never gated on `requireBoundary()`/`requireShell()`.
+// Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL
+// Closure arc (coordinator) — Commerce state now DURABLY persisted, one
+// append-only NDJSON log per repository under `commerceDurableFilePath()`
+// (`<dataDir()>/commerce/*.ndjson`), replacing the Commerce E2E Completion
+// arc's original in-memory-only `Local*` constructors with their `Durable*`
+// siblings — same Ports, zero behavior change to any caller of
+// `commerceState()`/`commerceReputationState()`. Still lazily constructed
+// on first use so Commerce stays reachable even before a profile exists
+// (unchanged Phase 1 property), never gated on
+// `requireBoundary()`/`requireShell()` — the durable log file itself is
+// process/profile-scoped, not identity-scoped, so this remains safe.
 // ---------------------------------------------------------------------
 let commerceProductRepo: CommerceProductRepositoryLike | null = null;
 let commerceOrderRepo: CommerceOrderRepositoryLike | null = null;
@@ -1180,13 +1229,19 @@ const COMMERCE_RECEIPT_ISSUER_ID = "fedos-commerce-e2e-demo-merchant";
 /**
  * Lazily constructs (once) and returns the process's Commerce state,
  * seeding `commerceProductRepo` with the EXACT Phase 1 demo products
- * (same ids/status — `LocalProductRepository`'s `initialProducts` seeds by
- * `.id` directly, never through `create()`) so existing Phase 1 catalog
- * behavior is unchanged, while making the catalog now backed by a real,
- * mutable repository a Merchant can create/edit/publish/unpublish
- * against. `commercePaymentProvider` is the LOUDLY-labeled TEST/LOCAL
- * simulator (`acknowledgeTestOnly: true`) — never a real payment rail;
- * see `RootModules.Commerce`'s own header.
+ * (same ids/status — `DurableProductRepository`'s `initialProducts` seeds
+ * by `.id` directly, never through `create()`, and only for an id not
+ * already present in the durable log, so a restart never re-seeds over a
+ * real merchant edit) so existing Phase 1 catalog behavior is unchanged,
+ * while making the catalog now backed by a real, mutable, DURABLE
+ * repository a Merchant can create/edit/publish/unpublish against and
+ * have survive a restart. `commercePaymentProvider` is the LOUDLY-labeled
+ * TEST/LOCAL simulator (`acknowledgeTestOnly: true`) — never a real
+ * payment rail; see `RootModules.Commerce`'s own header. Every repository
+ * below is now the `Durable*` sibling of its Commerce E2E Completion arc
+ * original (Commerce Durability arc, coordinator) — same Port, same
+ * caller-visible behavior, backed by an append-only NDJSON log file under
+ * `commerceDurableFilePath()`.
  */
 function commerceState(): {
   readonly products: CommerceProductRepositoryLike;
@@ -1196,20 +1251,25 @@ function commerceState(): {
   readonly deliveries: CommerceDeliveryRepositoryLike;
 } {
   const m = requireModules();
+  fs.mkdirSync(path.dirname(commerceDurableFilePath("products")), { recursive: true });
   if (commerceProductRepo === null) {
-    commerceProductRepo = new m.Commerce.LocalProductRepository(undefined, FEDOS_COMMERCE_DEMO_PRODUCTS as unknown as CommerceProductLike[]);
+    commerceProductRepo = new m.Commerce.DurableProductRepository(
+      commerceDurableFilePath("products"),
+      undefined,
+      FEDOS_COMMERCE_DEMO_PRODUCTS as unknown as CommerceProductLike[],
+    );
   }
   if (commerceOrderRepo === null) {
-    commerceOrderRepo = new m.Commerce.LocalOrderRepository();
+    commerceOrderRepo = new m.Commerce.DurableOrderRepository(commerceDurableFilePath("orders"));
   }
   if (commercePaymentProvider === null) {
     commercePaymentProvider = new m.Commerce.DeterministicLocalPaymentProvider({ acknowledgeTestOnly: true });
   }
   if (commercePaymentLedger === null) {
-    commercePaymentLedger = new m.Commerce.PaymentSettlementLedger();
+    commercePaymentLedger = new m.Commerce.DurablePaymentSettlementLedger(commerceDurableFilePath("payment_settlements"));
   }
   if (commerceDeliveryRepo === null) {
-    commerceDeliveryRepo = new m.Commerce.LocalDeliveryRepository();
+    commerceDeliveryRepo = new m.Commerce.DurableDeliveryRepository(commerceDurableFilePath("deliveries"));
   }
   return {
     products: commerceProductRepo,
@@ -1246,11 +1306,29 @@ function commerceReceiptSigningState(): { readonly issuerId: string; readonly ke
 // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Reputation /
 // Persona Epoch composition (Agent R's central-integration TODOs).
 //
-// Same lazy, process-lifetime, in-memory singleton pattern as
-// `commerceState()` above -- a real `LocalPersonaEpochRegistry` +
-// `LocalTradeCompletionAttestationStore`, constructed once, never
-// persisted across restarts (same posture as every other Commerce
-// repository this file already owns).
+// Same lazy singleton pattern as `commerceState()` above -- the
+// `PersonaEpochRegistry`/`TradeCompletionAttestationStore` repositories
+// are now DURABLE (Commerce Durability arc, coordinator): a restart
+// replays every persisted `PersonaEpoch` and issued attestation, so a
+// duplicate-attestation-for-the-same-completed-trade re-issue attempt is
+// still correctly rejected after a restart (proven by Agent D's targeted
+// tests). `commercePersonaEpochByPubkey` immediately below is a SEPARATE,
+// STILL process-lifetime-only piece of state -- disclosed, not silently
+// left inconsistent: it is this coordinator's real-pubkey -> PersonaEpoch
+// identity-minting CACHE, and it also holds each epoch's live
+// `PersonaEpochSigningKeypair` (a raw secp256k1 secret key). Persisting
+// that keypair safely needs a sealed/encrypted-at-rest key store (the
+// same class of primitive `FedosMasterSeedAuthority`'s own sealed-secret
+// storage already provides elsewhere in this codebase) -- inventing that
+// wiring under this arc's own time budget, for a secret key, is exactly
+// the kind of judgment call this arc's mandate says to disclose rather
+// than force through. Net effect after a real restart: past attestations
+// remain durable and query-able BY EPOCH ID, and cannot be duplicated,
+// but resolving "this real pubkey's persona epoch" via
+// `commercePersonaEpochForPubkey()` mints a FRESH, unlinked epoch rather
+// than resuming the pre-restart one -- a real, bounded, disclosed gap,
+// not a regression this arc introduced (this mapping was equally
+// in-memory-only before this arc too).
 //
 // PSEUDONYM MAPPING: `os/commerce/reputation`'s own domain layer
 // deliberately holds no mapping from a real pubkey to a `PersonaEpoch`
@@ -1276,11 +1354,12 @@ const COMMERCE_PERSONA_EPOCH_VALIDITY_SECONDS = 60 * 60 * 24 * 365;
 
 function commerceReputationState(): { readonly registry: CommercePersonaEpochRegistryLike; readonly store: CommerceTradeCompletionAttestationStoreLike } {
   const m = requireModules();
+  fs.mkdirSync(path.dirname(commerceDurableFilePath("persona_epochs")), { recursive: true });
   if (commercePersonaEpochRegistry === null) {
-    commercePersonaEpochRegistry = new m.Reputation.LocalPersonaEpochRegistry();
+    commercePersonaEpochRegistry = new m.Reputation.DurablePersonaEpochRegistry(commerceDurableFilePath("persona_epochs"));
   }
   if (commerceAttestationStore === null) {
-    commerceAttestationStore = new m.Reputation.LocalTradeCompletionAttestationStore();
+    commerceAttestationStore = new m.Reputation.DurableTradeCompletionAttestationStore(commerceDurableFilePath("trade_attestations"));
   }
   return { registry: commercePersonaEpochRegistry, store: commerceAttestationStore };
 }

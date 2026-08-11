@@ -169,10 +169,27 @@ export class DurableProductRepository implements ProductRepositoryPort {
   #products: Map<string, Product>;
   readonly #generateId: () => string;
 
-  constructor(filePath: string, generateId: () => string = generateFedosProductId) {
+  /**
+   * `initialProducts` (coordinator integration, Commerce Durability arc) —
+   * OPTIONAL composition-time seed, mirroring `LocalProductRepository`'s
+   * own `initialProducts` constructor param (e.g. the Phase 1 demo
+   * catalog's fixed ids/status). Unlike the in-memory sibling, seeding
+   * here must stay correct ACROSS a restart: an id already present in the
+   * replayed log is left untouched (a real merchant edit — or a prior
+   * run's own seed — must never be clobbered by a stale re-seed), and any
+   * id NOT yet present is durably persisted the same as a real `create()`
+   * call, so it survives every subsequent restart without needing to be
+   * re-seeded from this same array again.
+   */
+  constructor(filePath: string, generateId: () => string = generateFedosProductId, initialProducts: readonly Product[] = []) {
     this.#filePath = filePath;
     this.#generateId = generateId;
     this.#products = replayLog(filePath);
+    for (const product of initialProducts) {
+      if (!this.#products.has(product.id)) {
+        this.#persist(product);
+      }
+    }
   }
 
   #persist(product: Product): void {

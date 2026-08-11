@@ -119,6 +119,13 @@ export type {
   UpdateProductInput,
   ProductRepositoryMutationResult,
 } from "./catalog/product_repository_port.js";
+// Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL
+// Closure arc (Agent D) -- durable, restart-surviving sibling of
+// `LocalProductRepository` above, same `ProductRepositoryPort`, backed by
+// an append-only NDJSON log file (this codebase's own established local
+// persistence convention -- see that file's own header for the precedent
+// it follows).
+export { DurableProductRepository } from "./catalog/persistence/durable_product_repository.js";
 export { generateFedosProductId, generateFedosProductMediaId } from "./catalog/product_id.js";
 
 export { LocalProductMediaRepository } from "./catalog/local_product_media_repository.js";
@@ -166,6 +173,51 @@ export {
 } from "./catalog/product_media_encryption.js";
 export { UnavailableProductMediaDecryption, type ProductMediaDecryptionPort } from "./catalog/product_media_decryption.js";
 
+// Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL
+// Closure arc (Agent G) -- `MediaAccessGrant`: binds protected-media
+// decryption capability to a specific buyer/media/qualifying-Order/time
+// window via a signed, revocable grant. Barreled here so a future
+// composition-root wiring (no live "download protected media" IPC surface
+// exists in the shipped app yet — see this arc's own final report) has a
+// single, public entry point to import from, same as every other
+// Commerce capability in this file.
+export {
+  isQualifyingOrderStatusForMediaAccess,
+  evaluateMediaAccessGrant,
+  type MediaAccessDecision,
+  type MediaAccessDenialReason,
+  type EvaluateMediaAccessGrantInput,
+} from "./media_grant/media_access_grant_policy.js";
+export {
+  signMediaAccessGrant,
+  verifyMediaAccessGrantEnvelope,
+  MEDIA_ACCESS_GRANT_ENVELOPE_VERSION_1,
+  MEDIA_ACCESS_GRANT_ENVELOPE_TYPE,
+  type MediaAccessGrantSigningKeypair,
+  type MediaAccessGrantVerifyResult,
+  type MediaAccessGrantVerifyStatus,
+} from "./media_grant/media_access_grant_sign_verify.js";
+export {
+  type MediaAccessGrantPayload,
+  type MediaAccessGrantEnvelope,
+  isWellFormedMediaAccessGrantPayload,
+  mediaAccessGrantKey,
+} from "./media_grant/media_access_grant_types.js";
+export {
+  AppendOnlyMediaAccessGrantPersistence,
+  latestGrantVersion,
+  type MediaAccessGrantPersistence,
+  type MediaAccessGrantPersistenceWriteResult,
+} from "./media_grant/media_access_grant_persistence.js";
+export {
+  wrapMediaAccessGrantRelease,
+  unwrapMediaAccessGrantRelease,
+  MAX_MEDIA_ACCESS_GRANT_RELEASE_PAYLOAD_BYTES,
+  type WrapMediaAccessGrantReleaseInput,
+  type WrapMediaAccessGrantReleaseResult,
+  type UnwrapMediaAccessGrantReleaseInput,
+} from "./media_grant/media_access_grant_key_release.js";
+
 export type {
   PaymentProvider,
   PaymentProviderStatus,
@@ -207,6 +259,10 @@ export {
   type SettlementStatus,
   type SettlementTransitionRecord,
 } from "./payment/state_machine.js";
+// Commerce Durability arc (Agent D) -- durable, restart-surviving sibling
+// of `PaymentSettlementLedger` above; same `apply()`/`get()` contract,
+// backed by the same append-only NDJSON convention.
+export { DurablePaymentSettlementLedger } from "./payment/persistence/durable_payment_settlement_ledger.js";
 export { computeHmacSha256Hex, verifyHmacSha256Hex } from "./payment/callback_verification.js";
 
 export {
@@ -217,6 +273,9 @@ export {
   getAvailableActions,
   isTerminalOrderStatus,
   LocalOrderRepository,
+  // Commerce Durability arc (Agent D) -- durable, restart-surviving
+  // sibling of `LocalOrderRepository`, same `OrderRepository` Port.
+  DurableOrderRepository,
   buildCreateOrderDraft,
   buildCustomerOrderStatusViewModel,
   buildMerchantIncomingOrdersViewModel,
@@ -268,6 +327,7 @@ export {
   getAvailableDeliveryActions,
   isTerminalDeliveryStatus,
   LocalDeliveryRepository,
+  DurableDeliveryRepository,
   type CreateDeliveryInput,
   type DeliveryAction,
   type DeliveryActionType,

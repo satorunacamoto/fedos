@@ -38,3 +38,7 @@ export {
 
 export type { DeliveryRepository } from "./delivery_repository_port.js";
 export { LocalDeliveryRepository } from "./local_delivery_repository.js";
+// Commerce Durability arc (Agent D) -- durable, restart-surviving sibling
+// of `LocalDeliveryRepository`, same `DeliveryRepository` Port, backed by
+// an append-only NDJSON log file.
+export { DurableDeliveryRepository } from "./persistence/durable_delivery_repository.js";

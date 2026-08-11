@@ -89,8 +89,17 @@ export {
   type EpochCarryOverEnvelope,
   type RolloverPersonaEpochResult,
 } from "./persona_epoch_registry.js";
+// Commerce Durability arc (Agent D) -- durable, restart-surviving sibling
+// of `LocalPersonaEpochRegistry`, backed by an append-only NDJSON log
+// file. Insert-only, same as the in-memory registry.
+export { DurablePersonaEpochRegistry } from "./persistence/durable_persona_epoch_registry.js";
 
 export { LocalTradeCompletionAttestationStore } from "./trade_completion_attestation_store.js";
+// Commerce Durability arc (Agent D) -- durable, restart-surviving sibling
+// of `LocalTradeCompletionAttestationStore`. Its replay-time dedupe-key
+// hydration is what makes "the same completed trade cannot re-issue a
+// second attestation" survive a restart.
+export { DurableTradeCompletionAttestationStore } from "./persistence/durable_trade_completion_attestation_store.js";
 
 export {
   buildReputationAttestationSummary,
