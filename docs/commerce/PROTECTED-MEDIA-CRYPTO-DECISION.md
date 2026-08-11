@@ -827,3 +827,13 @@ Root-derived key function, but does not resolve what value Commerce's
 own domain code should pass). Those remain implementation-time decisions
 for whoever picks up the patch above — this document only establishes
 that the crypto primitive itself is safe to extend.
+
+---
+
+## Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL Closure arc update (current, additive)
+
+**The remaining "who is allowed to decrypt" question this document deliberately left open is now closed, one layer up.** `resolveCommerceMediaKey()` remains exactly what this document decided it should be: a real, per-PROFILE (not per-purchase) AEAD key — that has NOT changed, and a holder of the profile Master Seed can still, by itself, derive it. What is new: `src/os/commerce/media_grant/` adds a `MediaAccessGrant` layer strictly ABOVE this primitive, never modifying it — a real purchase-bound authorization gate (buyer+media+qualifying-Order+time-window, signed, revocable) that a caller must independently satisfy before the release path (`wrapMediaAccessGrantRelease()`/`unwrapMediaAccessGrantRelease()`) will hand over anything, reusing the codebase's existing NIP-44/ECDH primitive (`FedosMasterSeedAuthority.encryptNip44Wire`) — not a new cryptographic mechanism.
+
+**Disclosed limitation, precisely scoped:** this pass could NOT implement the fully portable "separate per-media symmetric content key, wrapped for the buyer" design this document's own "what this document does NOT decide" section gestured at — `fedos_runtime_encrypt.ts`'s own hard guardrail (`encrypt()` never accepts a raw-byte key, only an opaque `AeadKeyHandle` derived from the Master Seed) makes a JS-generated content key unable to decrypt existing `CommerceMedia` ciphertext on a different device without new Rust/WASM surface. The wrap therefore currently covers the release payload directly (bounded to 64 KiB), not an independently portable content key — a real, disclosed, named follow-up, not a silent shortcut.
+
+**No live IPC handler exists yet in the shipped app to consume this grant** — Product Media's own download/decrypt path was never reachable from the renderer before this arc either (same "real capability, not yet wired to a composition-root consumer" posture Order/Delivery/Reputation each had before their own respective wiring arcs).

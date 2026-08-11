@@ -77,3 +77,13 @@ stateDiagram-v2
 **PersonaEpoch validity is itself a small time-windowed state check**, not a transition machine: `isPersonaEpochCurrentlyValid(epoch, atTimeUnixSeconds)` is `true` strictly inside `[validFrom, validUntil)` (with a small, explicit clock-skew tolerance), `false` otherwise — an attestation signed while an epoch was valid remains verifiably `VALID` after the epoch later expires (verification is independent of epoch *currency*, only epoch *validity at signing time* matters), but a NEW attestation attempt under an already-expired epoch is correctly rejected. Epoch rollover (`buildEpochCarryOverStatement`) is a one-directional, predecessor-signed, explicitly-linkable-if-used statement — never a silent identity carry-over. See `test/commerce_reputation_persona_epoch.test.ts` / `test/commerce_reputation_issuance.test.ts`'s own "epoch rollover" and "OLD EPOCH" describe blocks.
 
 **STATE MACHINES (Commerce FINAL Closure Mega-Arc): Order/Delivery unchanged (REAL, GUARDED); Reputation issuance is a real, guarded GATE on Order's own terminal state, not a machine of its own; PersonaEpoch validity is a real, tested time-window check.**
+
+---
+
+## Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL Closure arc update (current, additive)
+
+**Order's `createOrder()` gains one new, unconditional guard**, closing a real gap this arc's own starting classification found: the acting customer's own pubkey is now compared against `input.sellerPubkey`, and self-dealing (`buyerPubkey === sellerPubkey`) is rejected with a new `self_dealing` code before the `Order` object is ever constructed — not a transition on an existing `Order`, since none exists yet to reject. Every other guard `createOrder()`/`applyOrderAction()` already enforced is unchanged.
+
+**A new artifact, `MediaAccessGrant`, is a small state machine of its own** (not a transition function on a mutable record, but a signed, versioned, revocable ALLOW/DENY decision — see `evaluateMediaAccessGrant()`, `src/os/commerce/media_grant/media_access_grant_policy.ts`): a grant version can be superseded by a newer version, `revoked: true` on any version invalidates access unconditionally, and `validFrom`/`validUntil` bound the grant's own time window — independent of, but consuming, `Order.status` (a grant is only issuable once the qualifying Order reaches `paid`/`fulfilling`/`delivered`/`completed`).
+
+**STATE MACHINES (this arc): Order gains an unconditional self-dealing guard at creation; a new, independent `MediaAccessGrant` decision function exists (signed/versioned/revocable, gated on Order's own status); Delivery/Payment/PersonaEpoch/Reputation-issuance are all unchanged from the prior arc's own account above.**

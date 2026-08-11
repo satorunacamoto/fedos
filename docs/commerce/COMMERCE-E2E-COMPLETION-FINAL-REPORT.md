@@ -6,6 +6,23 @@
 
 ---
 
+## Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL Closure arc (current, additive)
+
+**Starting CandidateHead:** `b447dfcc899b6c713606f36f02351bc566636e3e` **Starting EvidenceHead:** `9dbdc87ec4b9b10df73128ecf8e0337c49c0a427`
+
+Closed the four bounded P1s that lineage's own final classification left open, via 4 parallel agents (D: persistence, G: protected-media grant, O: order self-dealing, X: NSIS harness investigation) plus coordinator integration:
+
+- **Persistence (P1 #3): CLOSED.** Every Commerce repository now has a `Durable*` NDJSON-backed sibling of its `Local*` in-memory adapter, same Port, wired live into the Electron composition root. Proven with a real, passing, two-independent-Electron-process restart test (not just repository-level unit tests): `commerce_e2e_restart_persistence_real_electron.test.ts` — launch 1 completes a full trade, exits; launch 2 (fresh process, same profile, real unlock) confirms Product/Order/Delivery all durably survive with no impossible state.
+- **Self-dealing (P1 #1): CLOSED.** `createOrder()` now unconditionally rejects `buyerPubkey === sellerPubkey`; no bypass path exists anywhere in the commerce tree.
+- **Protected media (P1 #2): CLOSED at the domain layer.** A new, real, signed, tested `MediaAccessGrant` binds decryption capability to buyer+media+qualifying-Order+expiry, reusing existing crypto primitives (no new cryptography). No live IPC handler exists yet to consume it in the shipped app — disclosed, not glossed over, and a pre-existing condition (Product Media's own consumption path was never reachable from the UI before this arc either).
+- **Packaged-binary E2E (P1 #4): PARTIAL, root cause substantially narrowed.** Found and fixed a real packaging bug — `electron_builder.beta.config.json` never bundled `node_modules` into the packaged app at all, so `qrcode`/`@noble/curves`/`@noble/hashes` were always missing at Electron boot, before the app's first lifecycle checkpoint. Fixed, verified structurally (142 real dependency entries now inside the packaged `app.asar`) and independently confirmed to resolve the identical crash for a real dev-launch process. Two harness bugs (a UTF-8 console-encoding bug, a path-separator mismatch) were also found and fixed along the way, making the installed artifact's OS-process identity proof (installer hash, installed exe path, PID/ParentPID, running-exe hash) more robust than before. Despite all of this, the packaged binary — across every post-fix run — still never writes its first lifecycle checkpoint and does not exit on its own within its own test timeout (`exit code: null`, killed by the harness). A new crash-visibility diagnostic added this arc never fires either, ruling out a JS-level startup crash; live host telemetry throughout every run stayed healthy (moderate, fluctuating CPU, several GB free memory), ruling out severe contention as the sole explanation. The honest, narrowed conclusion: the hang is upstream of this app's own JS entirely, inside Electron's native process bootstrap for this specific packaged artifact in this environment — a real, precisely characterized, disclosed remaining gap, not a mystery and not something this arc's own "do not merely raise the timeout" instruction permits forcing through with more retries.
+
+**Also found and disclosed, not fixed (pre-existing, out-of-scope, same class of judgment call the arc's own mandate says to disclose rather than force through under time pressure):** the coordinator's real-pubkey→PersonaEpoch identity-minting cache (`commercePersonaEpochByPubkey`, which also holds each epoch's live signing keypair) and the demo Receipt-issuer's signing keypair (`commerceReceiptSigningState()`) are both still process-lifetime-only. Reputation registry/attestation-store durability and duplicate-issuance rejection ARE proven to survive a restart; but the live Seller Reputation UI panel falls back to "no history yet" after a restart (empirically reproduced and asserted in the new restart test) because the pubkey→epoch cache resets, and a Receipt signed before a restart cannot be re-verified against the live app's own single-issuer Trust policy after one, for the identical reason. Both need sealed/encrypted-at-rest key storage to close safely.
+
+**FINAL CandidateHead:** `5bfe57b3` (source/runtime frozen; see the arc's own final report for the EvidenceHead recorded after validation).
+
+---
+
 ## Scope actually delivered
 
 A real, locally-verifiable Commerce vertical slice, reachable end-to-end through the shipped FedOS Desktop Beta Electron app's own visible UI controls — no fake controls, no bare-claim authority anywhere in the PAID/delivered path:
