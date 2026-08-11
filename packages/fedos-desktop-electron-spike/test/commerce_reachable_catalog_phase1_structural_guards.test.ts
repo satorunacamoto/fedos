@@ -72,10 +72,15 @@ describe("Commerce Reachable Catalog Phase 1 -- composition root wiring", () => 
     expect(source).toMatch(/distUrl\("os", "commerce", "index\.js"\)/);
     expect(source).toMatch(/listViewableProducts:\s*RootModules\["Commerce"\]\["listViewableProducts"\]/);
     // The commerce dynamic-import block's destructured shape names exactly the arc's own widened, reviewed set.
-    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,900}?)\};/);
+    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,1600}?)\};/);
     expect(importBlockMatch, source).not.toBeNull();
     const importBlock = importBlockMatch![1];
-    for (const name of ["listViewableProducts", "LocalProductRepository", "LocalOrderRepository", "createOrder", "applyOrderAction", "DeterministicLocalPaymentProvider", "PaymentSettlementLedger"]) {
+    for (const name of [
+      "listViewableProducts", "LocalProductRepository", "LocalOrderRepository", "createOrder", "applyOrderAction",
+      "DeterministicLocalPaymentProvider", "PaymentSettlementLedger", "LocalDeliveryRepository", "createDelivery",
+      "applyDeliveryAction", "issueSignedTradeReceiptProof", "verifySignedTradeReceiptProof",
+      "encodeCommerceReceiptProofToQrText", "decodeCommerceReceiptProofFromQrText",
+    ]) {
       expect(importBlock, `expected commerce import block to name ${name}`).toMatch(new RegExp(name));
     }
     expect(importBlock).not.toMatch(/PlaceholderPaymentProvider/);
@@ -86,10 +91,15 @@ describe("Commerce Reachable Catalog Phase 1 -- composition root wiring", () => 
 
   it("3. RootModules.Commerce exposes exactly the Commerce E2E Completion arc's own reviewed name set -- no PlaceholderPaymentProvider/marketplace field, never the raw createCommerce() factory", () => {
     const source = stripComments(read(MAIN_PATH));
-    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,1400}?)\n  \};\n\}/);
+    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,1900}?)\n  \};/);
     expect(fieldMatch, source).not.toBeNull();
     const field = fieldMatch![1];
-    for (const name of ["listViewableProducts", "LocalProductRepository", "LocalOrderRepository", "createOrder", "applyOrderAction", "DeterministicLocalPaymentProvider", "PaymentSettlementLedger"]) {
+    for (const name of [
+      "listViewableProducts", "LocalProductRepository", "LocalOrderRepository", "createOrder", "applyOrderAction",
+      "DeterministicLocalPaymentProvider", "PaymentSettlementLedger", "LocalDeliveryRepository", "createDelivery",
+      "applyDeliveryAction", "issueSignedTradeReceiptProof", "verifySignedTradeReceiptProof",
+      "encodeCommerceReceiptProofToQrText", "decodeCommerceReceiptProofFromQrText",
+    ]) {
       expect(field, `expected RootModules.Commerce to declare ${name}`).toMatch(new RegExp(name));
     }
     expect(field).not.toMatch(/marketplace|PlaceholderPaymentProvider/i);
@@ -119,6 +129,10 @@ describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
       "commerce-orders-list-incoming",
       "commerce-payment-request",
       "commerce-payment-simulate",
+      "commerce-delivery-status",
+      "commerce-delivery-acknowledge-receipt",
+      "commerce-order-complete",
+      "commerce-receipt-issue",
     ];
     expect(channelMatches.length).toBe(EXPECTED_CHANNELS.length);
     for (const channel of EXPECTED_CHANNELS) {

@@ -704,6 +704,8 @@ function setCommerceActingAs(pubkey: string): void {
 
 let currentCommerceOrder: FedosCommerceOrder | null = null;
 let currentCommercePendingPayment: { readonly paymentId: string; readonly amountCents: number; readonly currency: string } | null = null;
+/** Commerce E2E Completion arc (Wave B integration) — the Delivery record bound to `currentCommerceOrder`, if one exists yet (created only once the merchant fulfills). Refetched every time the Order screen (re)renders. */
+let currentCommerceDelivery: FedosCommerceDelivery | null = null;
 
 function commerceOrderSummaryText(order: FedosCommerceOrder): string {
   return `${order.quantity} × ${formatCommercePrice(order.unitPriceCents, order.currency)} = ${formatCommercePrice(order.totalCents, order.currency)}`;
@@ -736,14 +738,71 @@ function renderCommerceOrderScreen(): void {
   byId("commerce-order-paid-banner").toggleAttribute("hidden", !["paid", "fulfilling", "delivered", "completed"].includes(order.status));
   byId("commerce-order-fulfill-actions").toggleAttribute("hidden", !(order.status === "paid" && isSeller));
 
+  const delivery = currentCommerceDelivery;
+  byId("commerce-order-delivery-status").textContent = delivery !== null ? `Delivery status: ${delivery.status}` : "";
+  byId("commerce-order-acknowledge-actions").toggleAttribute("hidden", !(order.status === "fulfilling" && isBuyer));
+  byId("commerce-order-complete-actions").toggleAttribute("hidden", !(order.status === "delivered" && (isBuyer || isSeller)));
+  byId("commerce-order-receipt-actions").toggleAttribute("hidden", order.status !== "completed");
+  if (order.status !== "completed") byId("commerce-order-receipt-result").setAttribute("hidden", "");
+
   byId("commerce-order-history").textContent = `Product ${order.productId} — buyer ${order.buyerPubkey.slice(0, 8)}… — seller ${order.sellerPubkey.slice(0, 8)}…`;
+}
+
+async function refreshCommerceDeliveryStatus(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  const result = await window.fedosApp.commerceDeliveryStatus(currentCommerceOrder.id);
+  currentCommerceDelivery = result.outcome === "ok" ? result.delivery ?? null : null;
+  renderCommerceOrderScreen();
 }
 
 function openCommerceOrderScreen(order: FedosCommerceOrder): void {
   currentCommerceOrder = order;
   currentCommercePendingPayment = null;
+  currentCommerceDelivery = null;
   showAppScreen("commerce-order");
   renderCommerceOrderScreen();
+  void refreshCommerceDeliveryStatus();
+}
+
+async function onCommerceDeliveryAcknowledgeReceiptClick(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  clearError("commerce-order-error");
+  const result = await window.fedosApp.commerceDeliveryAcknowledgeReceipt(currentCommerceOrder.id, commerceActingAsPubkey);
+  if (result.outcome !== "ok" || result.order === undefined) {
+    showCommerceError("commerce-order-error", result);
+    return;
+  }
+  currentCommerceOrder = result.order;
+  currentCommerceDelivery = result.delivery ?? currentCommerceDelivery;
+  renderCommerceOrderScreen();
+  void refreshCommerceMyOrdersList();
+}
+
+async function onCommerceOrderCompleteClick(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  clearError("commerce-order-error");
+  const result = await window.fedosApp.commerceOrderComplete(currentCommerceOrder.id, commerceActingAsPubkey);
+  if (result.outcome !== "ok" || result.order === undefined) {
+    showCommerceError("commerce-order-error", result);
+    return;
+  }
+  currentCommerceOrder = result.order;
+  renderCommerceOrderScreen();
+  void refreshCommerceDeliveryStatus();
+  void refreshCommerceMyOrdersList();
+}
+
+async function onCommerceReceiptIssueClick(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  clearError("commerce-order-receipt-error");
+  const result = await window.fedosApp.commerceReceiptIssue(currentCommerceOrder.id);
+  if (result.outcome !== "ok" || result.qrText === undefined) {
+    showCommerceError("commerce-order-receipt-error", result);
+    return;
+  }
+  byId("commerce-order-receipt-result").removeAttribute("hidden");
+  byId("commerce-order-receipt-verify-status").textContent = result.verifyStatus ?? "";
+  byId<HTMLTextAreaElement>("commerce-order-receipt-qr-text").value = result.qrText;
 }
 
 async function onCommerceOrderCreateSubmit(): Promise<void> {
@@ -776,6 +835,7 @@ async function onCommerceOrderActionClick(
   }
   currentCommerceOrder = result.order;
   renderCommerceOrderScreen();
+  void refreshCommerceDeliveryStatus();
   void refreshCommerceMyOrdersList();
 }
 
@@ -2319,6 +2379,9 @@ byId<HTMLButtonElement>("commerce-order-fulfill-btn").addEventListener("click", 
 );
 byId<HTMLButtonElement>("commerce-order-payment-request-btn").addEventListener("click", () => void onCommercePaymentRequestClick());
 byId<HTMLButtonElement>("commerce-order-payment-simulate-btn").addEventListener("click", () => void onCommercePaymentSimulateClick());
+byId<HTMLButtonElement>("commerce-order-acknowledge-receipt-btn").addEventListener("click", () => void onCommerceDeliveryAcknowledgeReceiptClick());
+byId<HTMLButtonElement>("commerce-order-complete-btn").addEventListener("click", () => void onCommerceOrderCompleteClick());
+byId<HTMLButtonElement>("commerce-order-receipt-issue-btn").addEventListener("click", () => void onCommerceReceiptIssueClick());
 byId<HTMLButtonElement>("commerce-merchant-create-submit").addEventListener("click", () => void onCommerceMerchantCreateSubmit());
 
 // Search.

@@ -526,6 +526,26 @@ interface RootModules {
     readonly applyOrderAction: (order: CommerceOrderLike, action: CommerceOrderActionLike, now: number) => CommerceOrderTransitionResultLike;
     readonly DeterministicLocalPaymentProvider: new (options: { readonly acknowledgeTestOnly: true; readonly runtimeProfile?: string }) => CommerceLocalPaymentProviderLike;
     readonly PaymentSettlementLedger: new () => CommercePaymentLedgerLike;
+    readonly LocalDeliveryRepository: new () => CommerceDeliveryRepositoryLike;
+    readonly createDelivery: (input: CommerceCreateDeliveryInputLike, actor: CommerceDeliveryActorLike, now: number) => CommerceDeliveryTransitionResultLike;
+    readonly applyDeliveryAction: (delivery: CommerceDeliveryRecordLike, action: CommerceDeliveryActionLike, now: number) => CommerceDeliveryTransitionResultLike;
+    readonly issueSignedTradeReceiptProof: (payload: unknown, keys: unknown, options: unknown) => unknown;
+    readonly verifySignedTradeReceiptProof: (envelope: unknown, policy: unknown) => { readonly status: string; readonly payload?: unknown };
+    readonly encodeCommerceReceiptProofToQrText: (envelope: unknown) => string;
+    readonly decodeCommerceReceiptProofFromQrText: (text: string) => unknown;
+  };
+  /**
+   * Commerce E2E Completion arc (coordinator) -- the narrow slice of the
+   * real `os/trust` barrel this main process needs to issue/verify a
+   * signed Commerce receipt (`os/commerce/receipt/commerce_trust_receipt_adapter.ts`'s
+   * own two required collaborators it never constructs itself: a signing
+   * keypair and a verification policy). Loaded exactly like `Commerce`
+   * above -- compiled `dist/`, dynamic `import()`. This is the ONLY
+   * `os/trust` surface this main process touches.
+   */
+  readonly Trust: {
+    readonly FedosTrustSigningKeypair: { readonly generate: () => { readonly publicKeyHex: string } };
+    readonly createSingleIssuerFedosTrustPolicy: (options: { readonly issuerId: string; readonly keys: readonly { readonly keyId: string; readonly publicKeyHex: string }[] }) => unknown;
   };
 }
 
@@ -641,6 +661,41 @@ interface CommercePaymentLedgerLike {
   get(paymentId: string): CommerceSettlementStateLike | undefined;
   apply(evidence: CommercePaymentEvidenceLike, expectedOrderId: string): CommerceSettlementApplyResultLike;
 }
+interface CommerceDeliveryActorLike {
+  readonly kind: "merchant" | "customer" | "delivery_evidence";
+}
+interface CommerceDeliveryRecordLike {
+  readonly id: string;
+  readonly orderId: string;
+  readonly buyerPubkey: string;
+  readonly sellerPubkey: string;
+  readonly status: string;
+  readonly receiptArtifact?: unknown;
+  readonly [key: string]: unknown;
+}
+interface CommerceCreateDeliveryInputLike {
+  readonly id: string;
+  readonly orderId: string;
+  readonly buyerPubkey: string;
+  readonly sellerPubkey: string;
+  readonly orderPaymentConfirmed: boolean;
+}
+interface CommerceDeliveryActionLike {
+  readonly type: string;
+  readonly actor: CommerceDeliveryActorLike;
+  readonly [key: string]: unknown;
+}
+interface CommerceDeliveryTransitionResultLike {
+  readonly ok: boolean;
+  readonly delivery?: CommerceDeliveryRecordLike;
+  readonly reason?: string;
+  readonly code?: string;
+}
+interface CommerceDeliveryRepositoryLike {
+  save(delivery: CommerceDeliveryRecordLike): void;
+  findById(id: string): CommerceDeliveryRecordLike | undefined;
+  findByOrderId(orderId: string): CommerceDeliveryRecordLike | undefined;
+}
 
 async function loadRootModules(): Promise<RootModules> {
   const attestation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_desktop_host_attestation.js"))) as {
@@ -714,6 +769,21 @@ async function loadRootModules(): Promise<RootModules> {
     applyOrderAction: RootModules["Commerce"]["applyOrderAction"];
     DeterministicLocalPaymentProvider: RootModules["Commerce"]["DeterministicLocalPaymentProvider"];
     PaymentSettlementLedger: RootModules["Commerce"]["PaymentSettlementLedger"];
+    LocalDeliveryRepository: RootModules["Commerce"]["LocalDeliveryRepository"];
+    createDelivery: RootModules["Commerce"]["createDelivery"];
+    applyDeliveryAction: RootModules["Commerce"]["applyDeliveryAction"];
+    issueSignedTradeReceiptProof: RootModules["Commerce"]["issueSignedTradeReceiptProof"];
+    verifySignedTradeReceiptProof: RootModules["Commerce"]["verifySignedTradeReceiptProof"];
+    encodeCommerceReceiptProofToQrText: RootModules["Commerce"]["encodeCommerceReceiptProofToQrText"];
+    decodeCommerceReceiptProofFromQrText: RootModules["Commerce"]["decodeCommerceReceiptProofFromQrText"];
+  };
+  // Commerce E2E Completion arc (coordinator) -- the ONE os/trust surface
+  // this main process touches: a signing keypair generator and a
+  // single-issuer verification policy, both required by the commerce
+  // receipt adapter's own `CommerceReceiptSigningKeys`/verify contract.
+  const trust = (await import(distUrl("os", "trust", "index.js"))) as {
+    FedosTrustSigningKeypair: RootModules["Trust"]["FedosTrustSigningKeypair"];
+    createSingleIssuerFedosTrustPolicy: RootModules["Trust"]["createSingleIssuerFedosTrustPolicy"];
   };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
@@ -742,6 +812,17 @@ async function loadRootModules(): Promise<RootModules> {
       applyOrderAction: commerce.applyOrderAction,
       DeterministicLocalPaymentProvider: commerce.DeterministicLocalPaymentProvider,
       PaymentSettlementLedger: commerce.PaymentSettlementLedger,
+      LocalDeliveryRepository: commerce.LocalDeliveryRepository,
+      createDelivery: commerce.createDelivery,
+      applyDeliveryAction: commerce.applyDeliveryAction,
+      issueSignedTradeReceiptProof: commerce.issueSignedTradeReceiptProof,
+      verifySignedTradeReceiptProof: commerce.verifySignedTradeReceiptProof,
+      encodeCommerceReceiptProofToQrText: commerce.encodeCommerceReceiptProofToQrText,
+      decodeCommerceReceiptProofFromQrText: commerce.decodeCommerceReceiptProofFromQrText,
+    },
+    Trust: {
+      FedosTrustSigningKeypair: trust.FedosTrustSigningKeypair,
+      createSingleIssuerFedosTrustPolicy: trust.createSingleIssuerFedosTrustPolicy,
     },
   };
 }
@@ -780,6 +861,10 @@ let commerceProductRepo: CommerceProductRepositoryLike | null = null;
 let commerceOrderRepo: CommerceOrderRepositoryLike | null = null;
 let commercePaymentProvider: CommerceLocalPaymentProviderLike | null = null;
 let commercePaymentLedger: CommercePaymentLedgerLike | null = null;
+let commerceDeliveryRepo: CommerceDeliveryRepositoryLike | null = null;
+let commerceReceiptKeypair: { readonly publicKeyHex: string } | null = null;
+let commerceReceiptPolicy: unknown = null;
+const COMMERCE_RECEIPT_ISSUER_ID = "fedos-commerce-e2e-demo-merchant";
 
 /**
  * Lazily constructs (once) and returns the process's Commerce state,
@@ -797,6 +882,7 @@ function commerceState(): {
   readonly orders: CommerceOrderRepositoryLike;
   readonly payments: CommerceLocalPaymentProviderLike;
   readonly ledger: CommercePaymentLedgerLike;
+  readonly deliveries: CommerceDeliveryRepositoryLike;
 } {
   const m = requireModules();
   if (commerceProductRepo === null) {
@@ -811,7 +897,38 @@ function commerceState(): {
   if (commercePaymentLedger === null) {
     commercePaymentLedger = new m.Commerce.PaymentSettlementLedger();
   }
-  return { products: commerceProductRepo, orders: commerceOrderRepo, payments: commercePaymentProvider, ledger: commercePaymentLedger };
+  if (commerceDeliveryRepo === null) {
+    commerceDeliveryRepo = new m.Commerce.LocalDeliveryRepository();
+  }
+  return {
+    products: commerceProductRepo,
+    orders: commerceOrderRepo,
+    payments: commercePaymentProvider,
+    ledger: commercePaymentLedger,
+    deliveries: commerceDeliveryRepo,
+  };
+}
+
+/**
+ * Commerce E2E Completion arc (coordinator) -- lazily generates ONE
+ * process-lifetime Trust signing keypair standing in for "the merchant's"
+ * receipt-issuing identity, plus the matching single-issuer verification
+ * policy. Scoping decision, documented: a real product would derive this
+ * from the merchant's OWN account identity (out of scope this arc -- no
+ * per-merchant Trust identity concept exists yet); this local-only demo
+ * keypair is sufficient to prove the real sign -> QR -> verify pipeline
+ * end to end without inventing that larger design here.
+ */
+function commerceReceiptSigningState(): { readonly issuerId: string; readonly keypair: { readonly publicKeyHex: string }; readonly policy: unknown } {
+  const m = requireModules();
+  if (commerceReceiptKeypair === null) {
+    commerceReceiptKeypair = m.Trust.FedosTrustSigningKeypair.generate();
+    commerceReceiptPolicy = m.Trust.createSingleIssuerFedosTrustPolicy({
+      issuerId: COMMERCE_RECEIPT_ISSUER_ID,
+      keys: [{ keyId: commerceReceiptKeypair.publicKeyHex, publicKeyHex: commerceReceiptKeypair.publicKeyHex }],
+    });
+  }
+  return { issuerId: COMMERCE_RECEIPT_ISSUER_ID, keypair: commerceReceiptKeypair, policy: commerceReceiptPolicy };
 }
 
 function requireModules(): RootModules {
@@ -1986,6 +2103,40 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
   const result = m.Commerce.applyOrderAction(order, action as CommerceOrderActionLike, Math.floor(Date.now() / 1000));
   if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
   orders.save(result.order);
+  if (actionType === "fulfill") {
+    // Commerce E2E Completion arc (coordinator) -- a successful "fulfill" on
+    // the Order side ALSO creates+starts the real Delivery record (Agent
+    // D's domain), a self-asserted merchant claim only sufficient to reach
+    // Delivery's own "fulfilling" status (never "delivered" -- see
+    // `delivery_types.ts`'s own module doc for why that specific transition
+    // carries no risk). Best-effort: a Delivery-side failure here does not
+    // roll back the already-saved Order transition (mirrors this file's
+    // existing posture of never partially-reverting an already-persisted
+    // domain transition), but IS surfaced in the response for the renderer
+    // to show, never silently swallowed.
+    const now = Math.floor(Date.now() / 1000);
+    const state = commerceState();
+    let delivery = state.deliveries.findByOrderId(result.order.id);
+    if (delivery === undefined) {
+      const created = m.Commerce.createDelivery(
+        { id: generateCommerceOrderId(), orderId: result.order.id, buyerPubkey: result.order.buyerPubkey, sellerPubkey: result.order.sellerPubkey, orderPaymentConfirmed: true },
+        { kind: "merchant" },
+        now,
+      );
+      if (created.ok && created.delivery !== undefined) {
+        delivery = created.delivery;
+        state.deliveries.save(delivery);
+      }
+    }
+    if (delivery !== undefined) {
+      const started = m.Commerce.applyDeliveryAction(
+        delivery,
+        { type: "start_fulfillment", actor: { kind: "merchant" }, claim: { deliveryId: delivery.id, orderId: result.order.id, claimedAt: now } },
+        now,
+      );
+      if (started.ok && started.delivery !== undefined) state.deliveries.save(started.delivery);
+    }
+  }
   return { outcome: "ok", order: commerceOrderDto(result.order) };
 }
 
@@ -2061,6 +2212,125 @@ async function handleCommercePaymentSimulate(payload: unknown) {
   if (result.outcome !== "transitioned" || result.order === undefined) return { outcome: "rejected", reason: result.reason };
   state.orders.save(result.order);
   return { outcome: "ok", order: commerceOrderDto(result.order) };
+}
+
+// ---------------------------------------------------------------------
+// Delivery + Trust/QR receipt (Commerce E2E Completion arc, Wave B
+// integration -- coordinator).
+//
+// CORE INVARIANT (mirrors the payment section's own): the ONLY place that
+// can move a Delivery/Order to "delivered" is
+// `handleCommerceDeliveryAcknowledgeReceipt` below, and it constructs
+// `verification: { source: "recipient_acknowledgment", authoritative:
+// true }` ONLY after confirming the calling actor's pubkey matches the
+// Order's OWN `buyerPubkey` -- never a bare merchant claim, never a
+// renderer-suppliable `verification`/`authoritative` field (the preload
+// bridge sends only `orderId`/`actorPubkey`).
+// ---------------------------------------------------------------------
+
+function commerceDeliveryDto(delivery: CommerceDeliveryRecordLike) {
+  return { id: delivery.id, orderId: delivery.orderId, status: delivery.status };
+}
+
+async function handleCommerceDeliveryStatus(payload: unknown) {
+  const orderId = (payload as { orderId?: unknown } | null)?.orderId;
+  if (!isBoundedString(orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
+  const delivery = commerceState().deliveries.findByOrderId(orderId);
+  if (delivery === undefined) return { outcome: "not-found", reason: "no delivery record for this order yet" };
+  return { outcome: "ok", delivery: commerceDeliveryDto(delivery) };
+}
+
+async function handleCommerceDeliveryAcknowledgeReceipt(payload: unknown) {
+  const body = payload as { orderId?: unknown; actorPubkey?: unknown } | null;
+  if (!isBoundedString(body?.orderId, MAX_ID_LENGTH) || !isBoundedString(body.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed orderId/actorPubkey" };
+  }
+  const state = commerceState();
+  const order = state.orders.findById(body.orderId);
+  if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+  if (order.buyerPubkey !== body.actorPubkey) return { outcome: "rejected", reason: "only the order's own buyer may acknowledge receipt" };
+  const delivery = state.deliveries.findByOrderId(body.orderId);
+  if (delivery === undefined) return { outcome: "not-found", reason: "no delivery record for this order yet" };
+
+  const now = Math.floor(Date.now() / 1000);
+  const m = requireModules();
+  const evidence = { deliveryId: delivery.id, orderId: order.id, status: "delivered" as const, observedAt: now, reason: "customer acknowledged receipt", verification: { source: "recipient_acknowledgment" as const, authoritative: true as const, acknowledgedBy: body.actorPubkey } };
+  const deliveryResult = m.Commerce.applyDeliveryAction(delivery, { type: "confirm_delivery", actor: { kind: "delivery_evidence" }, evidence }, now);
+  if (!deliveryResult.ok || deliveryResult.delivery === undefined) return { outcome: "rejected", reason: deliveryResult.reason };
+  state.deliveries.save(deliveryResult.delivery);
+
+  const orderEvidence = { orderId: order.id, deliveryId: delivery.id, status: "delivered" as const, observedAt: now, reason: "customer acknowledged receipt" };
+  const orderResult = m.Commerce.applyOrderAction(order, { type: "confirm_delivery", actor: { kind: "delivery_evidence" }, evidence: orderEvidence } as CommerceOrderActionLike, now);
+  if (orderResult.outcome !== "transitioned" || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
+  state.orders.save(orderResult.order);
+
+  return { outcome: "ok", order: commerceOrderDto(orderResult.order), delivery: commerceDeliveryDto(deliveryResult.delivery) };
+}
+
+async function handleCommerceOrderComplete(payload: unknown) {
+  const body = payload as { orderId?: unknown; actorPubkey?: unknown } | null;
+  if (!isBoundedString(body?.orderId, MAX_ID_LENGTH) || !isBoundedString(body.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed orderId/actorPubkey" };
+  }
+  const state = commerceState();
+  const order = state.orders.findById(body.orderId);
+  if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+  const actorKind: "customer" | "merchant" = order.buyerPubkey === body.actorPubkey ? "customer" : "merchant";
+  const now = Math.floor(Date.now() / 1000);
+  const m = requireModules();
+
+  const orderResult = m.Commerce.applyOrderAction(order, { type: "complete", actor: { kind: actorKind, pubkey: body.actorPubkey } } as CommerceOrderActionLike, now);
+  if (orderResult.outcome !== "transitioned" || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
+  state.orders.save(orderResult.order);
+
+  const delivery = state.deliveries.findByOrderId(body.orderId);
+  if (delivery !== undefined) {
+    const deliveryResult = m.Commerce.applyDeliveryAction(delivery, { type: "acknowledge", actor: { kind: actorKind } }, now);
+    if (deliveryResult.ok && deliveryResult.delivery !== undefined) state.deliveries.save(deliveryResult.delivery);
+  }
+  return { outcome: "ok", order: commerceOrderDto(orderResult.order) };
+}
+
+/**
+ * Issues a real signed `TradeReceiptProof` for a `"completed"` order,
+ * encodes it as QR text, and immediately decodes+verifies it back --
+ * proving the real Trust sign -> QR -> verify pipeline round-trips before
+ * ever handing anything to the renderer. `PLAINTEXT` bindings deliberately
+ * stay coarse (opaque ids only, see `receipt_types.ts`'s own field
+ * comments) -- never the product's title/price, never exact payment
+ * metadata beyond the opaque `paymentId` reference.
+ */
+async function handleCommerceReceiptIssue(payload: unknown) {
+  const orderId = (payload as { orderId?: unknown } | null)?.orderId;
+  if (!isBoundedString(orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
+  const state = commerceState();
+  const order = state.orders.findById(orderId);
+  if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+  if (order.status !== "completed") return { outcome: "rejected", reason: `order must be "completed" before a receipt can be issued (currently "${order.status}")` };
+
+  const m = requireModules();
+  const now = Math.floor(Date.now() / 1000);
+  const { issuerId, keypair, policy } = commerceReceiptSigningState();
+  const payloadRecord = {
+    kind: "trade_completion" as const,
+    orderId: order.id,
+    productRef: order.productId,
+    buyerRef: order.buyerPubkey,
+    sellerRef: order.sellerPubkey,
+    paymentEvidenceRef: order.paymentId ?? undefined,
+    completedAt: now,
+    formatVersion: 1 as const,
+  };
+  let envelope: unknown;
+  try {
+    envelope = m.Commerce.issueSignedTradeReceiptProof(payloadRecord, { keypair, issuer: issuerId }, { issuedAt: now });
+  } catch (err) {
+    return { outcome: "rejected", reason: err instanceof Error ? err.message : "receipt issuance failed" };
+  }
+  const qrText = m.Commerce.encodeCommerceReceiptProofToQrText(envelope);
+  const decoded = m.Commerce.decodeCommerceReceiptProofFromQrText(qrText);
+  const verified = m.Commerce.verifySignedTradeReceiptProof(decoded, policy);
+  return { outcome: "ok", qrText, verifyStatus: verified.status };
 }
 
 /**
@@ -2410,6 +2680,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-app:commerce-orders-list-incoming", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrdersListIncoming(payload));
   ipcMain.handle("fedos-app:commerce-payment-request", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePaymentRequest(payload));
   ipcMain.handle("fedos-app:commerce-payment-simulate", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePaymentSimulate(payload));
+  ipcMain.handle("fedos-app:commerce-delivery-status", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceDeliveryStatus(payload));
+  ipcMain.handle("fedos-app:commerce-delivery-acknowledge-receipt", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceDeliveryAcknowledgeReceipt(payload));
+  ipcMain.handle("fedos-app:commerce-order-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderComplete(payload));
+  ipcMain.handle("fedos-app:commerce-receipt-issue", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptIssue(payload));
 }
 
 // ---------------------------------------------------------------------

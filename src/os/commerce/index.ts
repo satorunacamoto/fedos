@@ -48,6 +48,13 @@
  *     re-exported here so the composition root can construct a
  *     `LocalOrderRepository` and drive `applyOrderAction()`/`createOrder()`
  *     the same way it already does for `LocalProductRepository`.
+ *   - The full `./delivery/index.js` barrel (Agent D's, Wave B) and
+ *     `./receipt/index.js` barrel (Agent T's, Wave B) — same "per-agent
+ *     scoped barrel, re-exported here at the coordinator's own integration
+ *     gate" pattern. `./events/` (Agent N's, Wave B) is deliberately NOT
+ *     re-exported here yet — Nostr publication is optional (per this
+ *     arc's own instruction) and not wired into the Electron composition
+ *     root this pass; import it directly by path if/when that changes.
  *
  * BOUNDARY CHECK (re-verify after any future edit to this file): `os/commerce`
  * must never import `os/messenger` (old or new location), and no
@@ -164,7 +171,12 @@ export {
   CustomerOrderController,
   MerchantOrderController,
   type CreateOrderInput,
-  type DeliveryStatus,
+  // NOTE: order/order_types.ts also defines a local `DeliveryStatus`
+  // placeholder (Agent O never imported the real one from `./delivery/`,
+  // same reasoning as its own `PaymentStatus` placeholder below). Aliased
+  // here to avoid colliding with the real `DeliveryStatus` exported below
+  // from `./delivery/index.js`.
+  type DeliveryStatus as OrderPlaceholderDeliveryStatus,
   type Order,
   type OrderAction,
   type OrderActionType,
@@ -190,6 +202,55 @@ export {
   type OrderReviewViewModel,
   type OrderStatusViewModel,
 } from "./order/index.js";
+
+export {
+  AUTHORITATIVE_DELIVERY_EVIDENCE_SOURCES,
+  DELIVERY_STATUSES,
+  TERMINAL_DELIVERY_STATUSES,
+  buildDeliveryReceiptArtifact,
+  applyDeliveryAction,
+  createDelivery,
+  getAvailableDeliveryActions,
+  isTerminalDeliveryStatus,
+  LocalDeliveryRepository,
+  type CreateDeliveryInput,
+  type DeliveryAction,
+  type DeliveryActionType,
+  type DeliveryActor,
+  type DeliveryActorKind,
+  type DeliveryEvidence,
+  type DeliveryEvidenceProvenance,
+  type DeliveryHistoryActionType,
+  type DeliveryReceiptArtifact,
+  type DeliveryRecord,
+  type DeliveryRejectionCode,
+  type DeliveryStatus,
+  type DeliveryTransitionRecord,
+  type DeliveryTransitionResult,
+  type MerchantDeliveryClaim,
+  type DeliveryRepository,
+} from "./delivery/index.js";
+
+export {
+  isWellFormedTradeReceiptProofPayload,
+  isWellFormedDeliveryReceiptProofPayload,
+  canonicalizeTradeReceiptProofPayloadV1,
+  canonicalizeDeliveryReceiptProofPayloadV1,
+  issueSignedTradeReceiptProof,
+  issueSignedDeliveryReceiptProof,
+  verifySignedTradeReceiptProof,
+  verifySignedDeliveryReceiptProof,
+  encodeCommerceReceiptProofToQrText,
+  decodeCommerceReceiptProofFromQrText,
+  type CommerceReceiptProofKind,
+  type TradeReceiptProofPayload,
+  type DeliveryReceiptProofPayload,
+  type SignedCommerceReceiptProofEnvelope,
+  type CommerceReceiptSigningKeys,
+  type IssueCommerceReceiptProofOptions,
+  type CommerceReceiptVerifyStatus,
+  type CommerceReceiptVerifyResult,
+} from "./receipt/index.js";
 
 export type {
   MarketplaceProvider,

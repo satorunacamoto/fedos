@@ -206,6 +206,33 @@ interface FedosCommercePaymentRequestResult {
   readonly currency?: string;
 }
 
+/** Commerce E2E Completion arc (Wave B integration) — Delivery + Trust/QR receipt shapes. */
+interface FedosCommerceDelivery {
+  readonly id: string;
+  readonly orderId: string;
+  readonly status: string;
+}
+
+interface FedosCommerceDeliveryStatusResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly delivery?: FedosCommerceDelivery;
+}
+
+interface FedosCommerceDeliveryAcknowledgeResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly order?: FedosCommerceOrder;
+  readonly delivery?: FedosCommerceDelivery;
+}
+
+interface FedosCommerceReceiptIssueResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly qrText?: string;
+  readonly verifyStatus?: string;
+}
+
 interface FedosAppBridge {
   readonly conversationsList: () => Promise<FedosAppCommandResult>;
   readonly conversationOpen: (conversationId: string) => Promise<FedosAppCommandResult>;
@@ -271,6 +298,10 @@ interface FedosAppBridge {
   readonly commerceOrdersListIncoming: (actorPubkey: string) => Promise<FedosCommerceOrdersListResult>;
   readonly commercePaymentRequest: (orderId: string) => Promise<FedosCommercePaymentRequestResult>;
   readonly commercePaymentSimulate: (orderId: string, paymentId: string) => Promise<FedosCommerceOrderResult>;
+  readonly commerceDeliveryStatus: (orderId: string) => Promise<FedosCommerceDeliveryStatusResult>;
+  readonly commerceDeliveryAcknowledgeReceipt: (orderId: string, actorPubkey: string) => Promise<FedosCommerceDeliveryAcknowledgeResult>;
+  readonly commerceOrderComplete: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>;
+  readonly commerceReceiptIssue: (orderId: string) => Promise<FedosCommerceReceiptIssueResult>;
 }
 
 interface Window {

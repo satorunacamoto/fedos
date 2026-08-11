@@ -249,6 +249,12 @@ const fedosApp: FedosAppBridge = Object.freeze({
   commercePaymentRequest: (orderId: string) => ipcRenderer.invoke("fedos-app:commerce-payment-request", { orderId: boundedString(orderId, MAX_ID_CHARS) }),
   commercePaymentSimulate: (orderId: string, paymentId: string) =>
     ipcRenderer.invoke("fedos-app:commerce-payment-simulate", { orderId: boundedString(orderId, MAX_ID_CHARS), paymentId: boundedString(paymentId, MAX_ID_CHARS) }),
+  commerceDeliveryStatus: (orderId: string) => ipcRenderer.invoke("fedos-app:commerce-delivery-status", { orderId: boundedString(orderId, MAX_ID_CHARS) }),
+  commerceDeliveryAcknowledgeReceipt: (orderId: string, actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-delivery-acknowledge-receipt", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceOrderComplete: (orderId: string, actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-order-complete", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceReceiptIssue: (orderId: string) => ipcRenderer.invoke("fedos-app:commerce-receipt-issue", { orderId: boundedString(orderId, MAX_ID_CHARS) }),
 });
 
 contextBridge.exposeInMainWorld("fedosProfile", fedosProfile);

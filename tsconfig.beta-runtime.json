@@ -36,6 +36,7 @@
     "src/os/messenger/desktop/websocket_relay.ts",
     "src/os/messenger/desktop/node_websocket_relay_socket_factory.ts",
     "src/os/commerce/index.ts",
+    "src/os/trust/index.ts",
     "src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.ts",
     "src/desktop/beta/fedos_desktop_beta_capability_manifest.ts",
     "src/device/sync_events/fedos_device_sync_event_bridge.ts"

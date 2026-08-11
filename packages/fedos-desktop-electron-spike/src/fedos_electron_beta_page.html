@@ -267,6 +267,29 @@
             <button id="commerce-order-fulfill-btn" type="button">Mark Fulfilling</button>
           </div>
 
+          <div id="commerce-order-delivery-status" class="muted"></div>
+
+          <div id="commerce-order-acknowledge-actions">
+            <p class="muted">Merchant has fulfilled this order — once you receive it, confirm receipt yourself. Only your own confirmation (never a merchant claim alone) can mark this delivered.</p>
+            <button id="commerce-order-acknowledge-receipt-btn" type="button">I Received This</button>
+          </div>
+
+          <div id="commerce-order-complete-actions">
+            <p class="muted">Delivery confirmed — either party may close this order.</p>
+            <button id="commerce-order-complete-btn" type="button">Complete Order</button>
+          </div>
+
+          <div id="commerce-order-receipt-actions">
+            <p class="muted">Order completed — issue a signed trade receipt and encode it as a QR-transportable proof.</p>
+            <button id="commerce-order-receipt-issue-btn" type="button">Issue Signed Receipt</button>
+            <div id="commerce-order-receipt-error" class="error" role="alert"></div>
+            <div id="commerce-order-receipt-result" hidden>
+              <p class="muted">Verification status: <span class="field" id="commerce-order-receipt-verify-status"></span></p>
+              <label for="commerce-order-receipt-qr-text">Signed receipt (QR-encoded text — the signed object itself is authoritative, QR is transport only)</label>
+              <textarea id="commerce-order-receipt-qr-text" readonly rows="4"></textarea>
+            </div>
+          </div>
+
           <p class="muted" id="commerce-order-history"></p>
         </div>
 
