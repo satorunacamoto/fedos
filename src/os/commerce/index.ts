@@ -67,8 +67,33 @@ export type {
   // barrel consumer implementing or calling either method needs the type
   // in scope, so it belongs alongside `PaymentProvider` itself.
   PaymentEvidence,
+  // `PaymentEvidenceProvenance` added (Payment Hardening +
+  // PaymentEvidence/PaymentStatus + local simulator, Commerce E2E
+  // Completion arc, Agent P) -- the WHO/WHAT-produced-this-evidence
+  // discriminant a caller needs in scope to construct or inspect
+  // `PaymentEvidence.verification`. `AUTHORITATIVE_PAYMENT_EVIDENCE_SOURCES`
+  // is the runtime allowlist `payment/state_machine.ts` checks against.
+  PaymentEvidenceProvenance,
 } from "./payment/types.js";
-export { NoopPaymentProvider, PlaceholderPaymentProvider } from "./payment/noop_payment.js";
+export { AUTHORITATIVE_PAYMENT_EVIDENCE_SOURCES } from "./payment/types.js";
+export { NoopPaymentProvider, PlaceholderPaymentProvider, type PlaceholderPaymentProviderOptions } from "./payment/noop_payment.js";
+export {
+  DeterministicLocalPaymentProvider,
+  TEST_SIMULATOR_NAME,
+  type DeterministicLocalPaymentProviderOptions,
+  type SimulatedSettlementOutcome,
+} from "./payment/local_simulator.js";
+export {
+  applySettlementEvidence,
+  createPendingSettlement,
+  PaymentSettlementLedger,
+  type PaymentSettlementState,
+  type SettlementApplyOutcome,
+  type SettlementApplyResult,
+  type SettlementStatus,
+  type SettlementTransitionRecord,
+} from "./payment/state_machine.js";
+export { computeHmacSha256Hex, verifyHmacSha256Hex } from "./payment/callback_verification.js";
 
 export type {
   MarketplaceProvider,
