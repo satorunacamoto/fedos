@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync, readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import packageJsonSource from "../../../package.json?raw";
@@ -13,7 +12,6 @@ import hostBridgeSource from "../../../src/os/messenger/desktop/host_boundary/fe
 import hostCommandSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostResponseSource from "../../../src/os/messenger/desktop/host_boundary/fedos_desktop_host_response.ts?raw";
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { execFileSync } from "node:child_process";
 import { assertFedosRootDependencyInvariant } from "../../helpers/fedos_root_dependency_invariant.js";
 

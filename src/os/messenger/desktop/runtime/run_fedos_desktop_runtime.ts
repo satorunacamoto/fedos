@@ -38,7 +38,6 @@
  *   - No Worker (`../../worker.js`) import of any kind.
  */
 
-// @ts-expect-error `node:process` has no type declarations without `@types/node` in this project's tsconfig.
 import process from "node:process";
 import { startFedosDesktopRuntime } from "./fedos_desktop_runtime.js";
 import type { FedosDesktopRuntimeConfig } from "./fedos_desktop_runtime_config.js";

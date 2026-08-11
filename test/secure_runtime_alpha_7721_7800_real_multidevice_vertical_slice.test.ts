@@ -1,11 +1,7 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error see above.
 import { Buffer } from "node:buffer";
 
 import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";

@@ -22,11 +22,8 @@
  * as not individually exercised.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, appendFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import { AppendOnlyFedosConversationActivationPersistence } from "../src/os/messenger/conversations/activation/append_only_fedos_conversation_activation_persistence.js";

@@ -2,7 +2,6 @@
  * Secure Runtime Alpha 6121–6200 — Append-Only Conversation Continuity
  * Persistence. Mirrors every other append-only backend in this domain.
  */
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   decodeFedosIdentityTransitionConversationContinuityRecordV1,

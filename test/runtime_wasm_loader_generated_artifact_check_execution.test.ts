@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import * as nodeFs from "node:fs";
 
 // `node:fs`'s own exports are non-configurable, so `vi.spyOn` cannot

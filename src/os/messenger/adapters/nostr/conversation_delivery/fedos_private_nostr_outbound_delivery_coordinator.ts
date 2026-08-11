@@ -26,7 +26,6 @@
  * (Alpha 934, UNCHANGED) — no new identity-resolution logic invented.
  */
 
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 import type { FedosConversationMembershipAuthority } from "../../../conversations/membership/fedos_conversation_membership_authority.js";
 import type { FedosConversationMessageEnvelopePersistence } from "../../../conversations/envelope/persistence/fedos_conversation_message_envelope_persistence.js";

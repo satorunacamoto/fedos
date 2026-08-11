@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
-// @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
 import { tmpdir } from "node:os";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 import { AppendOnlyFedosConversationPayloadStorage } from "../src/os/messenger/conversations/payload_storage/append_only_fedos_conversation_payload_storage.js";
 import type { FedosConversationPayloadDescriptor } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_descriptor.js";

@@ -5,7 +5,6 @@ import doc from "../docs/secure_runtime_alpha_448_outbox_publisher_readiness_ada
 import signingAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import wasmSigningAuthoritySource from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_wasm_nostr_signing_authority.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 
 describe("Secure Runtime Alpha 448 -- Outbox Publisher Readiness Adapter", () => {

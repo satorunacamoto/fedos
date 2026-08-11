@@ -33,9 +33,7 @@
  * packaging compatibility documented").
  */
 
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join, isAbsolute } from "node:path";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdirSync } from "node:fs";
 
 /** Every named durable leaf a profile owns. Non-secret path strings only. */

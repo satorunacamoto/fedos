@@ -8,11 +8,8 @@
  * Record persistence (in-memory + append-only restart-safety).
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import {

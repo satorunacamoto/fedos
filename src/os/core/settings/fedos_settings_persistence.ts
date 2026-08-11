@@ -25,9 +25,7 @@
  *     a closed "corrupt" outcome, never to a silent default.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { dirname } from "node:path";
 import {
   decodeFedosSettingsDescriptorV1,

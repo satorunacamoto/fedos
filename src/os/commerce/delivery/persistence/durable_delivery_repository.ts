@@ -27,7 +27,6 @@
  * state — every `save()` appends ONE complete `DeliveryRecord` snapshot.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import type { DeliveryRecord } from "../delivery_types.js";
 import type { DeliveryRepository } from "../delivery_repository_port.js";

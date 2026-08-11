@@ -8,7 +8,6 @@
  * future protocol-delivery/production-crypto capability.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import activationCoordinatorSource from "../src/os/messenger/conversations/activation/fedos_conversation_direct_activation_coordinator.ts?raw";

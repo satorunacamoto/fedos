@@ -6,11 +6,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, writeFileSync, appendFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 import { assembleFedosConversationRuntimeDependencies } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime_assembly.js";
 import { createFedosConversationRuntime } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";

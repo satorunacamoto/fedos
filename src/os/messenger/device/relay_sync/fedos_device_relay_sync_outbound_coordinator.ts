@@ -45,7 +45,6 @@ import { FedosDeviceRelaySyncPublisher, type FedosDeviceRelaySyncPublishOutcome 
 import type { FedosDeviceRelaySyncObservationRepository } from "./fedos_device_relay_sync_observation.js";
 import type { FedosDeviceRelaySyncOutboxPersistence } from "./persistence/fedos_device_relay_sync_outbox_persistence.js";
 
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 
 const DEFAULT_TTL_SECONDS = 86_400; // 24h -- generous enough for a genuinely offline target Device (Phase J).

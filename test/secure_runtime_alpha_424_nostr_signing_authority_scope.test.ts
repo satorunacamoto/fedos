@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_424_nostr_signing_authority_scope.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import fedosBoardPostSource from "../src/os/messenger/board/fedos_board_post.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 
 /**

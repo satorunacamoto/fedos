@@ -17,11 +17,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
-// @ts-expect-error same as above.
 import { tmpdir } from "node:os";
-// @ts-expect-error same as above.
 import { join } from "node:path";
 
 import { FedosIdentityTransitionFacade } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_facade.js";

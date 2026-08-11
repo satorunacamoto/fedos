@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync, mkdtempSync, rmSync, appendFileSync } from "node:fs";
-// @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
 import { tmpdir } from "node:os";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
 import { AppendOnlyFedosBoardOutboxPersistence } from "../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.js";

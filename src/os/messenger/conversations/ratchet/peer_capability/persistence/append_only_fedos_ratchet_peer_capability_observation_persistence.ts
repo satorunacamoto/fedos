@@ -11,7 +11,6 @@
  * log.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import type { FedosDeviceBindingAccountRef } from "../../../../device/fedos_device_binding.js";
 import {

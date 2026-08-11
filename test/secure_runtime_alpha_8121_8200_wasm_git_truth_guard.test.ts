@@ -1,7 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:fs`/`node:path` have no type declarations without `@types/node` in this project's root tsconfig (test-only usage, no new dependency) -- mirrors this repo's own established convention.
 import { writeFileSync, unlinkSync, existsSync, mkdirSync, rmdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { execFileSync } from "node:child_process";
 import { fedosCoreRustGitTrackedPaths } from "./support/fedos_core_rust_git_tracked_paths.js";
 

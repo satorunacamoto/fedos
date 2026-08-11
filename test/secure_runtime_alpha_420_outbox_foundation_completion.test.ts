@@ -11,7 +11,6 @@ import persistenceSource from "../src/os/messenger/board/outbox/fedos_board_outb
 import inMemorySource from "../src/os/messenger/board/outbox/in_memory_fedos_board_outbox_persistence.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import appendOnlySource from "../src/os/messenger/board/outbox/append_only_fedos_board_outbox_persistence.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 
 import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";

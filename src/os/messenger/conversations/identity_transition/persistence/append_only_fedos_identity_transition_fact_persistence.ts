@@ -10,7 +10,6 @@
  * replays this same log.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import { decodeFedosIdentityTransitionFactV1, encodeFedosIdentityTransitionFactV1, fedosIdentityTransitionFactKey, fedosIdentityTransitionLineageKeyParts, type FedosIdentityTransitionFactV1 } from "../fedos_identity_transition_fact.js";
 import { determineFedosIdentityTransitionFactWriteOutcome, type FedosIdentityTransitionFactWriteOutcome } from "../fedos_identity_transition_fact_conflict_detection.js";

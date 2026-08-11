@@ -10,9 +10,7 @@
  * boundary distinction using genuine artifacts when present.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import { FedosDirectRatchetCryptographicSession } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_cryptographic_session.js";

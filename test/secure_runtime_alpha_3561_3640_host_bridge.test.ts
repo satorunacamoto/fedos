@@ -14,11 +14,8 @@
  * do not apply and are not attempted.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import { createFedosDesktopHostBridge } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_bridge.js";

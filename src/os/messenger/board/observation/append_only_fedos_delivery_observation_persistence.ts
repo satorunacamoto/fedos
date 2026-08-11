@@ -63,7 +63,6 @@
  * `#bySubject` index (Alpha 7641–7720) already has.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   fedosPersistedDeliveryObservationRecordsAreEqual,

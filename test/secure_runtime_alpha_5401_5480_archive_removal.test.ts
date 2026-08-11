@@ -32,11 +32,8 @@ import { InMemoryFedosDeletionExecutionPersistence } from "../src/os/messenger/c
 import { FedosPayloadRetentionAuthority } from "../src/os/messenger/conversations/retention/fedos_payload_retention_authority.js";
 import { InMemoryFedosPayloadRetentionPersistence } from "../src/os/messenger/conversations/retention/in_memory_fedos_payload_retention_persistence.js";
 import { toFedosConversationPayloadId } from "../src/os/messenger/conversations/payload_storage/fedos_conversation_payload_id.js";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, symlinkSync, writeFileSync, rmSync, existsSync } from "node:fs";
-// @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
 import { tmpdir } from "node:os";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
 /**

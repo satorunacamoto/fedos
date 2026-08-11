@@ -3,7 +3,6 @@
 // `docs/ALPHA_HISTORY.md` (nothing edited in the move). The assertions
 // are unchanged; only the file holding the banners changed.
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_537_readme_status_update.md?raw";

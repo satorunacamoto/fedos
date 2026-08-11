@@ -45,7 +45,6 @@ vi.mock("node:fs", () => ({
     throw new Error("simulated: real fedos_core_rust_bg.wasm does not exist on disk in this repo");
   }),
 }));
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import * as nodeFs from "node:fs";
 
 /**

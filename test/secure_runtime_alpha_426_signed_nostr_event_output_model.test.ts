@@ -12,7 +12,6 @@ import validatedEventSource from "../src/os/messenger/desktop/fedos_validated_no
 // below reads the canonical source it aliases.
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import canonicalNostrEventSource from "../src/os/messenger/adapters/nostr/protocol/types.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 
 /**

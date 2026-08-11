@@ -3,11 +3,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import designDocSource from "../docs/secure_runtime_alpha_382_host_startup_failure_closure.md?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import hostSource from "../src/os/messenger/desktop/host/fedos_desktop_host.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-// @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
 import { tmpdir } from "node:os";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
 import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";

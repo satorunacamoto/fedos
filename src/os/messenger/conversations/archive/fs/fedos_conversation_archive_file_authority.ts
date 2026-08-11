@@ -59,9 +59,7 @@
  *     created in the same call.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { promises as fsPromises } from "node:fs";
-// @ts-expect-error see above.
 import { dirname, basename, join } from "node:path";
 import { randomBytes as nobleRandomBytes, bytesToHex } from "@noble/hashes/utils.js";
 

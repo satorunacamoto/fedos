@@ -10,11 +10,8 @@
  * own established pattern exactly.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { join, dirname } from "node:path";
-// @ts-expect-error see above.
 import { fileURLToPath } from "node:url";
 import { validateFedosDesktopHostCommand } from "../src/os/messenger/desktop/host_boundary/fedos_desktop_host_command.js";
 

@@ -7,11 +7,8 @@
  * `docs/secure_runtime_alpha_7881_7960_write_index_design_and_crash_consistency.md`.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
 import { AppendOnlyFedosDeliveryObservationPersistence } from "../src/os/messenger/board/observation/append_only_fedos_delivery_observation_persistence.js";

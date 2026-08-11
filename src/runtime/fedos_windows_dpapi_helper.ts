@@ -73,7 +73,6 @@
  *     every Crypto API.
  */
 
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` in this project's tsconfig.
 import { execFile } from "node:child_process";
 
 declare const process: { platform: string };

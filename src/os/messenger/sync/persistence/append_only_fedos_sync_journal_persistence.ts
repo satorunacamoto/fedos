@@ -23,7 +23,6 @@
  * layer).
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import { deserializeFedosSyncJournalEntry } from "./fedos_sync_journal_codec.js";
 import {

@@ -4,7 +4,6 @@
  * independent log file, insert-only, deterministic replay, fail-closed
  * on corruption.
  */
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   decodeFedosIdentityTransitionRatchetResetLinkV1,

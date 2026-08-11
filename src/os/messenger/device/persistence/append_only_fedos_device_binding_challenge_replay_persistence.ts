@@ -11,7 +11,6 @@
  * consumed after restart, because `getConsumption()` replays this same log.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import { deserializeFedosDeviceBindingChallengeConsumption } from "./fedos_device_binding_challenge_replay_codec.js";
 import {

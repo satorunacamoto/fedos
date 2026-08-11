@@ -20,11 +20,8 @@
  * `npm run build:wasm` first).
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync, mkdtempSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import { createFedosConversationRuntime, type FedosConversationRuntime } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";
@@ -61,7 +58,6 @@ import { decodeFedosDirectRatchetNip17PayloadFromContent, encodeFedosDirectRatch
 import type { FedosPrivateWireParsedRumor } from "../src/os/messenger/adapters/nostr/transport/fedos_private_wire_adapter.js";
 import type { FedosPrivateWireDeliveryQueueOutcome } from "../src/os/messenger/adapters/nostr/transport/fedos_private_wire_prepared_delivery.js";
 
-// @ts-expect-error node:buffer has no type declarations without @types/node in this tsconfig.
 import { Buffer } from "node:buffer";
 
 declare const process: { cwd(): string; env: { NODE_ENV?: string; [key: string]: string | undefined } };

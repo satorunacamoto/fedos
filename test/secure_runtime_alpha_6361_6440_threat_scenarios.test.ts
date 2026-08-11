@@ -8,11 +8,8 @@
  * table this file backs.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, appendFileSync, writeFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
@@ -313,11 +310,8 @@ describe("Secure Runtime Alpha 6361-6440 -- Threat Scenario 6: duplicated notifi
 
 describe("Secure Runtime Alpha 6361-6440 -- Threat Scenario 7: Archive restoration does not touch trust state", () => {
   it("7. no Archive-restore file in this codebase imports Device Registry or Identity Transition trust-mutation code", async () => {
-    // @ts-expect-error see header.
     const { readFileSync: rf, readdirSync } = await import("node:fs");
-    // @ts-expect-error see header.
     const { dirname } = await import("node:path");
-    // @ts-expect-error see header.
     const { fileURLToPath } = await import("node:url");
     const archiveDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "conversation", "archive");
     const files = (readdirSync(archiveDir) as string[]).filter((f: string) => f.endsWith(".ts") && /restore/i.test(f));

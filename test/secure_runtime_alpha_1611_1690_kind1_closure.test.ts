@@ -23,7 +23,6 @@
  * already permits exactly this value, unchanged.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 import {
   buildFedosPrivateTransportUnsignedEventRequest,

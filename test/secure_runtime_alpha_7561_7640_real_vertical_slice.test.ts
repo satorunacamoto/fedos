@@ -1,12 +1,8 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig — matches this repository's own established convention (see e.g. `test/support/fedos_real_local_websocket_relay_server.ts`).
 import { mkdtempSync, rmSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
-// @ts-expect-error see above.
 import { createHash } from "node:crypto";
 
 import { FedosPrivateTransport } from "../src/os/messenger/adapters/nostr/transport/fedos_private_transport.js";

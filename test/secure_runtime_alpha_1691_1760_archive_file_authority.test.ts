@@ -4,11 +4,8 @@
  * Real `node:fs`, a fresh temp directory per test.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, readdirSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
 import { NodeFedosConversationArchiveFileAuthority } from "../src/os/messenger/conversations/archive/fs/fedos_conversation_archive_file_authority.js";
 

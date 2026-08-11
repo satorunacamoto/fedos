@@ -1,9 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, appendFileSync, writeFileSync, readFileSync } from "node:fs";
-// @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
 import { tmpdir } from "node:os";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 import { DurablePaymentSettlementLedger } from "../src/os/commerce/payment/persistence/durable_payment_settlement_ledger.js";
 import type { PaymentSettlementState } from "../src/os/commerce/payment/state_machine.js";

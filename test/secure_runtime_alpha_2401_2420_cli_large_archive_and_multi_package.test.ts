@@ -29,7 +29,6 @@ import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_m
 import type { AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../src/runtime/fedos_wasm_loader.js";
 import { toFedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 import { toFedosBoardId, toFedosThreadId } from "../src/os/messenger/board/fedos_board_identifiers.js";
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 
 const CONVERSATION_ID = toFedosConversationId(toFedosBoardId("board-a")!, toFedosThreadId("thread-1")!);

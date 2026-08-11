@@ -52,7 +52,6 @@
  * `docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md`.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import {
   isWellFormedSealedMasterSeedEnvelopeV1Json,

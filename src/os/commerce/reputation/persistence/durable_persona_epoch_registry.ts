@@ -35,7 +35,6 @@
  * already-registered epoch.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import { isPersonaEpochCurrentlyValid, isWellFormedPersonaEpoch, type PersonaEpoch } from "../persona_epoch.js";
 

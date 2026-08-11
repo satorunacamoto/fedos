@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` in this project's tsconfig.
 import { execSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import documentSource from "../../../src/os/messenger/conversations/search/fedos_conversation_search_document.ts?raw";

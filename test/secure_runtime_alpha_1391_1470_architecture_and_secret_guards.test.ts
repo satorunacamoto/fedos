@@ -9,11 +9,8 @@
  * discipline.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error `node:process` has no type declarations without `@types/node` in this project's tsconfig.
 import process from "node:process";
 
 const DELIVERY_DIR = join(process.cwd(), "src/os/messenger/adapters/nostr/conversation_delivery");

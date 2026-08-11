@@ -10,7 +10,6 @@
  * precedent this codebase already applies (Alpha 829/840/914).
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   fedosConversationConstructionCoordinationRecordKey,

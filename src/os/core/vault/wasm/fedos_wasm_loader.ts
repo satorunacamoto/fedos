@@ -811,15 +811,12 @@ import { determineFedosRuntimeMode } from "./fedos_runtime_mode_authority.js";
 // this SAME import line -- no NEW `@ts-expect-error` suppression, no
 // new module. Used ONLY to read the SAME `fedos_core_rust_bg.wasm`
 // bytes Stage 921 already names, for WASM initialization input.
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync, readFileSync } from "node:fs";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 // Stage 945 (Prototype EXECUTION Phase 004) -- needed to turn the
 // SAME `process.cwd()`-relative path Stage 921 already computes into
 // a valid ESM `import()` specifier (Node's ESM resolver requires a
 // `file://` URL for an absolute filesystem path).
-// @ts-expect-error `node:url` has no type declarations without `@types/node` in this project's tsconfig.
 import { pathToFileURL } from "node:url";
 // Stage 929 (Prototype EXECUTION Phase 002) extends this SAME ambient
 // declaration with `env` -- no NEW `@ts-expect-error` suppression is

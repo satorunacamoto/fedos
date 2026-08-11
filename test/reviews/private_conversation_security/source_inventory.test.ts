@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync } from "node:fs";
 import { NoopCryptoProvider } from "../../../src/os/core/crypto/noop_crypto.js";
 import { canProtocolAdapterSupport } from "../../../src/os/_legacy_prototype/federation/capability_matrix.js";

@@ -18,11 +18,8 @@
  * Foundation's own tests already established.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
 import { InMemoryFedosConversationPersistence } from "../src/os/messenger/conversations/persistence/in_memory_fedos_conversation_persistence.js";
