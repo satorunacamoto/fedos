@@ -75,9 +75,23 @@
  * itself already documents.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
+// FedOS Commerce FINAL P1 Closure arc (Agent T) -- `@ts-ignore`, not this
+// repo's usual `@ts-expect-error`, is deliberate for these two lines only:
+// `commerce_e2e_restart_persistence_real_electron.test.ts`/
+// `commerce_e2e_sealed_key_corruption_real_electron.test.ts`
+// (`packages/fedos-desktop-electron-spike/test/`) are the first files to
+// import this module transitively, which now also type-checks it under
+// `packages/fedos-desktop-electron-spike/tsconfig.test.json` -- that
+// tsconfig declares `"types": ["node"]` (unlike the repo-root
+// `tsconfig.json` `typecheck:core` uses, which does not), so `@types/node`
+// IS ambiently visible there and an `@ts-expect-error` here would itself
+// error as "unused" under that program. `@ts-ignore` tolerates being
+// unnecessary in exactly the contexts where `@types/node` happens to be
+// visible, while still suppressing the real "no type declarations" error
+// under `typecheck:core`'s own program, where it is not.
+// @ts-ignore `node:fs` has no type declarations without `@types/node` in some of this repo's tsconfigs (see comment above).
 import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
+// @ts-ignore `node:path` has no type declarations without `@types/node` in some of this repo's tsconfigs (see comment above).
 import { dirname } from "node:path";
 import type { SealingAuthorityPort } from "../../ports/sealing_authority_port.js";
 

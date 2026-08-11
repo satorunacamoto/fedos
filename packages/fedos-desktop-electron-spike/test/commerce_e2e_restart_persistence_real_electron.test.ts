@@ -22,33 +22,79 @@
  * Delivery record) — i.e. a real OS-process restart, not just a fresh
  * repository instance in the same process.
  *
- * TWO GAPS THIS TEST EMPIRICALLY CONFIRMS, NOT JUST FIXES (both disclosed
- * in this arc's own final report as pre-existing, out-of-scope,
- * unsafe-key-architecture judgment calls this arc declined to force
- * through under time pressure):
+ * TWO GAPS THIS TEST ORIGINALLY EMPIRICALLY CONFIRMED -- BOTH NOW CLOSED
+ * (FedOS Commerce FINAL P1 Closure arc, Agents K1/K2 + this file's own
+ * Agent T update) -- kept documented here, not deleted, so the "before"
+ * shape of both gaps stays legible next to the restart-durability proof
+ * that now supersedes it:
  *
- *   1. Seller Reputation panel: EXPECTED (and asserted) to fall back to
- *      "no reputation history" after a real restart, even though the
- *      underlying `PersonaEpochRegistry`/`TradeCompletionAttestationStore`
- *      ARE durable (Agent D's own targeted tests prove past attestations
- *      replay and duplicate-issuance stays rejected). The gap is
- *      `commercePersonaEpochByPubkey` (`fedos_electron_beta_main.cts`) --
- *      the coordinator's own real-pubkey -> PersonaEpoch identity-minting
- *      CACHE, which also holds each epoch's live signing keypair -- still
- *      process-lifetime-only, so the read-only query path can no longer
- *      resolve a pubkey it already durably has history for.
- *   2. Receipt/QR durability is NOT exercised here at all: re-verifying
- *      the SAME original QR text after a restart would fail for the same
- *      class of reason -- `commerceReceiptSigningState()` mints a demo
+ *   1. Seller Reputation panel: PREVIOUSLY fell back to "no reputation
+ *      history" after a real restart, even though the underlying
+ *      `PersonaEpochRegistry`/`TradeCompletionAttestationStore` were ALWAYS
+ *      durable (Agent D's own targeted tests already proved past
+ *      attestations replay and duplicate-issuance stays rejected). The gap
+ *      was `commercePersonaEpochByPubkey` (`fedos_electron_beta_main.cts`)
+ *      -- the coordinator's own real-pubkey -> PersonaEpoch identity-minting
+ *      CACHE, which also holds each epoch's live signing keypair -- being
+ *      process-lifetime-only, so the read-only query path could no longer
+ *      resolve a pubkey it already durably had history for. Agent K1's
+ *      `durable_persona_epoch_signing_key_store.ts` closed this: the epoch
+ *      signing keypair is now sealed at rest and restored before the
+ *      in-memory cache is consulted, so `commercePersonaEpochForPubkey()`
+ *      resolves the SAME identity across a real restart. THIS TEST now
+ *      asserts the CLOSED-gap behavior live: the reputation panel renders
+ *      byte-for-byte identical content before and after a real restart (see
+ *      the `reputationBeforeRestart`/`reputationAfterRestart` assertions
+ *      below), not merely "no longer says no history".
+ *   2. Receipt/QR durability: PREVIOUSLY not exercised here at all, and
+ *      re-verifying the SAME original QR text after a restart would have
+ *      failed -- `commerceReceiptSigningState()` used to mint a demo
  *      receipt-issuer keypair once per process lifetime, never durably
- *      persisted, so the single-issuer Trust policy built from it cannot
+ *      persisted, so the single-issuer Trust policy built from it could not
  *      recognize a receipt signed by a prior process's now-discarded key.
+ *      Agent K2's `durable_receipt_issuer_signing_key_store.ts` closed this
+ *      the same way (sealed-at-rest, restored on every resolve). THIS TEST
+ *      now drives the real in-app "Issue Signed Receipt" UI control in BOTH
+ *      launches (real Trade A receipt before the restart, real Trade B
+ *      receipt after it) and, outside the Electron process, decodes both
+ *      QR-encoded envelopes with the SAME production
+ *      `decodeCommerceReceiptProofFromQrText`/`verifySignedTradeReceiptProof`
+ *      code `handleCommerceReceiptIssue` itself calls
+ *      (`src/os/commerce/receipt/commerce_trust_receipt_adapter.ts`) to
+ *      prove two concrete things a UI-only read cannot: (a) Trade A's
+ *      receipt, signed in launch 1, still independently verifies `"VALID"`
+ *      against a `FedosTrustPolicy` built from launch 2's live, restored
+ *      issuer key, and (b) both receipts' signing `keyId` (== issuer
+ *      `publicKeyHex`) are IDENTICAL across the restart -- issuer identity
+ *      continuity, not merely "some receipt was issued after restart too".
  */
 import { describe, it, expect, afterAll } from "vitest";
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+// Same production decode/verify pipeline `handleCommerceReceiptIssue`
+// (`fedos_electron_beta_main.cts`) itself calls via `m.Commerce.*` --
+// imported directly here (Node process, NOT inside Electron) purely to
+// INSPECT and CROSS-VERIFY the two real signed envelopes launch 1/launch 2
+// already produced through the real UI control below. This file invents no
+// new signing/verification logic of its own. Loaded via a DYNAMIC `import()`
+// (awaited inside the `it()` body below, see `loadReceiptTrustModules()`),
+// not a static top-level import: this package's own `package.json` has no
+// `"type": "module"` field, so this `.ts` test file is classified CommonJS
+// under `tsconfig.test.json`'s Node16 module resolution, and a static
+// `import` of the repo-root ESM module (`"type": "module"` there) is a
+// real, correct TS1479 compile error, not a style nit -- `import()` is the
+// TypeScript-recommended, always-valid way to cross that boundary.
+async function loadReceiptTrustModules() {
+  const receiptAdapter = await import("../../../src/os/commerce/receipt/commerce_trust_receipt_adapter.js");
+  const policy = await import("../../../src/os/trust/policy/index.js");
+  return {
+    decodeCommerceReceiptProofFromQrText: receiptAdapter.decodeCommerceReceiptProofFromQrText,
+    verifySignedTradeReceiptProof: receiptAdapter.verifySignedTradeReceiptProof,
+    createSingleIssuerFedosTrustPolicy: policy.createSingleIssuerFedosTrustPolicy,
+  };
+}
 
 const repoRoot = process.cwd();
 const packageDir = `${repoRoot}/packages/fedos-desktop-electron-spike`;
@@ -230,12 +276,21 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
         { action: "wait", ms: 400 }, // 58
         { action: "read", selector: "#commerce-order-status-text" }, // 59 -- expect "completed"
 
+        // Issue a REAL signed, QR-encoded Trust receipt for this trade ("Trade A")
+        // -- still on the Order detail screen, order is "completed" so
+        // `#commerce-order-receipt-actions` is visible. Captured below and
+        // cross-verified against launch 2's live, restored issuer policy.
+        { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 60
+        { action: "wait", ms: 500 }, // 61
+        { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 62 -- expect "VALID"
+        { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 63 -- non-empty real signed envelope text ("Trade A")
+
         // Capture the Seller Reputation panel BEFORE restart, for comparison.
-        { action: "click", selector: "#commerce-detail-back" }, // 60
-        { action: "wait", ms: 200 }, // 61
-        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 62
-        { action: "wait", ms: 400 }, // 63
-        { action: "read", selector: "#commerce-detail-reputation-summary" }, // 64
+        { action: "click", selector: "#commerce-detail-back" }, // 64
+        { action: "wait", ms: 200 }, // 65
+        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 66
+        { action: "wait", ms: 400 }, // 67
+        { action: "read", selector: "#commerce-detail-reputation-summary" }, // 68
       ]);
 
       expect(readAt(run1, 6)).toBe("ready");
@@ -249,7 +304,14 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
       expect(readAt(run1, 51)).toBe("fulfilling");
       expect(readAt(run1, 56)).toBe("delivered");
       expect(readAt(run1, 59)).toBe("completed");
-      const reputationBeforeRestart = readAt(run1, 64);
+
+      // "Trade A" receipt -- issued and independently verified VALID by the
+      // real in-app pipeline, in launch 1, BEFORE the restart.
+      expect(readAt(run1, 62)).toBe("VALID");
+      const qrTextTradeA = readAt(run1, 63);
+      expect(qrTextTradeA.length).toBeGreaterThan(0);
+
+      const reputationBeforeRestart = readAt(run1, 68);
       expect(reputationBeforeRestart).not.toMatch(/no reputation history/i);
       expect(reputationBeforeRestart).toMatch(/verified trades/i);
 
@@ -276,13 +338,24 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
         { action: "read", selector: "#commerce-order-status-text" }, // 14 -- expect "completed" (survived restart; reachable ONLY via the guarded chain: submitted->accepted->paid[verified evidence only]->fulfilling->delivered->completed, so this alone proves Payment+Delivery consistency too)
         { action: "read", selector: "#commerce-order-delivery-status" }, // 15 -- expect "Delivery status: completed" (the persisted DeliveryRecord's own terminal status, independently confirming Delivery durability -- Order completion also finalizes the linked Delivery record to its own "completed" state, not merely "delivered")
 
+        // Issue a SECOND real signed, QR-encoded Trust receipt for the SAME
+        // order ("Trade B") -- a brand new Electron process, after a real
+        // restart+unlock, still on this SAME Order's detail screen (still
+        // "completed", so `#commerce-order-receipt-actions` is visible
+        // again). Proves issuer-key continuity below (same `keyId` as
+        // Trade A's receipt from launch 1).
+        { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 16
+        { action: "wait", ms: 500 }, // 17
+        { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 18 -- expect "VALID"
+        { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 19 -- non-empty real signed envelope text ("Trade B")
+
         // Seller Reputation panel: re-open the SAME product's detail screen.
-        { action: "click", selector: "#nav-commerce" }, // 16
-        { action: "wait", ms: 300 }, // 17
-        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 18
-        { action: "wait", ms: 400 }, // 19
-        { action: "read", selector: "#commerce-detail-title" }, // 20 -- expect "Restart-Durability Test Mug"
-        { action: "read", selector: "#commerce-detail-reputation-summary" }, // 21 -- expect the SAME real reputation text, NOT "no history"
+        { action: "click", selector: "#nav-commerce" }, // 20
+        { action: "wait", ms: 300 }, // 21
+        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 22
+        { action: "wait", ms: 400 }, // 23
+        { action: "read", selector: "#commerce-detail-title" }, // 24 -- expect "Restart-Durability Test Mug"
+        { action: "read", selector: "#commerce-detail-reputation-summary" }, // 25 -- expect the SAME real reputation text, NOT "no history"
 
         // Duplicate-attestation-after-restart rejection: attempting the SAME
         // completed order's reputation issuance again must not be reachable
@@ -294,9 +367,9 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
         // show a "no history yet" board for a pubkey that already has one).
 
         // Messenger regression: still reachable after a real restart+unlock.
-        { action: "click", selector: "#nav-conversations" }, // 22
-        { action: "wait", ms: 300 }, // 23
-        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 24
+        { action: "click", selector: "#nav-conversations" }, // 26
+        { action: "wait", ms: 300 }, // 27
+        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 28
       ]);
 
       expect(readAt(run2, 1)).toBe("unlock");
@@ -311,32 +384,96 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
       expect(readAt(run2, 14)).toBe("completed");
       expect(readAt(run2, 15)).toMatch(/Delivery status: completed/);
 
-      expect(readAt(run2, 20)).toBe("Restart-Durability Test Mug");
-      const reputationAfterRestart = readAt(run2, 21);
-      // KNOWN, DISCLOSED GAP (Commerce Durability arc final report,
-      // "REPUTATION PERSISTENCE: PARTIAL"), empirically confirmed live by
-      // THIS assertion, not just reasoned from source: the underlying
-      // `PersonaEpochRegistry`/`TradeCompletionAttestationStore` ARE
-      // durable (Agent D's own targeted tests prove past attestations
-      // replay and duplicate-issuance stays rejected across a restart) --
-      // but `commercePersonaEpochByPubkey` (`fedos_electron_beta_main.cts`),
-      // the coordinator's own real-pubkey -> PersonaEpoch identity-minting
-      // CACHE (which also holds each epoch's live secp256k1 signing
-      // keypair), is still process-lifetime-only. After a real restart the
-      // cache is empty, so `commercePersonaEpochForPubkey(pubkey, false)`
-      // (the read-only Persona Board query path) returns `undefined` for a
-      // pubkey that provably DOES have durable attested history, and the
-      // renderer correctly, honestly renders its own "no history yet"
-      // fallback rather than fabricate a board. This assertion documents
-      // TODAY's true, reproduced behavior; it is INTENDED to start failing
-      // (as a welcome regression-catcher) once a sealed/encrypted-at-rest
-      // persona-epoch-identity store closes this gap for real -- see this
-      // arc's own final report for why that fix was disclosed, not forced,
-      // under this arc's time budget (it is the same class of judgment
-      // call as the Receipt-issuer signing keypair gap, also disclosed).
-      expect(reputationAfterRestart).toMatch(/no reputation history/i);
+      // "Trade B" receipt -- issued and independently verified VALID by the
+      // real in-app pipeline, in launch 2, AFTER the restart, for the SAME
+      // order.
+      expect(readAt(run2, 18)).toBe("VALID");
+      const qrTextTradeB = readAt(run2, 19);
+      expect(qrTextTradeB.length).toBeGreaterThan(0);
 
-      readAt(run2, 24); // Conversations still reachable.
+      expect(readAt(run2, 24)).toBe("Restart-Durability Test Mug");
+      const reputationAfterRestart = readAt(run2, 25);
+      // FORMERLY A KNOWN, DISCLOSED GAP (Commerce Durability arc final
+      // report, "REPUTATION PERSISTENCE: PARTIAL") -- NOW CLOSED (FedOS
+      // Commerce FINAL P1 Closure arc, Agent K1). The underlying
+      // `PersonaEpochRegistry`/`TradeCompletionAttestationStore` were ALWAYS
+      // durable (Agent D's own targeted tests already proved past
+      // attestations replay and duplicate-issuance stays rejected across a
+      // restart); the actual gap was `commercePersonaEpochByPubkey`
+      // (`fedos_electron_beta_main.cts`), the coordinator's own real-pubkey
+      // -> PersonaEpoch identity-minting CACHE (which also holds each
+      // epoch's live secp256k1 signing keypair), being process-lifetime-only
+      // -- after a real restart the cache used to be empty, so
+      // `commercePersonaEpochForPubkey(pubkey, false)` (the read-only
+      // Persona Board query path) returned `undefined` for a pubkey that
+      // provably DID have durable attested history.
+      //
+      // Agent K1's `durable_persona_epoch_signing_key_store.ts` closes this
+      // for real: `commercePersonaEpochForPubkey()` now tries the sealed,
+      // durable signing-key store FIRST (restoring the SAME epoch identity
+      // that already has attested history) before ever falling back to "no
+      // identity known yet". This assertion is the live, real-Electron-
+      // process proof of the CLOSED state, not just "no longer says no
+      // history": the reputation panel renders content IDENTICAL to what it
+      // rendered before the restart -- same persona-epoch label, same
+      // verified-trade bucket, same category, same validity -- because it
+      // is the SAME underlying attested history resolved through the SAME
+      // persisted signing identity both times.
+      expect(reputationAfterRestart).not.toMatch(/no reputation history/i);
+      expect(reputationAfterRestart).toMatch(/verified trades/i);
+      expect(reputationAfterRestart).toBe(reputationBeforeRestart);
+
+      readAt(run2, 28); // Conversations still reachable.
+
+      // --- Receipt-issuer continuity, decoded+cross-verified OUTSIDE Electron. ---
+      // Uses the SAME production `decodeCommerceReceiptProofFromQrText`/
+      // `verifySignedTradeReceiptProof` code `handleCommerceReceiptIssue`
+      // itself calls (`src/os/commerce/receipt/commerce_trust_receipt_adapter.ts`,
+      // via `m.Commerce.*` inside the real Electron process) -- this test
+      // file invents no parallel decode/verify logic of its own.
+      const { decodeCommerceReceiptProofFromQrText, verifySignedTradeReceiptProof, createSingleIssuerFedosTrustPolicy } =
+        await loadReceiptTrustModules();
+      const decodedTradeA = decodeCommerceReceiptProofFromQrText(qrTextTradeA);
+      const decodedTradeB = decodeCommerceReceiptProofFromQrText(qrTextTradeB);
+      expect("error" in decodedTradeA ? decodedTradeA.error : undefined, JSON.stringify(decodedTradeA)).toBeUndefined();
+      expect("error" in decodedTradeB ? decodedTradeB.error : undefined, JSON.stringify(decodedTradeB)).toBeUndefined();
+      if ("error" in decodedTradeA || "error" in decodedTradeB) throw new Error("unreachable");
+
+      // Issuer-key continuity: Trade A (launch 1, pre-restart) and Trade B
+      // (launch 2, post-restart) were signed under the SAME issuer `keyId`
+      // (== the receipt issuer's `publicKeyHex`, see
+      // `commerce_trust_receipt_adapter.ts`'s `buildEnvelopeInput`) -- proof
+      // this is one continuous issuer identity across the restart, not two
+      // different keys that happen to both say "VALID" locally.
+      expect(decodedTradeA.issuer).toBe(decodedTradeB.issuer);
+      expect(decodedTradeA.keyId).toBe(decodedTradeB.keyId);
+      expect(decodedTradeA.keyId).toMatch(/^[0-9a-f]{64}$/);
+
+      // The concrete "a historical receipt survives restart" proof: Trade
+      // A's receipt, signed BEFORE the restart, independently verifies
+      // `"VALID"` against a `FedosTrustPolicy` built from the SAME
+      // `issuer`/`keyId` launch 2's own live, restored issuer resolution
+      // uses (`commerceReceiptSigningState()`'s own
+      // `createSingleIssuerFedosTrustPolicy({issuerId, keys:[{keyId:
+      // keypair.publicKeyHex, publicKeyHex: keypair.publicKeyHex}]})` --
+      // mirrored exactly here, using launch 2's OWN decoded `keyId`, not a
+      // value this test invents).
+      const policyFromLaunch2Issuer = createSingleIssuerFedosTrustPolicy({
+        issuerId: decodedTradeB.issuer,
+        keys: [{ keyId: decodedTradeB.keyId, publicKeyHex: decodedTradeB.keyId }],
+      });
+      const verifiedTradeAAfterRestart = verifySignedTradeReceiptProof(decodedTradeA, policyFromLaunch2Issuer);
+      expect(verifiedTradeAAfterRestart.status, JSON.stringify(verifiedTradeAAfterRestart)).toBe("VALID");
+
+      // And the reverse direction, for completeness: Trade B (signed AFTER
+      // the restart) verifies VALID against a policy built from launch 1's
+      // own issuer key -- both directions confirm one continuous identity.
+      const policyFromLaunch1Issuer = createSingleIssuerFedosTrustPolicy({
+        issuerId: decodedTradeA.issuer,
+        keys: [{ keyId: decodedTradeA.keyId, publicKeyHex: decodedTradeA.keyId }],
+      });
+      const verifiedTradeBAgainstLaunch1Issuer = verifySignedTradeReceiptProof(decodedTradeB, policyFromLaunch1Issuer);
+      expect(verifiedTradeBAgainstLaunch1Issuer.status, JSON.stringify(verifiedTradeBAgainstLaunch1Issuer)).toBe("VALID");
     },
     150000,
   );
