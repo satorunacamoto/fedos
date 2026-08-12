@@ -278,3 +278,160 @@ describe("commerce_private_delivery_apply: defense in depth -- a sync payload ca
     expect(mismatched.outcome).toBe("rejected");
   });
 });
+
+/**
+ * FedOS Commerce Purchase Completion mega-arc (completion-lag fix round) —
+ * the `retryable` half of every non-`"applied"` outcome. Same defect and
+ * same discipline as `commerce_private_order_apply.test.ts`: the CALLER
+ * (`fedos_electron_beta_main.cts`) may only retire an inbound event id from
+ * its process-lifetime dedup set once the apply genuinely RESOLVED. A
+ * refusal that is merely EARLY must stay eligible, or a pure ordering race
+ * becomes a permanent per-process drop.
+ */
+describe("commerce_private_delivery_apply: 'not yet' (retryable) is distinguished from 'never' (retired)", () => {
+  /** Drives a real local `DeliveryRecord` to `pending`/`fulfilling`/`delivered`/`completed` through this module's own real transitions. */
+  function deliveryAt(status: "fulfilling" | "delivered" | "completed"): DeliveryRecord {
+    const created = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: undefined,
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: SELLER,
+      payload: payload({ action: "fulfilling" }),
+    });
+    if (created.outcome !== "applied") throw new Error("fixture: fulfilling failed");
+    if (status === "fulfilling") return created.delivery;
+    const delivered = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: created.delivery,
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "recipient_acknowledged" }),
+    });
+    if (delivered.outcome !== "applied") throw new Error("fixture: recipient_acknowledged failed");
+    if (status === "delivered") return delivered.delivery;
+    const completed = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: delivered.delivery,
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "completed" }),
+    });
+    if (completed.outcome !== "applied") throw new Error("fixture: completed failed");
+    return completed.delivery;
+  }
+
+  it("a buyer acknowledgment arriving before the seller's own 'fulfilling' did is RETRYABLE (out of order, not invalid)", () => {
+    const result = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: undefined,
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "recipient_acknowledged" }),
+    });
+    expect(result.outcome).toBe("rejected");
+    if (result.outcome !== "rejected") throw new Error("unreachable");
+    expect(result.retryable).toBe(true);
+
+    // ...and the SAME event applies once the record exists.
+    const later = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("fulfilling"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "recipient_acknowledged" }),
+    });
+    expect(later.outcome).toBe("applied");
+  });
+
+  it("a 'completed' arriving before the record reached 'delivered' is RETRYABLE, and applies once it has", () => {
+    const early = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("fulfilling"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "completed" }),
+    });
+    expect(early.outcome).toBe("no-op");
+    if (early.outcome !== "no-op") throw new Error("unreachable");
+    expect(early.retryable).toBe(true);
+
+    const later = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("delivered"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "completed" }),
+    });
+    expect(later.outcome).toBe("applied");
+  });
+
+  it("a 'fulfilling' refused only because this process's own Order is not payment-confirmed YET is RETRYABLE", () => {
+    const early = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: undefined,
+      orderPaymentConfirmed: false,
+      senderPubkeyHex: SELLER,
+      payload: payload({ action: "fulfilling" }),
+    });
+    expect(early.outcome).toBe("rejected");
+    if (early.outcome !== "rejected") throw new Error("unreachable");
+    expect(early.retryable, "order_not_paid is a local-state race, not a verdict about these bytes").toBe(true);
+
+    const later = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: undefined,
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: SELLER,
+      payload: payload({ action: "fulfilling" }),
+    });
+    expect(later.outcome).toBe("applied");
+  });
+
+  it("BOUNDED: a genuine REPLAY of an already-applied action is NOT retryable (superseded forever)", () => {
+    const fulfillingReplay = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("fulfilling"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: SELLER,
+      payload: payload({ action: "fulfilling" }),
+    });
+    expect(fulfillingReplay.outcome).toBe("no-op");
+    if (fulfillingReplay.outcome !== "no-op") throw new Error("unreachable");
+    expect(fulfillingReplay.retryable).toBe(false);
+
+    const completedReplay = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("completed"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "completed" }),
+    });
+    expect(completedReplay.outcome).toBe("no-op");
+    if (completedReplay.outcome !== "no-op") throw new Error("unreachable");
+    expect(completedReplay.retryable).toBe(false);
+  });
+
+  it("BOUNDED + TRUST BOUNDARY: every AUTHORITY refusal is retired immediately, never retried forever", () => {
+    // A seller trying to manufacture the buyer's acknowledgment.
+    const forged = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("fulfilling"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: SELLER,
+      payload: payload({ action: "recipient_acknowledged" }),
+    });
+    expect(forged.outcome).toBe("rejected");
+    if (forged.outcome !== "rejected") throw new Error("unreachable");
+    expect(forged.retryable, "a forged acknowledgment must never be kept alive for retry").toBe(false);
+
+    // A total stranger.
+    const stranger = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("delivered"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: MALLORY,
+      payload: payload({ action: "completed" }),
+    });
+    expect(stranger.outcome).toBe("rejected");
+    if (stranger.outcome !== "rejected") throw new Error("unreachable");
+    expect(stranger.retryable).toBe(false);
+
+    // A payload smuggling different identity fields.
+    const mismatched = applyInboundPrivateDeliverySyncPayload({
+      existingDelivery: deliveryAt("fulfilling"),
+      orderPaymentConfirmed: true,
+      senderPubkeyHex: BUYER,
+      payload: payload({ action: "recipient_acknowledged", orderId: "a-different-order" }),
+    });
+    expect(mismatched.outcome).toBe("rejected");
+    if (mismatched.outcome !== "rejected") throw new Error("unreachable");
+    expect(mismatched.retryable).toBe(false);
+  });
+});

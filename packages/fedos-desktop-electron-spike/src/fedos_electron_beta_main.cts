@@ -1005,6 +1005,32 @@ interface RootModules {
     readonly COMMERCE_PRIVATE_ORDER_SYNC_TAG: string;
     readonly PRIVATE_ORDER_SYNC_STATUS_ACTION: Readonly<Record<string, { readonly action: string; readonly actorKind: "customer" | "merchant" | "either" }>>;
     /**
+     * Pure reconciliation logic, `src/os/commerce/events/commerce_private_order_apply.ts`
+     * -- see that file's own header for the completion-lag defect its
+     * TRI-STATE outcome exists to close. Loaded here (not `Commerce`)
+     * alongside its Delivery sibling below, since it is a
+     * private-sync-only concern.
+     */
+    readonly applyInboundPrivateOrderSyncPayload: (input: {
+      readonly existingOrder: CommerceOrderLike | undefined;
+      readonly senderPubkeyHex: string;
+      readonly payload: {
+        readonly orderId: string;
+        readonly productId: string;
+        readonly buyerPubkey: string;
+        readonly sellerPubkey: string;
+        readonly quantity: number;
+        readonly unitPriceCents: number;
+        readonly currency: string;
+        readonly status: string;
+        readonly reason?: string;
+        readonly at: number;
+      };
+    }) =>
+      | { readonly outcome: "applied"; readonly order: CommerceOrderLike }
+      | { readonly outcome: "permanently-inapplicable"; readonly reason: string }
+      | { readonly outcome: "retry-later"; readonly reason: string };
+    /**
      * FedOS Commerce Purchase Completion mega-arc (Agent D) -- the PRIVATE
      * `Delivery`/status transport (arc "Cross-process delivery"
      * requirement). Same shape/design as `RealCommercePrivateOrderTransport`/
@@ -1051,7 +1077,10 @@ interface RootModules {
         readonly reason?: string;
         readonly at: number;
       };
-    }) => { readonly outcome: "applied"; readonly delivery: CommerceDeliveryRecordLike } | { readonly outcome: "no-op" } | { readonly outcome: "rejected"; readonly reason: string };
+    }) =>
+      | { readonly outcome: "applied"; readonly delivery: CommerceDeliveryRecordLike }
+      | { readonly outcome: "no-op"; readonly retryable: boolean }
+      | { readonly outcome: "rejected"; readonly reason: string; readonly retryable: boolean };
     /**
      * FedOS Commerce Purchase Completion mega-arc (Agent P, wired here by
      * the Coordinator's integration phase) -- the PRIVATE
@@ -1672,6 +1701,13 @@ async function loadRootModules(): Promise<RootModules> {
   const commercePrivateOrderSyncShapes = (await import(distUrl("os", "commerce", "events", "commerce_private_order_sync.js"))) as {
     PRIVATE_ORDER_SYNC_STATUS_ACTION: RootModules["CommerceNostr"]["PRIVATE_ORDER_SYNC_STATUS_ACTION"];
   };
+  // Completion-lag fix round -- the pure Order-side reconciliation, split
+  // out of `applyInboundPrivateOrderSyncNonFatal()` so the "not yet vs.
+  // never" decision is a real, unit-testable value instead of an
+  // indistinguishable bare `return`.
+  const commercePrivateOrderApply = (await import(distUrl("os", "commerce", "events", "commerce_private_order_apply.js"))) as {
+    applyInboundPrivateOrderSyncPayload: RootModules["CommerceNostr"]["applyInboundPrivateOrderSyncPayload"];
+  };
   // FedOS Commerce Purchase Completion mega-arc (Agent D) -- private
   // Delivery/status transport (arc "Cross-process delivery" requirement).
   // Two new `tsconfig.beta-runtime.json` entries, mirroring the private
@@ -1789,6 +1825,7 @@ async function loadRootModules(): Promise<RootModules> {
       verifyAndDecryptInboundPrivateOrderEnvelope: commercePrivateOrderBridge.verifyAndDecryptInboundPrivateOrderEnvelope,
       COMMERCE_PRIVATE_ORDER_SYNC_TAG: commercePrivateOrderBridge.COMMERCE_PRIVATE_ORDER_SYNC_TAG,
       PRIVATE_ORDER_SYNC_STATUS_ACTION: commercePrivateOrderSyncShapes.PRIVATE_ORDER_SYNC_STATUS_ACTION,
+      applyInboundPrivateOrderSyncPayload: commercePrivateOrderApply.applyInboundPrivateOrderSyncPayload,
       RealCommercePrivateDeliveryTransport: commercePrivateDeliveryBridge.RealCommercePrivateDeliveryTransport,
       verifyAndDecryptInboundPrivateDeliveryEnvelope: commercePrivateDeliveryBridge.verifyAndDecryptInboundPrivateDeliveryEnvelope,
       COMMERCE_PRIVATE_DELIVERY_SYNC_TAG: commercePrivateDeliveryBridge.COMMERCE_PRIVATE_DELIVERY_SYNC_TAG,
@@ -2576,7 +2613,21 @@ let commercePrivateOrderTransportSignerRef: NostrSigningAuthorityLike | null = n
  * `#appliedEventIds`. A duplicate/replayed event is a safe no-op either
  * way (the real state machine's own status guard also rejects a
  * re-applied transition with `invalid_state`), this Set just avoids
- * redundant re-processing work on every bounded refresh. */
+ * redundant re-processing work on every bounded refresh.
+ *
+ * COMPLETION-LAG FIX (read before touching any of the three sibling sets
+ * in this file): an event id is written here only AFTER the apply has
+ * genuinely RESOLVED -- either it applied, or it is confirmed
+ * inapplicable FOREVER. An apply refused merely because this process's
+ * own local state has not caught up yet (`"retry-later"`) is deliberately
+ * NOT recorded, so the SAME event is re-evaluated on the next bounded
+ * refresh in the SAME process. Writing the id before the attempt (the
+ * previous behaviour) turned every such ordering race into a permanent
+ * per-process drop -- live-proven on the seller's `"completed"` order-sync
+ * event, which the fixed pass order (order-sync -> payment-evidence ->
+ * delivery-sync) always evaluates one pass too early. See
+ * `src/os/commerce/events/commerce_private_order_apply.ts`'s own header
+ * for the full account and for why replay safety is unchanged. */
 const commercePrivateOrderAppliedEventIds = new Set<string>();
 
 /**
@@ -2661,16 +2712,20 @@ async function sendPrivateOrderSyncNonFatal(
  * already verified the signature): the REAL verified `senderPubkeyHex`
  * must match the party this specific transition authorizes
  * (`order_state_machine.ts`'s own `isActorIdentityAuthorized` — re-derived
- * here since this function constructs the `actor` the state machine will
- * itself ALSO re-check, defense in depth, same posture
+ * inside the pure module since it constructs the `actor` the state machine
+ * will itself ALSO re-check, defense in depth, same posture
  * `CommerceNostrProductReadModel.ingest()`'s own `"rejected-signer-mismatch"`
  * check already established for the public path). NEVER throws; any
- * rejection (unknown status mapping, out-of-order "not a submit but the
- * order doesn't exist locally yet", economics mismatch against an
- * already-known local order, or actor-identity mismatch) is a silent,
- * safe drop -- this function has no return value because there is no
- * caller-visible outcome to report for an inbound event a human never
- * directly requested.
+ * rejection is a silent, safe drop -- this function has no return value
+ * because there is no caller-visible outcome to report for an inbound
+ * event a human never directly requested.
+ *
+ * Every authority decision now lives in the pure, unit-tested
+ * `applyInboundPrivateOrderSyncPayload()`
+ * (`src/os/commerce/events/commerce_private_order_apply.ts`) -- this
+ * function is only its I/O shell: look up, delegate, save, and record the
+ * event id in the dedup set ONLY when the outcome genuinely resolved
+ * (`"applied"` or `"permanently-inapplicable"`), never on `"retry-later"`.
  */
 function applyInboundPrivateOrderSyncNonFatal(envelope: {
   readonly outcome: string;
@@ -2691,47 +2746,22 @@ function applyInboundPrivateOrderSyncNonFatal(envelope: {
 }): void {
   if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
   if (commercePrivateOrderAppliedEventIds.has(envelope.eventId)) return;
-  commercePrivateOrderAppliedEventIds.add(envelope.eventId);
 
-  const payload = envelope.payload;
   const m = requireModules();
-  const mapping = m.CommerceNostr.PRIVATE_ORDER_SYNC_STATUS_ACTION[payload.status];
-  if (mapping === undefined) return;
-
   const state = commerceState();
-  let order = state.orders.findById(payload.orderId);
-  if (order === undefined) {
-    if (mapping.action !== "submit") return; // out-of-order: dropped safely, never corrupts state
-    if (envelope.senderPubkeyHex !== payload.buyerPubkey) return; // trust boundary: only the real buyer may materialize a new order
-    const created = m.Commerce.createOrder(
-      { id: payload.orderId, productId: payload.productId, sellerPubkey: payload.sellerPubkey, unitPriceCents: payload.unitPriceCents, currency: payload.currency, quantity: payload.quantity },
-      { kind: "customer", pubkey: envelope.senderPubkeyHex },
-      payload.at,
-    );
-    if (!created.ok || created.order === undefined) return;
-    order = created.order;
-  } else if (
-    order.productId !== payload.productId ||
-    order.buyerPubkey !== payload.buyerPubkey ||
-    order.sellerPubkey !== payload.sellerPubkey ||
-    order.unitPriceCents !== payload.unitPriceCents ||
-    order.currency !== payload.currency ||
-    order.quantity !== payload.quantity
-  ) {
-    return; // defense in depth: a status-sync must never also silently change the order's own established economics
+  const result = m.CommerceNostr.applyInboundPrivateOrderSyncPayload({
+    existingOrder: state.orders.findById(envelope.payload.orderId),
+    senderPubkeyHex: envelope.senderPubkeyHex,
+    payload: envelope.payload,
+  });
+  if (result.outcome === "retry-later") {
+    // DELIBERATELY not recorded in the dedup set -- see that Set's own
+    // comment. The next bounded refresh re-evaluates this same event
+    // against a local state that may by then legitimately accept it.
+    return;
   }
-
-  const actorKind: "customer" | "merchant" =
-    mapping.actorKind === "either" ? (envelope.senderPubkeyHex === order.buyerPubkey ? "customer" : "merchant") : mapping.actorKind;
-  const expectedPubkey = actorKind === "customer" ? order.buyerPubkey : order.sellerPubkey;
-  if (envelope.senderPubkeyHex !== expectedPubkey) return; // trust boundary
-
-  const action: Record<string, unknown> = { type: mapping.action, actor: { kind: actorKind, pubkey: envelope.senderPubkeyHex } };
-  if ((mapping.action === "reject" || mapping.action === "cancel") && payload.reason !== undefined) action.reason = payload.reason;
-
-  const result = m.Commerce.applyOrderAction(order, action as CommerceOrderActionLike, payload.at);
-  if (!result.ok || result.order === undefined) return; // e.g. a replayed/out-of-order transition -- rejected by the state machine's own status guard, never corrupted
-  state.orders.save(result.order);
+  commercePrivateOrderAppliedEventIds.add(envelope.eventId);
+  if (result.outcome === "applied") state.orders.save(result.order);
 }
 
 /**
@@ -2806,7 +2836,7 @@ interface CommercePrivateDeliveryTransportLike {
 let commercePrivateDeliveryTransport: CommercePrivateDeliveryTransportLike | null = null;
 let commercePrivateDeliveryTransportProfileRef: CommerceNetworkProfileValue | null = null;
 let commercePrivateDeliveryTransportSignerRef: NostrSigningAuthorityLike | null = null;
-/** Same process-lifetime dedup discipline as `commercePrivateOrderAppliedEventIds`. */
+/** Same process-lifetime dedup discipline as `commercePrivateOrderAppliedEventIds`, INCLUDING its completion-lag rule: an id is recorded only once the apply genuinely resolved. `applyInboundPrivateDeliverySyncPayload()` reports that with its own `retryable` flag (a `"rejected"`/`"no-op"` outcome that is merely early -- e.g. a buyer acknowledgment reaching this process before the seller's own `"fulfilling"` event did -- is `retryable: true` and stays eligible). */
 const commercePrivateDeliveryAppliedEventIds = new Set<string>();
 
 function commercePrivateDeliveryTransportFor(): CommercePrivateDeliveryTransportLike | null {
@@ -2898,7 +2928,6 @@ function applyInboundPrivateDeliverySyncNonFatal(envelope: {
 }): void {
   if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
   if (commercePrivateDeliveryAppliedEventIds.has(envelope.eventId)) return;
-  commercePrivateDeliveryAppliedEventIds.add(envelope.eventId);
 
   const payload = envelope.payload;
   const m = requireModules();
@@ -2913,7 +2942,15 @@ function applyInboundPrivateDeliverySyncNonFatal(envelope: {
     senderPubkeyHex: envelope.senderPubkeyHex,
     payload,
   });
-  if (result.outcome !== "applied") return;
+  if (result.outcome !== "applied") {
+    // Same completion-lag rule as the Order channel: a refusal that is
+    // merely EARLY (`retryable`) leaves the event id out of the dedup set
+    // so the next bounded refresh can re-evaluate it; a refusal that can
+    // never reconcile retires it.
+    if (!result.retryable) commercePrivateDeliveryAppliedEventIds.add(envelope.eventId);
+    return;
+  }
+  commercePrivateDeliveryAppliedEventIds.add(envelope.eventId);
   state.deliveries.save(result.delivery);
 
   // Mirror onto the local Order, exactly like `handleCommerceDeliveryAcknowledgeReceipt`
@@ -3062,7 +3099,23 @@ interface CommercePaymentEvidenceTransportLike {
 let commercePaymentEvidenceTransport: CommercePaymentEvidenceTransportLike | null = null;
 let commercePaymentEvidenceTransportProfileRef: CommerceNetworkProfileValue | null = null;
 let commercePaymentEvidenceTransportSignerRef: NostrSigningAuthorityLike | null = null;
-/** Same process-lifetime dedup discipline as `commercePrivateOrderAppliedEventIds`/`commercePrivateDeliveryAppliedEventIds`. Note this is only a cheap short-circuit: the settlement ledger itself is the real replay authority (`applySettlementEvidence()` returns `no_op`/`rejected` for duplicate/stale evidence regardless). */
+/**
+ * Same process-lifetime dedup discipline as
+ * `commercePrivateOrderAppliedEventIds`/`commercePrivateDeliveryAppliedEventIds`,
+ * INCLUDING its completion-lag rule: an id is recorded only once the apply
+ * genuinely resolved. Note this is only a cheap short-circuit: the
+ * settlement ledger itself is the real replay authority
+ * (`applySettlementEvidence()` returns `no_op`/`rejected` for
+ * duplicate/stale evidence regardless).
+ *
+ * The ONE genuinely early case on this channel is "this process has no
+ * local Order for that orderId yet" -- the buyer's `"submitted"`
+ * order-sync event may still arrive on a later refresh (relay ordering, a
+ * `limit`-truncated page), and until it does the evidence has nothing to
+ * be judged against. Every OTHER refusal here is a settled semantic
+ * verdict (wrong standing, wrong product, malformed, or a receiver-gate /
+ * ledger rejection) and is retired immediately.
+ */
 const commercePrivatePaymentEvidenceAppliedEventIds = new Set<string>();
 
 function commercePaymentEvidenceTransportFor(): CommercePaymentEvidenceTransportLike | null {
@@ -3166,16 +3219,25 @@ function applyInboundPrivatePaymentEvidenceNonFatal(
 ): void {
   if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
   if (commercePrivatePaymentEvidenceAppliedEventIds.has(envelope.eventId)) return;
-  commercePrivatePaymentEvidenceAppliedEventIds.add(envelope.eventId);
 
   const m = requireModules();
   const state = commerceState();
   const localOrder = state.orders.findById(envelope.payload.orderId);
+  // THE one "not yet" case on this channel -- deliberately NOT retired
+  // from the dedup set (see that Set's own comment): the order-sync event
+  // that materializes this order locally may still arrive.
+  if (localOrder === undefined) return;
+
+  const retire = (): void => {
+    commercePrivatePaymentEvidenceAppliedEventIds.add(envelope.eventId);
+  };
   const expectation = commercePaymentEvidenceExpectationFor(localOrder, ownPubkeyHex);
-  if (expectation === null || localOrder === undefined) return;
+  // This process has no standing to accept payment evidence for an order
+  // it is not the seller of -- a settled verdict, never an early one.
+  if (expectation === null) return retire();
   // Extra receiver check the Port's own expectation shape has no field for:
   // the product this payment claims to be for must be THIS order's product.
-  if (envelope.payload.productId !== localOrder.productId) return;
+  if (envelope.payload.productId !== localOrder.productId) return retire();
 
   // The settlement ledger REJECTS evidence for a paymentId it never
   // `bind()`-ed (`PaymentSettlementLedger.apply()`), and this process --
@@ -3188,21 +3250,44 @@ function applyInboundPrivatePaymentEvidenceNonFatal(
   // bound to a DIFFERENT order is left alone and `applySettlementEvidence()`
   // rejects it as "wrong-order evidence" rather than being rebound here.
   const paymentId = (envelope.payload as { readonly paymentId?: unknown }).paymentId;
-  if (typeof paymentId !== "string" || paymentId.length === 0) return;
+  if (typeof paymentId !== "string" || paymentId.length === 0) return retire();
   if (state.ledger.get(paymentId) === undefined) {
     try {
       state.ledger.bind(paymentId, localOrder.id, localOrder.productId);
     } catch (err) {
-      console.error("fedos-beta: inbound PaymentEvidence -- settlement bind failed (non-fatal, event dropped):", err);
+      // An UNEXPECTED failure (the duplicate-paymentId case is already
+      // excluded by the `get()` guard above), so it is not a semantic
+      // verdict -- left eligible rather than retired, in line with "only
+      // record an id once the apply genuinely resolved".
+      console.error("fedos-beta: inbound PaymentEvidence -- settlement bind failed (non-fatal, event left eligible for the next refresh):", err);
       return;
     }
   }
 
   const applied = m.CommerceNostr.applyInboundPaymentEvidenceSync(envelope.senderPubkeyHex, envelope.payload, expectation, state.ledger);
   if (!applied.accepted) {
+    // Every rejection reason `applyInboundPaymentEvidenceSync()` can
+    // produce (malformed payload, wrong sender, wrong order, wrong
+    // amount/currency, non-authoritative source, wrong provider identity)
+    // is a fixed property of these exact bytes -- none of them can start
+    // passing because local state advanced. Retired.
     console.error("fedos-beta: inbound PaymentEvidence rejected by receiver validation (non-fatal, ledger untouched):", applied.reason);
-    return;
+    return retire();
   }
+  // Accepted by every receiver gate and handed to the ledger, which is
+  // this channel's real replay authority: whatever it decided
+  // (`transitioned`/`no_op`/`rejected`) is final for these bytes, so the
+  // event is retired here regardless of what the Order does below.
+  //
+  // KNOWN NARROW RESIDUAL (documented, not worked around): if the ledger
+  // TRANSITIONS but this process's local Order is not yet `"accepted"`,
+  // the Order cannot follow and a later refresh cannot recover it (the
+  // ledger would `no_op`). Unreachable on the real path -- the seller's
+  // own accept is what lets the buyer pay at all, and it is durable -- and
+  // fixing it properly means re-deriving the Order transition from the
+  // ledger's own settled state, which is a deliberate authority-model
+  // change, not a dedup fix.
+  retire();
   // Only a genuine ledger TRANSITION may move the Order -- never a
   // `no_op` (duplicate/idempotent) and never a `rejected`. This is the
   // second and last place in this file that constructs a

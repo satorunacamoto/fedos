@@ -60,6 +60,24 @@ function functionBody(source: string, declaration: string): string {
   return source.slice(start, end + 2);
 }
 
+/**
+ * `functionBody()` for the two inbound-apply functions whose signature is
+ * itself a multi-line inline object type ending in a COLUMN-0 `}):` --
+ * `function applyInboundPrivateOrderSyncNonFatal(envelope: {\n ... \n}): void {`.
+ * For those, `functionBody()`'s "first `\n}`" rule lands on the type's own
+ * closing brace, capturing the signature instead of the body. This variant
+ * anchors on the real body opener (`): void {`) first.
+ */
+function voidFunctionBody(source: string, declaration: string): string {
+  const declarationStart = source.indexOf(declaration);
+  expect(declarationStart, `expected to find "${declaration}" in source`).toBeGreaterThanOrEqual(0);
+  const bodyStart = source.indexOf("): void {", declarationStart);
+  expect(bodyStart, `expected a "): void {" body opener after "${declaration}"`).toBeGreaterThan(declarationStart);
+  const end = source.indexOf("\n}", bodyStart);
+  expect(end, `expected a column-0 closing brace after "${declaration}"`).toBeGreaterThan(bodyStart);
+  return source.slice(bodyStart, end + 2);
+}
+
 describe("Purchase Completion integration -- Agent P's PaymentEvidence transport is genuinely wired into the main process", () => {
   it("1. the payment-evidence bridge + receiver Port are really loaded as root modules (not merely present as unreferenced files on disk)", () => {
     const main = stripComments(read(MAIN_PATH));
@@ -143,7 +161,12 @@ describe("Purchase Completion integration -- Agent P's PaymentEvidence transport
     const orderApply = body.indexOf("applyOrderAction(");
     expect(expectationCall).toBeGreaterThanOrEqual(0);
     expect(portCall).toBeGreaterThan(expectationCall);
-    expect(body).toMatch(/if \(expectation === null \|\| localOrder === undefined\) return;/);
+    // (Completion-lag fix round: the two conditions are now separate --
+    // "no local order YET" is a retryable early state that must not
+    // consume the event id, whereas "no standing to accept" is a settled
+    // verdict that retires it. Both still return before the ledger.)
+    expect(body).toMatch(/if \(localOrder === undefined\) return;/);
+    expect(body).toMatch(/if \(expectation === null\) return retire\(\);/);
 
     // Extra receiver check beyond the Port's own six.
     expect(body).toMatch(/envelope\.payload\.productId !== localOrder\.productId/);
@@ -162,6 +185,77 @@ describe("Purchase Completion integration -- Agent P's PaymentEvidence transport
     // ...and only when genuinely unbound, so a paymentId already bound to a
     // different order is left for the state machine to reject.
     expect(body).toMatch(/if \(state\.ledger\.get\(paymentId\) === undefined\)/);
+  });
+
+  it("6b. COMPLETION-LAG FIX: none of the three inbound channels writes an event id into its dedup set BEFORE the apply has resolved", () => {
+    const main = stripComments(read(MAIN_PATH));
+
+    // The defect this guard exists to prevent regressing: the previous
+    // implementation did `set.add(envelope.eventId)` on the line straight
+    // after the `set.has(...)` short-circuit, i.e. BEFORE any apply was
+    // attempted, which turned every "this process's local state has not
+    // caught up yet" refusal into a permanent per-process drop. Live-proven
+    // on the seller's `"completed"` order-sync event -- see
+    // `commerce_e2e_two_process_real_electron.test.ts` STEP 10 and
+    // `src/os/commerce/events/commerce_private_order_apply.ts`'s header.
+    for (const setName of [
+      "commercePrivateOrderAppliedEventIds",
+      "commercePrivateDeliveryAppliedEventIds",
+      "commercePrivatePaymentEvidenceAppliedEventIds",
+    ]) {
+      expect(
+        main,
+        `${setName}: an \`.add()\` immediately after the \`.has()\` short-circuit means the id is consumed before the apply is even attempted`,
+      ).not.toMatch(new RegExp(`${setName}\\.has\\(envelope\\.eventId\\)\\) return;\\s*\\n\\s*${setName}\\.add\\(`));
+    }
+
+    // Order channel: every decision is delegated to the pure module, and
+    // the ONLY `retry-later` handling is an early return that does NOT add.
+    const orderBody = voidFunctionBody(main, "function applyInboundPrivateOrderSyncNonFatal(");
+    expect(orderBody).toMatch(/applyInboundPrivateOrderSyncPayload\(/);
+    const retryReturn = orderBody.indexOf('if (result.outcome === "retry-later")');
+    const orderAdd = orderBody.indexOf("commercePrivateOrderAppliedEventIds.add(");
+    expect(retryReturn).toBeGreaterThanOrEqual(0);
+    expect(orderAdd, "the dedup write must come strictly AFTER the retry-later early return").toBeGreaterThan(retryReturn);
+    expect(orderBody).toMatch(/if \(result\.outcome === "applied"\) state\.orders\.save\(result\.order\)/);
+
+    // Delivery channel: a non-applied outcome is retired only when the pure
+    // module says it can never reconcile.
+    const deliveryBody = voidFunctionBody(main, "function applyInboundPrivateDeliverySyncNonFatal(");
+    expect(deliveryBody).toMatch(/if \(!result\.retryable\) commercePrivateDeliveryAppliedEventIds\.add\(envelope\.eventId\);/);
+
+    // PaymentEvidence channel: the one early case (`localOrder === undefined`)
+    // returns without retiring; every other exit goes through `retire()`.
+    const paymentBody = voidFunctionBody(main, "function applyInboundPrivatePaymentEvidenceNonFatal(");
+    expect(paymentBody).toMatch(/const retire = \(\): void => \{\s*\n\s*commercePrivatePaymentEvidenceAppliedEventIds\.add\(envelope\.eventId\);/);
+    const localOrderGuard = paymentBody.indexOf("if (localOrder === undefined) return;");
+    const retireDefinition = paymentBody.indexOf("const retire =");
+    expect(localOrderGuard).toBeGreaterThanOrEqual(0);
+    expect(retireDefinition, "the retryable no-local-order case must be decided before `retire` is even in scope").toBeGreaterThan(localOrderGuard);
+  });
+
+  it("6c. COMPLETION-LAG FIX: idempotency/replay safety was NOT weakened -- the dedup sets are still only a short-circuit and every real guard survives", () => {
+    const main = stripComments(read(MAIN_PATH));
+
+    // The three sets still exist and are still consulted first.
+    for (const setName of [
+      "commercePrivateOrderAppliedEventIds",
+      "commercePrivateDeliveryAppliedEventIds",
+      "commercePrivatePaymentEvidenceAppliedEventIds",
+    ]) {
+      expect(main).toMatch(new RegExp(`if \\(${setName}\\.has\\(envelope\\.eventId\\)\\) return;`));
+    }
+
+    // The Order channel still routes through the REAL state machine (via
+    // the pure module) and never writes a status field directly.
+    const orderBody = voidFunctionBody(main, "function applyInboundPrivateOrderSyncNonFatal(");
+    expect(orderBody).not.toMatch(/status:\s*"/);
+    // The pure module is genuinely in the beta-runtime build, so the
+    // dynamic import above can resolve at runtime.
+    expect(read(BETA_RUNTIME_TSCONFIG)).toMatch(/src\/os\/commerce\/events\/commerce_private_order_apply\.ts/);
+    // ...and is genuinely loaded as a root module, not merely present.
+    expect(main).toMatch(/commerce_private_order_apply\.js/);
+    expect(main).toMatch(/applyInboundPrivateOrderSyncPayload:/);
   });
 
   it("7. `{ kind: \"payment_evidence\" }` remains constructible in exactly two places, both behind a real settlement-ledger verdict", () => {

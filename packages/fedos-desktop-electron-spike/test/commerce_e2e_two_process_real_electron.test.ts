@@ -127,27 +127,41 @@
  *    findings surfaced, both documented in place rather than worked
  *    around, both asserted so they cannot silently change:
  *
- *    a. SELLER-SIDE COMPLETION LAG (STEP 10). A bounded refresh runs its
+ *    a. SELLER-SIDE COMPLETION LAG (STEP 10) -- SINCE FIXED, and this
+ *       suite now asserts the FIXED behaviour. A bounded refresh runs its
  *       three passes in a fixed order (order-sync -> payment-evidence ->
- *       delivery-sync). The buyer's `"completed"` ORDER-sync event is
- *       therefore evaluated while the seller's local Order is still
- *       `"fulfilling"`, is correctly refused by the Order state machine,
- *       and is then permanently consumed because
- *       `applyInboundPrivateOrderSyncNonFatal()` writes the event id into
- *       `commercePrivateOrderAppliedEventIds` BEFORE attempting the apply.
- *       Extra Refresh clicks in the same process cannot recover it (proven
- *       live); it resolves on the next process launch (also proven live).
- *       Not a security/authority problem -- no gate misbehaved and no
- *       state was corrupted.
+ *       delivery-sync), so the buyer's `"completed"` ORDER-sync event is
+ *       still evaluated while the seller's local Order is `"fulfilling"`
+ *       and is still correctly refused by the Order state machine -- but
+ *       it is no longer permanently CONSUMED. The apply now returns a
+ *       tri-state outcome (`applied` / `permanently-inapplicable` /
+ *       `retry-later`) from the pure
+ *       `applyInboundPrivateOrderSyncPayload()`, and only the first two
+ *       write the event id into `commercePrivateOrderAppliedEventIds`, so
+ *       the NEXT bounded refresh point IN THE SAME PROCESS re-evaluates
+ *       the same event and completes it. Measured live in STEP 10 below:
+ *       the seller now reads `"completed"` within a single launch, where
+ *       the identical script previously read `"delivered"` after both
+ *       refreshes and only resolved on the next process start. No
+ *       authority gate was relaxed to achieve it; the same discipline was
+ *       applied to all three inbound channels.
  *
  *    b. PURCHASED CONTENT IS UNREACHABLE ONE LAYER EARLIER THAN THE ARC'S
- *       OWN DISCLOSED GAP (STEP 9). The only media-attach IPC handler in
- *       the app hard-codes `classification: "public"`, so no product can
- *       ever carry protected media, so no `MediaAccessGrant` is ever
- *       issued, so the buyer's real "Open Purchased Content" click can
- *       only ever be answered "this product has no protected content".
- *       The in-memory-only `IpfsMediaStore` byte transport the arc
- *       documents is real, but the real app never gets that far.
+ *       OWN DISCLOSED GAP (STEP 9) -- STILL OPEN, deliberately. The only
+ *       media-attach IPC handler in the app hard-codes
+ *       `classification: "public"`, so no product can ever carry protected
+ *       media, so no `MediaAccessGrant` is ever issued, so the buyer's
+ *       real "Open Purchased Content" click can only ever be answered
+ *       "this product has no protected content". A follow-up investigation
+ *       established that removing that hard-code is NOT a bounded wiring
+ *       job: there is no byte transport that can move ciphertext between
+ *       two OS processes at all (no IPFS client exists; the only
+ *       `IpfsTransport` implementation is an in-memory per-process `Map`;
+ *       no private-sync payload has a content field), and
+ *       `resolveCommerceMediaKey()` derives a per-PROFILE key with no
+ *       counterparty parameter and no raw-key-import primitive, so a
+ *       seller's ciphertext is structurally undecryptable by any other
+ *       profile. Left unbuilt on purpose -- see the fix round's own report.
  *
  * DELIBERATE SECURITY BOUNDARY THAT IS *STILL* REAL AND MUST STAY REAL
  * (unchanged by anything in this file): `PrivateOrderSyncStatus`
@@ -1129,39 +1143,52 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
 
       // ---------------------------------------------------------------
       // BOB_8 -- completion crossing back to the seller's own independent
-      // process. THIS PHASE FOUND A REAL, PREVIOUSLY-UNDOCUMENTED
-      // INTEGRATION DEFECT; the script below is shaped to pin it down
-      // precisely rather than to make it disappear.
+      // process. THIS PHASE ORIGINALLY FOUND A REAL, PREVIOUSLY-
+      // UNDOCUMENTED INTEGRATION DEFECT (the seller-side completion lag),
+      // WHICH HAS SINCE BEEN FIXED. The script keeps its original shape --
+      // two full refreshes in ONE process -- because that is precisely the
+      // sequence that used to fail; it is now the live proof of the fix.
       //
-      // THE DEFECT (live-reproduced here, source-confirmed afterwards):
-      // Bob's local Order sits at `"fulfilling"` when this launch starts.
-      // A bounded refresh runs its three passes in a FIXED order --
-      // order-sync, then payment-evidence, then delivery-sync (see
+      // THE ORDERING (unchanged, and not itself a bug): Bob's local Order
+      // sits at `"fulfilling"` when this launch starts. A bounded refresh
+      // runs its three passes in a FIXED order -- order-sync, then
+      // payment-evidence, then delivery-sync (see
       // `handleCommerceOrdersListIncoming()`). Alice's `"completed"`
       // ORDER-sync event is therefore evaluated FIRST, against a local
       // order still at `"fulfilling"`; `complete` legally requires
       // `"delivered"` (`order_state_machine.ts`), so `applyOrderAction()`
-      // correctly refuses it and `applyInboundPrivateOrderSyncNonFatal()`
-      // safely drops it. Only AFTERWARDS does the delivery pass apply
+      // correctly refuses it. Only AFTERWARDS does the delivery pass apply
       // Alice's `"recipient_acknowledged"` and mirror the local Order to
-      // `"delivered"` -- the exact state the just-dropped event needed.
+      // `"delivered"` -- the exact state the just-refused event needed.
       //
-      // What turns a one-pass ordering quirk into a real, user-visible
-      // defect is the dedup set: `applyInboundPrivateOrderSyncNonFatal()`
-      // adds `envelope.eventId` to `commercePrivateOrderAppliedEventIds`
-      // BEFORE attempting the apply, and never removes it on failure. So
-      // within this process the `"completed"` event is permanently
-      // consumed -- pressing Refresh again, however many times, can never
-      // resolve it. The script below proves exactly that by doing a
-      // SECOND full refresh in this same process, and the next phase
-      // proves it self-heals on the next process launch (fresh dedup set
-      // + the relay's own history replay).
+      // THE DEFECT (fixed): what turned that one-pass ordering quirk into
+      // a real, user-visible defect was the dedup set --
+      // `applyInboundPrivateOrderSyncNonFatal()` added `envelope.eventId`
+      // to `commercePrivateOrderAppliedEventIds` BEFORE attempting the
+      // apply, so the refusal was permanent for that whole process and
+      // pressing Refresh again could never resolve it (proven live, twice).
       //
-      // This is NOT a security/authority problem -- every gate behaved
-      // correctly and no state was corrupted -- and this suite does not
-      // "fix" it by relaxing anything. Changing when an inbound event is
-      // marked applied is a deliberate design decision about hostile-event
-      // re-processing cost, and belongs to whoever owns that integration.
+      // THE FIX (completion-lag fix round): the apply decision now returns
+      // a TRI-STATE outcome from the pure, unit-tested
+      // `applyInboundPrivateOrderSyncPayload()`
+      // (`src/os/commerce/events/commerce_private_order_apply.ts`), and the
+      // event id is recorded ONLY on `"applied"`/`"permanently-inapplicable"`
+      // -- never on `"retry-later"` (well-formed and fully authorized, but
+      // the local state has not caught up yet). Refresh pass #1 below
+      // therefore still leaves Bob at `"delivered"` (the ordering is
+      // unchanged and the event genuinely could not apply yet), but refresh
+      // pass #2 IN THE SAME PROCESS now re-evaluates that same event
+      // against the now-`"delivered"` local Order and completes it.
+      //
+      // Nothing was relaxed to achieve this: every authority/identity/
+      // economics gate is byte-for-byte the same and now lives in one
+      // pure module, replay safety still comes from the state machine's
+      // own status guard rather than the dedup set, and a genuinely
+      // inapplicable event is still retired on its first evaluation. See
+      // `test/commerce_private_order_apply.test.ts` for the domain-level
+      // regression proof and guard 6b/6c in
+      // `commerce_purchase_completion_integration_structural_guards.test.ts`
+      // for the wiring proof.
       // ---------------------------------------------------------------
       const bob8 = await runBetaUiScript("BOB_8_CONFIRM_COMPLETION", bobDataDir, [
         ...returningLaunchPreamble(BOB_PASSPHRASE, "direct", "#commerce-merchant-acting-as", bobPubkey), // 0..13
@@ -1186,27 +1213,44 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
       const bobStatusAfterRefresh2 = readAt(bob8, 26);
       const bobReputationSummary = softReadAt(bob8, 17);
       record(
-        `STEP 10 (seller side, cross-process -- REAL FINDING) -- Bob's independent process (pid ${String(bob8.pid)}) after refresh pass #1: order status "${bobStatusAfterRefresh1}", delivery "${bobDeliveryAfterComplete}". After a SECOND full refresh in the SAME process: "${bobStatusAfterRefresh2}". His OWN "My Store" reputation panel says: "${bobReputationSummary}".`,
+        `STEP 10 (seller side, cross-process -- COMPLETION-LAG FIX VERIFIED) -- Bob's independent process (pid ${String(bob8.pid)}) after refresh pass #1: order status "${bobStatusAfterRefresh1}", delivery "${bobDeliveryAfterComplete}". After a SECOND full refresh in the SAME process: "${bobStatusAfterRefresh2}". His OWN "My Store" reputation panel says: "${bobReputationSummary}".`,
       );
       // The delivery half genuinely crossed -- this is what proves the
-      // dropped event was the ORDER-channel "completed" specifically, and
-      // not a general failure to receive anything from Alice.
+      // event in question was the ORDER-channel "completed" specifically,
+      // and not a general failure to receive anything from Alice.
       expect(bobDeliveryAfterComplete, "Agent D's delivery channel DID deliver Alice's acknowledgment+completion cross-process").toMatch(/Delivery status: (delivered|completed)/);
-      expect(bobStatusAfterRefresh1, "live-reproduced ordering defect: the order-sync pass evaluates \"completed\" before the delivery pass has produced \"delivered\"").toBe("delivered");
+      // MEASURED, not predicted: the first reported status is already
+      // `"completed"`. The pass ordering itself did NOT change -- the
+      // Orders-list refresh (step 14) still evaluates Alice's `"completed"`
+      // while the local Order is `"fulfilling"` and still, correctly,
+      // cannot apply it -- but OPENING the order detail (step 18) is
+      // itself another bounded reliable-refresh point running the same
+      // three passes, and by then the delivery pass has moved the local
+      // Order to `"delivered"`, so the STILL-ELIGIBLE event applies there.
+      // Two refresh points, ONE process, no restart. The pre-fix run of
+      // this identical script reported "delivered" after BOTH refreshes;
+      // both readings are preserved in
+      // `docs/commerce/evidence/commerce_e2e_two_process_evidence.md`.
+      expect(
+        bobStatusAfterRefresh1,
+        "COMPLETION-LAG FIX: the event the Orders-list refresh had to refuse was NOT consumed by the dedup set (it resolved to \"retry-later\", not \"applied\"), so the next bounded refresh point in the SAME process re-evaluates it against the now-\"delivered\" local Order and completes it. A \"delivered\" here means the pre-apply dedup write has regressed -- see `src/os/commerce/events/commerce_private_order_apply.ts`",
+      ).toBe("completed");
       expect(
         bobStatusAfterRefresh2,
-        "the dedup set (`commercePrivateOrderAppliedEventIds`) is keyed per PROCESS and is written before the apply is attempted, so an extra Refresh in the same process cannot recover the dropped event -- if this ever starts returning \"completed\", the defect has been fixed upstream and this assertion should be updated, not deleted",
-      ).toBe("delivered");
+        "...and it is stable across further refreshes: a genuinely applied event IS retired, and re-applying it would be a safe no-op regardless",
+      ).toBe("completed");
       record(
-        "STEP 10 FINDING (seller-side completion lag, NOT a security issue, NOT worked around) -- Alice's \"completed\" order-sync event is dropped on the seller's first refresh because the fixed pass order (order-sync -> payment-evidence -> delivery-sync) evaluates it before the delivery pass has moved the local Order to \"delivered\", and the pre-apply dedup write then makes the drop permanent for that process. Proven live: two full refreshes in the same process both leave the seller at \"delivered\".",
+        "STEP 10 (seller-side completion lag -- FIXED, live-verified in this run) -- Bob's independent process now reaches \"completed\" WITHIN A SINGLE LAUNCH, no restart required. The order-sync pass still cannot apply Alice's \"completed\" while the local Order is \"fulfilling\", but the event is no longer consumed by the dedup set, so the next bounded refresh point in the same process applies it. The pre-fix run of this identical script reported \"delivered\" after BOTH refreshes (see the earlier section of this same evidence log).",
       );
 
       // ---------------------------------------------------------------
-      // BOB_8B -- the same seller, next process launch. Fresh (empty)
-      // dedup set + the relay's own history replay + a local Order that is
-      // now durably "delivered" => the very same "completed" event applies
-      // cleanly. This is the honest bound on the defect above: seller-side
-      // completion is not lost, it is delayed until the next app start.
+      // BOB_8B -- the same seller, next process launch. This phase used to
+      // be the honest BOUND on the defect above ("completion is not lost,
+      // just delayed until the next app start"); with the fix it is
+      // retained as the DURABILITY check instead: the completion reached
+      // in-process above must have been genuinely SAVED, so a brand-new
+      // process reads `"completed"` straight from its own durable store
+      // (and re-applying the relay's replayed history changes nothing).
       // ---------------------------------------------------------------
       const bob8b = await runBetaUiScript("BOB_8B_COMPLETION_RESOLVES_NEXT_LAUNCH", bobDataDir, [
         ...returningLaunchPreamble(BOB_PASSPHRASE, "direct", "#commerce-merchant-acting-as", bobPubkey), // 0..13
@@ -1226,8 +1270,8 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
         `STEP 10 (seller side, next launch) -- Bob's next independent process (pid ${String(bob8b.pid)}) reads order status "${bobCompletedStatus}", delivery "${softReadAt(bob8b, 20)}". Orders: ${JSON.stringify(bobOrdersAtCompletion)}`,
       );
       expect(countOrderRows(bobOrdersAtCompletion), "the delayed completion must resolve the SAME order, never a second one").toBe(1);
-      expect(bobCompletedStatus, "\"completed\" DOES travel on the order-sync channel -- it just needs the next process start to be applied").toBe("completed");
-      record("STEP 10 PASS (with the documented one-launch seller-side lag) -- full completion, a real signed+QR Trust receipt verified VALID by the real verifier, a real reputation record on the completing party's device, and the completion confirmed on the counterparty's own independent process.");
+      expect(bobCompletedStatus, "the in-process completion reached above must be durable -- a fresh process reads \"completed\" from its own store").toBe("completed");
+      record("STEP 10 PASS -- full completion, a real signed+QR Trust receipt verified VALID by the real verifier, a real reputation record on the completing party's device, and the completion confirmed on the counterparty's own independent process WITHIN THAT PROCESS (no app restart needed), then re-read durably on the next launch.");
     },
     600000,
   );

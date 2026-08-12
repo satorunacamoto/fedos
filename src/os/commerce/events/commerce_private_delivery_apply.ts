@@ -34,7 +34,7 @@
  * evidence" doc for `confirm_delivery`).
  */
 
-import { applyDeliveryAction, createDelivery, type DeliveryEvidence, type DeliveryRecord } from "../delivery/index.js";
+import { applyDeliveryAction, createDelivery, type DeliveryEvidence, type DeliveryRecord, type DeliveryStatus } from "../delivery/index.js";
 import type { PrivateDeliverySyncPayload } from "./commerce_private_delivery_sync.js";
 
 export interface ApplyInboundPrivateDeliverySyncInput {
@@ -57,10 +57,71 @@ export interface ApplyInboundPrivateDeliverySyncInput {
   readonly payload: PrivateDeliverySyncPayload;
 }
 
+/**
+ * `retryable` (completion-lag fix round): whether the CALLER's own
+ * process-lifetime dedup set may permanently retire this event id.
+ *
+ *   `retryable: false` -> retire it. No future local state can make this
+ *                        event apply: it is malformed, unauthorized, for a
+ *                        different record's identity, or already
+ *                        superseded (this process's Delivery has reached
+ *                        or passed the status the event asks for).
+ *   `retryable: true`  -> KEEP it eligible. The event is well-formed and
+ *                        authorized; this process's own local state has
+ *                        simply not caught up yet (e.g. a buyer's
+ *                        `"recipient_acknowledged"` arriving before the
+ *                        seller's `"fulfilling"` has been applied, or
+ *                        before the local Order has reached a
+ *                        payment-confirmed status). It MUST stay eligible
+ *                        so the SAME event applies on a later refresh in
+ *                        the SAME process.
+ *
+ * This exists because the caller previously wrote the event id into its
+ * dedup set BEFORE attempting the apply, which turned every "not yet" into
+ * a permanent drop for the whole process lifetime — see
+ * `./commerce_private_order_apply.ts`'s header for the live two-process
+ * E2E run that proved the consequence on the Order channel. Replay safety
+ * is unchanged: the dedup set was never the replay authority, the real
+ * `delivery_state_machine.ts` status guards still are, and a genuine
+ * replay of an already-applied event is `retryable: false` (superseded),
+ * exactly as safe a no-op as before.
+ */
 export type ApplyInboundPrivateDeliverySyncOutcome =
   | { readonly outcome: "applied"; readonly delivery: DeliveryRecord }
-  | { readonly outcome: "no-op" }
-  | { readonly outcome: "rejected"; readonly reason: string };
+  | { readonly outcome: "no-op"; readonly retryable: boolean }
+  | { readonly outcome: "rejected"; readonly reason: string; readonly retryable: boolean };
+
+/**
+ * Position of each `DeliveryStatus` on the single forward chain
+ * `pending -> fulfilling -> delivered -> completed`.
+ */
+const DELIVERY_STATUS_RANK: Readonly<Record<DeliveryStatus, number>> = {
+  pending: 0,
+  fulfilling: 1,
+  delivered: 2,
+  completed: 3,
+};
+
+/**
+ * The chain rank a local Delivery must still be BELOW for a given inbound
+ * sync action to have any future chance of applying — derived directly
+ * from `delivery_state_machine.ts`'s own status guards (the rank of the
+ * latest local status from which the transition is still legal, plus one):
+ *
+ *   fulfilling               `start_fulfillment` legal from pending(0)   -> 1
+ *   recipient_acknowledged   `confirm_delivery`  legal from fulfilling(1) -> 2
+ *   completed                `acknowledge`       legal from delivered(2)  -> 3
+ */
+const DELIVERY_SYNC_SUPERSEDED_AT_RANK: Readonly<Record<PrivateDeliverySyncPayload["action"], number>> = {
+  fulfilling: 1,
+  recipient_acknowledged: 2,
+  completed: 3,
+};
+
+/** Is a state-machine refusal for `action` against a local Delivery at `status` "too early" (retry later) or "already past it" (retire forever)? */
+function isRetryableForStatus(status: DeliveryStatus, action: PrivateDeliverySyncPayload["action"]): boolean {
+  return DELIVERY_STATUS_RANK[status] < DELIVERY_SYNC_SUPERSEDED_AT_RANK[action];
+}
 
 export function applyInboundPrivateDeliverySyncPayload(
   input: ApplyInboundPrivateDeliverySyncInput,
@@ -77,13 +138,15 @@ export function applyInboundPrivateDeliverySyncPayload(
     delivery !== undefined &&
     (delivery.orderId !== payload.orderId || delivery.buyerPubkey !== payload.buyerPubkey || delivery.sellerPubkey !== payload.sellerPubkey)
   ) {
-    return { outcome: "rejected", reason: "payload does not match the existing local delivery record" };
+    // The local record's own identity fields never change, so a mismatch
+    // can never reconcile itself on a later refresh.
+    return { outcome: "rejected", reason: "payload does not match the existing local delivery record", retryable: false };
   }
 
   if (payload.action === "fulfilling") {
     if (delivery === undefined) {
       if (senderPubkeyHex !== payload.sellerPubkey) {
-        return { outcome: "rejected", reason: "sender is not this delivery's seller" };
+        return { outcome: "rejected", reason: "sender is not this delivery's seller", retryable: false };
       }
       const created = createDelivery(
         {
@@ -97,12 +160,19 @@ export function applyInboundPrivateDeliverySyncPayload(
         payload.at,
       );
       if (!created.ok || created.delivery === undefined) {
-        return { outcome: "rejected", reason: created.ok ? "delivery creation failed unexpectedly" : created.reason };
+        // `order_not_paid` is the ONE creation refusal that is purely a
+        // local-state race: this process's own Order simply has not
+        // reached a payment-confirmed status YET (the caller derives
+        // `orderPaymentConfirmed` from it), and a later refresh -- e.g.
+        // after the payment-evidence pass runs -- can legitimately accept
+        // the very same event. Every other code is structural and final.
+        const retryable = !created.ok && created.code === "order_not_paid";
+        return { outcome: "rejected", reason: created.ok ? "delivery creation failed unexpectedly" : created.reason, retryable };
       }
       delivery = created.delivery;
     }
     if (senderPubkeyHex !== delivery.sellerPubkey) {
-      return { outcome: "rejected", reason: "sender is not this delivery's seller" };
+      return { outcome: "rejected", reason: "sender is not this delivery's seller", retryable: false };
     }
     const started = applyDeliveryAction(
       delivery,
@@ -118,19 +188,24 @@ export function applyInboundPrivateDeliverySyncPayload(
       // no-op. If this call freshly materialized the record above, the
       // record itself is still a real, newly-applied fact even though the
       // fulfillment claim on top of it didn't advance further.
-      return delivery !== input.existingDelivery ? { outcome: "applied", delivery } : { outcome: "no-op" };
+      return delivery !== input.existingDelivery
+        ? { outcome: "applied", delivery }
+        : { outcome: "no-op", retryable: isRetryableForStatus(delivery.status, payload.action) };
     }
     return { outcome: "applied", delivery: started.delivery };
   }
 
   if (payload.action === "recipient_acknowledged") {
     if (delivery === undefined) {
-      return { outcome: "rejected", reason: "no local delivery record for this order yet (out of order)" };
+      // Out of order, NOT invalid: the seller's own `"fulfilling"` event
+      // (which materializes the record) may still arrive on a later
+      // bounded refresh, so this event must stay eligible.
+      return { outcome: "rejected", reason: "no local delivery record for this order yet (out of order)", retryable: true };
     }
     if (senderPubkeyHex !== delivery.buyerPubkey) {
       // THE concrete enforcement of "Seller must NOT be able to manufacture
       // Buyer acknowledgment" -- see this file's own header.
-      return { outcome: "rejected", reason: "sender is not this delivery's buyer" };
+      return { outcome: "rejected", reason: "sender is not this delivery's buyer", retryable: false };
     }
     const evidence: DeliveryEvidence = {
       deliveryId: delivery.id,
@@ -145,20 +220,26 @@ export function applyInboundPrivateDeliverySyncPayload(
       verification: { source: "recipient_acknowledgment", authoritative: true, acknowledgedBy: senderPubkeyHex },
     };
     const result = applyDeliveryAction(delivery, { type: "confirm_delivery", actor: { kind: "delivery_evidence" }, evidence }, payload.at);
-    if (!result.ok) return { outcome: "no-op" };
+    // A refusal while the record is still `"pending"` is a pure ordering
+    // race (the seller's `"fulfilling"` has not been applied yet); a
+    // refusal at `"delivered"`/`"completed"` is a genuine replay.
+    if (!result.ok) return { outcome: "no-op", retryable: isRetryableForStatus(delivery.status, payload.action) };
     return { outcome: "applied", delivery: result.delivery };
   }
 
   // payload.action === "completed"
   if (delivery === undefined) {
-    return { outcome: "rejected", reason: "no local delivery record for this order yet (out of order)" };
+    return { outcome: "rejected", reason: "no local delivery record for this order yet (out of order)", retryable: true };
   }
   const actorKind: "customer" | "merchant" | undefined =
     senderPubkeyHex === delivery.buyerPubkey ? "customer" : senderPubkeyHex === delivery.sellerPubkey ? "merchant" : undefined;
   if (actorKind === undefined) {
-    return { outcome: "rejected", reason: "sender is neither this delivery's buyer nor seller" };
+    return { outcome: "rejected", reason: "sender is neither this delivery's buyer nor seller", retryable: false };
   }
   const result = applyDeliveryAction(delivery, { type: "acknowledge", actor: { kind: actorKind, pubkey: senderPubkeyHex } }, payload.at);
-  if (!result.ok) return { outcome: "no-op" };
+  // Same discipline: refused because the record has not reached
+  // `"delivered"` yet (retry) vs. because it is already `"completed"`
+  // (retire).
+  if (!result.ok) return { outcome: "no-op", retryable: isRetryableForStatus(delivery.status, payload.action) };
   return { outcome: "applied", delivery: result.delivery };
 }

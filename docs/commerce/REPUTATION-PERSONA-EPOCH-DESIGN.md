@@ -242,3 +242,86 @@ Test Files  4 passed (4)
 **Rotation, unchanged in design, now durable in practice:** `rolloverPersonaEpoch()` remains a caller-triggered, never-automatic operation (unchanged). The new `sealNextGenerationPersonaEpochSigningKeypair()` seam (`durable_persona_epoch_signing_key_store.ts`) is what a future rollover caller would use to seal the NEW epoch's keypair at the next `generation` for the same real pubkey — additive, not yet wired to an actual rollover trigger (none exists in the composition root today, unchanged from before this closure).
 
 **Cross-device scope, unchanged:** local-device-only. No sync of any kind was added. A second device profile mints and seals its own independent Persona Epoch keypair per real pubkey it encounters.
+
+---
+
+## Commerce Purchase Completion mega-arc — completion-lag fix round: cross-process reputation investigated, NOT built (additive)
+
+**Question asked:** after a fully completed, cross-process trade, the
+seller's own "My Store" reputation panel reads *"No reputation history on
+record for this seller yet."* (live-confirmed, twice, in
+`packages/fedos-desktop-electron-spike/test/commerce_e2e_two_process_real_electron.test.ts`
+SS21). Is closing that a small, bounded addition using the **exact** same
+private-sync pattern this arc already built three times — a new event
+content type + NIP-44 bridge + apply function + wiring at the same bounded
+refresh points?
+
+**Verdict: NO. Skipped deliberately.** A fourth private-sync channel would
+move bytes that the receiving process cannot use, because the two processes
+do not agree — and structurally cannot agree — on *who the subject is*.
+This is the same "local-device-only, a second device profile mints its own
+independent Persona Epoch per real pubkey" scope note recorded in the
+section immediately above, seen from the cross-*party* direction instead of
+the cross-*device* one.
+
+### Why relaying the attestation envelope does not work
+
+1. **Each process invents its own `PersonaEpoch` for the counterparty.**
+   `issueReputationAttestationsForCompletedOrderNonFatal()`
+   (`fedos_electron_beta_main.cts`) calls
+   `commercePersonaEpochForPubkey(order.buyerPubkey, true)` **and**
+   `commercePersonaEpochForPubkey(order.sellerPubkey, true)` — i.e. the
+   completing process mints (and seals) a persona epoch for **both**
+   parties, including the counterparty it is not.
+
+2. **Those epochs cannot coincide across processes.** `epochId` comes from
+   `generatePersonaEpochId()` (`persona_epoch_registry.ts:61`) — 16 fresh
+   CSPRNG bytes — and the epoch signing keypair is likewise a fresh random
+   secp256k1 secret (reaffirmed in the section above: sealed at rest,
+   *never* derived from the Master Seed, deliberately). So Alice's process's
+   epoch for Bob and Bob's own epoch for himself are two unrelated
+   identities with different `epochId`s and different keys.
+
+3. **The summary query is keyed on exactly that id.**
+   `buildReputationAttestationSummary()` (`reputation_issuance.ts`) reads
+   `store.findBySubjectEpochId(subjectEpoch.epochId)` and additionally
+   requires `aggregatorKeypair.publicKeyHex === subjectEpoch.epochKeyPublicHex`.
+   An envelope relayed from Alice would carry *her* invented subject
+   epochId, which Bob's panel never queries — so a correctly delivered,
+   correctly signed attestation would land in Bob's store and still display
+   nothing. The channel would be real and the outcome unchanged.
+
+4. **Worse, the current model has the wrong party holding the key.** Alice's
+   process signs the "seller attests buyer" attestation with a keypair
+   *Alice generated for Bob*. Bob's process could neither have produced that
+   signature nor verify it as his own. Relaying it would import a signature
+   over an identity Bob does not control.
+
+### What closing it actually requires (future-arc decisions, not wiring)
+
+- **A PersonaEpoch publication/exchange step**: each party publishes its
+  *own* epoch (id + public key), and the counterparty attests against
+  **that** epoch instead of inventing one. Note the domain layer
+  deliberately holds no real-pubkey→epoch mapping — this document's own
+  header states that binding is the composition root's job — so this is a
+  new protocol surface, not a lookup.
+- **Removing attest-on-behalf-of-the-counterparty**: each side signs only
+  its own attestation, with its own epoch key. That changes who signs what,
+  i.e. an authority-model change, not a transport addition.
+- **A linkability decision.** Publishing an epoch alongside a real pubkey
+  partially undoes the pseudonymity the epoch exists to provide. That
+  trade-off is precisely what `attestation_types.ts`'s header warns a UI
+  must never quietly contradict, and it needs an explicit decision.
+
+### Current state, stated honestly
+
+Reputation attestations remain **real, signed, durable, and restart-proof —
+in the process that ran the completion only**. The counterparty's own
+reputation surface is unaffected by a genuine completed trade, and says so
+truthfully rather than showing a fabricated or partial count. That is a
+disclosed limitation of the reputation surface, unchanged by this fix
+round. The two-process E2E suite captures the panel's real text verbatim
+into its evidence log via `record()` (SS21) rather than asserting it — a
+deliberate choice by the phase that found it, so that fixing the limitation
+later does not fail the suite, while a silent change in behaviour is still
+visible in the evidence diff.
