@@ -148,6 +148,121 @@ function showCommerceError(elementId: string, result: { readonly outcome: string
 }
 
 // ---------------------------------------------------------------------
+// FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- honest
+// cross-process sync-outcome copy + sync-state derivation for any bounded
+// Commerce data view (My Orders, Incoming Orders). INLINED here, never
+// imported -- this file's own header: "no `import` of any kind, reads
+// ONLY window.fedosProfile/window.fedosBeta/window.fedosApp" (a real
+// sandboxing constraint of the isolated renderer context, not a style
+// choice). The TESTED spec these mirror lives in
+// `src/os/commerce/order/cross_process_outcome_text.ts` /
+// `src/os/commerce/order/sync_state.ts` (see those files' own headers) --
+// same discipline this file's own pre-existing `OUTCOME_TEXT` already
+// uses (a closed vocabulary re-declared here rather than importing
+// `OrderRejectionCode`). Any behavior change to the algorithm belongs in
+// BOTH places; the tested module is the source of truth to keep this
+// inline copy honest against.
+// ---------------------------------------------------------------------
+
+/**
+ * Closed vocabulary for `nostrSyncOutcome` (see `FedosCommerceOrderResult`/
+ * `FedosCommerceProductMutationResult`'s own doc comments,
+ * `fedos_electron_beta_window.d.ts`) -- a real cross-process sync failure
+ * (the counterparty was never actually notified, or a listing never
+ * actually reached the Relay) was silently dropped at the UI layer before
+ * this arc (confirmed by grep: zero prior occurrences of `nostrSyncOutcome`
+ * anywhere in this file). `sendPrivateOrderSyncNonFatal()`
+ * (`fedos_electron_beta_main.cts`) can also return an ARBITRARY transport-
+ * supplied message string on this same field -- `describeCommerceSyncOutcome()`
+ * below NEVER echoes an unrecognized string back verbatim, exactly like
+ * `describeOutcome()`'s own unknown-outcome fallback.
+ */
+const COMMERCE_SYNC_OUTCOME_TEXT: Readonly<Record<string, string>> = {
+  published: "Synced to your configured Relay.",
+  duplicate: "Already synced to your configured Relay.",
+  rejected: "The Relay rejected this update. Your local copy is unaffected — you can try again later.",
+  "transport-error": "Couldn't reach your configured Relay just now. Your local copy is unaffected — this will not retry automatically.",
+  "network-disabled": "Network sync is off for this profile (see Settings → Network). Your local copy is unaffected.",
+};
+
+/** `undefined` in (no sync attempt happened) -> `undefined` out, never a fabricated claim either way. Any other unrecognized string -> the safe generic fallback, never echoed verbatim. */
+function describeCommerceSyncOutcome(outcome: string | undefined): string | undefined {
+  if (outcome === undefined) return undefined;
+  return COMMERCE_SYNC_OUTCOME_TEXT[outcome] ?? "Couldn't confirm this synced to your configured Relay. Your local copy is unaffected.";
+}
+
+/** Renders a `nostrSyncOutcome` note into `elementId`, or clears it when `outcome` is `undefined` (no attempt happened -- never leaves a stale note from a prior action visible). */
+function renderCommerceSyncOutcomeNote(elementId: string, outcome: string | undefined): void {
+  byId(elementId).textContent = describeCommerceSyncOutcome(outcome) ?? "";
+}
+
+/**
+ * The five honest states a Commerce data view may report -- matches the
+ * mega-arc brief's own required vocabulary verbatim ("Distinguish
+ * connected / syncing / offline / sync failed / up to date — without
+ * exposing implementation jargon"). See `sync_state.ts`'s own header for
+ * the full honesty contract this mirrors.
+ */
+type CommerceSyncStatus = "offline" | "syncing" | "sync-failed" | "up-to-date" | "connected";
+
+const COMMERCE_SYNC_STATUS_TEXT: Readonly<Record<CommerceSyncStatus, string>> = {
+  offline: "You're offline. Showing the last known information.",
+  syncing: "Checking for updates…",
+  "sync-failed": "Couldn't check for updates just now. Showing the last known information — try Refresh.",
+  "up-to-date": "Up to date.",
+  connected: "Connected. Refresh to check for the latest.",
+};
+
+/** This app has no push/poll for Commerce data (Refresh is always explicit) -- a success may only claim freshness for this long afterward. Mirrors `sync_state.ts`'s own `FRESH_WINDOW_MS`. */
+const COMMERCE_SYNC_FRESH_WINDOW_MS = 15_000;
+
+/** Tiny per-list sync bookkeeping (one instance per Commerce data view) -- mirrors `CommerceSyncTracker` (`sync_state.ts`, tested there) exactly. */
+class CommerceRendererSyncTracker {
+  inFlight = false;
+  lastAttemptAt: number | null = null;
+  lastAttemptSucceeded: boolean | null = null;
+
+  begin(): void {
+    this.inFlight = true;
+  }
+
+  complete(succeeded: boolean, at: number): void {
+    this.inFlight = false;
+    this.lastAttemptAt = at;
+    this.lastAttemptSucceeded = succeeded;
+  }
+
+  /**
+   * `navigator.onLine` is a REAL browser signal (this renderer runs in an
+   * ordinary, if sandboxed, Chromium context) -- never fabricated -- but it
+   * only reflects the OS network-interface state, not actual Relay
+   * reachability (mirrors `refreshRelayStatus()`'s own honesty about what
+   * it can and cannot know). `now` is caller-supplied so this stays
+   * consistent with `deriveCommerceSyncStatus()`'s own pure/testable
+   * design even though this copy is not itself unit-tested (no DOM/jsdom
+   * harness exists in this package -- see this arc's own structural-guard
+   * tests for how this wiring is proven instead).
+   */
+  status(now: number): CommerceSyncStatus {
+    if (!navigator.onLine) return "offline";
+    if (this.inFlight) return "syncing";
+    if (this.lastAttemptSucceeded === false) return "sync-failed";
+    if (this.lastAttemptSucceeded === true && this.lastAttemptAt !== null) {
+      const age = now - this.lastAttemptAt;
+      if (age >= 0 && age <= COMMERCE_SYNC_FRESH_WINDOW_MS) return "up-to-date";
+    }
+    return "connected";
+  }
+}
+
+const commerceMyOrdersSyncTracker = new CommerceRendererSyncTracker();
+const commerceMerchantOrdersSyncTracker = new CommerceRendererSyncTracker();
+
+function renderCommerceSyncStatus(elementId: string, tracker: CommerceRendererSyncTracker): void {
+  byId(elementId).textContent = COMMERCE_SYNC_STATUS_TEXT[tracker.status(Date.now())];
+}
+
+// ---------------------------------------------------------------------
 // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 21
 // (arc §22, §41-42): "SYSTEMATIC action-handler robustness" for every
 // Commerce IPC call site, buyer and seller actions alike. Before this arc,
@@ -601,6 +716,16 @@ async function onChatSend(): Promise<void> {
 // ---------------------------------------------------------------------
 
 let commerceCatalogCache: readonly FedosCommerceCatalogListItem[] = [];
+/**
+ * FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- last
+ * successfully-fetched My Orders list, kept so a FAILED refresh can
+ * honestly keep showing "the last known information" (per this arc's own
+ * sync-state requirement) instead of clearing the list to a fabricated
+ * empty state. `undefined` only before the very first fetch attempt ever
+ * completes.
+ */
+let commerceMyOrdersCache: readonly FedosCommerceOrder[] | undefined = undefined;
+let commerceMerchantOrdersCache: readonly FedosCommerceOrder[] | undefined = undefined;
 /** Set by `openCommerceProduct()`, read by `onCommerceOrderCreateSubmit()` — the id of whichever product Product Detail currently shows (mirrors `currentConversationId`'s own module-state convention above). */
 let currentCommerceDetailProductId: string | null = null;
 
@@ -723,6 +848,61 @@ async function refreshCommerceBuyerActivitySummary(): Promise<void> {
   if (b.readyToComplete > 0) parts.push(`${b.readyToComplete} ready to complete`);
   if (b.readyReceipts > 0) parts.push(`${b.readyReceipts} receipt(s) ready`);
   el.textContent = parts.length > 0 ? parts.join(" · ") : "Nothing needs your attention right now.";
+}
+
+/**
+ * FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- "where is my
+ * order?" landing-screen pointer (AFTER usability report row #7, P2: "no
+ * pointer back to an in-progress or just-completed order" after unlock or
+ * restart -- see `#commerce-landing-pointer`'s own HTML comment). Reuses
+ * the SAME `commerceActivitySummary()` call the buyer/seller activity
+ * summaries above already make -- no new IPC call. Mirrors
+ * `buildCommerceLandingPointer()`'s tested algorithm
+ * (`src/os/commerce/order/landing_pointer.ts`) exactly; inlined here for
+ * the same sandboxing reason as this file's other inlined-not-imported
+ * helpers (see this file's own header).
+ */
+function pluralizeCommerceLandingCount(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+async function refreshCommerceLandingPointer(): Promise<void> {
+  const el = byId("commerce-landing-pointer");
+  const result = await window.fedosApp.commerceActivitySummary(commerceActingAsPubkey);
+  if (result.outcome !== "ok") {
+    el.setAttribute("hidden", "");
+    el.textContent = "";
+    return;
+  }
+  const lines: string[] = [];
+  const b = result.asBuyer;
+  if (b !== undefined) {
+    const parts: string[] = [];
+    if (b.readyToPay > 0) parts.push(`${pluralizeCommerceLandingCount(b.readyToPay, "order")} ready to pay`);
+    if (b.readyToAcknowledge > 0) parts.push(`${pluralizeCommerceLandingCount(b.readyToAcknowledge, "order")} ready to acknowledge`);
+    if (b.readyToComplete > 0) parts.push(`${pluralizeCommerceLandingCount(b.readyToComplete, "order")} ready to complete`);
+    if (b.readyReceipts > 0) parts.push(`${pluralizeCommerceLandingCount(b.readyReceipts, "receipt")} ready`);
+    if (parts.length === 0 && b.awaitingSellerAcceptance > 0) {
+      parts.push(`${pluralizeCommerceLandingCount(b.awaitingSellerAcceptance, "order")} awaiting seller acceptance`);
+    }
+    if (parts.length > 0) lines.push(`Shop: ${parts.join(", ")}.`);
+  }
+  const s = result.asSeller;
+  if (s !== undefined) {
+    const parts: string[] = [];
+    if (s.newSubmitted > 0) parts.push(pluralizeCommerceLandingCount(s.newSubmitted, "new order"));
+    if (s.unpaid > 0) parts.push(`${pluralizeCommerceLandingCount(s.unpaid, "order")} awaiting buyer payment`);
+    if (s.paidReadyToFulfill > 0) parts.push(`${pluralizeCommerceLandingCount(s.paidReadyToFulfill, "order")} paid, ready to fulfill`);
+    if (s.fulfillingInProgress > 0) parts.push(`${pluralizeCommerceLandingCount(s.fulfillingInProgress, "order")} awaiting buyer confirmation`);
+    if (parts.length > 0) lines.push(`My Store: ${parts.join(", ")}.`);
+  }
+  if (lines.length === 0) {
+    el.setAttribute("hidden", "");
+    el.textContent = "";
+    return;
+  }
+  el.textContent = lines.join(" ");
+  el.removeAttribute("hidden");
 }
 
 /** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — which screen "← Back" returns to: the ordinary buyer catalog, or (for a merchant's own draft/unpublished Preview, friction ledger row #24) the Merchant screen it was opened from. */
@@ -1132,6 +1312,7 @@ function openCommerceOrderScreen(order: FedosCommerceOrder): void {
   currentCommercePendingPayment = null;
   currentCommerceDelivery = null;
   byId("commerce-order-completion-note").textContent = "";
+  byId("commerce-order-sync-note").textContent = "";
   showAppScreen("commerce-order");
   renderCommerceOrderScreen();
   void refreshCommerceDeliveryStatus();
@@ -1180,6 +1361,7 @@ async function onCommerceOrderCompleteClick(): Promise<void> {
     result.reputationSyncStatus === "unavailable"
       ? "Order completed. Note: a reputation record for this trade could not be saved just now — your completed order itself is unaffected."
       : "Order completed. Reputation records were saved for both parties.";
+  renderCommerceSyncOutcomeNote("commerce-order-sync-note", result.nostrSyncOutcome);
   void refreshCommerceDeliveryStatus();
   void refreshCommerceMyOrdersList();
 }
@@ -1246,6 +1428,12 @@ async function onCommerceOrderActionClick(
   }
   currentCommerceOrder = result.order;
   renderCommerceOrderScreen();
+  // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- honest,
+  // non-blocking note on whether the counterparty was actually notified of
+  // THIS action (never blocks/reverts the transition itself, which is
+  // already committed above -- mirrors `reputationSyncStatus`'s own
+  // established "core transaction succeeds regardless" discipline).
+  renderCommerceSyncOutcomeNote("commerce-order-sync-note", result.nostrSyncOutcome);
   void refreshCommerceDeliveryStatus();
   void refreshCommerceMyOrdersList();
 }
@@ -1264,6 +1452,7 @@ async function onCommerceOrderRejectClick(): Promise<void> {
   }
   currentCommerceOrder = result.order;
   renderCommerceOrderScreen();
+  renderCommerceSyncOutcomeNote("commerce-order-sync-note", result.nostrSyncOutcome);
   void refreshCommerceMyOrdersList();
 }
 
@@ -1369,11 +1558,30 @@ function renderCommerceMyOrdersList(orders: readonly FedosCommerceOrder[]): void
   }
 }
 
+/**
+ * FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- wraps the
+ * fetch with `commerceMyOrdersSyncTracker` so `#commerce-my-orders-sync-status`
+ * is always honest about whether this list's data actually just refreshed,
+ * is refreshing now, or failed to refresh (never silently stale with no
+ * signal either way -- see `CommerceRendererSyncTracker`'s own header).
+ */
 async function refreshCommerceMyOrdersList(): Promise<void> {
+  commerceMyOrdersSyncTracker.begin();
+  renderCommerceSyncStatus("commerce-my-orders-sync-status", commerceMyOrdersSyncTracker);
   const result = await runCommerceAction([], "commerce-error", () => window.fedosApp.commerceOrdersListMine(commerceActingAsPubkey));
-  const orders = result !== undefined && result.outcome === "ok" ? result.orders ?? [] : [];
-  renderCommerceMyOrdersList(orders);
-  updateCommerceNavBadge("commerce-my-orders-badge", orders);
+  const succeeded = result !== undefined && result.outcome === "ok";
+  const orders = succeeded ? result.orders ?? [] : [];
+  commerceMyOrdersSyncTracker.complete(succeeded, Date.now());
+  renderCommerceSyncStatus("commerce-my-orders-sync-status", commerceMyOrdersSyncTracker);
+  // A failed refresh keeps showing the LAST rendered list rather than
+  // clearing it to empty -- "showing the last known information", exactly
+  // what the sync-status text just promised, never a fabricated "no
+  // orders" on a mere fetch failure.
+  if (succeeded || commerceMyOrdersCache === undefined) {
+    commerceMyOrdersCache = orders;
+  }
+  renderCommerceMyOrdersList(commerceMyOrdersCache);
+  updateCommerceNavBadge("commerce-my-orders-badge", commerceMyOrdersCache);
 }
 
 // --- Merchant screen: My Products + Create Product + Incoming Orders ---
@@ -1513,6 +1721,10 @@ async function onCommercePublishAction(productId: string, action: "publish" | "u
       showCommerceError("commerce-merchant-products-error", result);
       return;
     }
+    // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- see
+    // `#commerce-order-sync-note`'s own comment for the full rationale;
+    // same honest, non-blocking note, here for publish/unpublish.
+    renderCommerceSyncOutcomeNote("commerce-merchant-products-sync-note", result.nostrSyncOutcome);
     void refreshCommerceMerchantProductsList();
     void refreshCommerceCatalogList();
   } finally {
@@ -1660,6 +1872,7 @@ async function onCommerceMerchantEditSave(): Promise<void> {
       return;
     }
     onCommerceMerchantEditCancel();
+    renderCommerceSyncOutcomeNote("commerce-merchant-products-sync-note", result.nostrSyncOutcome);
     void refreshCommerceMerchantProductsList();
     void refreshCommerceCatalogList();
   } finally {
@@ -1733,22 +1946,9 @@ function renderCommerceMerchantAttention(orders: readonly FedosCommerceOrder[]):
   }
 }
 
-async function refreshCommerceMerchantOrdersList(): Promise<void> {
-  const result = await runCommerceAction([], "commerce-merchant-orders-error", () => window.fedosApp.commerceOrdersListIncoming(commerceActingAsPubkey));
+function renderCommerceMerchantOrdersList(orders: readonly FedosCommerceOrder[]): void {
   const list = byId("commerce-merchant-orders-list");
   list.textContent = "";
-  if (result === undefined) {
-    renderCommerceMerchantAttention([]);
-    updateCommerceNavBadge("commerce-incoming-orders-badge", []);
-    return;
-  }
-  if (result.outcome !== "ok") {
-    showCommerceError("commerce-merchant-orders-error", result);
-    renderCommerceMerchantAttention([]);
-    updateCommerceNavBadge("commerce-incoming-orders-badge", []);
-    return;
-  }
-  const orders = result.orders ?? [];
   renderCommerceMerchantAttention(orders);
   updateCommerceNavBadge("commerce-incoming-orders-badge", orders);
   if (orders.length === 0) {
@@ -1758,6 +1958,27 @@ async function refreshCommerceMerchantOrdersList(): Promise<void> {
     return;
   }
   for (const order of orders) list.appendChild(commerceMerchantOrderRow(order));
+}
+
+/**
+ * FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- same honest
+ * sync-state tracking + "keep showing the last known information on a
+ * failed refresh" discipline as `refreshCommerceMyOrdersList()` above; see
+ * that function's own header.
+ */
+async function refreshCommerceMerchantOrdersList(): Promise<void> {
+  commerceMerchantOrdersSyncTracker.begin();
+  renderCommerceSyncStatus("commerce-merchant-orders-sync-status", commerceMerchantOrdersSyncTracker);
+  const result = await runCommerceAction([], "commerce-merchant-orders-error", () => window.fedosApp.commerceOrdersListIncoming(commerceActingAsPubkey));
+  const succeeded = result !== undefined && result.outcome === "ok";
+  if (result !== undefined && !succeeded) showCommerceError("commerce-merchant-orders-error", result);
+  const orders = succeeded ? result.orders ?? [] : [];
+  commerceMerchantOrdersSyncTracker.complete(succeeded, Date.now());
+  renderCommerceSyncStatus("commerce-merchant-orders-sync-status", commerceMerchantOrdersSyncTracker);
+  if (succeeded || commerceMerchantOrdersCache === undefined) {
+    commerceMerchantOrdersCache = orders;
+  }
+  renderCommerceMerchantOrdersList(commerceMerchantOrdersCache);
 }
 
 // Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge note):
@@ -1836,6 +2057,13 @@ async function refreshCommerceSellerActivitySummary(): Promise<void> {
   const s = result.asSeller;
   const parts: string[] = [];
   if (s.newSubmitted > 0) parts.push(`${s.newSubmitted} new order(s) awaiting your accept/reject`);
+  // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- the
+  // seller's own "which are unpaid?" bucket (`activity_summary.ts`'s newly
+  // added `unpaid` field), previously answered only by the separate,
+  // untested `renderCommerceMerchantAttention()` "Accepted — awaiting
+  // buyer payment" line -- now also surfaced here, from the SAME tested
+  // source of truth.
+  if (s.unpaid > 0) parts.push(`${s.unpaid} unpaid (awaiting buyer payment)`);
   if (s.paidReadyToFulfill > 0) parts.push(`${s.paidReadyToFulfill} paid, ready to fulfill`);
   if (s.fulfillingInProgress > 0) parts.push(`${s.fulfillingInProgress} fulfilling`);
   if (s.completedAwaitingReceipt > 0) parts.push(`${s.completedAwaitingReceipt} completed, receipt not yet issued`);
@@ -2790,6 +3018,10 @@ function renderReady(ready: FedosProfileCommandResult["ready"]): void {
   // rather than only after they manually visit either tab once.
   void refreshCommerceMyOrdersList();
   void refreshCommerceMerchantOrdersList();
+  // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- see
+  // `#commerce-landing-pointer`'s own HTML comment / `refreshCommerceLandingPointer()`'s
+  // own header.
+  void refreshCommerceLandingPointer();
 }
 
 function routeByStatus(status: FedosProfileStatusResult): void {
@@ -2809,6 +3041,7 @@ function routeByStatus(status: FedosProfileStatusResult): void {
     // own identical comment above (this is the OTHER Ready-routing path).
     void refreshCommerceMyOrdersList();
     void refreshCommerceMerchantOrdersList();
+    void refreshCommerceLandingPointer();
     return;
   }
   if (status.presence === "absent") {
@@ -3166,6 +3399,12 @@ byId<HTMLTextAreaElement>("chat-compose").addEventListener("keydown", (event) =>
 byId<HTMLButtonElement>("nav-conversations").addEventListener("click", () => {
   showAppScreen("conversations");
   void refreshConversationsList();
+  // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- keep the
+  // landing pointer current on every return to this screen, not merely at
+  // the moment of unlock/restart (reuses the same one-shot-per-navigation
+  // discipline every other screen's own refresh already follows -- never a
+  // recurring background poll).
+  void refreshCommerceLandingPointer();
 });
 byId<HTMLButtonElement>("nav-commerce").addEventListener("click", () => {
   showAppScreen("commerce");
@@ -3195,6 +3434,20 @@ byId<HTMLButtonElement>("nav-settings").addEventListener("click", () => {
   showAppScreen("settings");
   void refreshSettings();
 });
+
+// FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- explicit
+// manual refresh for My Orders / Incoming Orders (this app has no push/
+// poll for Commerce data -- see `CommerceRendererSyncTracker`'s own
+// header). `runCommerceAction()` inside each refresh function already
+// disables buttons it is told about; these two ARE that busy-button, so a
+// second click mid-refresh is a no-op via the same disable-while-in-flight
+// discipline every other Commerce action already uses.
+byId<HTMLButtonElement>("commerce-my-orders-refresh").addEventListener("click", () =>
+  void runCommerceAction(["commerce-my-orders-refresh"], "commerce-error", () => refreshCommerceMyOrdersList()),
+);
+byId<HTMLButtonElement>("commerce-merchant-orders-refresh").addEventListener("click", () =>
+  void runCommerceAction(["commerce-merchant-orders-refresh"], "commerce-merchant-orders-error", () => refreshCommerceMerchantOrdersList()),
+);
 
 // Conversations / chat.
 byId<HTMLInputElement>("conversations-filter").addEventListener("input", () => {

@@ -180,14 +180,26 @@ describe("Item 5/6 -- Merchant dashboard attention + reputation, reusing existin
   it("16. attention counts are derived from the SAME orders array commerceOrdersListIncoming() already returns -- no second IPC call inside renderCommerceMerchantAttention()", () => {
     const source = stripComments(read(RENDERER_PATH));
     expect(source).not.toMatch(/function renderCommerceMerchantAttention[\s\S]{0,600}?window\.fedosApp\./);
+    // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- refactored
+    // `refreshCommerceMerchantOrdersList()` to extract a
+    // `renderCommerceMerchantOrdersList(orders)` render helper (added
+    // honest sync-state tracking + "keep the last known list on a failed
+    // refresh" -- see that function's own header) -- the invariant this
+    // test proves (attention counts derived from the SAME fetched array,
+    // never a second IPC call) still holds, re-expressed against the new
+    // shape: `renderCommerceMerchantAttention(orders)` is called with the
+    // SAME `orders` parameter `renderCommerceMerchantOrdersList` receives,
+    // and there is exactly ONE `commerceOrdersListIncoming(` call site
+    // across both functions combined.
+    const renderStart = source.indexOf("function renderCommerceMerchantOrdersList(orders: readonly FedosCommerceOrder[]): void {");
+    expect(renderStart).toBeGreaterThanOrEqual(0);
+    const renderBody = source.slice(renderStart, renderStart + 500);
+    expect(renderBody).toMatch(/renderCommerceMerchantAttention\(orders\);/);
     const refreshStart = source.indexOf("async function refreshCommerceMerchantOrdersList(): Promise<void> {");
     expect(refreshStart).toBeGreaterThanOrEqual(0);
-    // Coordinator merge note: window widened from 700 -- Agent U's own
-    // additive updateCommerceNavBadge() calls in the two early-return
-    // branches above push this function's later lines further from its
-    // own start than before the merge.
-    const body = source.slice(refreshStart, refreshStart + 1000);
-    expect(body).toMatch(/const orders = result\.orders \?\? \[\];\s*\n\s*renderCommerceMerchantAttention\(orders\);/);
+    const combined = source.slice(renderStart, refreshStart + 1200);
+    expect((combined.match(/commerceOrdersListIncoming\(/g) ?? []).length).toBe(1);
+    expect(combined).toMatch(/renderCommerceMerchantOrdersList\(commerceMerchantOrdersCache\);/);
   });
 
   it("17. the Merchant dashboard reputation panel reuses the SAME renderCommercePersonaReputation() the buyer-facing Product Detail panel uses -- one shared function, never a duplicated query", () => {
