@@ -55,7 +55,7 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     expect(appBlockers).toEqual([]);
   });
 
-  it("does not regress past the currently-measured blocker baseline (10, up from 7 -- Commerce FINAL Closure Mega-Arc, Agent N -- a new violation must update this number deliberately, never silently)", () => {
+  it("does not regress past the currently-measured blocker baseline (16, up from 10 -- FedOS 'Real Two-Party Commerce + UX P0/P1 Closure' mega-arc, Agent N, Coordinator-directed pass -- a new violation must update this number deliberately, never silently)", () => {
     // Commerce E2E Completion arc, Wave B: 4 new, DELIBERATE, reviewed blockers on
     // top of the pre-existing 3 (os/core -> packages/fedos-core-rust; the two
     // pre-existing catalog/adapters/nostr/{bridge,classify}.ts -> os/messenger
@@ -87,8 +87,35 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     //     Nostr events (`../../../events/commerce_nostr_event_read_model.ts`'s
     //     own input) -- it is the read-side of the SAME adapter boundary the
     //     write-side blockers above already crossed.
+    // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+    // Coordinator-directed pass): 6 more new, DELIBERATE, reviewed blockers
+    // on top of the prior 10 -- all 6 from ONE new file,
+    // catalog/adapters/nostr/commerce_private_order_bridge.ts, the PRIVATE
+    // Order/status transport (arc items #4/#5). Lives in the SAME
+    // NOSTR_ADAPTER_DIR the outbound/inbound public-event bridges already
+    // use (`test/architecture_boundary_commerce.test.ts`'s own
+    // `NOSTR_ADAPTER_DIR` allowlist, unchanged by this pass) -- same
+    // narrowly-scoped exception, not a new category of leak:
+    //   - event.js's `isNostrEvent` (structural NostrEvent check, same
+    //     import the inbound public bridge already has)
+    //   - noble_signature.js's `NobleSignatureVerifier` (real Schnorr
+    //     verification, same as the inbound public bridge)
+    //   - signature.js's `SignatureVerifier` type (same as the inbound
+    //     public bridge)
+    //   - types.js's `NostrEvent` type (same as every bridge file here)
+    //   - publish.js's `RelayPublisher` type (same as the outbound public
+    //     bridge)
+    //   - sign/fedos_nostr_signing_authority.js's `FedosNostrSigningAuthority`/
+    //     `FedosNostrUnsignedEventRequest`/`freezeFedosNostrUnsignedEventRequest`/
+    //     `isWellFormedFedosNostrUnsignedEventRequest` (same real signing
+    //     seam the outbound public bridge already uses -- see this arc's
+    //     own Coordinator decision: reuse `FedosMasterSeedAuthority.encryptNip44Wire`/
+    //     `decryptNip44Wire`, the SAME real NIP-44 primitive the Gift-Wrap
+    //     adapter already uses, directly -- rather than the full NIP-17
+    //     stack, which would have pulled in a Conversation-domain
+    //     dependency instead of this already-sanctioned Nostr-protocol one)
     const { blockers } = runScan();
-    expect(blockers.length).toBeLessThanOrEqual(10);
+    expect(blockers.length).toBeLessThanOrEqual(16);
   });
 
   it("every blocker belongs to one of the three os/* roots (never the already-clean Electron app)", () => {
