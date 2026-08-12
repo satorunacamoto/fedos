@@ -44,6 +44,8 @@
  * network, opens no channel/invoice/checkout session.
  */
 
+import { bytesToHex, randomBytes as nobleRandomBytes } from "@noble/hashes/utils.js";
+
 import type {
   PaymentCapability,
   PaymentDecision,
@@ -53,6 +55,9 @@ import type {
   PaymentProviderStatus,
   PaymentRequest,
 } from "./types.js";
+
+/** Byte length of the per-instance salt mixed into every generated payment id -- see `#instanceSalt` below. */
+const INSTANCE_SALT_BYTE_LENGTH = 4;
 
 /** The exact, unmistakable name every `test_simulator` evidence this class produces carries in `verification.simulator`. */
 export const TEST_SIMULATOR_NAME = "DeterministicLocalPaymentProvider";
@@ -82,6 +87,12 @@ export interface DeterministicLocalPaymentProviderOptions {
    * way to know the profile itself (see file header).
    */
   readonly runtimeProfile?: "test" | "development" | "production" | (string & {});
+  /**
+   * Injected purely for deterministic tests (mirrors this module family's
+   * own `randomBytesFn` seam, e.g. `../catalog/product_id.ts`). Defaults to
+   * the real `@noble/hashes` `randomBytes`.
+   */
+  readonly randomBytesFn?: (length: number) => Uint8Array;
 }
 
 interface SimulatorLedgerEntry {
@@ -99,6 +110,22 @@ interface SimulatorLedgerEntry {
 export class DeterministicLocalPaymentProvider implements PaymentProvider {
   #ledger = new Map<string, SimulatorLedgerEntry>();
   #nextId = 0;
+  /**
+   * A random-per-instance salt mixed into every generated payment id.
+   *
+   * Real callers (e.g. the Electron main process) construct a FRESH
+   * `DeterministicLocalPaymentProvider` on every launch/restart, while
+   * `DurablePaymentSettlementLedger.bind()` persists bound payment ids
+   * ACROSS restarts and throws on a duplicate id. Before this salt existed,
+   * `#nextId` restarted from 0 every process, so the very first payment
+   * after any restart always re-minted `"local-sim-payment-1"` -- which
+   * collided with the same id a PRIOR process had already durably bound,
+   * making `bind()` throw and silently stalling the new order's payment
+   * with no visible error. The salt makes ids unique per process lifetime
+   * (collision probability across restarts is negligible) while `#nextId`
+   * still counts up within a single instance for readability/debugging.
+   */
+  #instanceSalt: string;
 
   constructor(options: DeterministicLocalPaymentProviderOptions) {
     if (options === undefined || options === null || options.acknowledgeTestOnly !== true) {
@@ -113,6 +140,8 @@ export class DeterministicLocalPaymentProvider implements PaymentProvider {
           "it is a TEST/LOCAL simulator only and can authoritatively fabricate a PAID-equivalent outcome.",
       );
     }
+    const randomBytesFn = options.randomBytesFn ?? nobleRandomBytes;
+    this.#instanceSalt = bytesToHex(randomBytesFn(INSTANCE_SALT_BYTE_LENGTH));
   }
 
   getStatus(): PaymentProviderStatus {
@@ -136,7 +165,7 @@ export class DeterministicLocalPaymentProvider implements PaymentProvider {
       return this.#decision(request, "expired", false, "request's expiresAt is already in the past");
     }
 
-    const paymentId = `local-sim-payment-${(this.#nextId += 1)}`;
+    const paymentId = `local-sim-payment-${this.#instanceSalt}-${(this.#nextId += 1)}`;
     this.#ledger.set(paymentId, {
       orderId: request.orderId,
       productId: request.productId,

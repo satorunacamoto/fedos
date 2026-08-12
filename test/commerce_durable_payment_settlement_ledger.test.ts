@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { DurablePaymentSettlementLedger } from "../src/os/commerce/payment/persistence/durable_payment_settlement_ledger.js";
 import type { PaymentSettlementState } from "../src/os/commerce/payment/state_machine.js";
 import type { PaymentEvidence } from "../src/os/commerce/payment/types.js";
+import { DeterministicLocalPaymentProvider } from "../src/os/commerce/payment/local_simulator.js";
 
 /**
  * Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL
@@ -175,5 +176,77 @@ describe("DurablePaymentSettlementLedger -- fail-closed on corruption", () => {
         ["createdAt", "history", "orderId", "paymentId", "productId", "status", "updatedAt"].sort(),
       );
     }
+  });
+});
+
+describe("DeterministicLocalPaymentProvider x DurablePaymentSettlementLedger -- restart-safe payment ids (Commerce Mainline Integration, regression for a real disclosed defect)", () => {
+  it("6. a payment requested by a FRESH provider instance (simulating a process restart) never collides with an id already durably bound by a PRIOR instance over the SAME ledger file", async () => {
+    dir = mkdtempSync(join(tmpdir(), "fedos-durable-payment-"));
+    const path = join(dir, "settlements.ndjson");
+
+    // Launch 1: fresh provider + fresh ledger view over the file, exactly
+    // as the Electron main process constructs both on every real launch.
+    const providerLaunch1 = new DeterministicLocalPaymentProvider({ acknowledgeTestOnly: true });
+    const ledgerLaunch1 = new DurablePaymentSettlementLedger(path);
+    const decisionOne = await providerLaunch1.requestPayment({
+      productId: "prod-1",
+      orderId: "order-1",
+      amountCents: 1000,
+      currency: "USD",
+      rail: "manual_placeholder",
+    });
+    expect(decisionOne.allowed).toBe(true);
+    expect(decisionOne.paymentId).toBeDefined();
+    ledgerLaunch1.bind(decisionOne.paymentId!, "order-1", "prod-1");
+
+    // Launch 2 ("restart"): a genuinely NEW provider instance -- before the
+    // fix, its in-memory `#nextId` counter always restarted at 0, so its
+    // very first payment always re-minted the exact same id
+    // ("local-sim-payment-1") the FIRST provider instance already
+    // durably bound above, and this second `bind()` call threw.
+    const providerLaunch2 = new DeterministicLocalPaymentProvider({ acknowledgeTestOnly: true });
+    const ledgerLaunch2 = new DurablePaymentSettlementLedger(path);
+    const decisionTwo = await providerLaunch2.requestPayment({
+      productId: "prod-2",
+      orderId: "order-2",
+      amountCents: 2000,
+      currency: "USD",
+      rail: "manual_placeholder",
+    });
+    expect(decisionTwo.allowed).toBe(true);
+    expect(decisionTwo.paymentId).toBeDefined();
+
+    // The actual regression assertion: this must NOT throw.
+    expect(() => ledgerLaunch2.bind(decisionTwo.paymentId!, "order-2", "prod-2")).not.toThrow();
+
+    // And the two ids must be genuinely distinct (not just non-throwing by
+    // accident) -- both orders' payments must be independently resolvable.
+    expect(decisionTwo.paymentId).not.toBe(decisionOne.paymentId);
+    expect(ledgerLaunch2.get(decisionOne.paymentId!)?.orderId).toBe("order-1");
+    expect(ledgerLaunch2.get(decisionTwo.paymentId!)?.orderId).toBe("order-2");
+  });
+
+  it("7. a THIRD fresh provider instance's first-ever payment id still never collides, across many simulated restarts", async () => {
+    dir = mkdtempSync(join(tmpdir(), "fedos-durable-payment-"));
+    const path = join(dir, "settlements.ndjson");
+    const seenIds = new Set<string>();
+
+    for (let restart = 0; restart < 25; restart += 1) {
+      const provider = new DeterministicLocalPaymentProvider({ acknowledgeTestOnly: true });
+      const ledger = new DurablePaymentSettlementLedger(path);
+      const decision = await provider.requestPayment({
+        productId: `prod-${restart}`,
+        orderId: `order-${restart}`,
+        amountCents: 500,
+        currency: "USD",
+        rail: "manual_placeholder",
+      });
+      expect(decision.allowed).toBe(true);
+      const paymentId = decision.paymentId!;
+      expect(seenIds.has(paymentId)).toBe(false);
+      seenIds.add(paymentId);
+      expect(() => ledger.bind(paymentId, `order-${restart}`, `prod-${restart}`)).not.toThrow();
+    }
+    expect(seenIds.size).toBe(25);
   });
 });
