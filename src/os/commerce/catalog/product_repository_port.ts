@@ -52,6 +52,17 @@ export interface CreateProductInput {
   readonly linkedEventIds?: readonly string[];
   readonly assetIds?: readonly string[];
   readonly stock?: number;
+  /**
+   * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — REQUIRED,
+   * explicit capacity the calling actor asserts for this specific call.
+   * Mirrors `OrderActor.kind` (`order_types.ts`): the caller must state
+   * which role it is acting in, never leave it to be inferred from
+   * ambient "currently selected identity" state. `create()` rejects
+   * (`policy.ts`'s `canCreateProduct()`) unless this is `"merchant"` —
+   * see that function's own header for the full rationale (friction
+   * ledger row #2, the "Unknown merchant" mis-attribution P0).
+   */
+  readonly actorRole: "customer" | "merchant";
 }
 
 /**
@@ -82,7 +93,15 @@ export type ProductRepositoryMutationResult =
   | { readonly outcome: "ok"; readonly product: Product }
   | { readonly outcome: "not-found" }
   | { readonly outcome: "forbidden"; readonly reason: string }
-  | { readonly outcome: "invalid-input"; readonly reason: string };
+  | { readonly outcome: "invalid-input"; readonly reason: string }
+  /**
+   * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — distinct
+   * from `"forbidden"` (an EXISTING product's owning-creator check
+   * failed) — this is the pre-creation gate: the actor did not assert a
+   * `"merchant"` capacity for this `create()` call at all. See
+   * `CreateProductInput.actorRole` / `policy.ts`'s `canCreateProduct()`.
+   */
+  | { readonly outcome: "unauthorized-actor"; readonly reason: string };
 
 /**
  * The persistence Port for merchant Product CRUD. Synchronous, mirroring

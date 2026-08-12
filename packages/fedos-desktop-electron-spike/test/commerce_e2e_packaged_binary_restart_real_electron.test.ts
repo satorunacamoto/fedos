@@ -443,12 +443,15 @@ realSuite(
           { action: "wait", ms: 200 }, // 11
           { action: "fill", selector: "#commerce-merchant-create-title", value: "Mainline Restart E2E Mug" }, // 12
           { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the mainline packaged-binary restart E2E." }, // 13
-          { action: "fill", selector: "#commerce-merchant-create-price", value: "2700" }, // 14
+          // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- price
+          // field is decimal-dollars now (friction ledger row #18); Publish
+          // click targets its own class since the row also has Preview/Edit.
+          { action: "fill", selector: "#commerce-merchant-create-price", value: "27.00" }, // 14
           { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 15
           { action: "click", selector: "#commerce-merchant-create-submit" }, // 16
           { action: "wait", ms: 300 }, // 17
           { action: "read", selector: "#commerce-merchant-products-list" }, // 18
-          { action: "click", selector: "#commerce-merchant-products-list li:last-child button" }, // 19 -- Publish
+          { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 19 -- Publish
 
           // Alice: discover, order, submit.
           { action: "wait", ms: 300 }, // 20

@@ -193,7 +193,14 @@ const fedosApp: FedosAppBridge = Object.freeze({
   // Commerce Reachable Catalog + Product Surface Phase 1 -- read-only,
   // same bounded-string discipline as every method above.
   commerceCatalogList: () => ipcRenderer.invoke("fedos-app:commerce-catalog-list"),
-  commerceProductDetail: (productId: string) => ipcRenderer.invoke("fedos-app:commerce-product-detail", { productId: boundedString(productId, MAX_ID_CHARS) }),
+  // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- `previewActorPubkey`
+  // is OPTIONAL/additive (friction ledger row #24, draft preview); omitted
+  // by every existing buyer-facing caller, unchanged behavior for those.
+  commerceProductDetail: (productId: string, previewActorPubkey?: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-product-detail", {
+      productId: boundedString(productId, MAX_ID_CHARS),
+      actorPubkey: previewActorPubkey === undefined ? undefined : boundedString(previewActorPubkey, MAX_ID_CHARS),
+    }),
   // Commerce E2E Completion arc (coordinator integration gate) -- Merchant
   // Product CRUD + Order + local Payment simulator. SAME bounded-string
   // discipline as every method above; no method here accepts a raw
@@ -202,9 +209,17 @@ const fedosApp: FedosAppBridge = Object.freeze({
   // `orderId`/`paymentId`, main process alone decides evidence and status.
   commerceMerchantProductsList: (actorPubkey: string) =>
     ipcRenderer.invoke("fedos-app:commerce-merchant-products-list", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
-  commerceProductCreate: (actorPubkey: string, input: { title: string; description?: string; priceCents: number; currency: string }) =>
+  // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- `actorRole`
+  // is a REQUIRED, separate, closed-literal argument (never folded into
+  // `input`, never left optional/defaulted here) so the renderer must
+  // explicitly assert which capacity it is acting in for every single
+  // create call -- see `fedos_electron_beta_main.cts`'s own
+  // `handleCommerceProductCreate()` doc comment for the full rationale
+  // (friction ledger row #2, the "Unknown merchant" P0 fix).
+  commerceProductCreate: (actorPubkey: string, actorRole: "customer" | "merchant", input: { title: string; description?: string; priceCents: number; currency: string }) =>
     ipcRenderer.invoke("fedos-app:commerce-product-create", {
       actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS),
+      actorRole: actorRole === "merchant" ? "merchant" : "customer",
       title: boundedString(input?.title, MAX_PRODUCT_TITLE_CHARS),
       description: input?.description === undefined ? undefined : boundedString(input.description, MAX_PRODUCT_DESCRIPTION_CHARS),
       priceCents: typeof input?.priceCents === "number" ? input.priceCents : -1,

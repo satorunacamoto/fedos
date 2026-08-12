@@ -2845,10 +2845,38 @@ async function handleCommerceCatalogList() {
   };
 }
 
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #24 / arc §30: draft/unpublished product preview. `actorPubkey`
+ * is OPTIONAL and additive -- every EXISTING caller (the public Commerce
+ * catalog's buyer-facing product-detail view) omits it and gets EXACTLY
+ * the prior published-only behavior, unchanged. When supplied, a product
+ * absent from `listPublished()` (draft/archived) is still returned, but
+ * ONLY if `actorPubkey` matches the product's own `creatorPubkey` -- the
+ * same "creator only may view a non-active product" rule
+ * `src/os/commerce/catalog/policy.ts`'s `canViewProduct()` already
+ * encodes (inlined here as a direct equality check, matching this file's
+ * own established convention for creator/owner checks elsewhere, e.g.
+ * `handleCommerceDeliveryAcknowledgeReceipt`'s `order.buyerPubkey !==
+ * body.actorPubkey` check, rather than adding a new domain-module export
+ * seam for one read path). This reuses the SAME renderer render function
+ * (`renderCommerceProductDetail`) a buyer's real product view already
+ * uses -- never a second, visually-divergent preview implementation.
+ */
 async function handleCommerceProductDetail(payload: unknown) {
-  const productId = (payload as { productId?: unknown } | null)?.productId;
+  const body = payload as { productId?: unknown; actorPubkey?: unknown } | null;
+  const productId = body?.productId;
   if (!isBoundedString(productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
-  const product = commerceState().products.listPublished().find((candidate) => candidate.id === productId);
+  const previewActorPubkey = isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) && body.actorPubkey.length > 0 ? body.actorPubkey : undefined;
+  let product = commerceState().products.listPublished().find((candidate) => candidate.id === productId);
+  let isPreview = false;
+  if (product === undefined && previewActorPubkey !== undefined) {
+    const candidate = commerceState().products.get(productId);
+    if (candidate !== undefined && candidate.creatorPubkey === previewActorPubkey) {
+      product = candidate;
+      isPreview = true;
+    }
+  }
   if (product === undefined) return { outcome: "not-found", reason: "no such product" };
   const media = commerceProductMediaFor(product.id);
   return {
@@ -2870,6 +2898,7 @@ async function handleCommerceProductDetail(payload: unknown) {
       creatorPubkey: product.creatorPubkey,
       status: product.status,
       media: media === null ? null : { dataUri: media.dataUri, mimeType: media.mimeType, altText: media.altText },
+      isPreview,
     },
   };
 }
@@ -2909,10 +2938,32 @@ async function handleCommerceMerchantProductsList(payload: unknown) {
   return { outcome: "ok", products: products.map(commerceProductDto) };
 }
 
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #2 / arc §12: the P0 "Unknown merchant" mis-attributed
+ * listing fix. `actorRole` travels explicitly with EVERY create call,
+ * exactly the same discipline this section's own header already
+ * documents for `actorPubkey` ("always travels explicitly ... never
+ * inferred from 'currently selected' state") -- the renderer derives it
+ * from whichever identity is actually acting (see
+ * `fedos_electron_beta_renderer.ts`'s `onCommerceMerchantCreateSubmit()`),
+ * never a hardcoded literal here. This handler is the FIRST enforcement
+ * point (fails closed on a malformed/missing role before the domain is
+ * even called); `LocalProductRepository`/`DurableProductRepository.create()`
+ * (`src/os/commerce/catalog/policy.ts`'s `canCreateProduct()`) is the
+ * AUTHORITATIVE second one -- a renderer bug that always sent
+ * `actorRole: "merchant"` regardless of the real UI state would defeat
+ * this handler-level check, but see that domain function's own header:
+ * this is a known, disclosed limitation of asserting capacity without a
+ * separate merchant-registration system, not a silent gap.
+ */
 async function handleCommerceProductCreate(payload: unknown) {
-  const body = payload as { actorPubkey?: unknown; title?: unknown; description?: unknown; priceCents?: unknown; currency?: unknown } | null;
+  const body = payload as { actorPubkey?: unknown; actorRole?: unknown; title?: unknown; description?: unknown; priceCents?: unknown; currency?: unknown } | null;
   if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (body.actorRole !== "customer" && body.actorRole !== "merchant") {
+    return { outcome: "invalid-input", reason: "actorRole must be \"customer\" or \"merchant\"" };
   }
   if (!isBoundedString(body.title, MAX_PRODUCT_TITLE_CHARS) || body.title.trim().length === 0) {
     return { outcome: "invalid-input", reason: "malformed title" };
@@ -2934,6 +2985,7 @@ async function handleCommerceProductCreate(payload: unknown) {
     linkedSpaceIds: [],
     linkedEventIds: [],
     assetIds: [],
+    actorRole: body.actorRole,
   });
   if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
   return { outcome: "ok", product: commerceProductDto(result.product) };

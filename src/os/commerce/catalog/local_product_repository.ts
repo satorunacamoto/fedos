@@ -25,7 +25,7 @@
  * product id.
  */
 
-import { canEditProduct } from "./policy.js";
+import { canCreateProduct, canEditProduct } from "./policy.js";
 import { listViewableProducts } from "./directory.js";
 import { generateFedosProductId } from "./product_id.js";
 import type { Product, ProductVisibility } from "./types.js";
@@ -88,6 +88,18 @@ export class LocalProductRepository implements ProductRepositoryPort {
   create(actorPubkey: string, input: CreateProductInput): ProductRepositoryMutationResult {
     if (actorPubkey.length === 0) {
       return { outcome: "invalid-input", reason: "actorPubkey must not be blank" };
+    }
+    // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+    // ledger row #2 P0 fix ("Unknown merchant" mis-attributed listing).
+    // Checked BEFORE any other validation, mirroring
+    // `order_state_machine.ts`'s "actor kind gate first" discipline. See
+    // `policy.ts`'s `canCreateProduct()` for the full rationale.
+    if (input.actorRole !== "customer" && input.actorRole !== "merchant") {
+      return { outcome: "invalid-input", reason: "actorRole must be \"customer\" or \"merchant\"" };
+    }
+    const roleDecision = canCreateProduct(input.actorRole);
+    if (!roleDecision.allowed) {
+      return { outcome: "unauthorized-actor", reason: roleDecision.reason };
     }
     const invalidReason = findInputInvalidReason(input);
     if (invalidReason !== null) {

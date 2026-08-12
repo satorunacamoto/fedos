@@ -284,12 +284,15 @@ realSuite("FedOS Commerce sealed signing-key stores -- real-filesystem corruptio
       { action: "wait", ms: 200 }, // 10
       { action: "fill", selector: "#commerce-merchant-create-title", value: "Corruption Seed Mug" }, // 11
       { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the sealed-key corruption E2E." }, // 12
-      { action: "fill", selector: "#commerce-merchant-create-price", value: "2500" }, // 13
+      // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- price
+      // field is decimal-dollars now (friction ledger row #18); Publish
+      // click targets its own class since the row also has Preview/Edit.
+      { action: "fill", selector: "#commerce-merchant-create-price", value: "25.00" }, // 13
       { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 14
       { action: "click", selector: "#commerce-merchant-create-submit" }, // 15
       { action: "wait", ms: 300 }, // 16
       { action: "read", selector: "#commerce-merchant-products-list" }, // 17
-      { action: "click", selector: "#commerce-merchant-products-list li:last-child button" }, // 18 -- Publish
+      { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 18 -- Publish
       { action: "wait", ms: 300 }, // 19
 
       { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 20

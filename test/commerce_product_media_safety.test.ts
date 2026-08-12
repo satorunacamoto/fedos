@@ -348,6 +348,7 @@ describe("LocalProductMediaRepository authority + validation", () => {
       priceCents: 100,
       currency: "USD",
       visibility: "public",
+      actorRole: "merchant",
     });
     if (created.outcome !== "ok") throw new Error("unreachable");
     const product = created.product;
@@ -389,6 +390,7 @@ describe("LocalProductMediaRepository authority + validation", () => {
       priceCents: 100,
       currency: "USD",
       visibility: "public",
+      actorRole: "merchant",
     });
     if (created.outcome !== "ok") throw new Error("unreachable");
 
@@ -422,6 +424,7 @@ describe("acceptance data: Product A (image only)", () => {
       priceCents: 1000,
       currency: "USD",
       visibility: "public",
+      actorRole: "merchant",
     });
     if (created.outcome !== "ok") throw new Error("unreachable");
     products.publish(MERCHANT, created.product.id);
@@ -462,6 +465,7 @@ describe("acceptance data: Product B (image + video metadata)", () => {
       priceCents: 2500,
       currency: "USD",
       visibility: "public",
+      actorRole: "merchant",
     });
     if (created.outcome !== "ok") throw new Error("unreachable");
     const product = created.product;
@@ -515,6 +519,7 @@ describe("acceptance data: Product C (image + downloadable sample)", () => {
       priceCents: 500,
       currency: "USD",
       visibility: "public",
+      actorRole: "merchant",
     });
     if (created.outcome !== "ok") throw new Error("unreachable");
     products.publish(MERCHANT, created.product.id);

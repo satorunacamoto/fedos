@@ -21,6 +21,7 @@ function baseInput(overrides: Partial<CreateProductInput> = {}): CreateProductIn
     priceCents: 500,
     currency: "USD",
     visibility: "public",
+    actorRole: "merchant",
     ...overrides,
   };
 }
@@ -101,6 +102,18 @@ describe("DurableProductRepository -- restart recovery", () => {
 });
 
 describe("DurableProductRepository -- authority is still enforced", () => {
+  it("0. create() by an actor asserting a customer capacity is rejected and never persisted (Real Two-Party Commerce + UX P0/P1 Closure arc, friction ledger row #2)", () => {
+    dir = mkdtempSync(join(tmpdir(), "fedos-durable-product-"));
+    const path = join(dir, "products.ndjson");
+    const repo = new DurableProductRepository(path, sequentialIdGenerator("p"));
+    const result = repo.create(MERCHANT_A, baseInput({ actorRole: "customer" }));
+    expect(result.outcome).toBe("unauthorized-actor");
+    expect(repo.list()).toHaveLength(0);
+
+    const restarted = new DurableProductRepository(path);
+    expect(restarted.list()).toHaveLength(0);
+  });
+
   it("1. update() by a non-owning merchant is forbidden and never persisted", () => {
     dir = mkdtempSync(join(tmpdir(), "fedos-durable-product-"));
     const path = join(dir, "products.ndjson");

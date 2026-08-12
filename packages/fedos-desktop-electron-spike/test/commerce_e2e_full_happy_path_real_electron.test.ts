@@ -156,12 +156,18 @@ realSuite("FedOS Commerce End-to-End -- REAL packaged Beta Electron process, ful
         { action: "wait", ms: 200 }, // 10
         { action: "fill", selector: "#commerce-merchant-create-title", value: "Handmade Ceramic Mug" }, // 11
         { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the E2E tabletop." }, // 12
-        { action: "fill", selector: "#commerce-merchant-create-price", value: "2500" }, // 13
+        // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- price
+        // field is now a decimal-dollars string (friction ledger row #18;
+        // "2500" would now mean $2,500.00, not $25.00), and the row now has
+        // Preview/Edit/Publish buttons, so the Publish click targets its own
+        // class rather than "the only button" -- same $25.00 real product
+        // price as before this arc, unchanged for every downstream assertion.
+        { action: "fill", selector: "#commerce-merchant-create-price", value: "25.00" }, // 13
         { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 14
         { action: "click", selector: "#commerce-merchant-create-submit" }, // 15
         { action: "wait", ms: 300 }, // 16
         { action: "read", selector: "#commerce-merchant-products-list" }, // 17 -- proves the new draft product is real and listed
-        { action: "click", selector: "#commerce-merchant-products-list li:last-child button" }, // 18 -- Publish (the new product is always inserted last)
+        { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 18 -- Publish (the new product is always inserted last)
         { action: "wait", ms: 300 }, // 19
 
         // Alice (Customer): discover, order, submit.

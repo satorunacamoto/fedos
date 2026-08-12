@@ -227,13 +227,17 @@ describe("Commerce Reachable Catalog Phase 1 -- preload/type surface", () => {
   it("11. fedosApp exposes commerceCatalogList/commerceProductDetail using the same boundedString discipline as every other method", () => {
     const source = stripComments(read(PRELOAD_PATH));
     expect(source).toMatch(/commerceCatalogList: \(\) => ipcRenderer\.invoke\("fedos-app:commerce-catalog-list"\)/);
-    expect(source).toMatch(/commerceProductDetail: \(productId: string\) => ipcRenderer\.invoke\("fedos-app:commerce-product-detail", \{ productId: boundedString\(productId, MAX_ID_CHARS\) \}\)/);
+    // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- `previewActorPubkey`
+    // is an ADDITIVE optional 2nd parameter (friction ledger row #24, draft
+    // preview); every call this test's own regex still requires still uses
+    // the exact same `boundedString(productId, MAX_ID_CHARS)` discipline.
+    expect(source).toMatch(/commerceProductDetail: \(productId: string, previewActorPubkey\?: string\) =>\s*\n\s*ipcRenderer\.invoke\("fedos-app:commerce-product-detail", \{\s*\n\s*productId: boundedString\(productId, MAX_ID_CHARS\),/);
   });
 
   it("12. FedosAppBridge's .d.ts declares both new methods with typed results", () => {
     const source = stripComments(read(WINDOW_DTS_PATH));
     expect(source).toMatch(/commerceCatalogList: \(\) => Promise<FedosCommerceCatalogListResult>/);
-    expect(source).toMatch(/commerceProductDetail: \(productId: string\) => Promise<FedosCommerceProductDetailResult>/);
+    expect(source).toMatch(/commerceProductDetail: \(productId: string, previewActorPubkey\?: string\) => Promise<FedosCommerceProductDetailResult>/);
   });
 });
 
@@ -341,18 +345,22 @@ describe("Commerce Reachable Catalog Phase 1 -- synthetic demo catalog shape", (
 });
 
 describe("Commerce Reachable Catalog Phase 1 -- navigation + Messenger regression", () => {
-  it("20. a Commerce nav entry exists alongside Conversations, and the catalog/detail screens are present with a back-to-Commerce control", () => {
+  it("20. a Commerce (\"Shop\") nav entry exists alongside Conversations, and the catalog/detail screens are present with a back control", () => {
     const html = read(HTML_PATH);
-    expect(html).toMatch(/<button id="nav-commerce" type="button">Commerce<\/button>/);
+    // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- friction
+    // ledger row #8 / arc §28: renamed "Commerce" -> "Shop" (element id
+    // unchanged: still `nav-commerce`, see that button's own comment for
+    // why the id is deliberately kept stable across the rename).
+    expect(html).toMatch(/<button id="nav-commerce" type="button">Shop<\/button>/);
     expect(html).toMatch(/id="app-screen-commerce"/);
     expect(html).toMatch(/id="app-screen-commerce-detail"/);
     expect(html).toMatch(/id="commerce-detail-back"/);
   });
 
-  it("21. the renderer wires nav-commerce to showAppScreen('commerce') + refreshCommerceCatalogList(), and commerce-detail-back returns to the catalog", () => {
+  it("21. the renderer wires nav-commerce to showAppScreen('commerce') + refreshCommerceCatalogList(), and commerce-detail-back returns to the catalog (or, for a merchant Preview, back to Merchant -- friction ledger row #24)", () => {
     const source = stripComments(read(RENDERER_PATH));
     expect(source).toMatch(/byId<HTMLButtonElement>\("nav-commerce"\)\.addEventListener\("click", \(\) => \{\s*\n\s*showAppScreen\("commerce"\);\s*\n\s*void refreshCommerceCatalogList\(\);/);
-    expect(source).toMatch(/byId<HTMLButtonElement>\("commerce-detail-back"\)\.addEventListener\("click", \(\) => \{\s*\n\s*showAppScreen\("commerce"\);/);
+    expect(source).toMatch(/byId<HTMLButtonElement>\("commerce-detail-back"\)\.addEventListener\("click", \(\) => \{[\s\S]{0,400}?showAppScreen\("commerce"\);\s*\n\s*void refreshCommerceCatalogList\(\);/);
   });
 
   it("22. Messenger's own nav/IPC vocabulary is untouched -- Conversations nav, conversations-list channel, and window.fedosAcceptance boundary all remain exactly as before", () => {

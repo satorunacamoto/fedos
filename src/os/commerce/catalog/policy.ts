@@ -92,6 +92,37 @@ export function canEditProduct(actorPubkey: string, product: Product): AccessDec
 }
 
 /**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #2 / arc §12 fix: "Unknown merchant" mis-attributed listing.
+ *
+ * Mirrors `order_state_machine.ts`'s `isActorKindAuthorized()` pattern
+ * (checked FIRST, independent of any other state) rather than inventing a
+ * new authority shape: `createOrder()` structurally requires
+ * `actor.kind === "customer"`; this is the Product-side equivalent,
+ * requiring `actorRole === "merchant"` before a product may even be
+ * constructed. Before this fix, `LocalProductRepository.create()`/
+ * `DurableProductRepository.create()` accepted ANY non-blank
+ * `actorPubkey` as the new product's `creatorPubkey` with no role check
+ * at all — a caller acting in a "customer" capacity (the repro: FedOS
+ * Commerce Usability Red-Team baseline, `SELLER-TABLETOP.md` §2) could
+ * silently create a permanently mis-attributed listing. This is a
+ * DOMAIN-layer gate, not a UI hint: `create()` itself now calls this and
+ * rejects before any product object is constructed, so no caller —
+ * including a future one that forgets a UI-side check — can route around
+ * it. There is deliberately no allowlist of "known merchant pubkeys"
+ * here (unlike the old two-fixed-demo-persona model): ANY pubkey may act
+ * as a merchant, exactly as ANY pubkey may act as a customer in
+ * `createOrder()` — the fix is that the CALL must explicitly and
+ * structurally assert which capacity it is acting in, never infer it
+ * from ambient "currently selected" UI state.
+ */
+export function canCreateProduct(actorRole: "customer" | "merchant"): AccessDecision {
+  return actorRole === "merchant"
+    ? decide(true, "actor asserted merchant capacity")
+    : decide(false, "only an actor explicitly acting in a merchant capacity may create a product");
+}
+
+/**
  * Whether the actor may access the product's digital assets. Creator or a holder
  * of a valid (non-revoked) grant only. This is an advisory model decision — it
  * is NOT download enforcement, DRM, or any form of content protection.
