@@ -697,6 +697,32 @@ async function refreshCommerceCatalogList(): Promise<void> {
     renderCommerceCatalogList();
   }
   void refreshCommerceMyOrdersList();
+  void refreshCommerceBuyerActivitySummary();
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- friction-ledger row #14 / arc §32/§36: a minimal, real
+ * "do I have anything to act on?" summary for the buyer role, backed by
+ * `commerceActivitySummary()`'s real repository-derived counts (never a
+ * stub). Agent U owns the actual badge/nav-chrome UI treatment — this is
+ * this file's own minimal fallback if that isn't visible/ready.
+ */
+async function refreshCommerceBuyerActivitySummary(): Promise<void> {
+  const el = byId("commerce-my-orders-activity-summary");
+  const result = await window.fedosApp.commerceActivitySummary(commerceActingAsPubkey);
+  if (result.outcome !== "ok" || result.asBuyer === undefined) {
+    el.textContent = "";
+    return;
+  }
+  const b = result.asBuyer;
+  const parts: string[] = [];
+  if (b.awaitingSellerAcceptance > 0) parts.push(`${b.awaitingSellerAcceptance} awaiting seller acceptance`);
+  if (b.readyToPay > 0) parts.push(`${b.readyToPay} ready to pay`);
+  if (b.readyToAcknowledge > 0) parts.push(`${b.readyToAcknowledge} ready to acknowledge receipt`);
+  if (b.readyToComplete > 0) parts.push(`${b.readyToComplete} ready to complete`);
+  if (b.readyReceipts > 0) parts.push(`${b.readyReceipts} receipt(s) ready`);
+  el.textContent = parts.length > 0 ? parts.join(" · ") : "Nothing needs your attention right now.";
 }
 
 /** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — which screen "← Back" returns to: the ordinary buyer catalog, or (for a merchant's own draft/unpublished Preview, friction ledger row #24) the Merchant screen it was opened from. */
@@ -1040,8 +1066,57 @@ function renderCommerceOrderScreen(): void {
   // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9:
   // raw hex ids demoted from primary label to this "Technical details"
   // disclosure -- never deleted, see `commerceActorLabel()`'s own header.
+  // Kept as the FULL, untruncated ids here (rather than Agent D's
+  // abbreviated `…`-suffixed variant) since this element lives inside the
+  // "Technical details" disclosure specifically to keep full cryptographic
+  // traceability reachable somewhere (arc §27) -- primary/friendly labels
+  // elsewhere already show the short/friendly form.
   byId("commerce-order-id").textContent = `Order id: ${order.id}`;
   byId("commerce-order-history").textContent = `Product id: ${order.productId} — buyer pubkey: ${order.buyerPubkey} — seller pubkey: ${order.sellerPubkey}`;
+
+  // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+  // (Agent D) -- friction-ledger row #15 / arc §36: an obvious buyer-facing
+  // action once the Order reaches a qualifying (paid-or-later) state —
+  // mirrors `isQualifyingOrderStatusForMediaAccess()`'s own allowed
+  // statuses exactly. Never claims content exists; the redeem call itself
+  // honestly reports "no protected content for this product" when there
+  // is none.
+  const qualifiesForPurchasedContent = ["paid", "fulfilling", "delivered", "completed"].includes(order.status) && isBuyer;
+  byId("commerce-order-purchased-content-actions").toggleAttribute("hidden", !qualifiesForPurchasedContent);
+  if (!qualifiesForPurchasedContent) byId("commerce-order-purchased-content-result").setAttribute("hidden", "");
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- friction-ledger row #15 / arc §36: the buyer-facing
+ * "receive the digital product I bought" action. NEVER exposes the
+ * `MediaAccessGrant` envelope, a content key, AEAD internals, or a CID —
+ * only the plain content bytes (as a downloadable data URL) once the
+ * grant-gated redeem call succeeds, or an honest denial reason.
+ */
+async function onCommerceOpenPurchasedContentClick(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  clearError("commerce-order-purchased-content-error");
+  const btn = byId<HTMLButtonElement>("commerce-order-purchased-content-btn");
+  btn.disabled = true;
+  try {
+    const result = await window.fedosApp.commerceMediaGrantRedeem(currentCommerceOrder.id, commerceActingAsPubkey);
+    if (result.outcome !== "ok" || result.contentBase64 === undefined) {
+      const reason = result.reason === "no-grant-on-file" || result.reason === "order-not-qualifying"
+        ? "No protected digital content is available for this order yet."
+        : (result.reason ?? result.outcome);
+      showCommerceError("commerce-order-purchased-content-error", { outcome: result.outcome, reason });
+      return;
+    }
+    byId("commerce-order-purchased-content-result").removeAttribute("hidden");
+    const link = byId<HTMLAnchorElement>("commerce-order-purchased-content-link");
+    link.href = `data:${result.contentType ?? "application/octet-stream"};base64,${result.contentBase64}`;
+    link.download = "purchased-content";
+  } catch (err) {
+    showCommerceError("commerce-order-purchased-content-error", { outcome: "error", reason: err instanceof Error ? err.message : "purchased content request failed unexpectedly" });
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function refreshCommerceDeliveryStatus(): Promise<void> {
@@ -1123,6 +1198,17 @@ async function onCommerceReceiptIssueClick(): Promise<void> {
   byId("commerce-order-receipt-result").removeAttribute("hidden");
   byId("commerce-order-receipt-verify-status").textContent = result.verifyStatus ?? "";
   byId<HTMLTextAreaElement>("commerce-order-receipt-qr-text").value = result.qrText;
+  // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+  // (Agent D) -- friction-ledger row #11 / arc §34: a real, rendered QR
+  // image, not merely the label claiming one exists.
+  const qrImage = byId<HTMLImageElement>("commerce-order-receipt-qr-image");
+  if (result.qrImageDataUrl !== undefined) {
+    qrImage.src = result.qrImageDataUrl;
+    qrImage.removeAttribute("hidden");
+  } else {
+    qrImage.setAttribute("hidden", "");
+    qrImage.removeAttribute("src");
+  }
 }
 
 async function onCommerceOrderCreateSubmit(): Promise<void> {
@@ -1387,20 +1473,24 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
     publishBtn.addEventListener("click", () => void onCommercePublishAction(product.id, "publish", publishBtn));
     li.appendChild(publishBtn);
   }
+  // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+  // (Agent D) -- friction-ledger row #17 / arc §38: per-product image
+  // attach control, independent of publish state.
+  li.appendChild(commerceMerchantProductImageAttachControls(product.id));
   return li;
 }
 
 // Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge note):
-// Agent U independently wrote a SECOND publish/unpublish handler
-// (`onCommerceProductPublishToggle`, a single-toggle design wrapped in the
-// generic `runCommerceAction()` helper) without visibility into Agent S's
-// sibling worktree, where S had already closed this exact P0 (friction
-// ledger row #3) with two separate, explicitly-labeled buttons and its own
-// manual disable/confirm/try-finally guard (mirroring the established
+// Both Agent U and Agent D independently wrote their OWN competing
+// publish/unpublish handler (`onCommerceProductPublishToggle`, a
+// single-toggle design), each without visibility into Agent S's sibling
+// worktree, where S had already closed this exact P0 (friction ledger row
+// #3) with two separate, explicitly-labeled buttons and its own manual
+// disable/confirm/try-finally guard (mirroring the established
 // `onDeviceRevoke()` pattern). S's two-button design is arc §14's own
 // explicit direction ("prefer separate semantics... rather than one
-// ambiguous toggle") -- kept below; U's competing single-toggle handler
-// was dropped as dead code rather than kept alongside it.
+// ambiguous toggle") -- kept below; both competing single-toggle handlers
+// were dropped as dead code rather than kept alongside it.
 async function onCommercePublishAction(productId: string, action: "publish" | "unpublish", btn: HTMLButtonElement): Promise<void> {
   // A product only ever offers "Unpublish" while `status === "active"` (see
   // `commerceMerchantProductRow` above), so every unpublish action IS a
@@ -1428,6 +1518,67 @@ async function onCommercePublishAction(productId: string, action: "publish" | "u
   } finally {
     btn.disabled = false;
   }
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- friction-ledger row #17 / arc §38: a small, additive
+ * per-product image-attach control (file picker + button + error area),
+ * reading the file via the ordinary browser `File`/`FileReader` API
+ * (available in this sandboxed renderer without any Node integration —
+ * no new capability exposed) and sending it as base64 over the existing
+ * bounded-string IPC discipline (`commerceProductImageAttach`).
+ */
+function commerceMerchantProductImageAttachControls(productId: string): HTMLDivElement {
+  const wrap = document.createElement("div");
+  wrap.className = "commerce-product-image-attach";
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/png,image/jpeg";
+  wrap.appendChild(fileInput);
+  const attachBtn = document.createElement("button");
+  attachBtn.type = "button";
+  attachBtn.textContent = "Attach Image";
+  wrap.appendChild(attachBtn);
+  const errorEl = document.createElement("div");
+  errorEl.className = "error";
+  errorEl.setAttribute("role", "alert");
+  wrap.appendChild(errorEl);
+
+  attachBtn.addEventListener("click", () => {
+    void (async () => {
+      errorEl.textContent = "";
+      const file = fileInput.files?.[0];
+      if (file === undefined) {
+        errorEl.textContent = "Choose a PNG or JPEG image file first.";
+        return;
+      }
+      attachBtn.disabled = true;
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("failed to read the selected file"));
+          reader.readAsDataURL(file);
+        });
+        const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+        const result = await window.fedosApp.commerceProductImageAttach(commerceActingAsPubkey, productId, base64, file.type);
+        if (result.outcome !== "ok") {
+          errorEl.textContent = result.reason ?? `attach failed: ${result.outcome}`;
+          return;
+        }
+        fileInput.value = "";
+        void refreshCommerceMerchantProductsList();
+        void refreshCommerceCatalogList();
+      } catch (err) {
+        errorEl.textContent = err instanceof Error ? err.message : "image attach failed unexpectedly";
+      } finally {
+        attachBtn.disabled = false;
+      }
+    })();
+  });
+
+  return wrap;
 }
 
 async function refreshCommerceMerchantProductsList(): Promise<void> {
@@ -1666,7 +1817,29 @@ async function onCommerceMerchantCreateSubmit(): Promise<void> {
 async function refreshCommerceMerchantScreen(): Promise<void> {
   populateCommerceActorSelect("commerce-merchant-acting-as");
   onCommerceMerchantEditCancel();
-  await Promise.all([refreshCommerceMerchantProductsList(), refreshCommerceMerchantOrdersList(), renderCommerceMerchantReputation()]);
+  await Promise.all([
+    refreshCommerceMerchantProductsList(),
+    refreshCommerceMerchantOrdersList(),
+    renderCommerceMerchantReputation(),
+    refreshCommerceSellerActivitySummary(),
+  ]);
+}
+
+/** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- seller-role mirror of `refreshCommerceBuyerActivitySummary()` above. */
+async function refreshCommerceSellerActivitySummary(): Promise<void> {
+  const el = byId("commerce-merchant-orders-activity-summary");
+  const result = await window.fedosApp.commerceActivitySummary(commerceActingAsPubkey);
+  if (result.outcome !== "ok" || result.asSeller === undefined) {
+    el.textContent = "";
+    return;
+  }
+  const s = result.asSeller;
+  const parts: string[] = [];
+  if (s.newSubmitted > 0) parts.push(`${s.newSubmitted} new order(s) awaiting your accept/reject`);
+  if (s.paidReadyToFulfill > 0) parts.push(`${s.paidReadyToFulfill} paid, ready to fulfill`);
+  if (s.fulfillingInProgress > 0) parts.push(`${s.fulfillingInProgress} fulfilling`);
+  if (s.completedAwaitingReceipt > 0) parts.push(`${s.completedAwaitingReceipt} completed, receipt not yet issued`);
+  el.textContent = parts.length > 0 ? parts.join(" · ") : "Nothing needs your attention right now.";
 }
 
 // ---------------------------------------------------------------------
@@ -3098,6 +3271,7 @@ byId<HTMLButtonElement>("commerce-order-payment-simulate-btn").addEventListener(
 byId<HTMLButtonElement>("commerce-order-acknowledge-receipt-btn").addEventListener("click", () => void onCommerceDeliveryAcknowledgeReceiptClick());
 byId<HTMLButtonElement>("commerce-order-complete-btn").addEventListener("click", () => void onCommerceOrderCompleteClick());
 byId<HTMLButtonElement>("commerce-order-receipt-issue-btn").addEventListener("click", () => void onCommerceReceiptIssueClick());
+byId<HTMLButtonElement>("commerce-order-purchased-content-btn").addEventListener("click", () => void onCommerceOpenPurchasedContentClick());
 byId<HTMLButtonElement>("commerce-merchant-create-submit").addEventListener("click", () => void onCommerceMerchantCreateSubmit());
 // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
 // ledger row #18: live formatted price preview as Bob types/changes

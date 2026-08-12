@@ -3,9 +3,8 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { startFedosRealLocalWebSocketRelayServer } from "./support/fedos_real_local_websocket_relay_server.js";
-import { createNodeWebSocketRelaySocketFactory } from "../src/os/messenger/desktop/node_websocket_relay_socket_factory.js";
 import { WebSocketRelayPublisher } from "../src/os/messenger/adapters/nostr/protocol/publish.js";
-import { WebSocketRelayAdapter } from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
+import { WebSocketRelayAdapter, type WebSocketFactory } from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
 import { createElectronMainHostAttestation } from "../src/os/messenger/desktop/production_activation/fedos_production_desktop_host_attestation.js";
 import { activateFedosProductionProfileMasterSeed } from "../src/os/messenger/desktop/production_activation/fedos_production_profile_activation.js";
 import { FedosProductionMasterSeedAuthority } from "../src/os/messenger/desktop/production_activation/fedos_production_master_seed_authority.js";
@@ -17,7 +16,22 @@ import {
   verifyAndDecryptInboundPrivateOrderEnvelope,
 } from "../src/os/commerce/catalog/adapters/nostr/commerce_private_order_bridge.js";
 import { PRIVATE_ORDER_SYNC_STATUS_ACTION, type PrivateOrderSyncPayload } from "../src/os/commerce/events/commerce_private_order_sync.js";
-import { createOrder, applyOrderAction, type Order, type OrderActor } from "../src/os/commerce/order/index.js";
+import { createOrder, applyOrderAction, type Order, type OrderActor, type OrderTransitionResult } from "../src/os/commerce/order/index.js";
+
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge fix) --
+ * `OrderTransitionResult` is a real discriminated union (`{ ok: true; order
+ * }` | `{ ok: false; code; reason }`), so `.order` does not exist at all on
+ * the type until narrowed by `ok` -- a bare `.order!` non-null assertion
+ * does not narrow a discriminated union and does not compile. This test
+ * asserts `ok` immediately before every use anyway (the real behavior under
+ * test), so throwing here on an unexpected `false` is equivalent, just
+ * type-correct.
+ */
+function orderOrThrow(result: OrderTransitionResult): Order {
+  if (!result.ok) throw new Error(`expected an ok OrderTransitionResult, got rejection: ${result.code} -- ${result.reason}`);
+  return result.order;
+}
 
 /**
  * FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
@@ -70,9 +84,44 @@ function samplePayload(buyerPubkey: string, sellerPubkey: string, overrides: Par
   };
 }
 
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge fix) --
+ * see `commerce_nostr_real_relay_two_party_discovery.test.ts`'s own
+ * `realWebSocketFactoryForAdapter()` header comment for the full rationale:
+ * `WebSocketRelayAdapter`/`WebSocketRelayPublisher` (`ws_relay.ts`/
+ * `publish.ts`) need the `WebSocketFactory`/`RelaySocketLike` shape;
+ * `createNodeWebSocketRelaySocketFactory()`'s own narrower `FedosRelaySocket`
+ * view (0-arg `close()`, no "open" event type) doesn't structurally satisfy
+ * it even though its real runtime value is a genuine, full global
+ * `WebSocket`. Reconnects to that SAME real global `WebSocket` constructor
+ * directly (not a new relay client) to sidestep the narrower intermediate
+ * type.
+ */
+declare const WebSocket: new (url: string) => {
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  addEventListener(type: string, listener: (event?: unknown) => void): void;
+};
+function realWebSocketFactoryForAdapter(): WebSocketFactory {
+  return (url: string) =>
+    new Promise((resolve, reject) => {
+      const socket = new WebSocket(url);
+      const onOpen = (): void => {
+        resolve({
+          send: (data: string) => socket.send(data),
+          close: (code?: number, reason?: string) => socket.close(code, reason),
+          addEventListener: (type, listener) => socket.addEventListener(type, (event) => listener((event as { data?: unknown } | undefined) ?? {})),
+        });
+      };
+      const onError = (): void => reject(new Error(`realWebSocketFactoryForAdapter: failed to connect to ${url}`));
+      socket.addEventListener("open", onOpen);
+      socket.addEventListener("error", onError);
+    });
+}
+
 /** One side's own bounded discovery query -- mirrors `commercePrivateOrderDiscoverAndApplyNonFatal()` (`fedos_electron_beta_main.cts`) exactly. */
 async function discoverPrivateOrderEvents(relayUrl: string, ownPubkeyHex: string): Promise<readonly unknown[]> {
-  const subscriber = new WebSocketRelayAdapter(relayUrl, { factory: createNodeWebSocketRelaySocketFactory(), timeoutMs: 2000 });
+  const subscriber = new WebSocketRelayAdapter(relayUrl, { factory: realWebSocketFactoryForAdapter(), timeoutMs: 2000 });
   return subscriber.query([{ kinds: [1], "#t": [COMMERCE_PRIVATE_ORDER_SYNC_TAG], "#p": [ownPubkeyHex] }]);
 }
 
@@ -85,7 +134,7 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
 
       const aliceTransport = new RealCommercePrivateOrderTransport({
         signingAuthority: alice.signer,
-        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: createNodeWebSocketRelaySocketFactory() }),
+        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: realWebSocketFactoryForAdapter() }),
         nip44Wire: alice.masterSeed,
         accountIndex: 0,
       });
@@ -112,11 +161,12 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
         payload.at,
       );
       expect(created.ok).toBe(true);
-      const submitted = applyOrderAction(created.order!, { type: "submit", actor: { kind: "customer", pubkey: envelope.senderPubkeyHex } }, payload.at);
+      const submitted = applyOrderAction(orderOrThrow(created), { type: "submit", actor: { kind: "customer", pubkey: envelope.senderPubkeyHex } }, payload.at);
       expect(submitted.ok).toBe(true);
-      expect(submitted.order!.status).toBe("submitted");
-      expect(submitted.order!.buyerPubkey).toBe(alice.pubkeyHex);
-      expect(submitted.order!.sellerPubkey).toBe(bob.pubkeyHex);
+      const submittedOrder = orderOrThrow(submitted);
+      expect(submittedOrder.status).toBe("submitted");
+      expect(submittedOrder.buyerPubkey).toBe(alice.pubkeyHex);
+      expect(submittedOrder.sellerPubkey).toBe(bob.pubkeyHex);
     } finally {
       await relay.close();
     }
@@ -134,15 +184,15 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
         { kind: "customer", pubkey: alice.pubkeyHex },
         1_700_500_000,
       );
-      const aliceOrder = applyOrderAction(created.order!, { type: "submit", actor: { kind: "customer", pubkey: alice.pubkeyHex } }, 1_700_500_000).order!;
+      const aliceOrder = orderOrThrow(applyOrderAction(orderOrThrow(created), { type: "submit", actor: { kind: "customer", pubkey: alice.pubkeyHex } }, 1_700_500_000));
 
       // Bob accepts LOCALLY on his own independent process, then privately notifies Alice.
-      const bobOrder = applyOrderAction(aliceOrder, { type: "accept", actor: { kind: "merchant", pubkey: bob.pubkeyHex } }, 1_700_500_100).order!;
+      const bobOrder = orderOrThrow(applyOrderAction(aliceOrder, { type: "accept", actor: { kind: "merchant", pubkey: bob.pubkeyHex } }, 1_700_500_100));
       expect(bobOrder.status).toBe("accepted");
 
       const bobTransport = new RealCommercePrivateOrderTransport({
         signingAuthority: bob.signer,
-        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: createNodeWebSocketRelaySocketFactory() }),
+        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: realWebSocketFactoryForAdapter() }),
         nip44Wire: bob.masterSeed,
         accountIndex: 0,
       });
@@ -173,7 +223,7 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
       const actor: OrderActor = { kind: "merchant", pubkey: envelope.senderPubkeyHex };
       const aliceApplied = applyOrderAction(aliceOrder, { type: "accept", actor }, envelope.payload!.at);
       expect(aliceApplied.ok).toBe(true);
-      expect(aliceApplied.order!.status).toBe("accepted");
+      expect(orderOrThrow(aliceApplied).status).toBe("accepted");
     } finally {
       await relay.close();
     }
@@ -187,7 +237,7 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
 
       const aliceTransport = new RealCommercePrivateOrderTransport({
         signingAuthority: alice.signer,
-        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: createNodeWebSocketRelaySocketFactory() }),
+        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: realWebSocketFactoryForAdapter() }),
         nip44Wire: alice.masterSeed,
         accountIndex: 0,
       });
@@ -203,7 +253,7 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
         { kind: "customer", pubkey: envelope.senderPubkeyHex },
         envelope.payload!.at,
       );
-      let order: Order = applyOrderAction(created.order!, { type: "submit", actor: { kind: "customer", pubkey: envelope.senderPubkeyHex } }, envelope.payload!.at).order!;
+      let order: Order = orderOrThrow(applyOrderAction(orderOrThrow(created), { type: "submit", actor: { kind: "customer", pubkey: envelope.senderPubkeyHex } }, envelope.payload!.at));
       expect(order.status).toBe("submitted");
 
       // Bob's process restarts / re-scans the relay (historyEnabled replays
@@ -217,6 +267,7 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
       // second history entry, never a corrupted state.
       const replayResult = applyOrderAction(order, { type: "submit", actor: { kind: "customer", pubkey: envelope.senderPubkeyHex } }, envelope.payload!.at);
       expect(replayResult.ok).toBe(false);
+      if (replayResult.ok) throw new Error("unreachable -- asserted above");
       expect(replayResult.code).toBe("invalid_state");
       expect(order.history).toHaveLength(2); // create + submit only, never 3
     } finally {
@@ -237,14 +288,14 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
         { kind: "customer", pubkey: alice.pubkeyHex },
         1_700_500_000,
       );
-      const order = applyOrderAction(created.order!, { type: "submit", actor: { kind: "customer", pubkey: alice.pubkeyHex } }, 1_700_500_000).order!;
+      const order = orderOrThrow(applyOrderAction(orderOrThrow(created), { type: "submit", actor: { kind: "customer", pubkey: alice.pubkeyHex } }, 1_700_500_000));
 
       // Mallory, a genuine real identity, signs+encrypts a claimed "accept"
       // for Alice's order, addressed to Alice, and GENUINELY sends it --
       // real signature, real encryption, real relay delivery.
       const malloryTransport = new RealCommercePrivateOrderTransport({
         signingAuthority: mallory.signer,
-        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: createNodeWebSocketRelaySocketFactory() }),
+        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: realWebSocketFactoryForAdapter() }),
         nip44Wire: mallory.masterSeed,
         accountIndex: 0,
       });
@@ -281,6 +332,7 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
       const claimedActor: OrderActor = { kind: "merchant", pubkey: envelope.senderPubkeyHex };
       const forgedResult = applyOrderAction(order, { type: "accept", actor: claimedActor }, envelope.payload!.at);
       expect(forgedResult.ok).toBe(false);
+      if (forgedResult.ok) throw new Error("unreachable -- asserted above");
       expect(forgedResult.code).toBe("unauthorized_actor");
       expect(order.status).toBe("submitted"); // unchanged
     } finally {
@@ -296,7 +348,7 @@ suite("Real two-party private Order sync over a REAL local relay + REAL WASM NIP
 
       const aliceTransport = new RealCommercePrivateOrderTransport({
         signingAuthority: alice.signer,
-        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: createNodeWebSocketRelaySocketFactory() }),
+        relayPublisher: new WebSocketRelayPublisher(relay.url, { factory: realWebSocketFactoryForAdapter() }),
         nip44Wire: alice.masterSeed,
         accountIndex: 0,
       });

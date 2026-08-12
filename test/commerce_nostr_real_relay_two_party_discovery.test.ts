@@ -4,9 +4,8 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 
 import { startFedosRealLocalWebSocketRelayServer } from "./support/fedos_real_local_websocket_relay_server.js";
-import { createNodeWebSocketRelaySocketFactory } from "../src/os/messenger/desktop/node_websocket_relay_socket_factory.js";
 import { WebSocketRelayPublisher } from "../src/os/messenger/adapters/nostr/protocol/publish.js";
-import { WebSocketRelayAdapter } from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
+import { WebSocketRelayAdapter, type WebSocketFactory } from "../src/os/messenger/adapters/nostr/protocol/ws_relay.js";
 import type { NostrEvent } from "../src/os/messenger/adapters/nostr/protocol/types.js";
 import {
   CommerceNostrEventPortImpl,
@@ -80,7 +79,7 @@ function validProductPublication(overrides: Partial<ProductPublicationEventDraft
  * hands the signed event to the REAL `WebSocketRelayPublisher` against the
  * REAL local relay — no fake transport, no in-memory array. */
 function realSigningRelayTransport(relayUrl: string, secretKey: Uint8Array, createdAtRef: { value: number }): CommerceNostrEventTransport {
-  const publisher = new WebSocketRelayPublisher(relayUrl, { factory: createNodeWebSocketRelaySocketFactory() });
+  const publisher = new WebSocketRelayPublisher(relayUrl, { factory: realWebSocketFactoryForAdapter() });
   return {
     async send(draft: CommerceNostrEventDraft): Promise<CommerceNostrTransportSendResult> {
       const event = signCommerceDraftAsRealNostrEvent(draft, secretKey, createdAtRef.value++);
@@ -88,6 +87,47 @@ function realSigningRelayTransport(relayUrl: string, secretKey: Uint8Array, crea
       return { accepted: result.accepted, eventId: result.eventId, message: result.message };
     },
   };
+}
+
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge fix) --
+ * `createNodeWebSocketRelaySocketFactory()` (the real Node/global-`WebSocket`
+ * factory this repo already ships, `desktop/node_websocket_relay_socket_factory.ts`)
+ * returns its socket typed as the narrower `FedosRelaySocket`
+ * (`desktop/websocket_relay.ts`'s own 3-event-type, 0-arg-`close()` view) --
+ * but its own source casts a REAL global `WebSocket` down to that narrower
+ * type (`socket as unknown as FedosRelaySocket`), so the real runtime value
+ * genuinely supports the full real `WebSocket` surface underneath (an
+ * "open" event included). `ws_relay.ts`'s own `WebSocketRelayAdapter` (a
+ * separate, pre-existing real relay-client abstraction, used for read-only
+ * NIP-01 query -- not a second one built by this arc) expects the slightly
+ * wider `WebSocketFactory`/`RelaySocketLike` shape. Reconnecting to the
+ * REAL global `WebSocket` constructor directly here (same one
+ * `createNodeWebSocketRelaySocketFactory` itself uses, not a new
+ * implementation) sidesteps the narrower intermediate type rather than
+ * fighting it, and mirrors that file's own "open"/"error" connect-wait
+ * pattern exactly.
+ */
+declare const WebSocket: new (url: string) => {
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  addEventListener(type: string, listener: (event?: unknown) => void): void;
+};
+function realWebSocketFactoryForAdapter(): WebSocketFactory {
+  return (url: string) =>
+    new Promise((resolve, reject) => {
+      const socket = new WebSocket(url);
+      const onOpen = (): void => {
+        resolve({
+          send: (data: string) => socket.send(data),
+          close: (code?: number, reason?: string) => socket.close(code, reason),
+          addEventListener: (type, listener) => socket.addEventListener(type, (event) => listener((event as { data?: unknown } | undefined) ?? {})),
+        });
+      };
+      const onError = (): void => reject(new Error(`realWebSocketFactoryForAdapter: failed to connect to ${url}`));
+      socket.addEventListener("open", onOpen);
+      socket.addEventListener("error", onError);
+    });
 }
 
 /** Alice's real discovery query: a bounded REQ/EOSE round trip against the
@@ -98,7 +138,7 @@ function realSigningRelayTransport(relayUrl: string, secretKey: Uint8Array, crea
  * (irrelevant to this test — the gate is exercised separately by the
  * existing `CommerceNostrEventPortImpl` "local-only" tests). */
 async function aliceDiscover(relayUrl: string, readModel: CommerceNostrProductReadModel): Promise<readonly string[]> {
-  const subscriber = new WebSocketRelayAdapter(relayUrl, { factory: createNodeWebSocketRelaySocketFactory(), timeoutMs: 1500 });
+  const subscriber = new WebSocketRelayAdapter(relayUrl, { factory: realWebSocketFactoryForAdapter(), timeoutMs: 1500 });
   const events = await subscriber.query([
     { kinds: [1], "#t": ["fedos-commerce:product-publication:v1", "fedos-commerce:product-update:v1"] },
   ]);

@@ -222,6 +222,23 @@ const MAX_PRODUCT_TITLE_CHARS = 200;
 const MAX_PRODUCT_DESCRIPTION_CHARS = 4000;
 const MAX_CURRENCY_CHARS = 8;
 const MAX_ORDER_REJECTION_REASON_CHARS = 500;
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- bounds for the new product-image-attach IPC surface (arc
+ * §38 / friction-ledger row #17). `MAX_PRODUCT_IMAGE_BASE64_CHARS` bounds
+ * the base64-encoded transport form (renderer -> IPC -> main); the
+ * DECODED byte bound (`COMMERCE_MEDIA_MAX_PAYLOAD_BYTES`, already declared
+ * below near `commerceMediaStoreFor()`) is the real, authoritative size
+ * gate `IpfsMediaStore.put()` itself enforces. Base64 expands ~4/3, so
+ * this transport bound is sized generously above that expansion, never
+ * the reverse (a base64 string just under this bound must still decode to
+ * ≤ the real byte bound, or `IpfsMediaStore.put()` itself rejects it as
+ * `"oversized"` -- belt and suspenders, not a second source of truth).
+ */
+const MAX_PRODUCT_IMAGE_BASE64_CHARS = 12_000_000;
+const MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS = 300;
+const MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS = 64;
+const COMMERCE_PUBLIC_IMAGE_CONTENT_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg"]);
 /** Secure Runtime Alpha 7001-7080 — same bound class as `MAX_LABEL_CHARS` above, sized for a real chat message body rather than a short label. */
 const MAX_MESSAGE_BODY_CHARS = 8192;
 /** Secure Runtime Alpha 7001-7080 — a real Device-pairing encoded request/approval string is larger than an id but still bounded (JSON envelope + one signature + one public key, never unbounded). */
@@ -387,6 +404,21 @@ interface MasterSeedAuthorityLike {
     generation: number,
     sealedBlob: string,
   ): Promise<Uint8Array | null>;
+  /**
+   * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+   * (Agent D) -- present (as real, callable functions) on the SAME
+   * canonical production `FedosProductionMasterSeedAuthority`
+   * (`src/os/core/vault/wasm/fedos_master_seed_authority.ts`), reused
+   * here EXACTLY as `media_access_grant_key_release.ts`'s own
+   * `wrapMediaAccessGrantRelease()`/`unwrapMediaAccessGrantRelease()`
+   * already require -- the ECDH-bound "wrap opaque bytes for exactly one
+   * counterparty" primitive that lets a grant-gated release actually
+   * reach the buyer without ever handing out the profile-wide
+   * CommerceMedia key. OPTIONAL for the same reason every other method on
+   * this structural "Like" interface is optional.
+   */
+  encryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, plaintext: Uint8Array): Promise<string | null>;
+  decryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, payload: string): Promise<Uint8Array | null>;
 }
 /**
  * FedOS Commerce FINAL P1 Closure (Agent K2) -- narrows
@@ -701,6 +733,88 @@ interface RootModules {
     readonly verifySignedTradeReceiptProof: (envelope: unknown, policy: unknown) => { readonly status: string; readonly payload?: unknown };
     readonly encodeCommerceReceiptProofToQrText: (envelope: unknown) => string;
     readonly decodeCommerceReceiptProofFromQrText: (text: string) => unknown;
+    /**
+     * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+     * (Agent D) -- friction-ledger row #5 / arc §33: durable, idempotent
+     * receipt-envelope persistence (never a new mechanism -- same
+     * append-only-NDJSON pattern as `DurablePaymentSettlementLedger` above).
+     */
+    readonly DurableReceiptStore: new (filePath: string) => CommerceReceiptStoreLike;
+    /**
+     * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+     * (Agent D) -- the first real production caller of the previously-inert
+     * `LocalProductMediaRepository`/`generateFedosProductMediaId` (arc §38 /
+     * friction-ledger row #17).
+     */
+    readonly LocalProductMediaRepository: new (generateId?: () => string) => CommerceProductMediaRepositoryLike;
+    readonly generateFedosProductMediaId: () => string;
+    /**
+     * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+     * (Agent D) -- the first real production caller of the
+     * `MediaAccessGrant` system (arc §35-37 / friction-ledger row #15).
+     */
+    readonly isQualifyingOrderStatusForMediaAccess: (status: string) => boolean;
+    readonly issueMediaAccessGrantsForOrder: (input: {
+      readonly order: { readonly id: string; readonly productId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly status: string };
+      readonly candidateMedia: readonly { readonly id: string; readonly productId: string; readonly classification: "public" | "protected" }[];
+      readonly sellerSigningKeypair: { readonly publicKeyHex: string };
+      readonly latestKnownGrantVersionFor: (mediaId: string) => number;
+      readonly now: number;
+    }) => CommerceIssueMediaAccessGrantsOutcomeLike;
+    readonly AppendOnlyMediaAccessGrantPersistence: new (filePath: string) => CommerceMediaAccessGrantPersistenceLike;
+    readonly latestGrantVersion: (entries: readonly CommerceMediaAccessGrantEnvelopeLike[], mediaId: string, buyerPubkey: string, orderId: string) => number;
+    readonly evaluateMediaAccessGrant: (input: {
+      readonly envelope: unknown;
+      readonly media: { readonly id: string; readonly productId: string };
+      readonly actorPubkey: string;
+      readonly order: CommerceOrderLike | null;
+      readonly now: number;
+      readonly latestKnownGrantVersion?: number;
+    }) => CommerceMediaAccessDecisionLike;
+    readonly wrapMediaAccessGrantRelease: (input: {
+      readonly envelope: unknown;
+      readonly media: { readonly id: string; readonly productId: string };
+      readonly actorPubkey: string;
+      readonly order: CommerceOrderLike | null;
+      readonly now: number;
+      readonly latestKnownGrantVersion?: number;
+      readonly merchantAccountIndex: number;
+      readonly releasePayload: Uint8Array;
+      readonly authority: MasterSeedAuthorityLike;
+    }) => Promise<CommerceWrapMediaAccessGrantReleaseResultLike>;
+    readonly resolveCommerceMediaGrantSigningKeypair: (
+      masterSeedAuthority: MasterSeedAuthorityLike | null,
+      store: unknown,
+      subjectId: string,
+      createIfAbsent: boolean,
+      nowUnixSeconds: number,
+    ) => Promise<CommerceMediaGrantSigningKeyResolveResultLike>;
+    /**
+     * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+     * (Agent D) -- friction-ledger row #14 / arc §32/§36: real,
+     * repository-derived activity/badge counting logic.
+     */
+    readonly computeCommerceBuyerActivitySummary: (
+      orders: readonly { readonly id: string; readonly status: string }[],
+      hasReceipt: (orderId: string) => boolean,
+    ) => {
+      readonly draft: number;
+      readonly awaitingSellerAcceptance: number;
+      readonly readyToPay: number;
+      readonly inFulfillment: number;
+      readonly readyToAcknowledge: number;
+      readonly readyToComplete: number;
+      readonly readyReceipts: number;
+    };
+    readonly computeCommerceSellerActivitySummary: (
+      orders: readonly { readonly id: string; readonly status: string }[],
+      hasReceipt: (orderId: string) => boolean,
+    ) => {
+      readonly newSubmitted: number;
+      readonly paidReadyToFulfill: number;
+      readonly fulfillingInProgress: number;
+      readonly completedAwaitingReceipt: number;
+    };
   };
   /**
    * Commerce E2E Completion arc (coordinator) -- the narrow slice of the
@@ -727,6 +841,15 @@ interface RootModules {
       store: unknown,
       issuerId: string,
     ) => Promise<ReceiptIssuerSigningKeyResolution>;
+    /**
+     * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+     * (Agent D) -- friction-ledger row #11 / arc §34: renders a real,
+     * scannable QR PNG from the already-signed receipt QR text. The
+     * `qrcode` npm package underneath is ALREADY a real, packaged runtime
+     * dependency of this app (`src/os/trust/qr/fedos_trust_qr_image.ts`'s
+     * own header) -- this is its first Commerce production caller.
+     */
+    readonly renderFedosTrustQrTextToPngDataUrl: (text: string) => Promise<string>;
   };
   /**
    * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
@@ -946,6 +1069,78 @@ interface CommerceOrderRepositoryLike {
   listByBuyer(buyerPubkey: string): readonly CommerceOrderLike[];
   listBySeller(sellerPubkey: string): readonly CommerceOrderLike[];
 }
+
+// ---------------------------------------------------------------------
+// FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+// (Agent D) -- structural mirrors for the receipt-persistence,
+// product-media, and MediaAccessGrant real production wiring.
+// ---------------------------------------------------------------------
+interface CommerceReceiptStoreLike {
+  getByOrderId(orderId: string): { readonly orderId: string; readonly envelope: unknown; readonly issuedAt: number } | undefined;
+  putIfAbsent(orderId: string, envelope: unknown, issuedAt: number): "inserted" | "already-present";
+}
+interface CommerceProductMediaLike {
+  readonly id: string;
+  readonly productId: string;
+  readonly role: string;
+  readonly classification: "public" | "protected";
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly checksum: string;
+  readonly checksumSubject: "plaintext" | "ciphertext";
+  readonly altText?: string;
+  readonly storageRef: string;
+}
+type CommerceProductMediaMutationResultLike =
+  | { readonly outcome: "ok"; readonly media: CommerceProductMediaLike }
+  | { readonly outcome: "forbidden" | "invalid-input" | "not-found"; readonly reason?: string };
+interface CommerceProductMediaRepositoryLike {
+  add(
+    actorPubkey: string,
+    product: CommerceProductLike,
+    input: {
+      readonly role: string;
+      readonly classification: "public" | "protected";
+      readonly contentType: string;
+      readonly sizeBytes: number;
+      readonly checksum: string;
+      readonly checksumSubject: "plaintext" | "ciphertext";
+      readonly altText?: string;
+      readonly storageRef: string;
+    },
+  ): CommerceProductMediaMutationResultLike;
+  get(mediaId: string): CommerceProductMediaLike | undefined;
+  listForProduct(productId: string): readonly CommerceProductMediaLike[];
+}
+interface CommerceMediaAccessGrantEnvelopeLike {
+  readonly [key: string]: unknown;
+  readonly payload: {
+    readonly mediaId: string;
+    readonly productId: string;
+    readonly buyerPubkey: string;
+    readonly orderId: string;
+    readonly grantVersion: number;
+    readonly revoked: boolean;
+  };
+}
+interface CommerceMediaAccessGrantPersistenceLike {
+  putGrant(envelope: CommerceMediaAccessGrantEnvelopeLike): "inserted" | "already-present" | "conflict" | "failed";
+  listGrants(): readonly CommerceMediaAccessGrantEnvelopeLike[];
+}
+type CommerceIssueMediaAccessGrantsOutcomeLike =
+  | { readonly outcome: "issued"; readonly envelopes: readonly CommerceMediaAccessGrantEnvelopeLike[] }
+  | { readonly outcome: "no-protected-media" | "order-not-qualifying" | "seller-not-grant-capable" };
+type CommerceMediaAccessDecisionLike =
+  | { readonly allowed: true; readonly grant: { readonly buyerPubkey: string } }
+  | { readonly allowed: false; readonly reason: string; readonly detail?: string };
+type CommerceWrapMediaAccessGrantReleaseResultLike =
+  | { readonly outcome: "released"; readonly wireCiphertext: string }
+  | { readonly outcome: "denied"; readonly reason: string; readonly detail?: string }
+  | { readonly outcome: "payload-too-large" | "wrap-unavailable" };
+type CommerceMediaGrantSigningKeyResolveResultLike =
+  | { readonly outcome: "restored" | "created"; readonly keypair: { readonly publicKeyHex: string }; readonly generation: number }
+  | { readonly outcome: "not-found" | "sealing-unavailable" | "seal-failed" }
+  | { readonly outcome: "corrupted"; readonly reason: string };
 interface CommercePaymentEvidenceLike {
   readonly paymentId: string;
   readonly productId: string;
@@ -1106,7 +1301,30 @@ interface CommercePersonaEpochSigningKeyResolveResultLike {
  * method on it this pass, so only the shape needed to construct/introspect
  * it is declared.
  */
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- widened from a bare index signature to the real,
+ * structural `IpfsMediaStore` surface this arc actually calls
+ * (`./catalog/ipfs_media_store.ts`'s own public methods): the first real
+ * IPC-reachable caller of `commerceMediaStoreFor()` beyond mere
+ * construction.
+ */
+interface CommerceMediaObjectMetadataLike {
+  readonly key: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly checksum: string;
+  readonly storedAt: number;
+}
+type CommerceMediaStorePutResultLike =
+  | { readonly outcome: "stored" | "already-present"; readonly metadata: CommerceMediaObjectMetadataLike }
+  | { readonly outcome: "conflict" | "oversized" | "unsupported-content-type" | "failed" };
 interface CommerceMediaStoreLike {
+  put(request: { readonly bytes: Uint8Array; readonly contentType: string }): CommerceMediaStorePutResultLike;
+  putPublic(plaintext: Uint8Array, contentType: string): CommerceMediaStorePutResultLike;
+  putProtected(plaintext: Uint8Array, contentType: string): Promise<CommerceMediaStorePutResultLike>;
+  get(key: string): { readonly metadata: CommerceMediaObjectMetadataLike; readonly bytes: Uint8Array } | null;
+  getProtected(key: string): Promise<Uint8Array | null>;
   readonly [key: string]: unknown;
 }
 
@@ -1222,6 +1440,18 @@ async function loadRootModules(): Promise<RootModules> {
     verifySignedTradeReceiptProof: RootModules["Commerce"]["verifySignedTradeReceiptProof"];
     encodeCommerceReceiptProofToQrText: RootModules["Commerce"]["encodeCommerceReceiptProofToQrText"];
     decodeCommerceReceiptProofFromQrText: RootModules["Commerce"]["decodeCommerceReceiptProofFromQrText"];
+    DurableReceiptStore: RootModules["Commerce"]["DurableReceiptStore"];
+    LocalProductMediaRepository: RootModules["Commerce"]["LocalProductMediaRepository"];
+    generateFedosProductMediaId: RootModules["Commerce"]["generateFedosProductMediaId"];
+    isQualifyingOrderStatusForMediaAccess: RootModules["Commerce"]["isQualifyingOrderStatusForMediaAccess"];
+    issueMediaAccessGrantsForOrder: RootModules["Commerce"]["issueMediaAccessGrantsForOrder"];
+    AppendOnlyMediaAccessGrantPersistence: RootModules["Commerce"]["AppendOnlyMediaAccessGrantPersistence"];
+    latestGrantVersion: RootModules["Commerce"]["latestGrantVersion"];
+    evaluateMediaAccessGrant: RootModules["Commerce"]["evaluateMediaAccessGrant"];
+    wrapMediaAccessGrantRelease: RootModules["Commerce"]["wrapMediaAccessGrantRelease"];
+    resolveCommerceMediaGrantSigningKeypair: RootModules["Commerce"]["resolveCommerceMediaGrantSigningKeypair"];
+    computeCommerceBuyerActivitySummary: RootModules["Commerce"]["computeCommerceBuyerActivitySummary"];
+    computeCommerceSellerActivitySummary: RootModules["Commerce"]["computeCommerceSellerActivitySummary"];
   };
   // Commerce E2E Completion arc (coordinator) -- the ONE os/trust surface
   // this main process touches: a signing keypair generator and a
@@ -1232,6 +1462,7 @@ async function loadRootModules(): Promise<RootModules> {
     createSingleIssuerFedosTrustPolicy: RootModules["Trust"]["createSingleIssuerFedosTrustPolicy"];
     DurableSealedSigningKeyStore: RootModules["Trust"]["DurableSealedSigningKeyStore"];
     resolveReceiptIssuerSigningKeypair: RootModules["Trust"]["resolveReceiptIssuerSigningKeypair"];
+    renderFedosTrustQrTextToPngDataUrl: RootModules["Trust"]["renderFedosTrustQrTextToPngDataUrl"];
   };
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's own
   // scoped reputation barrel (`os/commerce/reputation/index.js`), loaded
@@ -1340,12 +1571,25 @@ async function loadRootModules(): Promise<RootModules> {
       verifySignedTradeReceiptProof: commerce.verifySignedTradeReceiptProof,
       encodeCommerceReceiptProofToQrText: commerce.encodeCommerceReceiptProofToQrText,
       decodeCommerceReceiptProofFromQrText: commerce.decodeCommerceReceiptProofFromQrText,
+      DurableReceiptStore: commerce.DurableReceiptStore,
+      LocalProductMediaRepository: commerce.LocalProductMediaRepository,
+      generateFedosProductMediaId: commerce.generateFedosProductMediaId,
+      isQualifyingOrderStatusForMediaAccess: commerce.isQualifyingOrderStatusForMediaAccess,
+      issueMediaAccessGrantsForOrder: commerce.issueMediaAccessGrantsForOrder,
+      AppendOnlyMediaAccessGrantPersistence: commerce.AppendOnlyMediaAccessGrantPersistence,
+      latestGrantVersion: commerce.latestGrantVersion,
+      evaluateMediaAccessGrant: commerce.evaluateMediaAccessGrant,
+      wrapMediaAccessGrantRelease: commerce.wrapMediaAccessGrantRelease,
+      resolveCommerceMediaGrantSigningKeypair: commerce.resolveCommerceMediaGrantSigningKeypair,
+      computeCommerceBuyerActivitySummary: commerce.computeCommerceBuyerActivitySummary,
+      computeCommerceSellerActivitySummary: commerce.computeCommerceSellerActivitySummary,
     },
     Trust: {
       FedosTrustSigningKeypair: trust.FedosTrustSigningKeypair,
       createSingleIssuerFedosTrustPolicy: trust.createSingleIssuerFedosTrustPolicy,
       DurableSealedSigningKeyStore: trust.DurableSealedSigningKeyStore,
       resolveReceiptIssuerSigningKeypair: trust.resolveReceiptIssuerSigningKeypair,
+      renderFedosTrustQrTextToPngDataUrl: trust.renderFedosTrustQrTextToPngDataUrl,
     },
     Reputation: {
       LocalPersonaEpochRegistry: reputation.LocalPersonaEpochRegistry,
@@ -1445,6 +1689,47 @@ let commerceReceiptPolicy: unknown = null;
  */
 let commerceReceiptSigningCorruptedReason: string | null = null;
 const COMMERCE_RECEIPT_ISSUER_ID = "fedos-commerce-e2e-demo-merchant";
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- durable receipt-envelope store (friction-ledger row #5),
+ * product-media repository (row #17), and MediaAccessGrant persistence
+ * (row #15). Same lazy-construction-on-first-use discipline as every
+ * other Commerce state above.
+ */
+let commerceReceiptStore: CommerceReceiptStoreLike | null = null;
+let commerceProductMediaRepo: CommerceProductMediaRepositoryLike | null = null;
+let commerceMediaGrantPersistence: CommerceMediaAccessGrantPersistenceLike | null = null;
+let commerceMediaGrantSigningKeyStore: unknown = null;
+
+function commerceReceiptState(): CommerceReceiptStoreLike {
+  const m = requireModules();
+  if (commerceReceiptStore === null) {
+    fs.mkdirSync(path.dirname(commerceDurableFilePath("receipts")), { recursive: true });
+    commerceReceiptStore = new m.Commerce.DurableReceiptStore(commerceDurableFilePath("receipts"));
+  }
+  return commerceReceiptStore;
+}
+
+function commerceProductMediaState(): CommerceProductMediaRepositoryLike {
+  const m = requireModules();
+  if (commerceProductMediaRepo === null) {
+    commerceProductMediaRepo = new m.Commerce.LocalProductMediaRepository();
+  }
+  return commerceProductMediaRepo;
+}
+
+function commerceMediaGrantState(): { readonly persistence: CommerceMediaAccessGrantPersistenceLike; readonly signingKeyStore: unknown } {
+  const m = requireModules();
+  if (commerceMediaGrantPersistence === null) {
+    fs.mkdirSync(path.dirname(commerceDurableFilePath("media_access_grants")), { recursive: true });
+    commerceMediaGrantPersistence = new m.Commerce.AppendOnlyMediaAccessGrantPersistence(commerceDurableFilePath("media_access_grants"));
+  }
+  if (commerceMediaGrantSigningKeyStore === null) {
+    fs.mkdirSync(path.dirname(commerceDurableFilePath("media_grant_signing_keys")), { recursive: true });
+    commerceMediaGrantSigningKeyStore = new m.Trust.DurableSealedSigningKeyStore(commerceDurableFilePath("media_grant_signing_keys"));
+  }
+  return { persistence: commerceMediaGrantPersistence, signingKeyStore: commerceMediaGrantSigningKeyStore };
+}
 
 /**
  * Lazily constructs (once) and returns the process's Commerce state,
@@ -3292,12 +3577,29 @@ function commerceMerchantLabelFor(creatorPubkey: string): string {
   return fedosCommerceDemoMerchantLabel(creatorPubkey);
 }
 
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- friction-ledger row #17 / arc §38: a real, Merchant-attached
+ * PUBLIC image (via `handleCommerceProductImageAttach()` below) now takes
+ * priority over the static Phase 1 demo fallback map. Reads the FIRST
+ * `classification: "public"` `ProductMedia` record for `productId` (a
+ * Merchant may attach more than one; this surface only shows the primary
+ * one, matching every existing single-image product-card/detail
+ * rendering already in the renderer). Falls back to the SAME safe
+ * missing-image fallback every un-imaged product already rendered before
+ * this arc -- never a fake/placeholder photo, never a thrown error.
+ */
 function commerceProductMediaFor(productId: string): { readonly dataUri: string; readonly mimeType: string; readonly altText: string } | null {
-  // Scoping decision (Commerce E2E Completion arc): a newly Merchant-created
-  // product has no wired path to a real image yet (that needs the
-  // MediaStore/IPC surface -- Wave B's Agent I lane, not this pass). It
-  // renders the SAME safe missing-image fallback every un-imaged Phase 1
-  // demo product already renders -- never a fake/placeholder photo.
+  const attached = commerceProductMediaState()
+    .listForProduct(productId)
+    .find((item) => item.classification === "public");
+  if (attached !== undefined) {
+    const stored = commerceMediaStoreFor().get(attached.storageRef);
+    if (stored !== null) {
+      const base64 = Buffer.from(stored.bytes).toString("base64");
+      return { dataUri: `data:${attached.contentType};base64,${base64}`, mimeType: attached.contentType, altText: attached.altText ?? "" };
+    }
+  }
   return FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA[productId] ?? null;
 }
 
@@ -3537,6 +3839,70 @@ async function handleCommerceProductCreate(payload: unknown) {
   });
   if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
   return { outcome: "ok", product: commerceProductDto(result.product) };
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- friction-ledger row #17 / arc §38: the first real IPC path
+ * reaching `LocalProductMediaRepository`/`IpfsMediaStore.putPublic()`
+ * (both previously "inert scaffolding, not reachable from the shipped
+ * Electron app" per their own file headers). IMAGE-level, PUBLIC media
+ * only, by explicit arc scope -- `classification` is always `"public"`
+ * here, never caller-suppliable, and `contentType` is checked against a
+ * small, real-image-only allowlist (never `application/pdf`/`application/zip`,
+ * which `commerceMediaStoreFor()`'s own supported-content-types set
+ * permits for OTHER callers but this handler does not offer). Content
+ * ownership is enforced by `LocalProductMediaRepository.add()`'s own
+ * `canEditProduct()` check (same authority discipline as
+ * `handleCommerceProductUpdate` below) -- never trusted as a bare
+ * `actorPubkey` claim alone.
+ */
+async function handleCommerceProductImageAttach(payload: unknown) {
+  const body = payload as { actorPubkey?: unknown; productId?: unknown; imageBase64?: unknown; contentType?: unknown; altText?: unknown } | null;
+  if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+  if (!isBoundedString(body.contentType, MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS) || !COMMERCE_PUBLIC_IMAGE_CONTENT_TYPES.has(body.contentType)) {
+    return { outcome: "invalid-input", reason: `contentType must be one of: ${[...COMMERCE_PUBLIC_IMAGE_CONTENT_TYPES].join(", ")}` };
+  }
+  if (!isBoundedString(body.imageBase64, MAX_PRODUCT_IMAGE_BASE64_CHARS) || body.imageBase64.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed or missing image data" };
+  }
+  const altText = isBoundedString(body.altText, MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS) ? body.altText : undefined;
+
+  const product = commerceState().products.get(body.productId);
+  if (product === undefined) return { outcome: "not-found", reason: "no such product" };
+
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(Buffer.from(body.imageBase64, "base64"));
+  } catch {
+    return { outcome: "invalid-input", reason: "image data is not valid base64" };
+  }
+  if (bytes.length === 0) return { outcome: "invalid-input", reason: "image data decoded to zero bytes" };
+
+  const putResult = commerceMediaStoreFor().putPublic(bytes, body.contentType);
+  if (putResult.outcome !== "stored" && putResult.outcome !== "already-present") {
+    return { outcome: "rejected", reason: `image storage failed: ${putResult.outcome}` };
+  }
+
+  const addResult = commerceProductMediaState().add(body.actorPubkey, product, {
+    role: "primary",
+    classification: "public",
+    contentType: body.contentType,
+    sizeBytes: putResult.metadata.sizeBytes,
+    checksum: putResult.metadata.checksum,
+    checksumSubject: "plaintext",
+    altText,
+    storageRef: putResult.metadata.key,
+  });
+  if (addResult.outcome !== "ok") return { outcome: addResult.outcome, reason: addResult.reason };
+
+  return {
+    outcome: "ok",
+    media: { id: addResult.media.id, productId: addResult.media.productId, contentType: addResult.media.contentType, altText: addResult.media.altText ?? "" },
+  };
 }
 
 async function handleCommerceProductUpdate(payload: unknown) {
@@ -3790,6 +4156,14 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
       );
       if (started.ok && started.delivery !== undefined) state.deliveries.save(started.delivery);
     }
+    // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+    // (Agent D) -- arc §35-37 / friction-ledger row #15: the ONE real
+    // production trigger point for `MediaAccessGrant` issuance. Best-effort,
+    // non-fatal (mirrors the Delivery block immediately above and
+    // `issueReputationAttestationsForCompletedOrderNonFatal()`'s own
+    // established discipline) -- a grant-issuance failure never reverts or
+    // blocks the already-committed Order/Delivery transition.
+    await issueCommerceMediaAccessGrantsNonFatal(result.order, now);
   }
   // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
   // Coordinator-directed pass) -- arc items #4/#5: privately notify the
@@ -3801,6 +4175,66 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
   const reasonForSync = typeof action.reason === "string" ? action.reason : undefined;
   const nostrSyncOutcome = await sendPrivateOrderSyncNonFatal(result.order, syncStatus, recipientPubkey, Math.floor(Date.now() / 1000), reasonForSync);
   return { outcome: "ok", order: commerceOrderDto(result.order), nostrSyncOutcome };
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- see `issueMediaAccessGrantsForOrder()`'s own header
+ * (`src/os/commerce/media_grant/media_access_grant_issuance.ts`) for the
+ * full gating discipline this wraps: qualifying Order status AND a
+ * REAL, resolved signing keypair whose public key equals
+ * `order.sellerPubkey` LITERALLY -- never a bare claim, never a
+ * self-issued/free mapping. `resolveCommerceMediaGrantSigningKeypair()`
+ * mints (once, sealed-at-rest) a real keypair PER CLAIMED `order.sellerPubkey`
+ * -- for this app's shipped demo actor identities (`COMMERCE_DEMO_ACTORS`,
+ * non-cryptographic fixed constants with no real private key anywhere in
+ * this system), that minted keypair's own public key can never equal the
+ * literal claimed constant, so `"seller-not-grant-capable"` is the
+ * EXPECTED, disclosed, honest outcome here today -- never silently
+ * reported as success. See this arc's own final report for the full
+ * account.
+ */
+async function issueCommerceMediaAccessGrantsNonFatal(order: CommerceOrderLike, now: number): Promise<void> {
+  try {
+    const m = requireModules();
+    const media = commerceProductMediaState().listForProduct(order.productId);
+    const protectedMedia = media.filter((item) => item.classification === "protected");
+    if (protectedMedia.length === 0) return;
+
+    const grantState = commerceMediaGrantState();
+    const signingKeyResult = await m.Commerce.resolveCommerceMediaGrantSigningKeypair(
+      activeMasterSeedAuthority,
+      grantState.signingKeyStore,
+      order.sellerPubkey,
+      true,
+      now,
+    );
+    if (signingKeyResult.outcome !== "restored" && signingKeyResult.outcome !== "created") {
+      console.warn(`fedos-beta: Commerce media-grant signing key unavailable for seller (non-fatal, no protected-media grant issued this pass): ${signingKeyResult.outcome}`);
+      return;
+    }
+
+    const existingGrants = grantState.persistence.listGrants();
+    const outcome = m.Commerce.issueMediaAccessGrantsForOrder({
+      order: { id: order.id, productId: order.productId, buyerPubkey: order.buyerPubkey, sellerPubkey: order.sellerPubkey, status: order.status },
+      candidateMedia: protectedMedia.map((item) => ({ id: item.id, productId: item.productId, classification: item.classification })),
+      sellerSigningKeypair: signingKeyResult.keypair,
+      latestKnownGrantVersionFor: (mediaId) => m.Commerce.latestGrantVersion(existingGrants, mediaId, order.buyerPubkey, order.id),
+      now,
+    });
+    if (outcome.outcome !== "issued") {
+      // "no-protected-media"/"order-not-qualifying" are ordinary,
+      // non-noteworthy states; "seller-not-grant-capable" is the disclosed,
+      // expected outcome for this app's non-cryptographic demo actors (see
+      // this function's own header) -- never escalated to an error log.
+      return;
+    }
+    for (const envelope of outcome.envelopes) {
+      grantState.persistence.putGrant(envelope);
+    }
+  } catch (err) {
+    console.error("fedos-beta: Commerce media-grant issuance attempt failed (non-fatal, Order/Delivery unaffected):", err);
+  }
 }
 
 async function handleCommerceOrdersListMine(payload: unknown) {
@@ -4056,6 +4490,27 @@ async function handleCommerceNetworkProfileSet(payload: unknown) {
  * stay coarse (opaque ids only, see `receipt_types.ts`'s own field
  * comments) -- never the product's title/price, never exact payment
  * metadata beyond the opaque `paymentId` reference.
+ *
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- TWO real fixes, friction-ledger rows #5 and #11:
+ *
+ *   1. PERSISTENCE (row #5 / arc §33): `commerceReceiptState()` (a real
+ *      `DurableReceiptStore`) is checked FIRST. A `"completed"` order that
+ *      already has a durably-stored receipt returns THAT SAME envelope
+ *      (re-verified live, never re-signed) -- never a second, freshly
+ *      re-signed envelope with a different `issuedAt`/signature. Only the
+ *      FIRST successful issuance for an `orderId` ever calls
+ *      `issueSignedTradeReceiptProof()`. This is what makes a receipt
+ *      survive a real app restart with the SAME proof the user already
+ *      saw, not merely "still independently re-verifiable" (which the
+ *      prior, already-durable receipt-issuer signing KEY alone provided).
+ *   2. REAL QR IMAGE (row #11 / arc §34): `renderFedosTrustQrTextToPngDataUrl()`
+ *      renders the ALREADY-signed `qrText` as a real scannable PNG data
+ *      URL -- the underlying signed text remains authoritative; the image
+ *      is presentation/transport only, exactly like `qrText` itself always
+ *      was. Rendering failure is non-fatal to the (already-durable) text
+ *      proof -- `qrImageDataUrl` is simply omitted, never a fabricated
+ *      placeholder image.
  */
 async function handleCommerceReceiptIssue(payload: unknown) {
   const orderId = (payload as { orderId?: unknown } | null)?.orderId;
@@ -4071,27 +4526,176 @@ async function handleCommerceReceiptIssue(payload: unknown) {
   if (signingState.outcome === "issuer-identity-corrupted") {
     return { outcome: "rejected", reason: `receipt issuer identity is corrupted and cannot safely issue new receipts: ${signingState.reason}` };
   }
-  const { issuerId, keypair, policy } = signingState;
-  const payloadRecord = {
-    kind: "trade_completion" as const,
-    orderId: order.id,
-    productRef: order.productId,
-    buyerRef: order.buyerPubkey,
-    sellerRef: order.sellerPubkey,
-    paymentEvidenceRef: order.paymentId ?? undefined,
-    completedAt: now,
-    formatVersion: 1 as const,
-  };
+  const { policy } = signingState;
+  const receiptStore = commerceReceiptState();
+
   let envelope: unknown;
-  try {
-    envelope = m.Commerce.issueSignedTradeReceiptProof(payloadRecord, { keypair, issuer: issuerId }, { issuedAt: now });
-  } catch (err) {
-    return { outcome: "rejected", reason: err instanceof Error ? err.message : "receipt issuance failed" };
+  const existing = receiptStore.getByOrderId(orderId);
+  if (existing !== undefined) {
+    envelope = existing.envelope;
+  } else {
+    const { issuerId, keypair } = signingState;
+    const payloadRecord = {
+      kind: "trade_completion" as const,
+      orderId: order.id,
+      productRef: order.productId,
+      buyerRef: order.buyerPubkey,
+      sellerRef: order.sellerPubkey,
+      paymentEvidenceRef: order.paymentId ?? undefined,
+      completedAt: now,
+      formatVersion: 1 as const,
+    };
+    try {
+      envelope = m.Commerce.issueSignedTradeReceiptProof(payloadRecord, { keypair, issuer: issuerId }, { issuedAt: now });
+    } catch (err) {
+      return { outcome: "rejected", reason: err instanceof Error ? err.message : "receipt issuance failed" };
+    }
+    // Idempotent: if a concurrent call already won the race, `putIfAbsent`
+    // reports "already-present" and this in-memory `envelope` is simply
+    // discarded in favor of re-reading the durably-won one below, so two
+    // concurrent issuances for the SAME orderId can never both "win".
+    const putResult = receiptStore.putIfAbsent(orderId, envelope, now);
+    if (putResult === "already-present") {
+      envelope = receiptStore.getByOrderId(orderId)?.envelope ?? envelope;
+    }
   }
+
   const qrText = m.Commerce.encodeCommerceReceiptProofToQrText(envelope);
   const decoded = m.Commerce.decodeCommerceReceiptProofFromQrText(qrText);
   const verified = m.Commerce.verifySignedTradeReceiptProof(decoded, policy);
-  return { outcome: "ok", qrText, verifyStatus: verified.status };
+
+  let qrImageDataUrl: string | undefined;
+  try {
+    qrImageDataUrl = await m.Trust.renderFedosTrustQrTextToPngDataUrl(qrText);
+  } catch (err) {
+    console.error("fedos-beta: QR image rendering failed (non-fatal, the signed text receipt above remains authoritative):", err);
+  }
+
+  return { outcome: "ok", qrText, qrImageDataUrl, verifyStatus: verified.status };
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- friction-ledger row #15 / arc §35-37: the buyer-side
+ * REDEEM path, the ONLY code reaching `commerceMediaStoreFor().getProtected()`
+ * anywhere in this file (grep-verifiable) -- there is no IPC channel that
+ * exposes that store's `getProtected()`/decrypt capability directly. The
+ * gate order below is fixed and cannot be reordered by a caller:
+ *   1. Look up the REAL Order via the durable repository (never a
+ *      caller-supplied Order shape) and the REAL `ProductMedia` record.
+ *   2. Look up the REAL, durably-persisted candidate grant envelope for
+ *      the exact `(mediaId, actorPubkey, orderId)` triple -- never
+ *      trusted from the renderer.
+ *   3. `evaluateMediaAccessGrant()` -- signature, Order-status,
+ *      expiry/revocation/version, wrong-buyer/wrong-media/wrong-signer,
+ *      ALL real checks, not re-implemented here.
+ *   4. ONLY on `allowed: true` does this handler ever touch the
+ *      Master-Seed-derived `CommerceMedia` key AT ALL, via
+ *      `wrapMediaAccessGrantRelease()` (which itself re-runs step 3
+ *      before ever calling `authority.encryptNip44Wire()`) --
+ *      `commerceMediaStoreFor().getProtected()` decrypts the merchant's
+ *      OWN stored ciphertext (never handed to the buyer directly), and
+ *      the plaintext bytes are then re-wrapped end-to-end for the ONE
+ *      grant-authorized buyer.
+ * Never returns the `MediaAccessGrant` envelope, a content key, AEAD
+ * internals, or a CID/storageRef to the caller -- only opaque
+ * `contentBase64`/`contentType` on success, or a closed-vocabulary denial
+ * reason on failure.
+ */
+async function handleCommerceMediaGrantRedeem(payload: unknown) {
+  const body = payload as { orderId?: unknown; actorPubkey?: unknown } | null;
+  if (!isBoundedString(body?.orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
+  if (!isBoundedString(body.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  const m = requireModules();
+  const order = commerceState().orders.findById(body.orderId);
+  if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+
+  const protectedMedia = commerceProductMediaState()
+    .listForProduct(order.productId)
+    .filter((item) => item.classification === "protected");
+  if (protectedMedia.length === 0) return { outcome: "not-found", reason: "this product has no protected content" };
+  const media = protectedMedia[0];
+  if (media === undefined) return { outcome: "not-found", reason: "this product has no protected content" };
+
+  const grantState = commerceMediaGrantState();
+  const allGrants = grantState.persistence.listGrants();
+  const latestVersion = m.Commerce.latestGrantVersion(allGrants, media.id, body.actorPubkey, order.id);
+  const candidate = allGrants.find(
+    (entry) =>
+      entry.payload.mediaId === media.id &&
+      entry.payload.buyerPubkey === body.actorPubkey &&
+      entry.payload.orderId === order.id &&
+      entry.payload.grantVersion === latestVersion,
+  );
+  if (candidate === undefined) return { outcome: "denied", reason: "no-grant-on-file" };
+
+  if (activeMasterSeedAuthority === null) return { outcome: "denied", reason: "wrap-unavailable" };
+
+  const now = Math.floor(Date.now() / 1000);
+  const decision = m.Commerce.evaluateMediaAccessGrant({
+    envelope: candidate,
+    media: { id: media.id, productId: media.productId },
+    actorPubkey: body.actorPubkey,
+    order,
+    now,
+    latestKnownGrantVersion: latestVersion,
+  });
+  // The candidate grant must independently evaluate ALLOW here -- BEFORE
+  // this handler ever calls `getProtected()` -- so a denial never touches
+  // the Master-Seed-derived decrypt path at all.
+  if (!decision.allowed) return { outcome: "denied", reason: decision.reason };
+
+  const decrypted = await commerceMediaStoreFor().getProtected(media.storageRef);
+  if (decrypted === null) return { outcome: "denied", reason: "content-unavailable" };
+
+  const finalWrap = await m.Commerce.wrapMediaAccessGrantRelease({
+    envelope: candidate,
+    media: { id: media.id, productId: media.productId },
+    actorPubkey: body.actorPubkey,
+    order,
+    now,
+    latestKnownGrantVersion: latestVersion,
+    merchantAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+    releasePayload: decrypted,
+    authority: activeMasterSeedAuthority,
+  });
+  if (finalWrap.outcome !== "released") return { outcome: "denied", reason: finalWrap.outcome === "denied" ? finalWrap.reason : finalWrap.outcome };
+
+  if (typeof activeMasterSeedAuthority.decryptNip44Wire !== "function") return { outcome: "denied", reason: "wrap-unavailable" };
+  const unwrapped = await activeMasterSeedAuthority.decryptNip44Wire(COMMERCE_NOSTR_ACCOUNT_INDEX, order.sellerPubkey, finalWrap.wireCiphertext);
+  if (unwrapped === null) return { outcome: "denied", reason: "wrap-unavailable" };
+
+  return { outcome: "ok", contentBase64: Buffer.from(unwrapped).toString("base64"), contentType: media.contentType };
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- friction-ledger row #14 / arc §32/§36: the real DATA query
+ * a badge/nav-chrome UI (Agent U's territory, or this file's own minimal
+ * fallback below) needs -- new submitted orders, orders awaiting
+ * acceptance, paid-ready-to-fulfill, delivery/completion states, ready
+ * receipts, per role. Computed fresh from the real, durable Order
+ * repository every call -- never cached, never a stub.
+ */
+async function handleCommerceActivitySummary(payload: unknown) {
+  const actorPubkey = (payload as { actorPubkey?: unknown } | null)?.actorPubkey;
+  if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  const m = requireModules();
+  const orders = commerceState().orders;
+  const asBuyerOrders = orders.listByBuyer(actorPubkey);
+  const asSellerOrders = orders.listBySeller(actorPubkey);
+  const receiptStore = commerceReceiptState();
+  const hasReceipt = (orderId: string) => receiptStore.getByOrderId(orderId) !== undefined;
+
+  return {
+    outcome: "ok",
+    asBuyer: m.Commerce.computeCommerceBuyerActivitySummary(asBuyerOrders, hasReceipt),
+    asSeller: m.Commerce.computeCommerceSellerActivitySummary(asSellerOrders, hasReceipt),
+  };
 }
 
 /**
@@ -4450,6 +5054,13 @@ function registerIpcHandlers(): void {
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface.
   ipcMain.handle("fedos-app:commerce-network-profile-get", async () => handleCommerceNetworkProfileGet());
   ipcMain.handle("fedos-app:commerce-network-profile-set", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceNetworkProfileSet(payload));
+  // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+  // (Agent D) -- new production IPC channels: protected-media redemption
+  // (arc §35-37), public product-image attach (arc §38), and the real
+  // activity/badge data query (arc §32/§36).
+  ipcMain.handle("fedos-app:commerce-product-image-attach", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductImageAttach(payload));
+  ipcMain.handle("fedos-app:commerce-media-grant-redeem", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceMediaGrantRedeem(payload));
+  ipcMain.handle("fedos-app:commerce-activity-summary", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceActivitySummary(payload));
 }
 
 // ---------------------------------------------------------------------

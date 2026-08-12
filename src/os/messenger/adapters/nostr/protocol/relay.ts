@@ -19,6 +19,17 @@ export interface NostrFilter {
   "#e"?: string[];
   /** Referenced pubkeys (#p tag). */
   "#p"?: string[];
+  /**
+   * Hashtag / free-text label values (#t tag, NIP-12). Real Two-Party
+   * Commerce + UX P0/P1 Closure arc (Agent N) -- used to route/distinguish
+   * FedOS Commerce's own event kinds (product publication/update, private
+   * order sync) without inventing a new event kind of their own (they all
+   * stay `kind: 1`, distinguished by this tag). Already used in production
+   * (`fedos_electron_beta_main.cts`'s discovery queries) before this field
+   * existed on the type -- adding it here just makes the existing,
+   * already-shipped filter shape type-correct.
+   */
+  "#t"?: string[];
   since?: number;
   until?: number;
   limit?: number;

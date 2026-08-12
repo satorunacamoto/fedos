@@ -79,6 +79,10 @@
       .commerce-actor-bar label { margin: 0; flex: none; }
       .commerce-actor-bar select { width: 100%; max-width: 22rem; flex: 1 1 12rem; min-width: 0; }
       .commerce-sim-pill { display: inline-block; padding: 0 0.35rem; border-radius: 3px; font-size: 0.7rem; background: #3a341a; color: #fd7; margin-left: 0.4rem; }
+      /* FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D). */
+      #commerce-order-receipt-qr-image { width: 176px; height: 176px; display: block; margin-bottom: 0.5rem; border-radius: 4px; background: #fff; }
+      .commerce-product-image-attach { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+      .commerce-product-image-attach .error { margin: 0; }
       .commerce-order-status { font-weight: 600; }
       .commerce-order-status-paid, .commerce-order-status-completed, .commerce-order-status-delivered { color: #7fd; }
       .commerce-order-status-rejected, .commerce-order-status-cancelled { color: #f97; }
@@ -260,6 +264,7 @@
 
           <h3>My Orders</h3>
           <p class="muted">Orders you created as the currently selected "Acting as" customer identity.</p>
+          <p class="muted" id="commerce-my-orders-activity-summary" role="status" aria-live="polite"></p>
           <ul class="plain-list" id="commerce-my-orders-list"></ul>
         </div>
 
@@ -350,6 +355,15 @@
             <button id="commerce-order-complete-btn" type="button" class="commerce-btn-primary">Complete Order</button>
           </div>
 
+          <div id="commerce-order-purchased-content-actions">
+            <p class="muted">Digital content from this purchase, if the seller attached any.</p>
+            <button id="commerce-order-purchased-content-btn" type="button">Open Purchased Content</button>
+            <div id="commerce-order-purchased-content-error" class="error" role="alert"></div>
+            <div id="commerce-order-purchased-content-result" hidden>
+              <a id="commerce-order-purchased-content-link" href="#">Download purchased content</a>
+            </div>
+          </div>
+
           <div id="commerce-order-receipt-actions">
             <p class="muted">Order completed — issue a signed trade receipt and encode it as a QR-transportable proof.</p>
             <!-- Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 21 / arc §42:
@@ -362,7 +376,8 @@
             <div id="commerce-order-receipt-error" class="error" role="alert"></div>
             <div id="commerce-order-receipt-result" hidden>
               <p class="muted">Verification status: <span class="field" id="commerce-order-receipt-verify-status"></span></p>
-              <label for="commerce-order-receipt-qr-text">Signed receipt (QR-encoded text — the signed object itself is authoritative, QR is transport only)</label>
+              <img id="commerce-order-receipt-qr-image" alt="Scannable QR code encoding the signed receipt below" hidden />
+              <label for="commerce-order-receipt-qr-text">Signed receipt (QR-encoded text — the signed object itself is authoritative, the QR image above is transport only)</label>
               <textarea id="commerce-order-receipt-qr-text" readonly rows="4"></textarea>
             </div>
           </div>
@@ -443,6 +458,7 @@
           </div>
 
           <h3>Incoming Orders</h3>
+          <p class="muted" id="commerce-merchant-orders-activity-summary" role="status" aria-live="polite"></p>
           <div id="commerce-merchant-orders-error" class="error" role="alert"></div>
           <ul class="plain-list" id="commerce-merchant-orders-list"></ul>
         </div>
