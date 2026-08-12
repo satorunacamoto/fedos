@@ -15,6 +15,7 @@ function baseInput(overrides: Partial<CreateProductInput> = {}): CreateProductIn
     priceCents: 500,
     currency: "USD",
     visibility: "public",
+    actorRole: "merchant",
     ...overrides,
   };
 }
@@ -56,6 +57,40 @@ describe("LocalProductRepository.create", () => {
     expect(result.product.linkedSpaceIds).toEqual(["s1"]);
     expect(result.product.linkedSpaceIds).not.toBe(linkedSpaceIds);
     expect(result.product.stock).toBeUndefined();
+  });
+});
+
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #2 P0: "Unknown merchant" mis-attributed listing. Proves the
+ * DOMAIN-layer fix (`policy.ts`'s `canCreateProduct()`, wired into
+ * `create()` above `findInputInvalidReason()`) rejects product creation
+ * whenever the caller does not explicitly assert a `"merchant"` capacity
+ * — a plain, otherwise-valid `actorPubkey` is never sufficient by itself,
+ * closing the gap the tabletop review found: creating a product while
+ * "Acting as: Customer" silently succeeded and produced a permanently
+ * mis-attributed "Unknown merchant" listing with no fix path.
+ */
+describe("LocalProductRepository.create — actor-role authority (friction ledger row #2)", () => {
+  it("16. rejects creation when the actor asserts a customer capacity, never constructing a product", () => {
+    const repo = new LocalProductRepository();
+    const result = repo.create(MERCHANT_A, baseInput({ actorRole: "customer" }));
+    expect(result.outcome).toBe("unauthorized-actor");
+    expect(repo.list()).toHaveLength(0);
+  });
+
+  it("17. rejects creation when actorRole is missing/malformed as invalid-input, never a silent default-allow", () => {
+    const repo = new LocalProductRepository();
+    const malformed = { ...baseInput(), actorRole: undefined as unknown as "merchant" };
+    const result = repo.create(MERCHANT_A, malformed);
+    expect(result.outcome).toBe("invalid-input");
+    expect(repo.list()).toHaveLength(0);
+  });
+
+  it("18. accepts creation when the actor explicitly asserts a merchant capacity, same as before this fix", () => {
+    const repo = new LocalProductRepository();
+    const result = repo.create(MERCHANT_A, baseInput({ actorRole: "merchant" }));
+    expect(result.outcome).toBe("ok");
   });
 });
 

@@ -184,6 +184,8 @@ async function renderBetaStatus(): Promise<void> {
 // ---------------------------------------------------------------------
 
 let localAccountPublicIdentifier = "";
+/** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- mirrors `localAccountPublicIdentifier`'s own set/clear points exactly; used only to label the REAL local-identity "Acting as" option (see the Commerce section below), never anything security-relevant. */
+let localDisplayLabel = "";
 let currentConversationId: string | null = null;
 let conversationsCache: readonly { readonly conversationId: string; readonly [key: string]: unknown }[] = [];
 let currentIdentityTransitionSelection: { readonly peerAccountRef: unknown; readonly peerDeviceRef: string; readonly transitionId: string } | null = null;
@@ -622,7 +624,10 @@ async function refreshCommerceCatalogList(): Promise<void> {
   void refreshCommerceMyOrdersList();
 }
 
-async function openCommerceProduct(productId: string): Promise<void> {
+/** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — which screen "← Back" returns to: the ordinary buyer catalog, or (for a merchant's own draft/unpublished Preview, friction ledger row #24) the Merchant screen it was opened from. */
+let commerceDetailReturnScreen: "commerce" | "commerce-merchant" = "commerce";
+
+async function openCommerceProductDetailScreen(productId: string, previewActorPubkey?: string): Promise<void> {
   currentCommerceDetailProductId = productId;
   showAppScreen("commerce-detail");
   clearError("commerce-detail-error");
@@ -634,7 +639,8 @@ async function openCommerceProduct(productId: string): Promise<void> {
   byId("commerce-detail-status").textContent = "";
   byId("commerce-detail-description").textContent = "";
   byId("commerce-detail-reputation-summary").textContent = "";
-  const result = await window.fedosApp.commerceProductDetail(productId);
+  byId("commerce-detail-preview-banner").setAttribute("hidden", "");
+  const result = await window.fedosApp.commerceProductDetail(productId, previewActorPubkey);
   if (result.outcome !== "ok" || result.product === undefined) {
     byId("commerce-detail-title").textContent = "Product";
     showError("commerce-detail-error", result);
@@ -643,8 +649,27 @@ async function openCommerceProduct(productId: string): Promise<void> {
   renderCommerceProductDetail(result.product);
 }
 
+async function openCommerceProduct(productId: string): Promise<void> {
+  commerceDetailReturnScreen = "commerce";
+  await openCommerceProductDetailScreen(productId);
+}
+
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #24 / arc §30: lets a merchant preview a draft/unpublished
+ * product of their OWN exactly as a buyer would see it, before
+ * publishing. Feeds the SAME `renderCommerceProductDetail()` a real
+ * buyer's Product Detail view already uses — never a second,
+ * visually-divergent preview renderer.
+ */
+async function openCommerceProductPreview(productId: string): Promise<void> {
+  commerceDetailReturnScreen = "commerce-merchant";
+  await openCommerceProductDetailScreen(productId, commerceActingAsPubkey);
+}
+
 function renderCommerceProductDetail(product: FedosCommerceProductDetail): void {
   byId("commerce-detail-title").textContent = product.title;
+  byId("commerce-detail-preview-banner").toggleAttribute("hidden", !product.isPreview);
   const mediaArea = byId("commerce-detail-media-area");
   mediaArea.textContent = "";
   mediaArea.appendChild(buildCommerceMediaElement(product.media, product.title, "commerce-detail-media", "commerce-detail-media-fallback"));
@@ -652,9 +677,9 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
   byId("commerce-detail-merchant").textContent = `Sold by ${product.merchantLabel}`;
   byId("commerce-detail-status").textContent = `Status: ${product.status}`;
   byId("commerce-detail-description").textContent = product.description;
-  const isCustomer = COMMERCE_DEMO_ACTORS.find((a) => a.pubkey === commerceActingAsPubkey)?.role === "customer";
-  byId("commerce-detail-order-form").toggleAttribute("hidden", !isCustomer);
-  byId("commerce-detail-order-unavailable-note").toggleAttribute("hidden", isCustomer);
+  const isCustomer = commerceActorRole(commerceActingAsPubkey) === "customer";
+  byId("commerce-detail-order-form").toggleAttribute("hidden", !isCustomer || product.isPreview);
+  byId("commerce-detail-order-unavailable-note").toggleAttribute("hidden", isCustomer || product.isPreview);
   void renderCommerceSellerReputation(product.creatorPubkey);
 }
 
@@ -668,12 +693,21 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
  * case for every demo product's first order) renders a plain, honest
  * "no history yet" message -- never a fabricated zero/empty board.
  */
-async function renderCommerceSellerReputation(creatorPubkey: string): Promise<void> {
-  const el = byId("commerce-detail-reputation-summary");
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #13 / arc §40: the SAME reputation query+formatting used by
+ * both the buyer-facing Product Detail "Seller Reputation" panel AND
+ * (new) the Merchant/My Store dashboard's "My Reputation" panel — one
+ * shared function, `targetElementId` is the only thing that differs, so
+ * there is exactly one place that calls `commercePersonaBoardQuery()`
+ * and exactly one place that formats its result, never a duplicated copy.
+ */
+async function renderCommercePersonaReputation(subjectPubkey: string, targetElementId: string): Promise<void> {
+  const el = byId(targetElementId);
   el.textContent = "Loading reputation…";
-  const result = await window.fedosApp.commercePersonaBoardQuery(creatorPubkey);
+  const result = await window.fedosApp.commercePersonaBoardQuery(subjectPubkey);
   if (result.outcome !== "ok" || result.view === undefined) {
-    el.textContent = "No reputation history on record for this seller yet.";
+    el.textContent = "No reputation history on record yet.";
     return;
   }
   const view = result.view;
@@ -682,6 +716,16 @@ async function renderCommerceSellerReputation(creatorPubkey: string): Promise<vo
   const epochLabel = view.epochId.length > 12 ? `${view.epochId.slice(0, 12)}…` : view.epochId;
   const validity = result.verificationState?.epochCurrentlyValid === true ? "currently valid" : "not currently valid";
   el.textContent = `Persona ${epochLabel} — ${bucket} verified trades — mostly ${category} — persona epoch ${validity}. Reputation is pseudonymous, self-reported by trading counterparties, and not a guarantee of identity or Sybil resistance.`;
+}
+
+/** Buyer-facing wrapper — unchanged call shape for existing callers. */
+async function renderCommerceSellerReputation(creatorPubkey: string): Promise<void> {
+  await renderCommercePersonaReputation(creatorPubkey, "commerce-detail-reputation-summary");
+}
+
+/** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — the Merchant/My Store dashboard's own reputation panel, same query+formatting as above, keyed to whichever identity is currently acting as merchant. */
+async function renderCommerceMerchantReputation(): Promise<void> {
+  await renderCommercePersonaReputation(commerceActingAsPubkey, "commerce-merchant-reputation-summary");
 }
 
 // ---------------------------------------------------------------------
@@ -701,33 +745,94 @@ async function renderCommerceSellerReputation(creatorPubkey: string): Promise<vo
 // plus one new synthetic customer persona (`"c".repeat(64)`) — this file
 // cannot `import` that module (see this file's own header), so the values
 // are restated here, structurally identical.
+//
+// Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+// ledger row #2 / arc §8 / arc §12 ("Bob's own actual profile identity
+// can never be used as a seller identity"): `COMMERCE_DEMO_ACTORS` below
+// is KEPT exactly as a test/dev fixture (never deleted — still the only
+// way to exercise a two-role tabletop in one process), but it is no
+// longer the ONLY identity source. `commerceActingAsOptions()` ADDITIVELY
+// appends the REAL local Persona (`localAccountPublicIdentifier` /
+// `localDisplayLabel`, the same identity `window.fedosProfile.status()`
+// already established elsewhere in this file) as a distinct, clearly
+// non-demo "My Store" option whenever a profile is unlocked — this is
+// the real production merchant identity the brief asks for, structurally
+// separated (own array, own `isDemo: false` flag, own label prefix) from
+// the fictional fixtures rather than merged/renamed into them. Acting as
+// your real identity always asserts a MERCHANT capacity (creating/
+// managing your OWN store's listings) — this build has no separate real
+// "become a customer" identity concept yet, so real-identity purchases
+// are not offered here; the demo customer persona remains the only way
+// to exercise a buyer flow in this single-process build.
 // ---------------------------------------------------------------------
 
-const COMMERCE_DEMO_ACTORS: readonly { readonly pubkey: string; readonly label: string; readonly role: "customer" | "merchant" }[] = [
-  { pubkey: "c".repeat(64), label: "Customer — Alice (demo)", role: "customer" },
-  { pubkey: "a".repeat(64), label: "Merchant — Northlight Studio (demo)", role: "merchant" },
-  { pubkey: "b".repeat(64), label: "Merchant — Riverbend Makerspace (demo)", role: "merchant" },
+interface CommerceActingAsActor {
+  readonly pubkey: string;
+  readonly label: string;
+  readonly role: "customer" | "merchant";
+  readonly isDemo: boolean;
+}
+
+const COMMERCE_DEMO_ACTORS: readonly CommerceActingAsActor[] = [
+  { pubkey: "c".repeat(64), label: "Customer — Alice (demo)", role: "customer", isDemo: true },
+  { pubkey: "a".repeat(64), label: "Merchant — Northlight Studio (demo)", role: "merchant", isDemo: true },
+  { pubkey: "b".repeat(64), label: "Merchant — Riverbend Makerspace (demo)", role: "merchant", isDemo: true },
 ];
+
+/** The real local Persona as a Commerce actor, or `null` before a profile is unlocked. Never a demo fixture — see this section's own header. */
+function commerceRealActor(): CommerceActingAsActor | null {
+  if (localAccountPublicIdentifier.length === 0) return null;
+  const label = localDisplayLabel.length > 0 ? localDisplayLabel : "your profile";
+  return { pubkey: localAccountPublicIdentifier, label: `My Store — ${label} (real profile)`, role: "merchant", isDemo: false };
+}
+
+/** Every selectable "Acting as" actor: the real local Persona first (when available), then the demo fixtures — so the real production identity is never buried below fictional ones. */
+function commerceActingAsOptions(): readonly CommerceActingAsActor[] {
+  const real = commerceRealActor();
+  return real === null ? COMMERCE_DEMO_ACTORS : [real, ...COMMERCE_DEMO_ACTORS];
+}
+
+/** The asserted role for a given "Acting as" pubkey, across BOTH the real identity and the demo fixtures — `undefined` for an unrecognized pubkey (never defaults to a privileged role). */
+function commerceActorRole(pubkey: string): "customer" | "merchant" | undefined {
+  return commerceActingAsOptions().find((a) => a.pubkey === pubkey)?.role;
+}
 
 let commerceActingAsPubkey: string = COMMERCE_DEMO_ACTORS[0]?.pubkey ?? "";
 
 function populateCommerceActorSelect(selectId: string): void {
   const select = byId<HTMLSelectElement>(selectId);
   select.textContent = "";
-  for (const actor of COMMERCE_DEMO_ACTORS) {
+  for (const actor of commerceActingAsOptions()) {
     const option = document.createElement("option");
     option.value = actor.pubkey;
     option.textContent = actor.label;
     select.appendChild(option);
   }
   select.value = commerceActingAsPubkey;
+  const noteId = selectId === "commerce-acting-as" ? "commerce-acting-as-note" : "commerce-merchant-acting-as-note";
+  const noteEl = document.getElementById(noteId);
+  if (noteEl !== null) {
+    const active = commerceActingAsOptions().find((a) => a.pubkey === select.value);
+    noteEl.textContent =
+      active === undefined
+        ? ""
+        : active.isDemo
+          ? "Demo fixture identity — not your real profile, not a real merchant/customer."
+          : "Your real local profile, acting as this store's merchant.";
+  }
 }
 
-/** Keeps the Commerce screen's and Merchant screen's selectors mirrored to ONE shared demo identity — see this section's own header for why two selectors exist at all (both screens need the control visible without cross-navigating). */
+/** Keeps the Commerce screen's and Merchant screen's selectors mirrored to ONE shared identity — see this section's own header for why two selectors exist at all (both screens need the control visible without cross-navigating). */
 function setCommerceActingAs(pubkey: string): void {
   commerceActingAsPubkey = pubkey;
   byId<HTMLSelectElement>("commerce-acting-as").value = pubkey;
   byId<HTMLSelectElement>("commerce-merchant-acting-as").value = pubkey;
+}
+
+/** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — re-populates BOTH "Acting as" selectors so the real local-identity option appears the moment a profile becomes ready, mirroring the startup call's own "populate both, unconditionally" discipline (see that call's own comment further below) rather than only lazily on next screen visit. */
+function refreshCommerceActorOptionsForRealIdentity(): void {
+  populateCommerceActorSelect("commerce-acting-as");
+  populateCommerceActorSelect("commerce-merchant-acting-as");
 }
 
 let currentCommerceOrder: FedosCommerceOrder | null = null;
@@ -948,6 +1053,38 @@ async function refreshCommerceMyOrdersList(): Promise<void> {
 
 // --- Merchant screen: My Products + Create Product + Incoming Orders ---
 
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #18 / arc §29: safe decimal-string -> integer-cents parsing.
+ * Deliberately string/integer-based (split on ".", pad the fractional
+ * part, then integer-multiply/add) rather than `Number.parseFloat(x) *
+ * 100`, which is the classic float-money bug class (e.g. some inputs
+ * round to `...999999999998` instead of an exact integer). Returns
+ * `null` for anything that is not a non-negative amount with at most 2
+ * decimal places — never silently clamps or guesses.
+ */
+function parseCommerceDecimalPriceToCents(raw: string): number | null {
+  const trimmed = raw.trim();
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(trimmed);
+  if (match === null) return null;
+  const wholePart = match[1] ?? "0";
+  const fractionPart = (match[2] ?? "").padEnd(2, "0");
+  const wholeUnits = Number.parseInt(wholePart, 10);
+  const fractionCents = Number.parseInt(fractionPart, 10);
+  if (!Number.isSafeInteger(wholeUnits) || wholeUnits < 0) return null;
+  const wholeCents = wholeUnits * 100; // exact: integer * integer, well within Number.isSafeInteger range for any realistic price.
+  if (!Number.isSafeInteger(wholeCents)) return null;
+  return wholeCents + fractionCents;
+}
+
+/** Live `= $18.00 USD`-style preview alongside a price/currency input pair — friction ledger row #18. */
+function commerceUpdatePricePreview(priceInputId: string, currencySelectId: string, previewId: string): void {
+  const raw = byId<HTMLInputElement>(priceInputId).value;
+  const currency = byId<HTMLSelectElement>(currencySelectId).value;
+  const cents = parseCommerceDecimalPriceToCents(raw);
+  byId(previewId).textContent = cents === null ? "Enter a valid amount, e.g. 18.00" : `= ${formatCommercePrice(cents, currency)}`;
+}
+
 function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTMLLIElement {
   const li = document.createElement("li");
   const title = document.createElement("div");
@@ -957,26 +1094,82 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
   price.className = "commerce-price";
   price.textContent = formatCommercePrice(product.priceCents, product.currency);
   li.appendChild(price);
-  const publishBtn = document.createElement("button");
-  publishBtn.type = "button";
+
+  // friction ledger row #24 / arc §30 — Preview reuses the SAME product-detail
+  // render path a buyer's real view already uses (`openCommerceProductPreview`).
+  const previewBtn = document.createElement("button");
+  previewBtn.type = "button";
+  previewBtn.className = "commerce-btn-preview";
+  previewBtn.textContent = "Preview";
+  previewBtn.setAttribute("aria-label", `Preview ${product.title} as a buyer would see it`);
+  previewBtn.addEventListener("click", () => void openCommerceProductPreview(product.id));
+  li.appendChild(previewBtn);
+
+  // friction ledger row #16 / arc §13 — Edit.
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "commerce-btn-edit";
+  editBtn.textContent = "Edit";
+  editBtn.setAttribute("aria-label", `Edit ${product.title}`);
+  editBtn.addEventListener("click", () => onCommerceMerchantEditOpen(product));
+  li.appendChild(editBtn);
+
+  // friction ledger row #3 P0 fix / arc §14 — explicit, SEPARATE Publish
+  // and Unpublish buttons (never one dual-purpose label), each disabled
+  // for the duration of its own in-flight call, mirroring the established
+  // `onDeviceRevoke()` "if (btn.disabled) return; btn.disabled = true;
+  // try { ... } finally { btn.disabled = false; }" guard pattern
+  // (`secure_runtime_alpha_8121_8200_double_submit_guards.test.ts` proves
+  // that exact mechanism live). This closes the rapid-double-click
+  // draft->active->archived bug the tabletop found: only ONE of these two
+  // buttons is ever rendered for a given product, so there is no shared
+  // label/state to race on.
   const isPublished = product.status === "active";
-  publishBtn.textContent = isPublished ? "Unpublish" : "Publish";
-  publishBtn.addEventListener("click", () => void onCommerceProductPublishToggle(product.id, !isPublished));
-  li.appendChild(publishBtn);
+  if (isPublished) {
+    const unpublishBtn = document.createElement("button");
+    unpublishBtn.type = "button";
+    unpublishBtn.className = "commerce-btn-unpublish";
+    unpublishBtn.textContent = "Unpublish";
+    unpublishBtn.addEventListener("click", () => void onCommercePublishAction(product.id, "unpublish", unpublishBtn));
+    li.appendChild(unpublishBtn);
+  } else {
+    const publishBtn = document.createElement("button");
+    publishBtn.type = "button";
+    publishBtn.className = "commerce-btn-publish";
+    publishBtn.textContent = "Publish";
+    publishBtn.addEventListener("click", () => void onCommercePublishAction(product.id, "publish", publishBtn));
+    li.appendChild(publishBtn);
+  }
   return li;
 }
 
-async function onCommerceProductPublishToggle(productId: string, publish: boolean): Promise<void> {
-  clearError("commerce-merchant-products-error");
-  const result = publish
-    ? await window.fedosApp.commerceProductPublish(commerceActingAsPubkey, productId)
-    : await window.fedosApp.commerceProductUnpublish(commerceActingAsPubkey, productId);
-  if (result.outcome !== "ok") {
-    showCommerceError("commerce-merchant-products-error", result);
+async function onCommercePublishAction(productId: string, action: "publish" | "unpublish", btn: HTMLButtonElement): Promise<void> {
+  // A product only ever offers "Unpublish" while `status === "active"` (see
+  // `commerceMerchantProductRow` above), so every unpublish action IS a
+  // currently-LIVE listing leaving buyer view — confirm every time, per
+  // arc §14 ("removing something real from view is different from
+  // never-published-yet draft state"). Publish (draft/archived -> active)
+  // never needs this — nothing real is being taken away from a buyer.
+  if (action === "unpublish" && !window.confirm("Unpublish this listing? It will stop appearing in the Shop catalog for buyers immediately. You can publish it again later.")) {
     return;
   }
-  void refreshCommerceMerchantProductsList();
-  void refreshCommerceCatalogList();
+  if (btn.disabled) return;
+  btn.disabled = true;
+  clearError("commerce-merchant-products-error");
+  try {
+    const result =
+      action === "publish"
+        ? await window.fedosApp.commerceProductPublish(commerceActingAsPubkey, productId)
+        : await window.fedosApp.commerceProductUnpublish(commerceActingAsPubkey, productId);
+    if (result.outcome !== "ok") {
+      showCommerceError("commerce-merchant-products-error", result);
+      return;
+    }
+    void refreshCommerceMerchantProductsList();
+    void refreshCommerceCatalogList();
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function refreshCommerceMerchantProductsList(): Promise<void> {
@@ -998,26 +1191,71 @@ async function refreshCommerceMerchantProductsList(): Promise<void> {
   for (const product of products) list.appendChild(commerceMerchantProductRow(product));
 }
 
-async function onCommerceMerchantCreateSubmit(): Promise<void> {
-  clearError("commerce-merchant-create-error");
-  const title = byId<HTMLInputElement>("commerce-merchant-create-title").value;
-  const description = byId<HTMLTextAreaElement>("commerce-merchant-create-description").value;
-  const priceCents = Number.parseInt(byId<HTMLInputElement>("commerce-merchant-create-price").value, 10);
-  const currency = byId<HTMLInputElement>("commerce-merchant-create-currency").value;
-  const result = await window.fedosApp.commerceProductCreate(commerceActingAsPubkey, {
-    title,
-    description: description.length > 0 ? description : undefined,
-    priceCents: Number.isFinite(priceCents) ? priceCents : -1,
-    currency,
-  });
-  if (result.outcome !== "ok") {
-    showCommerceError("commerce-merchant-create-error", result);
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger row #16 / arc §13: opens the (single, shared) Edit form for one
+ * product. `commerceProductUpdate` (already wired end-to-end: preload +
+ * `handleCommerceProductUpdate` + `LocalProductRepository.update()`'s
+ * existing `canEditProduct()` creator-only check) had no renderer caller
+ * before this — this is that caller, never a new authority mechanism.
+ */
+let commerceEditingProductId: string | null = null;
+
+function onCommerceMerchantEditOpen(product: FedosCommerceMerchantProduct): void {
+  commerceEditingProductId = product.id;
+  clearError("commerce-merchant-edit-error");
+  byId("commerce-merchant-edit-title-label").textContent = `Editing "${product.title}"`;
+  byId<HTMLInputElement>("commerce-merchant-edit-title").value = product.title;
+  byId<HTMLTextAreaElement>("commerce-merchant-edit-description").value = product.description;
+  byId<HTMLInputElement>("commerce-merchant-edit-price").value = (product.priceCents / 100).toFixed(2);
+  const currencySelect = byId<HTMLSelectElement>("commerce-merchant-edit-currency");
+  if (!Array.from(currencySelect.options).some((o) => o.value === product.currency)) {
+    const opt = document.createElement("option");
+    opt.value = product.currency;
+    opt.textContent = product.currency;
+    currencySelect.appendChild(opt);
+  }
+  currencySelect.value = product.currency;
+  commerceUpdatePricePreview("commerce-merchant-edit-price", "commerce-merchant-edit-currency", "commerce-merchant-edit-price-preview");
+  byId("commerce-merchant-edit-form").removeAttribute("hidden");
+}
+
+function onCommerceMerchantEditCancel(): void {
+  commerceEditingProductId = null;
+  byId("commerce-merchant-edit-form").setAttribute("hidden", "");
+}
+
+async function onCommerceMerchantEditSave(): Promise<void> {
+  if (commerceEditingProductId === null) return;
+  clearError("commerce-merchant-edit-error");
+  const priceCents = parseCommerceDecimalPriceToCents(byId<HTMLInputElement>("commerce-merchant-edit-price").value);
+  if (priceCents === null) {
+    showCommerceError("commerce-merchant-edit-error", { outcome: "invalid-input", reason: "Enter a valid price, e.g. 18.00" });
     return;
   }
-  clearField("commerce-merchant-create-title");
-  clearField("commerce-merchant-create-description");
-  byId<HTMLInputElement>("commerce-merchant-create-price").value = "0";
-  void refreshCommerceMerchantProductsList();
+  const title = byId<HTMLInputElement>("commerce-merchant-edit-title").value;
+  const description = byId<HTMLTextAreaElement>("commerce-merchant-edit-description").value;
+  const currency = byId<HTMLSelectElement>("commerce-merchant-edit-currency").value;
+  const btn = byId<HTMLButtonElement>("commerce-merchant-edit-save");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const result = await window.fedosApp.commerceProductUpdate(commerceActingAsPubkey, commerceEditingProductId, {
+      title,
+      description: description.length > 0 ? description : undefined,
+      priceCents,
+      currency,
+    });
+    if (result.outcome !== "ok") {
+      showCommerceError("commerce-merchant-edit-error", result);
+      return;
+    }
+    onCommerceMerchantEditCancel();
+    void refreshCommerceMerchantProductsList();
+    void refreshCommerceCatalogList();
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function commerceMerchantOrderRow(order: FedosCommerceOrder): HTMLLIElement {
@@ -1037,6 +1275,48 @@ function commerceMerchantOrderRow(order: FedosCommerceOrder): HTMLLIElement {
   return li;
 }
 
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+ * ledger rows #13/#14 / arc §31: "what needs my attention?" Built
+ * entirely from the SAME `orders` array `refreshCommerceMerchantOrdersList()`
+ * already fetched via `commerceOrdersListIncoming()` — no second IPC
+ * call, counts are a pure client-side derivation, never a second source
+ * of truth for order state.
+ */
+const COMMERCE_ATTENTION_STATUS_LABELS: Readonly<Record<string, string>> = {
+  submitted: "New order — awaiting your Accept/Reject",
+  accepted: "Accepted — awaiting buyer payment",
+  paid: "Paid — ready to fulfill",
+  fulfilling: "Fulfilling — awaiting buyer's delivery confirmation",
+};
+
+function renderCommerceMerchantAttention(orders: readonly FedosCommerceOrder[]): void {
+  const list = byId("commerce-merchant-attention-list");
+  list.textContent = "";
+  const counts = new Map<string, number>();
+  for (const order of orders) {
+    if (!(order.status in COMMERCE_ATTENTION_STATUS_LABELS)) continue;
+    counts.set(order.status, (counts.get(order.status) ?? 0) + 1);
+  }
+  const relevantStatuses = Object.keys(COMMERCE_ATTENTION_STATUS_LABELS).filter((status) => (counts.get(status) ?? 0) > 0);
+  if (relevantStatuses.length === 0) {
+    const li = document.createElement("li");
+    li.className = "commerce-attention-empty";
+    li.textContent = "Nothing needs your attention right now.";
+    list.appendChild(li);
+    return;
+  }
+  for (const status of relevantStatuses) {
+    const li = document.createElement("li");
+    const badge = document.createElement("span");
+    badge.className = "commerce-attention-badge";
+    badge.textContent = String(counts.get(status) ?? 0);
+    li.appendChild(badge);
+    li.appendChild(document.createTextNode(COMMERCE_ATTENTION_STATUS_LABELS[status] ?? status));
+    list.appendChild(li);
+  }
+}
+
 async function refreshCommerceMerchantOrdersList(): Promise<void> {
   clearError("commerce-merchant-orders-error");
   const result = await window.fedosApp.commerceOrdersListIncoming(commerceActingAsPubkey);
@@ -1044,9 +1324,11 @@ async function refreshCommerceMerchantOrdersList(): Promise<void> {
   list.textContent = "";
   if (result.outcome !== "ok") {
     showCommerceError("commerce-merchant-orders-error", result);
+    renderCommerceMerchantAttention([]);
     return;
   }
   const orders = result.orders ?? [];
+  renderCommerceMerchantAttention(orders);
   if (orders.length === 0) {
     const li = document.createElement("li");
     li.textContent = "No incoming orders yet.";
@@ -1056,9 +1338,54 @@ async function refreshCommerceMerchantOrdersList(): Promise<void> {
   for (const order of orders) list.appendChild(commerceMerchantOrderRow(order));
 }
 
+async function onCommerceMerchantCreateSubmit(): Promise<void> {
+  clearError("commerce-merchant-create-error");
+  // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+  // ledger row #2 P0: UI-level guard (fast, no IPC round trip) blocking
+  // creation while the currently "Acting as" identity is not asserting a
+  // merchant capacity. This is a UX convenience ONLY, not the real
+  // enforcement boundary — `handleCommerceProductCreate()` always sends
+  // this same `actorRole` explicitly, and `canCreateProduct()`
+  // (`src/os/commerce/catalog/policy.ts`) is what actually, unbypassably
+  // rejects a non-merchant actor at the domain layer. See those files'
+  // own headers for the full rationale.
+  const actorRole = commerceActorRole(commerceActingAsPubkey);
+  if (actorRole !== "merchant") {
+    showCommerceError("commerce-merchant-create-error", {
+      outcome: "unauthorized-actor",
+      reason: 'The identity currently selected in "Acting as" is not a merchant identity. Switch "Acting as" to a merchant identity (or your own real profile) before creating a product.',
+    });
+    return;
+  }
+  const priceCents = parseCommerceDecimalPriceToCents(byId<HTMLInputElement>("commerce-merchant-create-price").value);
+  if (priceCents === null) {
+    showCommerceError("commerce-merchant-create-error", { outcome: "invalid-input", reason: "Enter a valid price, e.g. 18.00" });
+    return;
+  }
+  const title = byId<HTMLInputElement>("commerce-merchant-create-title").value;
+  const description = byId<HTMLTextAreaElement>("commerce-merchant-create-description").value;
+  const currency = byId<HTMLSelectElement>("commerce-merchant-create-currency").value;
+  const result = await window.fedosApp.commerceProductCreate(commerceActingAsPubkey, actorRole, {
+    title,
+    description: description.length > 0 ? description : undefined,
+    priceCents,
+    currency,
+  });
+  if (result.outcome !== "ok") {
+    showCommerceError("commerce-merchant-create-error", result);
+    return;
+  }
+  clearField("commerce-merchant-create-title");
+  clearField("commerce-merchant-create-description");
+  byId<HTMLInputElement>("commerce-merchant-create-price").value = "0.00";
+  commerceUpdatePricePreview("commerce-merchant-create-price", "commerce-merchant-create-currency", "commerce-merchant-create-price-preview");
+  void refreshCommerceMerchantProductsList();
+}
+
 async function refreshCommerceMerchantScreen(): Promise<void> {
   populateCommerceActorSelect("commerce-merchant-acting-as");
-  await Promise.all([refreshCommerceMerchantProductsList(), refreshCommerceMerchantOrdersList()]);
+  onCommerceMerchantEditCancel();
+  await Promise.all([refreshCommerceMerchantProductsList(), refreshCommerceMerchantOrdersList(), renderCommerceMerchantReputation()]);
 }
 
 // ---------------------------------------------------------------------
@@ -1988,6 +2315,8 @@ function renderReady(ready: FedosProfileCommandResult["ready"]): void {
   byId("ready-device").textContent = ready.localDeviceId;
   byId("ready-trust").textContent = ready.deviceTrustState;
   localAccountPublicIdentifier = ready.accountPublicIdentifier;
+  localDisplayLabel = ready.displayLabel;
+  refreshCommerceActorOptionsForRealIdentity();
   showScreen("ready");
   void renderBetaStatus();
   showAppScreen("conversations");
@@ -2002,6 +2331,8 @@ function routeByStatus(status: FedosProfileStatusResult): void {
     byId("ready-account").textContent = status.accountPublicIdentifier ?? "";
     byId("ready-device").textContent = status.localDeviceId ?? "";
     localAccountPublicIdentifier = status.accountPublicIdentifier ?? "";
+    localDisplayLabel = status.displayLabel ?? "";
+    refreshCommerceActorOptionsForRealIdentity();
     showScreen("ready");
     void renderBetaStatus();
     showAppScreen("conversations");
@@ -2201,6 +2532,7 @@ function clearAllRendererContentState(): void {
   archiveRestoreSourcePath = null;
   settingsWorkingCopy = null;
   localAccountPublicIdentifier = "";
+  localDisplayLabel = "";
   pendingDevicePairingId = null;
 
   // Content-bearing DOM containers (list/detail views, error text, status/feedback text).
@@ -2407,6 +2739,15 @@ byId<HTMLButtonElement>("chat-send").addEventListener("click", () => void onChat
 
 // Commerce.
 byId<HTMLButtonElement>("commerce-detail-back").addEventListener("click", () => {
+  // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- returns to
+  // wherever this detail view was opened FROM (the buyer catalog, or the
+  // Merchant screen for a draft Preview, friction ledger row #24) rather
+  // than always the buyer catalog.
+  if (commerceDetailReturnScreen === "commerce-merchant") {
+    showAppScreen("commerce-merchant");
+    void refreshCommerceMerchantScreen();
+    return;
+  }
   showAppScreen("commerce");
   void refreshCommerceCatalogList();
 });
@@ -2460,6 +2801,25 @@ byId<HTMLButtonElement>("commerce-order-acknowledge-receipt-btn").addEventListen
 byId<HTMLButtonElement>("commerce-order-complete-btn").addEventListener("click", () => void onCommerceOrderCompleteClick());
 byId<HTMLButtonElement>("commerce-order-receipt-issue-btn").addEventListener("click", () => void onCommerceReceiptIssueClick());
 byId<HTMLButtonElement>("commerce-merchant-create-submit").addEventListener("click", () => void onCommerceMerchantCreateSubmit());
+// Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
+// ledger row #18: live formatted price preview as Bob types/changes
+// currency, on both the Create and Edit forms. "input" + "change" both
+// listened, matching the "Acting as" selects' own documented reasoning
+// just above (the ui-script test harness only ever dispatches "input").
+byId<HTMLInputElement>("commerce-merchant-create-price").addEventListener("input", () =>
+  commerceUpdatePricePreview("commerce-merchant-create-price", "commerce-merchant-create-currency", "commerce-merchant-create-price-preview"),
+);
+byId<HTMLSelectElement>("commerce-merchant-create-currency").addEventListener("change", () =>
+  commerceUpdatePricePreview("commerce-merchant-create-price", "commerce-merchant-create-currency", "commerce-merchant-create-price-preview"),
+);
+byId<HTMLInputElement>("commerce-merchant-edit-price").addEventListener("input", () =>
+  commerceUpdatePricePreview("commerce-merchant-edit-price", "commerce-merchant-edit-currency", "commerce-merchant-edit-price-preview"),
+);
+byId<HTMLSelectElement>("commerce-merchant-edit-currency").addEventListener("change", () =>
+  commerceUpdatePricePreview("commerce-merchant-edit-price", "commerce-merchant-edit-currency", "commerce-merchant-edit-price-preview"),
+);
+byId<HTMLButtonElement>("commerce-merchant-edit-save").addEventListener("click", () => void onCommerceMerchantEditSave());
+byId<HTMLButtonElement>("commerce-merchant-edit-cancel").addEventListener("click", () => onCommerceMerchantEditCancel());
 
 // Search.
 byId<HTMLButtonElement>("search-submit").addEventListener("click", () => void onSearchSubmit());
@@ -2500,6 +2860,9 @@ byId<HTMLButtonElement>("commerce-network-profile-save").addEventListener("click
 // regardless of whether a human notices it.
 populateCommerceActorSelect("commerce-acting-as");
 populateCommerceActorSelect("commerce-merchant-acting-as");
+// Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — initial live
+// price preview for the Create Product form's default "0.00" value.
+commerceUpdatePricePreview("commerce-merchant-create-price", "commerce-merchant-create-currency", "commerce-merchant-create-price-preview");
 
 void refreshFromStatus();
 })();

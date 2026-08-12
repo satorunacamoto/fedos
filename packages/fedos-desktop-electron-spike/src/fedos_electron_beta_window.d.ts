@@ -107,6 +107,16 @@ interface FedosAppCommandResult {
   readonly [key: string]: unknown;
 }
 
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — the capacity
+ * an actor explicitly asserts for a Commerce action. Mirrors the real
+ * `os/commerce` domain's `OrderActorKind`/`CreateProductInput.actorRole`
+ * (structurally re-declared here, same discipline as every other
+ * `FedosCommerce*` shape in this file — see this file's own header on why
+ * this package never `import type`s from `src/os/commerce/**`).
+ */
+type FedosCommerceActorRole = "customer" | "merchant";
+
 /** Commerce Reachable Catalog + Product Surface Phase 1 — one catalog row. */
 interface FedosCommerceCatalogListItem {
   readonly id: string;
@@ -141,6 +151,8 @@ interface FedosCommerceProductDetail {
   readonly media: FedosCommerceProductMedia | null;
   /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- the seller's real pubkey, used by the renderer's Seller Reputation panel to call `commercePersonaBoardQuery`. */
   readonly creatorPubkey: string;
+  /** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- true only when this response came from the creator-only draft/unpublished preview path (friction ledger row #24), never for an ordinary published buyer view. */
+  readonly isPreview: boolean;
 }
 
 interface FedosCommerceProductDetailResult {
@@ -316,11 +328,19 @@ interface FedosAppBridge {
   readonly relayStatus: () => Promise<FedosAppCommandResult>;
   /** Commerce Reachable Catalog + Product Surface Phase 1 — read-only. */
   readonly commerceCatalogList: () => Promise<FedosCommerceCatalogListResult>;
-  readonly commerceProductDetail: (productId: string) => Promise<FedosCommerceProductDetailResult>;
+  /** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- `previewActorPubkey` optional/additive, see `FedosCommerceProductDetail.isPreview`. */
+  readonly commerceProductDetail: (productId: string, previewActorPubkey?: string) => Promise<FedosCommerceProductDetailResult>;
   /** Commerce E2E Completion arc — Merchant Product CRUD + Order + local Payment simulator. */
   readonly commerceMerchantProductsList: (actorPubkey: string) => Promise<FedosCommerceMerchantProductsListResult>;
+  /**
+   * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- `actorRole`
+   * is REQUIRED and separate from `actorPubkey`/`input`: see
+   * `fedos_electron_beta_main.cts`'s `handleCommerceProductCreate()` doc
+   * comment (friction ledger row #2, "Unknown merchant" P0 fix).
+   */
   readonly commerceProductCreate: (
     actorPubkey: string,
+    actorRole: FedosCommerceActorRole,
     input: { readonly title: string; readonly description?: string; readonly priceCents: number; readonly currency: string },
   ) => Promise<FedosCommerceProductMutationResult>;
   readonly commerceProductUpdate: (
