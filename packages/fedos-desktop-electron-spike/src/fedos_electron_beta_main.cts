@@ -4090,11 +4090,34 @@ async function handleCommerceOrderCreate(payload: unknown) {
     return { outcome: "invalid-input", reason: "quantity must be a positive integer" };
   }
   const product = commerceState().products.listPublished().find((candidate) => candidate.id === body.productId);
-  if (product === undefined) return { outcome: "not-found", reason: "no such published product" };
+  // Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator, closing a
+  // real gap the two-process E2E agent found and precisely root-caused
+  // live): a buyer could VIEW a Nostr-discovered listing
+  // (handleCommerceProductDetail already falls back to the read model,
+  // see that function's own header) but could never ORDER it, because
+  // this handler only ever checked the caller's own LOCAL repository.
+  // Mirrors handleCommerceProductDetail's exact fallback: re-run discovery
+  // (idempotent, cheap) if the product isn't already local, then map the
+  // SAME discovered-product fields that function already uses.
+  let sellerPubkey: string;
+  let unitPriceCents: number;
+  let currency: string;
+  if (product !== undefined) {
+    sellerPubkey = product.creatorPubkey;
+    unitPriceCents = product.priceCents;
+    currency = product.currency;
+  } else {
+    await commerceNostrDiscoverAndIngestProductsNonFatal();
+    const discovered = commerceNostrReadModelFor().getProduct(body.productId) as CommerceReadModelProductViewLike | undefined;
+    if (discovered === undefined || discovered.status !== "active") return { outcome: "not-found", reason: "no such published product" };
+    sellerPubkey = discovered.creatorPubkeyHex;
+    unitPriceCents = discovered.priceCents;
+    currency = discovered.currency;
+  }
 
   const m = requireModules();
   const result = m.Commerce.createOrder(
-    { id: generateCommerceOrderId(), productId: product.id, sellerPubkey: product.creatorPubkey, unitPriceCents: product.priceCents, currency: product.currency, quantity },
+    { id: generateCommerceOrderId(), productId: body.productId, sellerPubkey, unitPriceCents, currency, quantity },
     { kind: "customer", pubkey: body.buyerPubkey },
     Math.floor(Date.now() / 1000),
   );

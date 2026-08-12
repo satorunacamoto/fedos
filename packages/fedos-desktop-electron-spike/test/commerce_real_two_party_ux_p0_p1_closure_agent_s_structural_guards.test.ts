@@ -148,9 +148,12 @@ describe("Item 4 -- Publish/Unpublish P0: explicit semantics, debounce, confirm-
     const start = source.indexOf("function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTMLLIElement {");
     expect(start).toBeGreaterThanOrEqual(0);
     const body = source.slice(start, start + 2200);
-    expect(body).toMatch(/unpublishBtn\.className = "commerce-btn-unpublish";/);
+    // Coordinator merge note: Agent U layered its own primary/secondary
+    // visual-hierarchy class (arc §44) onto these SAME two buttons -- the
+    // className now carries both classes, not just this item's own.
+    expect(body).toMatch(/unpublishBtn\.className = "commerce-btn-unpublish commerce-btn-secondary";/);
     expect(body).toMatch(/unpublishBtn\.textContent = "Unpublish";/);
-    expect(body).toMatch(/publishBtn\.className = "commerce-btn-publish";/);
+    expect(body).toMatch(/publishBtn\.className = "commerce-btn-publish commerce-btn-primary";/);
     expect(body).toMatch(/publishBtn\.textContent = "Publish";/);
     expect(body).toMatch(/if \(isPublished\) \{[\s\S]*?\} else \{/);
   });
@@ -179,7 +182,11 @@ describe("Item 5/6 -- Merchant dashboard attention + reputation, reusing existin
     expect(source).not.toMatch(/function renderCommerceMerchantAttention[\s\S]{0,600}?window\.fedosApp\./);
     const refreshStart = source.indexOf("async function refreshCommerceMerchantOrdersList(): Promise<void> {");
     expect(refreshStart).toBeGreaterThanOrEqual(0);
-    const body = source.slice(refreshStart, refreshStart + 700);
+    // Coordinator merge note: window widened from 700 -- Agent U's own
+    // additive updateCommerceNavBadge() calls in the two early-return
+    // branches above push this function's later lines further from its
+    // own start than before the merge.
+    const body = source.slice(refreshStart, refreshStart + 1000);
     expect(body).toMatch(/const orders = result\.orders \?\? \[\];\s*\n\s*renderCommerceMerchantAttention\(orders\);/);
   });
 
@@ -261,7 +268,13 @@ describe("Item 8 -- draft/unpublished product preview reuses the real detail ren
 describe("Item 9 -- nav language: \"Commerce\"/\"Merchant\" renamed to \"Shop\"/\"My Store\"", () => {
   it("26. nav-commerce reads \"Shop\" and nav-commerce-merchant reads \"My Store\" -- element ids deliberately unchanged for merge-friendliness with any concurrent nav-language work", () => {
     const html = read(HTML_PATH);
-    expect(html).toMatch(/<button id="nav-commerce" type="button">Shop<\/button>/);
-    expect(html).toMatch(/<button id="nav-commerce-merchant" type="button">My Store<\/button>/);
+    // Coordinator merge note: Agent U independently landed the identical
+    // wording and additionally wired nav count badges (a <span> nested
+    // inside the same button, after the text) -- regex intentionally does
+    // NOT require an immediately-following </button>, see
+    // commerce_reachable_catalog_phase1_structural_guards.test.ts's own
+    // matching fix for the same merge.
+    expect(html).toMatch(/<button id="nav-commerce" type="button">Shop/);
+    expect(html).toMatch(/<button id="nav-commerce-merchant" type="button">My Store/);
   });
 });

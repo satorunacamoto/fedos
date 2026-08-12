@@ -52,8 +52,14 @@ describe("Agent U -- row 21: systematic action-handler robustness", () => {
     // The helper's own definition is one occurrence; every OTHER occurrence
     // is a real call site (directly, or the one generic
     // onCommerceOrderActionClick wrapper reused by Submit/Cancel/Accept/
-    // Fulfill).
-    expect(runCommerceActionUses.length).toBeGreaterThanOrEqual(19);
+    // Fulfill). Coordinator merge note: threshold was 19 pre-merge; Agent
+    // S had independently closed the Publish/Unpublish P0 (friction ledger
+    // row #3) with its own two-separate-buttons + manual disable/confirm/
+    // try-finally guard, per arc §14's own explicit direction against a
+    // single ambiguous toggle -- kept over Agent U's competing single-
+    // toggle handler (which used runCommerceAction) as the correct design,
+    // dropping that one call site deliberately, not by accident.
+    expect(runCommerceActionUses.length).toBeGreaterThanOrEqual(18);
   });
 
   it("2. runCommerceAction() disables its busy buttons before calling, clears the error element first, and always re-enables in a finally", () => {
@@ -85,15 +91,25 @@ describe("Agent U -- row 21: systematic action-handler robustness", () => {
     const rendererSource = stripComments(read(RENDERER_PATH));
     expect(rendererSource).toMatch(/result\.reputationSyncStatus === "unavailable"/);
     // The CORE transaction (order reaching "completed") is never gated on
-    // the secondary one -- `outcome: "ok"` is set regardless.
-    expect(mainSource).toMatch(/outcome: "ok",\s*\n\s*order: commerceOrderDto\(orderResult\.order\),\s*\n\s*reputationSyncStatus:/);
+    // the secondary one -- `outcome: "ok"` is set regardless. Coordinator
+    // merge note: Agent N's own real nostrSyncOutcome field (arc items
+    // #4/#5) now sits between `order:` and `reputationSyncStatus:` --
+    // both are genuinely truthful, additive, non-blocking fields on the
+    // SAME response, not a regression of either.
+    expect(mainSource).toMatch(/outcome: "ok",\s*\n\s*order: commerceOrderDto\(orderResult\.order\),\s*\n\s*nostrSyncOutcome,\s*\n\s*reputationSyncStatus:/);
   });
 });
 
 describe("Agent U -- row 4 (P0, arc §23): order-form quantity resets on product change", () => {
-  it("5. openCommerceProduct() resets #commerce-order-quantity to a clean default -- the ONLY place currentCommerceDetailProductId changes, so every navigation path to Product Detail is covered", () => {
+  it("5. openCommerceProductDetailScreen() resets #commerce-order-quantity to a clean default -- the ONLY place currentCommerceDetailProductId changes, so every navigation path to Product Detail is covered", () => {
     const source = stripComments(read(RENDERER_PATH));
-    const fnMatch = source.match(/async function openCommerceProduct\([\s\S]{0,1400}?\n\}/);
+    // Coordinator merge note: the real reset logic lives in
+    // openCommerceProductDetailScreen() -- openCommerceProduct() itself is
+    // a separate, thin wrapper (catalog "View" click ->
+    // openCommerceProductDetailScreen(productId)) with no reset logic of
+    // its own. Retargeted this regex to the function that actually
+    // contains the reset (verified directly in the merged source).
+    const fnMatch = source.match(/async function openCommerceProductDetailScreen\([\s\S]{0,1400}?\n\}/);
     expect(fnMatch, source).not.toBeNull();
     const fn = fnMatch![0];
     expect(fn).toMatch(/currentCommerceDetailProductId = productId/);
@@ -156,7 +172,11 @@ describe("Agent U -- row 7 (arc §25): symmetric waiting-state copy for both rol
 
   it("11. renderCommerceOrderScreen() renders the waiting text into #commerce-order-waiting on every render", () => {
     const source = stripComments(read(RENDERER_PATH));
-    const fnMatch = source.match(/function renderCommerceOrderScreen\(\)[\s\S]{0,3200}?\n\}/);
+    // Coordinator merge note: window widened from 3200 -- Agent D's own
+    // additive purchased-content-actions block (arc §36) inside this same
+    // function pushes later lines further from the function's own start
+    // than before the merge (real function length now ~4450 chars).
+    const fnMatch = source.match(/function renderCommerceOrderScreen\(\)[\s\S]{0,4600}?\n\}/);
     expect(fnMatch, source).not.toBeNull();
     expect(fnMatch![0]).toMatch(/byId\("commerce-order-waiting"\)\.textContent = commerceOrderWaitingText\(/);
     const html = read(HTML_PATH);
@@ -241,8 +261,19 @@ describe("Agent U -- row 23 (arc §44): primary/secondary/destructive action hie
     expect(html).toMatch(/button\.commerce-btn-danger \{[^}]*margin-left:[^}]*\}/);
   });
 
-  it("21. the Publish/Unpublish toggle (Agent S's own debounce mechanics, untouched) gets the SAME visual-hierarchy treatment applied via a class, not a second bespoke mechanism", () => {
+  it("21. Publish/Unpublish (Agent S's own two-separate-buttons debounce mechanics, untouched) get the SAME visual-hierarchy treatment applied via a class, not a second bespoke mechanism", () => {
+    // Coordinator merge note: Agent U's own original design here was a
+    // SINGLE toggle button whose className swapped with state
+    // (`publishBtn.className = isPublished ? ... : ...`) -- written without
+    // visibility into Agent S's sibling worktree, where S had already
+    // closed the Publish/Unpublish P0 (friction ledger row #3) with two
+    // separate, explicitly-labeled buttons, per arc §14's own explicit
+    // direction against a single ambiguous toggle. The coordinator merge
+    // kept S's two-button architecture (the correct P0 fix) and layered
+    // this row's primary/secondary classes onto BOTH buttons instead --
+    // same visual-hierarchy intent, different (and correct) button count.
     const source = stripComments(read(RENDERER_PATH));
-    expect(source).toMatch(/publishBtn\.className = isPublished \? "commerce-btn-secondary" : "commerce-btn-primary"/);
+    expect(source).toMatch(/unpublishBtn\.className = "commerce-btn-unpublish commerce-btn-secondary";/);
+    expect(source).toMatch(/publishBtn\.className = "commerce-btn-publish commerce-btn-primary";/);
   });
 });
