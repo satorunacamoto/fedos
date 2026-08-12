@@ -1293,7 +1293,23 @@ interface CommerceLocalPaymentProviderLike {
     readonly expiresAt?: number;
     readonly idempotencyKey?: string;
   }>;
-  simulateSettlement(paymentId: string, outcome: "settled" | "failed" | "expired" | "refunded"): Promise<CommercePaymentEvidenceLike>;
+  /**
+   * FedOS Commerce "Purchase Completion" mega-arc (Two-Process E2E agent) --
+   * this structural mirror previously declared the outcome vocabulary as
+   * `"settled" | "failed" | "expired" | "refunded"`. That is NOT the real
+   * `SimulatedSettlementOutcome` (`src/os/commerce/payment/local_simulator.ts`),
+   * which is `"paid" | "failed" | "expired" | "refunded" | "disputed"` --
+   * `"settled"` is not a member of it at all, and `"disputed"` was missing.
+   * Because this file deliberately never `import type`s from
+   * `src/os/commerce/**` (it loads only the compiled runtime, dynamically),
+   * the compiler could not catch the mismatch, and the single live call
+   * site below passed the non-existent `"settled"` for the whole life of
+   * this handler (since `d6c3a942`). See `handleCommercePaymentSimulate()`
+   * for the full account of what that actually did at runtime. Corrected
+   * here to the provider's own real, published vocabulary so the compiler
+   * catches any future drift.
+   */
+  simulateSettlement(paymentId: string, outcome: "paid" | "failed" | "expired" | "refunded" | "disputed"): Promise<CommercePaymentEvidenceLike>;
 }
 interface CommerceSettlementStateLike {
   readonly paymentId: string;
@@ -5020,7 +5036,43 @@ async function handleCommercePaymentSimulate(payload: unknown) {
   const order = state.orders.findById(body.orderId);
   if (order === undefined) return { outcome: "not-found", reason: "no such order" };
 
-  const evidence = await state.payments.simulateSettlement(body.paymentId, "settled");
+  // FedOS Commerce "Purchase Completion" mega-arc (Two-Process E2E agent) --
+  // REAL BUG FIX, found live by the two-independent-process E2E suite
+  // (`packages/fedos-desktop-electron-spike/test/commerce_e2e_two_process_real_electron.test.ts`),
+  // pre-existing since `d6c3a942`. This call used to pass `"settled"`,
+  // which is NOT a member of `SimulatedSettlementOutcome`
+  // (`"paid" | "failed" | "expired" | "refunded" | "disputed"`, see
+  // `src/os/commerce/payment/local_simulator.ts`) -- and could not be
+  // caught by the compiler because this file's own structural mirror of
+  // that provider declared the wrong vocabulary too (now corrected; see
+  // `CommerceLocalPaymentProviderLike` above). At runtime the damage was
+  // real and entirely silent:
+  //
+  //   1. `DeterministicLocalPaymentProvider` stored the unrecognized
+  //      `"settled"` as the ledger entry's own status, so its private
+  //      `statusMap` lookup missed and `PaymentEvidence.status` came back
+  //      `undefined`.
+  //   2. `applySettlementEvidence()` maps an unrecognized evidence status
+  //      through its `default:` arm to `"failed"` -- and `pending -> failed`
+  //      IS a legal edge -- so `state.ledger.apply()` returned
+  //      `"transitioned"` while durably recording the buyer's own payment
+  //      as FAILED. `"failed"` is fully terminal in `ALLOWED_TRANSITIONS`,
+  //      so nothing could ever repair it afterwards.
+  //   3. This handler nonetheless moved the ORDER to `"paid"`, because the
+  //      order action it builds below carries its own hard-coded
+  //      `status: "settled"` rather than the provider's real evidence --
+  //      leaving the two payment authorities on one device permanently
+  //      disagreeing, with no error shown anywhere.
+  //   4. `buildOutboundPaymentEvidenceSyncPayload()` then (CORRECTLY)
+  //      refused to package that malformed evidence for transport, so the
+  //      cross-process PaymentEvidence channel Agent P + the Coordinator
+  //      built was dead on arrival: no seller could ever learn a payment
+  //      happened. The outbound authority gate was never at fault -- it was
+  //      the only layer that noticed.
+  //
+  // Passing the provider's own real `"paid"` outcome fixes all four. No
+  // validation anywhere is relaxed by this change.
+  const evidence = await state.payments.simulateSettlement(body.paymentId, "paid");
   const applied = state.ledger.apply(evidence, order.id);
   if (applied.outcome !== "transitioned") return { outcome: "rejected", reason: applied.reason ?? `settlement ledger: ${applied.outcome}` };
 
