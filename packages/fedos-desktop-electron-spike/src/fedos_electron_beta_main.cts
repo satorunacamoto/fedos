@@ -346,6 +346,19 @@ interface MasterSeedAuthorityLike {
    */
   resolveCommerceMediaKey?(): Promise<unknown>;
   /**
+   * FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+   * Coordinator-directed pass) -- present (as real, callable functions) on
+   * the SAME canonical production `FedosProductionMasterSeedAuthority`
+   * this Coordinator already activates (Secure Runtime Alpha 1761-1840
+   * Phase B); OPTIONAL for the same "other non-Commerce-aware callers
+   * satisfy this structural interface too" reason as `resolveCommerceMediaKey?`
+   * above. `RealCommercePrivateOrderTransport`/`verifyAndDecryptInboundPrivateOrderEnvelope`
+   * (`commercePrivateOrderTransportFor()`/`commercePrivateOrderDiscoverAndApplyNonFatal()`
+   * below) are the only callers.
+   */
+  encryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, plaintext: Uint8Array): Promise<string | null>;
+  decryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, payload: string): Promise<Uint8Array | null>;
+  /**
    * FedOS Commerce FINAL P1 Closure (coordinator, shared foundation) --
    * present (as real, callable functions) on the SAME canonical production
    * `FedosProductionMasterSeedAuthority` this Coordinator already
@@ -818,6 +831,43 @@ interface RootModules {
       url: string,
       options: { readonly factory: (url: string) => Promise<unknown>; readonly timeoutMs?: number },
     ) => { query(filters: readonly unknown[]): Promise<readonly unknown[]> };
+    /**
+     * FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent
+     * N, Coordinator-directed pass) -- the PRIVATE Order/status transport
+     * (arc items #4/#5). Calls `FedosMasterSeedAuthority.encryptNip44Wire()`/
+     * `decryptNip44Wire()` directly (the SAME real NIP-44 primitive the
+     * Gift-Wrap adapter uses underneath) -- see
+     * `commerce_private_order_bridge.ts`'s own header for exactly why the
+     * full NIP-17 Gift-Wrap stack was evaluated and rejected for Commerce.
+     */
+    readonly RealCommercePrivateOrderTransport: new (options: {
+      readonly signingAuthority: unknown;
+      readonly relayPublisher: unknown;
+      readonly nip44Wire: unknown;
+      readonly accountIndex: number;
+    }) => { send(payload: unknown, counterpartyPublicKeyHex: string): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }> };
+    readonly verifyAndDecryptInboundPrivateOrderEnvelope: (
+      event: unknown,
+      options: { readonly nip44Wire: unknown; readonly localAccountIndex: number },
+    ) => Promise<{
+      readonly outcome: string;
+      readonly eventId: string;
+      readonly senderPubkeyHex: string;
+      readonly payload?: {
+        readonly orderId: string;
+        readonly productId: string;
+        readonly buyerPubkey: string;
+        readonly sellerPubkey: string;
+        readonly quantity: number;
+        readonly unitPriceCents: number;
+        readonly currency: string;
+        readonly status: string;
+        readonly reason?: string;
+        readonly at: number;
+      };
+    }>;
+    readonly COMMERCE_PRIVATE_ORDER_SYNC_TAG: string;
+    readonly PRIVATE_ORDER_SYNC_STATUS_ACTION: Readonly<Record<string, { readonly action: string; readonly actorKind: "customer" | "merchant" | "either" }>>;
   };
 }
 
@@ -1228,6 +1278,19 @@ async function loadRootModules(): Promise<RootModules> {
   const commerceNostrRelaySubscriber = (await import(distUrl("os", "messenger", "adapters", "nostr", "protocol", "ws_relay.js"))) as {
     WebSocketRelayAdapter: RootModules["CommerceNostr"]["WebSocketRelayAdapter"];
   };
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- private Order/status transport (arc
+  // items #4/#5). Two new `tsconfig.beta-runtime.json` entries.
+  const commercePrivateOrderBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_private_order_bridge.js")
+  )) as {
+    RealCommercePrivateOrderTransport: RootModules["CommerceNostr"]["RealCommercePrivateOrderTransport"];
+    verifyAndDecryptInboundPrivateOrderEnvelope: RootModules["CommerceNostr"]["verifyAndDecryptInboundPrivateOrderEnvelope"];
+    COMMERCE_PRIVATE_ORDER_SYNC_TAG: string;
+  };
+  const commercePrivateOrderSyncShapes = (await import(distUrl("os", "commerce", "events", "commerce_private_order_sync.js"))) as {
+    PRIVATE_ORDER_SYNC_STATUS_ACTION: RootModules["CommerceNostr"]["PRIVATE_ORDER_SYNC_STATUS_ACTION"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
@@ -1298,6 +1361,10 @@ async function loadRootModules(): Promise<RootModules> {
       verifyAndBuildInboundCommerceNostrEnvelope: commerceNostrInboundBridge.verifyAndBuildInboundCommerceNostrEnvelope,
       WebSocketRelayPublisher: commerceNostrRelayPublisher.WebSocketRelayPublisher,
       WebSocketRelayAdapter: commerceNostrRelaySubscriber.WebSocketRelayAdapter,
+      RealCommercePrivateOrderTransport: commercePrivateOrderBridge.RealCommercePrivateOrderTransport,
+      verifyAndDecryptInboundPrivateOrderEnvelope: commercePrivateOrderBridge.verifyAndDecryptInboundPrivateOrderEnvelope,
+      COMMERCE_PRIVATE_ORDER_SYNC_TAG: commercePrivateOrderBridge.COMMERCE_PRIVATE_ORDER_SYNC_TAG,
+      PRIVATE_ORDER_SYNC_STATUS_ACTION: commercePrivateOrderSyncShapes.PRIVATE_ORDER_SYNC_STATUS_ACTION,
     },
   };
 }
@@ -1964,6 +2031,268 @@ async function commerceNostrDiscoverAndIngestProductsNonFatal(): Promise<void> {
     }
   } catch (err) {
     console.error("fedos-beta: Nostr Commerce discovery query failed (non-fatal, local catalog unaffected):", err);
+  }
+}
+
+// ---------------------------------------------------------------------
+// FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+// Coordinator-directed pass) -- PRIVATE Order/status transport (arc items
+// #4/#5). See `commerce_private_order_bridge.ts`'s own header for the
+// honest privacy boundary (content encrypted; sender/recipient pubkeys and
+// rough timing are NOT hidden) and for why the full NIP-17 Gift-Wrap stack
+// was evaluated and rejected in favor of calling
+// `FedosMasterSeedAuthority.encryptNip44Wire()`/`decryptNip44Wire()`
+// directly. Gated by the SAME `commerceNetworkProfile` as the public
+// discovery/publish paths -- "local-only" means zero network reach here
+// too.
+//
+// SAFELY-SYNCED TRANSITIONS ONLY: `submit`/`cancel`/`accept`/`reject`/
+// `fulfill`/`complete` -- every one a `"customer"`/`"merchant"` actor-kind
+// action `order_state_machine.ts`'s own `AUTHORIZED_ACTOR_KINDS` already
+// pubkey-checks. `confirm_payment`/`confirm_delivery` (the `"paid"`/
+// `"delivered"` transitions) are DELIBERATELY NEVER synced this way --
+// `PrivateOrderSyncPayload`'s own validator structurally cannot even
+// construct a `"paid"`/`"delivered"` payload (see that file's header) --
+// because only a `payment_evidence`/`delivery_evidence` actor, constructed
+// from THIS process's own locally-verified evidence at exactly ONE call
+// site each (`handleCommercePaymentSimulate`/
+// `handleCommerceDeliveryAcknowledgeReceipt`, this file's own existing
+// "CORE INVARIANT" comments), may ever cause those two transitions --
+// accepting a remote peer's bare claim here would let a compromised or
+// buggy counterparty falsely advance MY OWN process's authoritative Order
+// state, exactly the "never trust a bare inbound event's claimed status"
+// failure this arc's own trust-boundary discipline (§55) prohibits.
+// ---------------------------------------------------------------------
+
+/** `order_state_machine.ts` `OrderActionType` -> the `PrivateOrderSyncStatus`
+ * this process privately reports after a successful local transition --
+ * the send-side inverse of `PRIVATE_ORDER_SYNC_STATUS_ACTION`
+ * (`commerce_private_order_sync.ts`), which the RECEIVING side consults. */
+const ORDER_ACTION_TO_PRIVATE_SYNC_STATUS: Readonly<Record<string, string>> = {
+  submit: "submitted",
+  cancel: "cancelled",
+  accept: "accepted",
+  reject: "rejected",
+  fulfill: "fulfilling",
+  complete: "completed",
+};
+
+interface CommercePrivateOrderTransportLike {
+  send(payload: unknown, counterpartyPublicKeyHex: string): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+}
+
+let commercePrivateOrderTransport: CommercePrivateOrderTransportLike | null = null;
+let commercePrivateOrderTransportProfileRef: CommerceNetworkProfileValue | null = null;
+let commercePrivateOrderTransportSignerRef: NostrSigningAuthorityLike | null = null;
+/** In-memory, process-lifetime dedup of private-order event ids already
+ * applied -- same discipline as the public read model's own
+ * `#appliedEventIds`. A duplicate/replayed event is a safe no-op either
+ * way (the real state machine's own status guard also rejects a
+ * re-applied transition with `invalid_state`), this Set just avoids
+ * redundant re-processing work on every bounded refresh. */
+const commercePrivateOrderAppliedEventIds = new Set<string>();
+
+/**
+ * Lazily constructs (and rebuilds on a profile/signer change) the ONE real
+ * private-order transport this process holds -- `null` whenever
+ * `commerceNetworkProfile` is `"local-only"`, no signer is unlocked, no
+ * Relay is configured, or no Master Seed authority is held (mirrors
+ * `commerceNostrOutboundPortFor()`'s own gating exactly, plus the
+ * additional Master Seed requirement `encryptNip44Wire`/`decryptNip44Wire`
+ * need).
+ */
+function commercePrivateOrderTransportFor(): CommercePrivateOrderTransportLike | null {
+  if (commerceNetworkProfile === "local-only") return null;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return null;
+  const m = requireModules();
+  if (
+    commercePrivateOrderTransport === null ||
+    commercePrivateOrderTransportProfileRef !== commerceNetworkProfile ||
+    commercePrivateOrderTransportSignerRef !== activeNostrSigningAuthority
+  ) {
+    const relayUrl = activeRelays[0]?.url ?? "";
+    const relayPublisher = new m.CommerceNostr.WebSocketRelayPublisher(relayUrl, { factory: m.createNodeWebSocketRelaySocketFactory() });
+    commercePrivateOrderTransport = new m.CommerceNostr.RealCommercePrivateOrderTransport({
+      signingAuthority: activeNostrSigningAuthority,
+      relayPublisher,
+      nip44Wire: activeMasterSeedAuthority,
+      accountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+    });
+    commercePrivateOrderTransportProfileRef = commerceNetworkProfile;
+    commercePrivateOrderTransportSignerRef = activeNostrSigningAuthority;
+  }
+  return commercePrivateOrderTransport;
+}
+
+/**
+ * Best-effort, non-fatal private notification to `recipientPubkeyHex`
+ * after a LOCAL Order transition already committed. Mirrors
+ * `publishCommerceNostrProductEventNonFatal()`'s own discipline exactly:
+ * a failure here NEVER unwinds the already-saved local Order -- the
+ * caller only surfaces this outcome as an OPTIONAL, truthful sync-status
+ * field, never a silent "delivered to the counterparty" claim.
+ */
+async function sendPrivateOrderSyncNonFatal(
+  order: CommerceOrderLike,
+  syncStatus: string,
+  recipientPubkeyHex: string,
+  now: number,
+  reason?: string,
+): Promise<string> {
+  const transport = commercePrivateOrderTransportFor();
+  if (transport === null) return "network-disabled";
+  try {
+    const payload: Record<string, unknown> = {
+      category: "private-order-sync",
+      formatVersion: 1,
+      orderId: order.id,
+      productId: order.productId,
+      buyerPubkey: order.buyerPubkey,
+      sellerPubkey: order.sellerPubkey,
+      quantity: order.quantity,
+      unitPriceCents: order.unitPriceCents,
+      currency: order.currency,
+      status: syncStatus,
+      at: now,
+    };
+    if (reason !== undefined) payload.reason = reason;
+    const result = await transport.send(payload, recipientPubkeyHex);
+    if (result.accepted) return "published";
+    return result.message.length > 0 ? result.message : "transport-error";
+  } catch (err) {
+    console.error("fedos-beta: private Order sync attempt failed (non-fatal, local Order state unaffected):", err);
+    return "transport-error";
+  }
+}
+
+/**
+ * Applies ONE already-decrypted, already-signature-verified inbound
+ * private-order envelope to this process's own authoritative
+ * `commerceState().orders` -- via the REAL `order_state_machine.ts`
+ * (`m.Commerce.createOrder()`/`applyOrderAction()`), never a direct field
+ * write. Trust boundary (arc §55, re-checked here even though the bridge
+ * already verified the signature): the REAL verified `senderPubkeyHex`
+ * must match the party this specific transition authorizes
+ * (`order_state_machine.ts`'s own `isActorIdentityAuthorized` — re-derived
+ * here since this function constructs the `actor` the state machine will
+ * itself ALSO re-check, defense in depth, same posture
+ * `CommerceNostrProductReadModel.ingest()`'s own `"rejected-signer-mismatch"`
+ * check already established for the public path). NEVER throws; any
+ * rejection (unknown status mapping, out-of-order "not a submit but the
+ * order doesn't exist locally yet", economics mismatch against an
+ * already-known local order, or actor-identity mismatch) is a silent,
+ * safe drop -- this function has no return value because there is no
+ * caller-visible outcome to report for an inbound event a human never
+ * directly requested.
+ */
+function applyInboundPrivateOrderSyncNonFatal(envelope: {
+  readonly outcome: string;
+  readonly eventId: string;
+  readonly senderPubkeyHex: string;
+  readonly payload?: {
+    readonly orderId: string;
+    readonly productId: string;
+    readonly buyerPubkey: string;
+    readonly sellerPubkey: string;
+    readonly quantity: number;
+    readonly unitPriceCents: number;
+    readonly currency: string;
+    readonly status: string;
+    readonly reason?: string;
+    readonly at: number;
+  };
+}): void {
+  if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
+  if (commercePrivateOrderAppliedEventIds.has(envelope.eventId)) return;
+  commercePrivateOrderAppliedEventIds.add(envelope.eventId);
+
+  const payload = envelope.payload;
+  const m = requireModules();
+  const mapping = m.CommerceNostr.PRIVATE_ORDER_SYNC_STATUS_ACTION[payload.status];
+  if (mapping === undefined) return;
+
+  const state = commerceState();
+  let order = state.orders.findById(payload.orderId);
+  if (order === undefined) {
+    if (mapping.action !== "submit") return; // out-of-order: dropped safely, never corrupts state
+    if (envelope.senderPubkeyHex !== payload.buyerPubkey) return; // trust boundary: only the real buyer may materialize a new order
+    const created = m.Commerce.createOrder(
+      { id: payload.orderId, productId: payload.productId, sellerPubkey: payload.sellerPubkey, unitPriceCents: payload.unitPriceCents, currency: payload.currency, quantity: payload.quantity },
+      { kind: "customer", pubkey: envelope.senderPubkeyHex },
+      payload.at,
+    );
+    if (!created.ok || created.order === undefined) return;
+    order = created.order;
+  } else if (
+    order.productId !== payload.productId ||
+    order.buyerPubkey !== payload.buyerPubkey ||
+    order.sellerPubkey !== payload.sellerPubkey ||
+    order.unitPriceCents !== payload.unitPriceCents ||
+    order.currency !== payload.currency ||
+    order.quantity !== payload.quantity
+  ) {
+    return; // defense in depth: a status-sync must never also silently change the order's own established economics
+  }
+
+  const actorKind: "customer" | "merchant" =
+    mapping.actorKind === "either" ? (envelope.senderPubkeyHex === order.buyerPubkey ? "customer" : "merchant") : mapping.actorKind;
+  const expectedPubkey = actorKind === "customer" ? order.buyerPubkey : order.sellerPubkey;
+  if (envelope.senderPubkeyHex !== expectedPubkey) return; // trust boundary
+
+  const action: Record<string, unknown> = { type: mapping.action, actor: { kind: actorKind, pubkey: envelope.senderPubkeyHex } };
+  if ((mapping.action === "reject" || mapping.action === "cancel") && payload.reason !== undefined) action.reason = payload.reason;
+
+  const result = m.Commerce.applyOrderAction(order, action as CommerceOrderActionLike, payload.at);
+  if (!result.ok || result.order === undefined) return; // e.g. a replayed/out-of-order transition -- rejected by the state machine's own status guard, never corrupted
+  state.orders.save(result.order);
+}
+
+/**
+ * The receive-side counterpart of `commerceNostrDiscoverAndIngestProductsNonFatal()`
+ * -- a bounded, non-fatal `REQ`/`EOSE` query filtered to THIS process's
+ * own real pubkey (`"#p"`) and the private-order tag, decrypting and
+ * applying every candidate through `applyInboundPrivateOrderSyncNonFatal()`.
+ * Called from the Orders list handlers below (arc's own accepted "bounded
+ * reliable-refresh" fallback, same posture as the public catalog's own
+ * discovery -- not a standing live subscription).
+ */
+async function commercePrivateOrderDiscoverAndApplyNonFatal(): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return;
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return;
+
+  const m = requireModules();
+  const signer = activeNostrSigningAuthority;
+  const nip44Wire = activeMasterSeedAuthority;
+  try {
+    const ownIdentity = await signer.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      { kinds: [1], "#t": [m.CommerceNostr.COMMERCE_PRIVATE_ORDER_SYNC_TAG], "#p": [ownIdentity.publicKeyHex], limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT },
+    ]);
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndDecryptInboundPrivateOrderEnvelope(event, {
+          nip44Wire,
+          localAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+        });
+        applyInboundPrivateOrderSyncNonFatal(envelope);
+      } catch (err) {
+        console.error("fedos-beta: private Order sync -- one candidate event failed to decrypt/apply (non-fatal, skipped):", err);
+      }
+    }
+  } catch (err) {
+    console.error("fedos-beta: private Order sync discovery query failed (non-fatal, local Orders unaffected):", err);
   }
 }
 
@@ -3372,7 +3701,16 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
       if (started.ok && started.delivery !== undefined) state.deliveries.save(started.delivery);
     }
   }
-  return { outcome: "ok", order: commerceOrderDto(result.order) };
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- arc items #4/#5: privately notify the
+  // OTHER party of this real, already-committed transition. Recipient is
+  // always the counterparty of whichever role just acted -- never the
+  // acting party themselves.
+  const recipientPubkey = actorKind === "customer" ? result.order.sellerPubkey : result.order.buyerPubkey;
+  const syncStatus = ORDER_ACTION_TO_PRIVATE_SYNC_STATUS[actionType] ?? actionType;
+  const reasonForSync = typeof action.reason === "string" ? action.reason : undefined;
+  const nostrSyncOutcome = await sendPrivateOrderSyncNonFatal(result.order, syncStatus, recipientPubkey, Math.floor(Date.now() / 1000), reasonForSync);
+  return { outcome: "ok", order: commerceOrderDto(result.order), nostrSyncOutcome };
 }
 
 async function handleCommerceOrdersListMine(payload: unknown) {
@@ -3380,6 +3718,12 @@ async function handleCommerceOrdersListMine(payload: unknown) {
   if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- bounded reliable-refresh: pull any
+  // private Order/status updates this process's own pubkey has received
+  // before listing, same posture as the public catalog's own
+  // discovery-on-load.
+  await commercePrivateOrderDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listByBuyer(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -3388,6 +3732,7 @@ async function handleCommerceOrdersListIncoming(payload: unknown) {
   if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
+  await commercePrivateOrderDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listBySeller(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -3534,7 +3879,12 @@ async function handleCommerceOrderComplete(payload: unknown) {
   // revert `orderResult.order` having already been saved.
   await issueReputationAttestationsForCompletedOrderNonFatal(orderResult.order, now);
 
-  return { outcome: "ok", order: commerceOrderDto(orderResult.order) };
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- arc items #4/#5: notify the OTHER party.
+  const recipientPubkey = actorKind === "customer" ? orderResult.order.sellerPubkey : orderResult.order.buyerPubkey;
+  const nostrSyncOutcome = await sendPrivateOrderSyncNonFatal(orderResult.order, "completed", recipientPubkey, now);
+
+  return { outcome: "ok", order: commerceOrderDto(orderResult.order), nostrSyncOutcome };
 }
 
 /**
