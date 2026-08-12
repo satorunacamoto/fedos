@@ -62,50 +62,49 @@
  * suite where the literal on-screen control is not visible; every other
  * step clicks a genuinely visible, genuinely enabled control.
  *
- * PRIMARY CONFIRMED, LIVE-REPRODUCED BLOCKER (root-caused, not guessed --
- * see the long comment above the STEP 4 assertions below): STEPS 1-3 of
- * this suite (real relay, real separate Bob+Alice Personas, Bob's real
- * publish, Alice's real cross-process DISCOVERY of Bob's listing via the
- * real relay, real Product Detail render) all PASS live. Submitting the
- * actual Order (STEP 4) is where this suite found a genuine, unconditional
- * integration gap: `handleCommerceOrderCreate()` (`fedos_electron_beta_main.cts`)
- * resolves the product ONLY via `commerceState().products.listPublished()`
- * -- the caller's own LOCAL durable product repository -- and never
- * consults the separate, purely in-memory `CommerceNostrProductReadModel`
- * a Nostr-discovered listing actually lives in (confirmed by direct source
- * read of `commerce_nostr_event_read_model.ts`: its `#products` Map is
- * private to that one read-model instance, never written back into the
- * durable repository). `handleCommerceProductDetail()` -- the function
- * that successfully rendered Alice's Product Detail view one step earlier
- * in this same run -- explicitly DOES fall back to that read model as its
- * own documented 3rd tier; `handleCommerceOrderCreate()` was never wired
- * to the same fallback. The practical consequence, live-reproduced this
- * run: a buyer can view a Nostr-discovered listing but can never actually
- * order it. This is not a timing/discovery-timeout issue (STEP 3 already
- * proved discovery itself works) -- Alice's own local product repository
- * will NEVER contain Bob's product, no matter how long this suite waits,
- * because she never created it locally. STEPS 5-10 (Bob discovering and
- * accepting the order, Alice paying, Bob fulfilling, delivery, receipt,
- * reputation, and the optional two-process restart pass) are consequently
- * NOT ATTEMPTED -- there is no real Order for any of them to act on.
+ * REVISION HISTORY OF THIS SUITE'S OWN FINDINGS (read this before trusting
+ * any comment below in isolation): the FIRST live run of this suite found
+ * STEP 4 (Alice submitting a real Order against Bob's Nostr-discovered
+ * listing) unconditionally rejected -- `handleCommerceOrderCreate()`
+ * checked only the caller's own LOCAL product repository, never the
+ * separate, purely in-memory `CommerceNostrProductReadModel` a
+ * Nostr-discovered listing actually lives in, even though
+ * `handleCommerceProductDetail()` (which rendered Alice's Product Detail
+ * view one step earlier, successfully) already fell back to that same
+ * read model as its own documented 3rd tier. The Coordinator fixed this
+ * (commit `f5df38fa`, "Coordinator: fix order-create can't reach a
+ * Nostr-discovered product", merged into this branch) by mirroring
+ * `handleCommerceProductDetail()`'s own fallback exactly. This suite was
+ * then RE-RUN against the fix and STEP 4 now PASSES live -- see the STEP
+ * 4 comment below for the re-verification, and this arc's own final
+ * report for the full before/after account.
  *
- * SEPARATE, ALSO-CONFIRMED BLOCKER (by static source read only -- this
- * suite's own live run never reaches it, since STEP 4 above already blocks
- * first): even if the STEP 4 gap were fixed, `sendPrivateOrderSyncNonFatal`
- * (`fedos_electron_beta_main.cts`) has exactly two call sites --
- * `handleCommerceOrderAction` (submit / cancel / accept / reject / fulfill
- * / complete) and `handleCommerceOrderComplete`. `handleCommercePaymentSimulate`
- * and `handleCommerceDeliveryAcknowledgeReceipt` NEVER call it -- matching
- * that same file's own documented design intent ("confirm_payment"/
- * "confirm_delivery" are deliberately never synced this way, to avoid
- * trusting a bare remote claim as authoritative). Combined with
- * `order_state_machine.ts`'s `transitionFulfill` requiring the LOCAL
- * order's own status to already be `"paid"`, the seller's own separate
- * process would have NO real production mechanism to ever learn the
- * buyer's real, local-only TEST/LOCAL payment happened -- so it could
- * never legitimately reach `"fulfilling"` either, even past STEP 4. See
- * this suite's own final `describe` block comment and this arc's own final
- * report for the complete account of both findings.
+ * CONFIRMED, LIVE-REPRODUCED, DELIBERATE (NOT A BUG) SECURITY BOUNDARY
+ * (see the long comment above `BOB_4_CONFIRM_PAYMENT_PROPAGATION_WALL`
+ * below): with STEP 4 fixed, this suite now gets Alice's real Order all
+ * the way through submit (STEP 4) -> Bob's independent cross-process
+ * discovery+accept (STEP 5) -> Alice's real TEST/LOCAL payment (STEP 6,
+ * local to her own process only) -> Bob's process re-checking and being
+ * shown to remain at `"accepted"`, never `"paid"` (STEP 7). This is NOT a
+ * gap to close -- confirmed by direct source read of
+ * `src/os/commerce/events/commerce_private_order_sync.ts`: its
+ * `PrivateOrderSyncStatus` type is a CLOSED union of exactly six values
+ * (`submitted`/`accepted`/`rejected`/`fulfilling`/`completed`/`cancelled`)
+ * -- `"paid"`/`"delivered"` are DELIBERATELY EXCLUDED AT THE TYPE LEVEL
+ * (that file's own header: "rather than merely 'not sent this pass'"),
+ * mirroring `order_state_machine.ts`'s own `AUTHORIZED_ACTOR_KINDS`, which
+ * accepts ONLY a `"payment_evidence"`/`"delivery_evidence"` actor for
+ * those two transitions -- never a bare `"customer"`/`"merchant"` claim,
+ * remote or local. Relaying a remote peer's claim of "I paid"/"I received
+ * it" as if it were this process's own locally-verified evidence would let
+ * a compromised or buggy counterparty falsely advance this process's own
+ * authoritative Order state -- exactly the "PAID authority regression"
+ * this arc's own stop-condition list forbids. STEPS 8-10 (Bob fulfilling,
+ * delivery, receipt, reputation on Bob's side) and the optional
+ * two-process restart pass are consequently NOT ATTEMPTED past STEP 7 --
+ * per the Coordinator's own explicit instruction, this suite confirms and
+ * documents the wall, it does not invent a workaround, and fixing it (if
+ * ever justified) needs its own dedicated architecture review.
  *
  * Skips itself with a clear message if the real `pkg/` WASM artifact, its
  * manifest, the compiled root `dist/`, or the real Electron binary are
@@ -374,7 +373,7 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
   }, 30000);
 
   it(
-    "Bob creates+publishes a real product; Alice (separate process, separate real Persona) discovers it via the REAL relay and views it -- then Alice's real Order-create attempt is shown, live, to be REJECTED by a confirmed, unconditional integration gap (handleCommerceOrderCreate never falls back to the Nostr-discovered-products read model) -- accept/pay/fulfill/deliver/receipt/reputation are consequently NOT ATTEMPTED",
+    "Bob creates+publishes a real product; Alice (separate process, separate real Persona) discovers it via the REAL relay, views it, submits a real Order (Coordinator's fix f5df38fa re-verified live); Bob (separate process) independently discovers+accepts it via bounded refresh; Alice pays (TEST/LOCAL, local to her own process); Bob's process is shown, live, to hit the DELIBERATE payment-evidence propagation wall (never a bug) and correctly cannot fulfill",
     async () => {
       // =====================================================================
       // STEP 1/2 -- BOB_1_CREATE: real Create-profile flow, capture Bob's
@@ -522,10 +521,12 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
         { action: "read", selector: "#commerce-detail-merchant" }, // 21 -- "Sold by ..." -- real seller identity
         { action: "screenshot", value: "alice-03-detail" }, // 22
         { action: "click", selector: "#commerce-order-create-submit" }, // 23 -- see top-of-file comment: real button, real IPC, click bypasses a cosmetic hidden-form gap only
-        { action: "wait", ms: 500 }, // 24
-        { action: "read", selector: "#commerce-order-status-text" }, // 25 -- expect "created" (see STEP 4 finding below: this comes back EMPTY)
-        { action: "read", selector: "#commerce-order-create-error" }, // 26 -- CONFIRMED-BLOCKER diagnostic: the real IPC rejection reason
-        { action: "screenshot", value: "alice-04-order-create-attempt" }, // 27
+        { action: "wait", ms: 600 }, // 24 -- Coordinator's fix (f5df38fa) re-runs discovery inside the handler before falling back to the read model -- give it real time
+        { action: "read", selector: "#commerce-order-status-text" }, // 25 -- expect "created" (Coordinator's fix landed -- was empty/rejected before)
+        { action: "click", selector: "#commerce-order-submit-btn" }, // 26
+        { action: "wait", ms: 500 }, // 27 -- also sends the real private-order-sync EVENT to Bob's real pubkey
+        { action: "read", selector: "#commerce-order-status-text" }, // 28 -- expect "submitted"
+        { action: "screenshot", value: "alice-04-order-submitted" }, // 29
       ], true);
       expect(readAt(alice2, 1)).toBe("unlock");
       expect(readAt(alice2, 5)).toBe("ready");
@@ -541,47 +542,200 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
       record(`STEP 3 PASS -- Product Detail rendered from the REAL discovered+verified envelope: title="${readAt(alice2, 20)}", seller line="${sellerLine}".`);
 
       // =====================================================================
-      // STEP 4 -- CONFIRMED, LIVE-REPRODUCED BLOCKER (root-caused, not
-      // guessed -- static source read + this live reproduction agree
-      // exactly): `handleCommerceOrderCreate()` (`fedos_electron_beta_main.cts`)
-      // resolves `body.productId` via
-      // `commerceState().products.listPublished().find(...)` ONLY -- the
-      // process's own LOCAL durable product repository. It never consults
-      // `commerceNostrReadModelFor()` (the separate, purely in-memory
-      // `CommerceNostrProductReadModel` -- confirmed by direct source read
-      // of `commerce_nostr_event_read_model.ts`: its `#products` Map is
-      // private to that one instance, never written back into
-      // `commerceState().products`), even though `handleCommerceProductDetail()`
-      // (the function that rendered Alice's Product Detail view one step
-      // above, successfully) explicitly DOES fall back to that same read
-      // model as its documented 3rd tier ("Agent N (real two-party data
-      // plane): if still not found locally at all, fall back to a
-      // Nostr-discovered listing"). This is a real, unconditional
-      // integration gap between Agent N's discovery work and the
-      // order-create handler, not a timing race or a fixable-by-waiting-
-      // longer issue: Alice's local product repository will NEVER contain
-      // Bob's product (she never created it locally), so this lookup can
-      // never succeed for a Nostr-discovered listing, regardless of how
-      // long this suite waits. Live-reproduced: order creation returns
-      // `#commerce-order-status-text` EMPTY (the app never navigated to
-      // the Order screen because `handleCommerceOrderCreate` rejected the
-      // call) and `#commerce-order-create-error` carries the real handler's
-      // own rejection reason.
+      // STEP 4 -- was a CONFIRMED, live-reproduced blocker in this suite's
+      // prior run (handleCommerceOrderCreate() checked only the caller's
+      // own LOCAL product repository, never the Nostr-discovered-products
+      // read model handleCommerceProductDetail() already fell back to).
+      // The Coordinator fixed it (commit f5df38fa, merged into this branch)
+      // by mirroring handleCommerceProductDetail()'s own fallback exactly.
+      // Re-verified live here, against the SAME real Nostr-discovered
+      // product (never locally created by Alice's own process).
       // =====================================================================
-      const orderStatusAfterCreateAttempt = readAt(alice2, 25);
-      const orderCreateErrorText = readAt(alice2, 26);
+      const createdStatus = readAt(alice2, 25);
+      const submittedStatus = readAt(alice2, 28);
       record(
-        `STEP 4 (CONFIRMED BLOCKER, live-reproduced) -- Alice's real Order-create attempt for Bob's Nostr-discovered (never locally-created-by-her) product was REJECTED by the real \`fedos-app:commerce-order-create\` IPC handler. #commerce-order-status-text after the attempt: ${JSON.stringify(orderStatusAfterCreateAttempt)} (empty -- the app never reached the Order screen). #commerce-order-create-error: ${JSON.stringify(orderCreateErrorText)}. Root cause (confirmed by direct source read of fedos_electron_beta_main.cts): handleCommerceOrderCreate() resolves productId via commerceState().products.listPublished() ONLY -- it never falls back to the Nostr-discovered-products read model the way handleCommerceProductDetail() (one step above, which DID succeed) explicitly does. A buyer can view a Nostr-discovered listing but can never order it, in the current shipped code -- independent of relay timing, discovery timeout, or settings persistence (all of which this suite separately confirmed working correctly in STEP 3).`,
+        `STEP 4 (RE-VERIFIED PASS after Coordinator's fix f5df38fa) -- Alice's real Order-create attempt for Bob's Nostr-discovered product now SUCCEEDS: status after create="${createdStatus}", status after submit="${submittedStatus}". handleCommerceOrderCreate() now falls back to commerceNostrReadModelFor().getProduct() exactly like handleCommerceProductDetail() already did -- confirmed by this live re-run, not just by reading the diff.`,
       );
-      expect(orderStatusAfterCreateAttempt, "expected order creation to be rejected (empty order-screen status) for a Nostr-discovered product this process never locally created -- if this is ever non-empty, the integration gap this suite documents has been closed upstream and this finding is stale; re-investigate before trusting this comment.").toBe("");
-      expect(orderCreateErrorText.length, "expected a real, non-empty rejection reason from the real order-create IPC handler").toBeGreaterThan(0);
-      expect(orderCreateErrorText).toMatch(/not.?found|no such|published product/i);
+      expect(createdStatus).toBe("created");
+      expect(submittedStatus).toBe("submitted");
+      record(`STEP 4 PASS -- Alice's process created+submitted a REAL Order as buyer=${alicePubkey} (her own real Persona, never a demo actor) against seller=${bobPubkey}, for a product her own process only ever learned about via real Nostr discovery. "submitted" also sent a real private-order-sync EVENT addressed to Bob's real pubkey over the real relay.`);
+
+      // =====================================================================
+      // STEP 5 -- BOB_3_DISCOVER_AND_ACCEPT: THE make-or-break FACT FOR THE
+      // WHOLE ARC. Bob's process (a THIRD, brand-new launch, own new PID,
+      // NO shared memory with Alice's process, which has already fully
+      // exited) unlocks and navigates to "My Store" -- this triggers
+      // `commercePrivateOrderDiscoverAndApplyNonFatal()`, a real bounded
+      // `REQ`/`EOSE` query against the real relay filtered to Bob's own real
+      // pubkey (`"#p"`), decrypts Alice's real NIP-44-wire-encrypted
+      // envelope, and -- because this Order did not exist locally in Bob's
+      // process before this call -- MATERIALIZES the entire Order fresh,
+      // straight from Alice's real signed/encrypted event, never a
+      // same-process shortcut of any kind.
+      // =====================================================================
+      const bob3 = await runBetaUiScript("BOB_3_DISCOVER_AND_ACCEPT", bobDataDir, [
+        { action: "wait", ms: 300 }, // 0
+        { action: "read", selector: "#current-screen" }, // 1 -- expect "unlock"
+        { action: "fill", selector: "#unlock-pass", value: BOB_PASSPHRASE }, // 2
+        { action: "click", selector: "#unlock-submit" }, // 3
+        { action: "wait", ms: 2500 }, // 4
+        { action: "read", selector: "#current-screen" }, // 5 -- expect "ready"
+        { action: "click", selector: "#nav-settings" }, // 6
+        { action: "wait", ms: 300 }, // 7
+        { action: "fill", selector: "#commerce-network-profile-select", value: "direct" }, // 8
+        { action: "wait", ms: 100 }, // 9
+        { action: "click", selector: "#commerce-network-profile-save" }, // 10
+        { action: "wait", ms: 300 }, // 11
+        { action: "fill", selector: "#commerce-merchant-acting-as", value: bobPubkey }, // 12
+        { action: "wait", ms: 200 }, // 13
+        { action: "click", selector: "#nav-commerce-merchant" }, // 14 -- triggers the REAL bounded private-order-sync discovery query
+        { action: "wait", ms: 4000 }, // 15
+        { action: "read", selector: "#commerce-merchant-orders-list" }, // 16 -- MAKE-OR-BREAK #2: must contain Alice's real order
+        { action: "screenshot", value: "bob-05-incoming-orders" }, // 17
+        { action: "click", selector: "#commerce-merchant-orders-list li:last-child button" }, // 18 -- "Open"
+        { action: "wait", ms: 400 }, // 19
+        { action: "read", selector: "#commerce-order-status-text" }, // 20 -- expect "submitted"
+        { action: "read", selector: "#commerce-order-parties-text" }, // 21 -- real buyer/seller labels
+        { action: "click", selector: "#commerce-order-accept-btn" }, // 22
+        { action: "wait", ms: 500 }, // 23 -- also sends a real private-order-sync EVENT back to Alice
+        { action: "read", selector: "#commerce-order-status-text" }, // 24 -- expect "accepted"
+        { action: "screenshot", value: "bob-06-accepted" }, // 25
+      ], true);
+      expect(readAt(bob3, 1)).toBe("unlock");
+      expect(readAt(bob3, 5)).toBe("ready");
+      const incomingOrdersText = readAt(bob3, 16);
+      const bobReceivedOrder = !incomingOrdersText.includes("No incoming orders yet");
+      record(`STEP 5 (MAKE-OR-BREAK #2, THE central fact for this whole arc) -- Bob's THIRD, brand-new, separate process (pid ${String(bob3.pid)}) real "My Store" incoming-orders query result: ${bobReceivedOrder ? "PASS -- Alice's real Order WAS independently discovered/materialized, with ZERO same-process shortcut" : "FAIL -- no order discovered"}. Raw incoming-orders list text: ${JSON.stringify(incomingOrdersText)}`);
+      expect(incomingOrdersText, `Bob's real "My Store" incoming-orders list (via the REAL private-order-sync discovery path) did not contain Alice's real order. Raw text: ${incomingOrdersText}`).not.toMatch(/No incoming orders yet/);
+      expect(readAt(bob3, 20)).toBe("submitted");
+      expect(readAt(bob3, 24)).toBe("accepted");
+      record(`STEP 5 PASS -- Bob's process independently discovered+materialized Alice's real Order (parties: ${readAt(bob3, 21)}) purely from the real relay's replayed event, then real-Accepted it (also sending a real private-order-sync EVENT back to Alice's real pubkey).`);
+
+      // =====================================================================
+      // ALICE_3_PAY: Alice's process discovers "accepted" (bounded refresh
+      // via nav-commerce -> refreshCommerceMyOrdersList -> the same real
+      // discovery query, filtered to her own pubkey), then performs a real
+      // TEST/LOCAL "Pay Now" + "Simulate Payment" -- explicitly NEVER real
+      // money, and NEVER something the seller could force (only the buyer's
+      // own process can request+simulate payment for HER OWN order).
+      // =====================================================================
+      const alice3 = await runBetaUiScript("ALICE_3_PAY", aliceDataDir, [
+        { action: "wait", ms: 300 }, // 0
+        { action: "read", selector: "#current-screen" }, // 1 -- expect "unlock"
+        { action: "fill", selector: "#unlock-pass", value: ALICE_PASSPHRASE }, // 2
+        { action: "click", selector: "#unlock-submit" }, // 3
+        { action: "wait", ms: 2500 }, // 4
+        { action: "read", selector: "#current-screen" }, // 5 -- expect "ready"
+        { action: "click", selector: "#nav-settings" }, // 6
+        { action: "wait", ms: 300 }, // 7
+        { action: "fill", selector: "#commerce-network-profile-select", value: "direct" }, // 8
+        { action: "wait", ms: 100 }, // 9
+        { action: "click", selector: "#commerce-network-profile-save" }, // 10
+        { action: "wait", ms: 300 }, // 11
+        { action: "fill", selector: "#commerce-acting-as", value: alicePubkey }, // 12
+        { action: "wait", ms: 200 }, // 13
+        { action: "click", selector: "#nav-commerce" }, // 14 -- triggers the REAL bounded discovery for "My Orders" -> should now show "accepted" (Bob's real accept-sync)
+        { action: "wait", ms: 4000 }, // 15
+        { action: "read", selector: "#commerce-my-orders-list" }, // 16
+        { action: "screenshot", value: "alice-05-myorders-accepted" }, // 17
+        { action: "click", selector: "#commerce-my-orders-list li:last-child button" }, // 18 -- "Open"
+        { action: "wait", ms: 400 }, // 19
+        { action: "read", selector: "#commerce-order-status-text" }, // 20 -- MAKE-OR-BREAK #3: expect "accepted" (Bob's real accept, cross-process)
+        { action: "click", selector: "#commerce-order-payment-request-btn" }, // 21 -- real TEST/LOCAL Pay Now
+        { action: "wait", ms: 500 }, // 22
+        { action: "read", selector: "#commerce-order-payment-id" }, // 23 -- non-empty real paymentId
+        { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 24 -- real TEST/LOCAL settlement simulation, NEVER real money
+        { action: "wait", ms: 500 }, // 25
+        { action: "read", selector: "#commerce-order-status-text" }, // 26 -- expect "paid" (local to Alice's own process ONLY -- see this file's own header comment)
+        { action: "screenshot", value: "alice-06-paid" }, // 27
+      ], true);
+      expect(readAt(alice3, 1)).toBe("unlock");
+      expect(readAt(alice3, 5)).toBe("ready");
+      const acceptedStatus = readAt(alice3, 20);
+      record(`STEP (MAKE-OR-BREAK #3, third independent cross-process fact) -- Alice's process independently discovered Bob's real "accepted" transition: ${acceptedStatus === "accepted" ? "PASS" : `FAIL (got "${acceptedStatus}")`}`);
+      expect(acceptedStatus).toBe("accepted");
+      const paymentId = readAt(alice3, 23);
+      expect(paymentId.length).toBeGreaterThan(0);
+      const paidStatus = readAt(alice3, 26);
+      expect(paidStatus).toBe("paid");
+      record(`STEP 6 PASS (Alice's side only -- see STEP 7 below) -- Alice performed a REAL TEST/LOCAL payment (paymentId=${paymentId}) entirely within her own process; her own local Order now shows "paid". NEVER real money; the seller could not have forced this -- only Alice's own process ever called Pay Now/Simulate for her own order.`);
+
+      // =====================================================================
+      // STEP 7 -- BOB_4_CONFIRM_PAYMENT_PROPAGATION_WALL. NOT a bug to fix,
+      // NOT something this suite works around -- per the Coordinator's own
+      // explicit instruction, this is a deliberate, correct security
+      // boundary and this phase exists ONLY to confirm+document it live.
+      //
+      // Static, type-level confirmation (`src/os/commerce/events/commerce_private_order_sync.ts`):
+      // `PrivateOrderSyncStatus` is a CLOSED union of exactly six values --
+      // `"submitted" | "accepted" | "rejected" | "fulfilling" | "completed"
+      // | "cancelled"`. `"paid"`/`"delivered"` are not merely "not sent this
+      // pass" -- a well-formed `PrivateOrderSyncPayload` carrying either
+      // value CANNOT BE CONSTRUCTED AT ALL (the file's own header states
+      // this explicitly: "DELIBERATELY EXCLUDED ... rather than merely 'not
+      // sent this pass'"). This mirrors `order_state_machine.ts`'s own
+      // `AUTHORIZED_ACTOR_KINDS`: `confirm_payment`/`confirm_delivery`
+      // accept ONLY a `"payment_evidence"`/`"delivery_evidence"` actor --
+      // never `"customer"`/`"merchant"` -- and exactly ONE call site per
+      // process ever constructs one of those two actor kinds
+      // (`handleCommercePaymentSimulate`/`handleCommerceDeliveryAcknowledgeReceipt`,
+      // fed only by this SAME process's own locally-verified evidence).
+      // Relaying a remote peer's bare "I paid"/"I received it" claim as if
+      // it were that same locally-verified evidence would let a
+      // compromised or buggy counterparty falsely advance this process's
+      // own authoritative Order state -- the exact "PAID authority
+      // regression" this arc's own stop-condition list forbids. This phase
+      // reproduces the resulting (correct, intended) wall live: Bob's
+      // process, launched AFTER Alice's real payment above, re-runs the
+      // real bounded discovery refresh one more time and is shown to
+      // remain at "accepted" -- then the real Fulfill control is clicked
+      // anyway (same visibility-blind `.click()` primitive every other step
+      // uses; the fulfill section is naturally CSS-hidden for a non-"paid"
+      // order) purely to capture the real IPC handler's own rejection text
+      // as further evidence -- never to force it to succeed.
+      // =====================================================================
+      const bob4 = await runBetaUiScript("BOB_4_CONFIRM_PAYMENT_PROPAGATION_WALL", bobDataDir, [
+        { action: "wait", ms: 300 }, // 0
+        { action: "read", selector: "#current-screen" }, // 1 -- expect "unlock"
+        { action: "fill", selector: "#unlock-pass", value: BOB_PASSPHRASE }, // 2
+        { action: "click", selector: "#unlock-submit" }, // 3
+        { action: "wait", ms: 2500 }, // 4
+        { action: "read", selector: "#current-screen" }, // 5 -- expect "ready"
+        { action: "click", selector: "#nav-settings" }, // 6
+        { action: "wait", ms: 300 }, // 7
+        { action: "fill", selector: "#commerce-network-profile-select", value: "direct" }, // 8
+        { action: "wait", ms: 100 }, // 9
+        { action: "click", selector: "#commerce-network-profile-save" }, // 10
+        { action: "wait", ms: 300 }, // 11
+        { action: "fill", selector: "#commerce-merchant-acting-as", value: bobPubkey }, // 12
+        { action: "wait", ms: 200 }, // 13
+        { action: "click", selector: "#nav-commerce-merchant" }, // 14 -- re-runs the REAL bounded discovery refresh, one more real chance to receive a "paid" signal if one existed
+        { action: "wait", ms: 4000 }, // 15
+        { action: "click", selector: "#commerce-merchant-orders-list li:last-child button" }, // 16
+        { action: "wait", ms: 400 }, // 17
+        { action: "read", selector: "#commerce-order-status-text" }, // 18 -- live-confirms Bob's own local order is STILL "accepted", never advanced to "paid"
+        { action: "screenshot", value: "bob-07-still-accepted-after-alice-paid" }, // 19
+        { action: "click", selector: "#commerce-order-fulfill-btn" }, // 20 -- real button, real IPC call, CSS-hidden for this status (clicked anyway to get the real handler's own answer -- never to force success)
+        { action: "wait", ms: 400 }, // 21
+        { action: "read", selector: "#commerce-order-error" }, // 22 -- the real state machine's own rejection reason
+        { action: "read", selector: "#commerce-order-status-text" }, // 23 -- must remain "accepted" -- confirms the rejection was real, not cosmetic
+        { action: "screenshot", value: "bob-08-fulfill-rejected" }, // 24
+      ], true);
+      expect(readAt(bob4, 1)).toBe("unlock");
+      expect(readAt(bob4, 5)).toBe("ready");
+      const bobStatusAfterAlicePaid = readAt(bob4, 18);
+      const fulfillErrorText = readAt(bob4, 22);
+      const bobStatusAfterFulfillAttempt = readAt(bob4, 23);
+      record(
+        `STEP 7 (CONFIRMED, DELIBERATE security boundary, live-reproduced -- NOT a bug, not fixed, not worked around) -- after Alice's REAL payment, Bob's brand-new process re-ran the real bounded discovery refresh: his own local Order status is STILL "${bobStatusAfterAlicePaid}" (never "paid" -- PrivateOrderSyncStatus structurally cannot carry "paid"/"delivered", by design). Clicking the real Fulfill control anyway (to capture the real handler's own answer, not to force success), the real IPC handler REJECTED it with: "${fulfillErrorText}". Order status after the rejected attempt: "${bobStatusAfterFulfillAttempt}" (unchanged, confirming the rejection was real and the order was never corrupted).`,
+      );
+      expect(bobStatusAfterAlicePaid, "Bob's own local Order unexpectedly advanced to \"paid\" -- if this ever happens, the deliberate security boundary this suite documents has been removed upstream; re-investigate before trusting this comment (and do NOT treat that as a suite improvement -- see the arc's own stop-condition list on PAID-authority regressions).").toBe("accepted");
+      expect(fulfillErrorText.length, "expected a real, non-empty rejection reason from the real order-fulfill IPC handler").toBeGreaterThan(0);
+      expect(fulfillErrorText).toMatch(/paid|accepted|invalid|status/i);
+      expect(bobStatusAfterFulfillAttempt).toBe("accepted");
 
       record(
-        "STEPS 5-10 (Bob discovers+accepts the order, Alice pays, Bob fulfills, delivery, receipt, reputation) -- NOT ATTEMPTED. Root cause: STEP 4's confirmed blocker means Alice's Order was never actually created against Bob's real Nostr-discovered listing in the first place, so there is nothing for Bob's process to discover, accept, or fulfill. Continuing past this point would require either a same-process shortcut (explicitly forbidden by this agent's mandate) or a new product-code fix wiring handleCommerceOrderCreate() to the same discovered-products fallback handleCommerceProductDetail() already uses (out of scope for a prove-what-exists E2E agent -- this suite proves and precisely documents the gap, it does not patch production code to route around it). The two-process restart pass (arc §52) was consequently also NOT ATTEMPTED.",
-      );
-      record(
-        "SEPARATE, ALSO-CONFIRMED (by static source read only, not live-reproduced this run since STEP 4 already blocks reaching it): even if the STEP 4 gap were fixed, a SECOND, independent blocker exists downstream -- `sendPrivateOrderSyncNonFatal()` (fedos_electron_beta_main.cts) has exactly two call sites (`handleCommerceOrderAction` for submit/cancel/accept/reject/fulfill/complete, and `handleCommerceOrderComplete`); `handleCommercePaymentSimulate()` and `handleCommerceDeliveryAcknowledgeReceipt()` NEVER call it. Combined with `order_state_machine.ts`'s `transitionFulfill()` requiring the LOCAL order to already be \"paid\", the seller's own separate process has no real production mechanism to ever learn a real TEST/LOCAL payment happened on the buyer's side -- so it could never legitimately reach \"fulfilling\" either, even past STEP 4.",
+        "SUMMARY -- what DOES cross-process-propagate today via the real private-order-sync channel (Agent N's design, all independently live-confirmed this run): submit (STEP 4), accept (STEP 5); reject/cancel/fulfill/complete share the exact same mechanism (`sendPrivateOrderSyncNonFatal`/`PRIVATE_ORDER_SYNC_STATUS_ACTION`, one call site each in handleCommerceOrderAction/handleCommerceOrderComplete) so were not separately re-verified live in this run but are not in question. What does NOT propagate, confirmed live in STEP 7: payment confirmation (\"paid\") and (by the identical mechanism, not separately live-tested this run) delivery confirmation (\"delivered\") -- both DELIBERATELY excluded, at the TYPE level, from PrivateOrderSyncStatus, mirroring order_state_machine.ts's own AUTHORIZED_ACTOR_KINDS restricting confirm_payment/confirm_delivery to a payment_evidence/delivery_evidence actor only THIS process's own locally-verified evidence may ever construct. This is not an oversight or a missing feature -- it is the arc's own explicit stop-condition (\"PAID authority regression\") encoded directly into the type system, so that no remote peer's claim, however genuinely signed and verified, can ever move this process's own authoritative Order into a state that unlocks money/goods release. STEPS 8-10 (fulfill/deliver/receipt/reputation on Bob's side) and the optional two-process restart pass were consequently NOT ATTEMPTED past STEP 7 -- Bob's process has no real, honest way to reach them for THIS order, and building one is a deliberate architecture decision for a dedicated future review, not something to improvise here.",
       );
 
       expect(outcomeAt(bob1, 6)).toBe("ok");
