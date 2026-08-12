@@ -347,11 +347,14 @@ describe("Commerce Reachable Catalog Phase 1 -- synthetic demo catalog shape", (
 describe("Commerce Reachable Catalog Phase 1 -- navigation + Messenger regression", () => {
   it("20. a Commerce (\"Shop\") nav entry exists alongside Conversations, and the catalog/detail screens are present with a back control", () => {
     const html = read(HTML_PATH);
-    // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- friction
-    // ledger row #8 / arc §28: renamed "Commerce" -> "Shop" (element id
-    // unchanged: still `nav-commerce`, see that button's own comment for
-    // why the id is deliberately kept stable across the rename).
-    expect(html).toMatch(/<button id="nav-commerce" type="button">Shop<\/button>/);
+    // Real Two-Party Commerce + UX P0/P1 Closure arc -- friction ledger row
+    // #8 / arc §28: renamed "Commerce" -> "Shop" (element id unchanged:
+    // still `nav-commerce`, see that button's own comment for why the id is
+    // deliberately kept stable across the rename). Regex intentionally does
+    // NOT require an immediately-following `</button>` -- Agent U's merged
+    // markup also nests a `<span id="commerce-my-orders-badge">` count
+    // badge inside the same button, after the "Shop" text.
+    expect(html).toMatch(/<button id="nav-commerce" type="button">Shop/);
     expect(html).toMatch(/id="app-screen-commerce"/);
     expect(html).toMatch(/id="app-screen-commerce-detail"/);
     expect(html).toMatch(/id="commerce-detail-back"/);

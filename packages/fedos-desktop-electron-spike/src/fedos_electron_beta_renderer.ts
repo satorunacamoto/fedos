@@ -55,6 +55,12 @@ function showScreen(name: ScreenName): void {
     section.classList.remove("active");
   }
   byId(`screen-${name}`).classList.add("active");
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 12
+  // (arc §26): `textContent` is ALWAYS kept current (never gated) -- several
+  // real E2E tests read it directly via `document.querySelector`. Only the
+  // ROW's visibility (`#current-screen-row`'s own `hidden` attribute,
+  // toggled once at startup below) is gated behind
+  // `window.fedosBeta.debugInstrumentationEnabled`.
   byId("current-screen").textContent = name;
 }
 
@@ -139,6 +145,73 @@ function clearError(elementId: string): void {
  */
 function showCommerceError(elementId: string, result: { readonly outcome: string; readonly reason?: string }): void {
   byId(elementId).textContent = result.reason !== undefined && result.reason.length > 0 ? result.reason : describeOutcome(result.outcome);
+}
+
+// ---------------------------------------------------------------------
+// Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 21
+// (arc §22, §41-42): "SYSTEMATIC action-handler robustness" for every
+// Commerce IPC call site, buyer and seller actions alike. Before this arc,
+// ZERO Commerce call site had any error handling beyond checking
+// `result.outcome` on a SUCCESSFULLY-resolved promise -- a genuinely thrown/
+// rejected call (main process killed mid-call, a bug in a handler, etc.)
+// produced an uncaught rejection with no user-facing feedback at all, and
+// no button was ever disabled while a call was in flight (so a fast
+// double-click could reach the SAME handler twice concurrently -- the exact
+// shape of the "double-click mints a second paymentId" bug this arc also
+// fixed at its root cause, see `payment/local_simulator.ts`'s own
+// idempotency fix; this helper is defense-in-depth on top of that, not a
+// replacement for it).
+//
+// Mirrors Chat/Search/Archive/Device/Settings' own already-correct
+// established pattern (`setBusy()` + try/finally around each handler,
+// confirmed by direct source inspection before writing this) rather than
+// inventing a new one -- extended with one genuinely new element: a real
+// `catch`, so an unexpected thrown error still produces a recoverable,
+// human-readable message (never a stack trace) instead of silence.
+// ---------------------------------------------------------------------
+
+/**
+ * Runs one Commerce IPC action with the shared robustness contract every
+ * Commerce call site now uses:
+ *   1. disables `busyButtonIds` for the call's duration -- ALSO the
+ *      duplicate-invocation guard: a second click while disabled never
+ *      re-enters `action()` (mirrors `setBusy()`'s existing role elsewhere
+ *      in this file exactly; empty array is a valid no-op for a screen-load
+ *      query with no single triggering button);
+ *   2. clears `errorElementId` before calling, matching every other
+ *      screen's own convention;
+ *   3. on a genuine thrown/rejected error, shows a generic safe message
+ *      (never a stack trace/raw exception string) and returns `undefined`
+ *      so the caller can distinguish "never got a result" from "got a
+ *      result whose own `outcome` says something failed";
+ *   4. always re-enables `busyButtonIds` in a `finally`, success or not.
+ * Callers still check `result.outcome`/`showCommerceError()` themselves
+ * exactly as before for an ORDINARY `{outcome: "rejected"|...}` result --
+ * this helper only adds the outer safety net + busy-state bracketing.
+ *
+ * `busyButtons` accepts a static `#id` string (looked up via `byId()`,
+ * matching `setBusy()`'s own convention) OR a direct `HTMLButtonElement`
+ * reference -- needed for the per-row Publish/Unpublish and "View"/"Open"
+ * buttons this file builds dynamically in a loop and never assigns a
+ * static id to.
+ */
+async function runCommerceAction<T>(
+  busyButtons: readonly (string | HTMLButtonElement)[],
+  errorElementId: string,
+  action: () => Promise<T>,
+): Promise<T | undefined> {
+  const buttons = busyButtons.map((b) => (typeof b === "string" ? byId<HTMLButtonElement>(b) : b));
+  clearError(errorElementId);
+  for (const b of buttons) b.disabled = true;
+  try {
+    return await action();
+  } catch (err) {
+    console.error("fedos-beta: Commerce action failed unexpectedly:", err);
+    byId(errorElementId).textContent = "Something went wrong. Please try again.";
+    return undefined;
+  } finally {
+    for (const b of buttons) b.disabled = false;
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -611,9 +684,11 @@ function renderCommerceCatalogList(): void {
 
 async function refreshCommerceCatalogList(): Promise<void> {
   populateCommerceActorSelect("commerce-acting-as");
-  clearError("commerce-error");
-  const result = await window.fedosApp.commerceCatalogList();
-  if (result.outcome !== "ok") {
+  const result = await runCommerceAction([], "commerce-error", () => window.fedosApp.commerceCatalogList());
+  if (result === undefined) {
+    commerceCatalogCache = [];
+    renderCommerceCatalogList();
+  } else if (result.outcome !== "ok") {
     showError("commerce-error", result);
     commerceCatalogCache = [];
     renderCommerceCatalogList();
@@ -630,8 +705,18 @@ let commerceDetailReturnScreen: "commerce" | "commerce-merchant" = "commerce";
 async function openCommerceProductDetailScreen(productId: string, previewActorPubkey?: string): Promise<void> {
   currentCommerceDetailProductId = productId;
   showAppScreen("commerce-detail");
-  clearError("commerce-detail-error");
   clearError("commerce-order-create-error");
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 4,
+  // arc §23 (P0): the order-form quantity (and any other per-product
+  // order-form state added later) MUST reset whenever the underlying
+  // product identity changes -- before this fix, navigating Product A
+  // (qty=5) -> Product B silently carried qty=5 into B with no validation
+  // catching it. `openCommerceProduct()` is the ONLY place
+  // `currentCommerceDetailProductId` changes, so resetting here covers
+  // every navigation path to Product Detail (catalog "View", order-screen
+  // "Back to Commerce" then a different product, etc.), not just one entry
+  // point. See `commerce_quantity_reset_on_product_change.test.ts`.
+  byId<HTMLInputElement>("commerce-order-quantity").value = "1";
   byId("commerce-detail-title").textContent = "Loading…";
   byId("commerce-detail-media-area").textContent = "";
   byId("commerce-detail-price").textContent = "";
@@ -640,7 +725,13 @@ async function openCommerceProductDetailScreen(productId: string, previewActorPu
   byId("commerce-detail-description").textContent = "";
   byId("commerce-detail-reputation-summary").textContent = "";
   byId("commerce-detail-preview-banner").setAttribute("hidden", "");
-  const result = await window.fedosApp.commerceProductDetail(productId, previewActorPubkey);
+  const result = await runCommerceAction([], "commerce-detail-error", () =>
+    window.fedosApp.commerceProductDetail(productId, previewActorPubkey),
+  );
+  if (result === undefined) {
+    byId("commerce-detail-title").textContent = "Product";
+    return;
+  }
   if (result.outcome !== "ok" || result.product === undefined) {
     byId("commerce-detail-title").textContent = "Product";
     showError("commerce-detail-error", result);
@@ -705,9 +796,16 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
 async function renderCommercePersonaReputation(subjectPubkey: string, targetElementId: string): Promise<void> {
   const el = byId(targetElementId);
   el.textContent = "Loading reputation…";
-  const result = await window.fedosApp.commercePersonaBoardQuery(subjectPubkey);
-  if (result.outcome !== "ok" || result.view === undefined) {
-    el.textContent = "No reputation history on record yet.";
+  // No dedicated error element for this read-only panel -- a genuine
+  // thrown/rejected call still falls back to the SAME honest "no history"
+  // text a normal not-found/unavailable outcome already produces below,
+  // never a stack trace (this panel has no separate `.error` region to
+  // render one into, and inventing one for a single non-critical read-only
+  // summary would be disproportionate — see `runCommerceAction()`'s own
+  // header for the general policy this is a deliberate, narrow exception to).
+  const result = await runCommerceAction([], "commerce-detail-error", () => window.fedosApp.commercePersonaBoardQuery(subjectPubkey));
+  if (result === undefined || result.outcome !== "ok" || result.view === undefined) {
+    el.textContent = "No reputation history on record for this seller yet.";
     return;
   }
   const view = result.view;
@@ -835,6 +933,25 @@ function refreshCommerceActorOptionsForRealIdentity(): void {
   populateCommerceActorSelect("commerce-merchant-acting-as");
 }
 
+/**
+ * Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9
+ * (arc §27): reuses the SAME friendly `COMMERCE_DEMO_ACTORS` labels this
+ * file already computes for the "Acting as" selectors, as the PRIMARY
+ * human-readable identity everywhere a buyer/seller pubkey would otherwise
+ * render as a raw 64-char hex string (order parties, order lists). Falls
+ * back to a short, non-full hex fragment for a pubkey outside the closed
+ * demo-actor set -- should not happen in this local-demo-only build, but
+ * never crashes or blanks the screen if it does. Raw hex stays reachable
+ * everywhere via the `<details>` "Technical details" disclosure this arc
+ * also added -- this never deletes the cryptographic id, only demotes it
+ * from primary label to secondary/advanced.
+ */
+function commerceActorLabel(pubkey: string): string {
+  const actor = COMMERCE_DEMO_ACTORS.find((a) => a.pubkey === pubkey);
+  if (actor !== undefined) return actor.label;
+  return pubkey.length > 12 ? `${pubkey.slice(0, 12)}…` : pubkey;
+}
+
 let currentCommerceOrder: FedosCommerceOrder | null = null;
 let currentCommercePendingPayment: { readonly paymentId: string; readonly amountCents: number; readonly currency: string } | null = null;
 /** Commerce E2E Completion arc (Wave B integration) — the Delivery record bound to `currentCommerceOrder`, if one exists yet (created only once the merchant fulfills). Refetched every time the Order screen (re)renders. */
@@ -844,12 +961,45 @@ function commerceOrderSummaryText(order: FedosCommerceOrder): string {
   return `${order.quantity} × ${formatCommercePrice(order.unitPriceCents, order.currency)} = ${formatCommercePrice(order.totalCents, order.currency)}`;
 }
 
+/**
+ * Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 7
+ * (arc §25): every actionless core Order state gets real, symmetric,
+ * non-jargon copy explaining what happened, who acts next, that it's safe
+ * to leave/restart, and how the screen updates (reopening this order --
+ * this codebase has no push/poll for Commerce state, so that is the
+ * honest answer, never a fabricated "we'll notify you"). Returns `""`
+ * (hidden by `#commerce-order-waiting:empty`) whenever the CURRENT actor
+ * has their own action available on this screen (that action's own `<div>`
+ * already explains what to do) or the order is in a state/role combination
+ * outside this function's own scope (e.g. a genuinely uninvolved viewer).
+ */
+function commerceOrderWaitingText(status: string, isBuyer: boolean, isSeller: boolean): string {
+  if (status === "created" && isSeller && !isBuyer) {
+    return "Waiting on the buyer to review and submit this order. You can safely close this and come back later — nothing is lost. Reopen this order to see whether they've submitted it.";
+  }
+  if (status === "submitted" && isBuyer && !isSeller) {
+    return "Submitted — waiting on the seller to accept or reject. You can safely close this and come back later; reopen this order to see their decision.";
+  }
+  if (status === "accepted" && isSeller && !isBuyer) {
+    return "Accepted — waiting on the buyer to pay. Reopen this order later to see whether payment has arrived.";
+  }
+  if (status === "paid" && isBuyer && !isSeller) {
+    return "Payment confirmed — waiting on the seller to fulfill your order. Reopen this order later to check progress.";
+  }
+  if (status === "fulfilling" && isSeller && !isBuyer) {
+    return "Marked fulfilling — waiting on the buyer to confirm they received it. Reopen this order later to see whether they have.";
+  }
+  if (!isBuyer && !isSeller) {
+    return "You're viewing this order under an identity that is neither its buyer nor its seller — no action is available to you here.";
+  }
+  return "";
+}
+
 function renderCommerceOrderScreen(): void {
   const order = currentCommerceOrder;
   clearError("commerce-order-error");
   clearError("commerce-order-payment-error");
   if (order === null) return;
-  byId("commerce-order-id").textContent = `Order ${order.id}`;
   const statusText = byId("commerce-order-status-text");
   statusText.textContent = order.status;
   statusText.className = `commerce-order-status commerce-order-status-${order.status}`;
@@ -857,6 +1007,12 @@ function renderCommerceOrderScreen(): void {
 
   const isBuyer = commerceActingAsPubkey === order.buyerPubkey;
   const isSeller = commerceActingAsPubkey === order.sellerPubkey;
+
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9
+  // (arc §27): friendly buyer/seller names as the PRIMARY label, reusing
+  // the SAME resolution the "Acting as" selectors already use.
+  byId("commerce-order-parties-text").textContent = `Buyer: ${commerceActorLabel(order.buyerPubkey)} · Seller: ${commerceActorLabel(order.sellerPubkey)}`;
+  byId("commerce-order-waiting").textContent = commerceOrderWaitingText(order.status, isBuyer, isSeller);
 
   byId("commerce-order-review-actions").toggleAttribute("hidden", !(order.status === "created" && isBuyer));
   byId("commerce-order-merchant-actions").toggleAttribute("hidden", !(order.status === "submitted" && isSeller));
@@ -876,15 +1032,23 @@ function renderCommerceOrderScreen(): void {
   byId("commerce-order-acknowledge-actions").toggleAttribute("hidden", !(order.status === "fulfilling" && isBuyer));
   byId("commerce-order-complete-actions").toggleAttribute("hidden", !(order.status === "delivered" && (isBuyer || isSeller)));
   byId("commerce-order-receipt-actions").toggleAttribute("hidden", order.status !== "completed");
-  if (order.status !== "completed") byId("commerce-order-receipt-result").setAttribute("hidden", "");
+  if (order.status !== "completed") {
+    byId("commerce-order-receipt-result").setAttribute("hidden", "");
+    byId("commerce-order-completion-note").textContent = "";
+  }
 
-  byId("commerce-order-history").textContent = `Product ${order.productId} — buyer ${order.buyerPubkey.slice(0, 8)}… — seller ${order.sellerPubkey.slice(0, 8)}…`;
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9:
+  // raw hex ids demoted from primary label to this "Technical details"
+  // disclosure -- never deleted, see `commerceActorLabel()`'s own header.
+  byId("commerce-order-id").textContent = `Order id: ${order.id}`;
+  byId("commerce-order-history").textContent = `Product id: ${order.productId} — buyer pubkey: ${order.buyerPubkey} — seller pubkey: ${order.sellerPubkey}`;
 }
 
 async function refreshCommerceDeliveryStatus(): Promise<void> {
   if (currentCommerceOrder === null) return;
-  const result = await window.fedosApp.commerceDeliveryStatus(currentCommerceOrder.id);
-  currentCommerceDelivery = result.outcome === "ok" ? result.delivery ?? null : null;
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction([], "commerce-order-error", () => window.fedosApp.commerceDeliveryStatus(orderId));
+  currentCommerceDelivery = result !== undefined && result.outcome === "ok" ? result.delivery ?? null : null;
   renderCommerceOrderScreen();
 }
 
@@ -892,6 +1056,7 @@ function openCommerceOrderScreen(order: FedosCommerceOrder): void {
   currentCommerceOrder = order;
   currentCommercePendingPayment = null;
   currentCommerceDelivery = null;
+  byId("commerce-order-completion-note").textContent = "";
   showAppScreen("commerce-order");
   renderCommerceOrderScreen();
   void refreshCommerceDeliveryStatus();
@@ -899,8 +1064,11 @@ function openCommerceOrderScreen(order: FedosCommerceOrder): void {
 
 async function onCommerceDeliveryAcknowledgeReceiptClick(): Promise<void> {
   if (currentCommerceOrder === null) return;
-  clearError("commerce-order-error");
-  const result = await window.fedosApp.commerceDeliveryAcknowledgeReceipt(currentCommerceOrder.id, commerceActingAsPubkey);
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction(["commerce-order-acknowledge-receipt-btn"], "commerce-order-error", () =>
+    window.fedosApp.commerceDeliveryAcknowledgeReceipt(orderId, commerceActingAsPubkey),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.order === undefined) {
     showCommerceError("commerce-order-error", result);
     return;
@@ -911,24 +1079,43 @@ async function onCommerceDeliveryAcknowledgeReceiptClick(): Promise<void> {
   void refreshCommerceMyOrdersList();
 }
 
+/**
+ * Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 21
+ * (arc §42): `result.reputationSyncStatus` truthfully reports whether the
+ * SECONDARY, non-fatal reputation-attestation issuance actually succeeded.
+ * The Order reaching "completed" (this call's own `outcome`) is the CORE
+ * transaction and is never blocked by that secondary one failing -- but the
+ * UI must say so honestly rather than staying silent either way (never
+ * "Published everywhere" if it didn't).
+ */
 async function onCommerceOrderCompleteClick(): Promise<void> {
   if (currentCommerceOrder === null) return;
-  clearError("commerce-order-error");
-  const result = await window.fedosApp.commerceOrderComplete(currentCommerceOrder.id, commerceActingAsPubkey);
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction(["commerce-order-complete-btn"], "commerce-order-error", () =>
+    window.fedosApp.commerceOrderComplete(orderId, commerceActingAsPubkey),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.order === undefined) {
     showCommerceError("commerce-order-error", result);
     return;
   }
   currentCommerceOrder = result.order;
   renderCommerceOrderScreen();
+  byId("commerce-order-completion-note").textContent =
+    result.reputationSyncStatus === "unavailable"
+      ? "Order completed. Note: a reputation record for this trade could not be saved just now — your completed order itself is unaffected."
+      : "Order completed. Reputation records were saved for both parties.";
   void refreshCommerceDeliveryStatus();
   void refreshCommerceMyOrdersList();
 }
 
 async function onCommerceReceiptIssueClick(): Promise<void> {
   if (currentCommerceOrder === null) return;
-  clearError("commerce-order-receipt-error");
-  const result = await window.fedosApp.commerceReceiptIssue(currentCommerceOrder.id);
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction(["commerce-order-receipt-issue-btn"], "commerce-order-receipt-error", () =>
+    window.fedosApp.commerceReceiptIssue(orderId),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.qrText === undefined) {
     showCommerceError("commerce-order-receipt-error", result);
     return;
@@ -939,15 +1126,18 @@ async function onCommerceReceiptIssueClick(): Promise<void> {
 }
 
 async function onCommerceOrderCreateSubmit(): Promise<void> {
-  clearError("commerce-order-create-error");
   const productId = currentCommerceDetailProductId;
   const quantityRaw = byId<HTMLInputElement>("commerce-order-quantity").value;
   const quantity = Number.parseInt(quantityRaw, 10);
   if (productId === null) {
+    clearError("commerce-order-create-error");
     showCommerceError("commerce-order-create-error", { outcome: "invalid-input", reason: "no product selected" });
     return;
   }
-  const result = await window.fedosApp.commerceOrderCreate(commerceActingAsPubkey, productId, Number.isFinite(quantity) ? quantity : undefined);
+  const result = await runCommerceAction(["commerce-order-create-submit"], "commerce-order-create-error", () =>
+    window.fedosApp.commerceOrderCreate(commerceActingAsPubkey, productId, Number.isFinite(quantity) ? quantity : undefined),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.order === undefined) {
     showCommerceError("commerce-order-create-error", result);
     return;
@@ -958,10 +1148,12 @@ async function onCommerceOrderCreateSubmit(): Promise<void> {
 async function onCommerceOrderActionClick(
   action: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>,
   errorElementId: string,
+  busyButtonId: string,
 ): Promise<void> {
   if (currentCommerceOrder === null) return;
-  clearError(errorElementId);
-  const result = await action(currentCommerceOrder.id, commerceActingAsPubkey);
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction([busyButtonId], errorElementId, () => action(orderId, commerceActingAsPubkey));
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.order === undefined) {
     showCommerceError(errorElementId, result);
     return;
@@ -974,21 +1166,28 @@ async function onCommerceOrderActionClick(
 
 async function onCommerceOrderRejectClick(): Promise<void> {
   if (currentCommerceOrder === null) return;
-  clearError("commerce-order-error");
+  const orderId = currentCommerceOrder.id;
   const reason = byId<HTMLInputElement>("commerce-order-reject-reason").value;
-  const result = await window.fedosApp.commerceOrderReject(currentCommerceOrder.id, commerceActingAsPubkey, reason.length > 0 ? reason : undefined);
+  const result = await runCommerceAction(["commerce-order-reject-btn"], "commerce-order-error", () =>
+    window.fedosApp.commerceOrderReject(orderId, commerceActingAsPubkey, reason.length > 0 ? reason : undefined),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.order === undefined) {
     showCommerceError("commerce-order-error", result);
     return;
   }
   currentCommerceOrder = result.order;
   renderCommerceOrderScreen();
+  void refreshCommerceMyOrdersList();
 }
 
 async function onCommercePaymentRequestClick(): Promise<void> {
   if (currentCommerceOrder === null) return;
-  clearError("commerce-order-payment-error");
-  const result = await window.fedosApp.commercePaymentRequest(currentCommerceOrder.id);
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction(["commerce-order-payment-request-btn"], "commerce-order-payment-error", () =>
+    window.fedosApp.commercePaymentRequest(orderId),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.paymentId === undefined || result.amountCents === undefined || result.currency === undefined) {
     showCommerceError("commerce-order-payment-error", result);
     return;
@@ -1007,8 +1206,12 @@ async function onCommercePaymentRequestClick(): Promise<void> {
  */
 async function onCommercePaymentSimulateClick(): Promise<void> {
   if (currentCommerceOrder === null || currentCommercePendingPayment === null) return;
-  clearError("commerce-order-payment-error");
-  const result = await window.fedosApp.commercePaymentSimulate(currentCommerceOrder.id, currentCommercePendingPayment.paymentId);
+  const orderId = currentCommerceOrder.id;
+  const paymentId = currentCommercePendingPayment.paymentId;
+  const result = await runCommerceAction(["commerce-order-payment-simulate-btn"], "commerce-order-payment-error", () =>
+    window.fedosApp.commercePaymentSimulate(orderId, paymentId),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.order === undefined) {
     showCommerceError("commerce-order-payment-error", result);
     return;
@@ -1017,6 +1220,22 @@ async function onCommercePaymentSimulateClick(): Promise<void> {
   currentCommercePendingPayment = null;
   renderCommerceOrderScreen();
   void refreshCommerceMyOrdersList();
+}
+
+/**
+ * Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 14
+ * (badge-UI half only; Agent D owns the underlying activity DATA this only
+ * renders a count from -- reads the SAME already-fetched order lists every
+ * Commerce/Merchant screen already fetches, never a new IPC call or a new
+ * background poll). "Active" means not yet in a terminal state.
+ */
+const COMMERCE_TERMINAL_ORDER_STATUSES: readonly string[] = ["completed", "rejected", "cancelled"];
+
+function updateCommerceNavBadge(elementId: string, orders: readonly FedosCommerceOrder[]): void {
+  const active = orders.filter((o) => !COMMERCE_TERMINAL_ORDER_STATUSES.includes(o.status)).length;
+  const el = byId(elementId);
+  el.textContent = String(active);
+  el.toggleAttribute("hidden", active === 0);
 }
 
 function renderCommerceMyOrdersList(orders: readonly FedosCommerceOrder[]): void {
@@ -1028,11 +1247,29 @@ function renderCommerceMyOrdersList(orders: readonly FedosCommerceOrder[]): void
     list.appendChild(li);
     return;
   }
-  for (const order of orders) {
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 8/
+  // arc §32 (buyer order recovery): active orders sort first, so "where is
+  // my order?" never requires scanning past finished/rejected/cancelled
+  // ones -- especially after a restart, when this is the first thing a
+  // returning buyer sees on the Commerce screen.
+  const sorted = [...orders].sort((a, b) => {
+    const aActive = COMMERCE_TERMINAL_ORDER_STATUSES.includes(a.status) ? 1 : 0;
+    const bActive = COMMERCE_TERMINAL_ORDER_STATUSES.includes(b.status) ? 1 : 0;
+    return aActive - bActive;
+  });
+  for (const order of sorted) {
     const li = document.createElement("li");
     const title = document.createElement("div");
-    title.textContent = `Order ${order.id.slice(0, 12)}… — ${order.status}`;
+    // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9:
+    // friendly seller name as the primary label, reusing the SAME
+    // resolution the "Acting as" selectors already use; raw order id
+    // demoted to a smaller, muted line rather than deleted.
+    title.textContent = `${commerceActorLabel(order.sellerPubkey)} — ${order.status}`;
     li.appendChild(title);
+    const idLine = document.createElement("div");
+    idLine.className = "muted";
+    idLine.textContent = `Order ${order.id.slice(0, 12)}…`;
+    li.appendChild(idLine);
     const summary = document.createElement("div");
     summary.className = "muted";
     summary.textContent = commerceOrderSummaryText(order);
@@ -1047,8 +1284,10 @@ function renderCommerceMyOrdersList(orders: readonly FedosCommerceOrder[]): void
 }
 
 async function refreshCommerceMyOrdersList(): Promise<void> {
-  const result = await window.fedosApp.commerceOrdersListMine(commerceActingAsPubkey);
-  renderCommerceMyOrdersList(result.outcome === "ok" ? result.orders ?? [] : []);
+  const result = await runCommerceAction([], "commerce-error", () => window.fedosApp.commerceOrdersListMine(commerceActingAsPubkey));
+  const orders = result !== undefined && result.outcome === "ok" ? result.orders ?? [] : [];
+  renderCommerceMyOrdersList(orders);
+  updateCommerceNavBadge("commerce-my-orders-badge", orders);
 }
 
 // --- Merchant screen: My Products + Create Product + Incoming Orders ---
@@ -1125,17 +1364,25 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
   // buttons is ever rendered for a given product, so there is no shared
   // label/state to race on.
   const isPublished = product.status === "active";
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 23
+  // (arc §44), layered on top of Agent S's own two-separate-buttons P0 fix
+  // (never one dual-purpose toggle -- see this block's own header comment
+  // above): each button ALSO gets a primary/secondary visual-hierarchy
+  // class (weight + padding, not color alone) in addition to S's own
+  // distinct publish/unpublish color classes. Publish (draft/archived ->
+  // active) reads as the primary/constructive action; Unpublish (takes a
+  // LIVE listing down) reads as the more cautious, secondary one.
   if (isPublished) {
     const unpublishBtn = document.createElement("button");
     unpublishBtn.type = "button";
-    unpublishBtn.className = "commerce-btn-unpublish";
+    unpublishBtn.className = "commerce-btn-unpublish commerce-btn-secondary";
     unpublishBtn.textContent = "Unpublish";
     unpublishBtn.addEventListener("click", () => void onCommercePublishAction(product.id, "unpublish", unpublishBtn));
     li.appendChild(unpublishBtn);
   } else {
     const publishBtn = document.createElement("button");
     publishBtn.type = "button";
-    publishBtn.className = "commerce-btn-publish";
+    publishBtn.className = "commerce-btn-publish commerce-btn-primary";
     publishBtn.textContent = "Publish";
     publishBtn.addEventListener("click", () => void onCommercePublishAction(product.id, "publish", publishBtn));
     li.appendChild(publishBtn);
@@ -1143,6 +1390,17 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
   return li;
 }
 
+// Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge note):
+// Agent U independently wrote a SECOND publish/unpublish handler
+// (`onCommerceProductPublishToggle`, a single-toggle design wrapped in the
+// generic `runCommerceAction()` helper) without visibility into Agent S's
+// sibling worktree, where S had already closed this exact P0 (friction
+// ledger row #3) with two separate, explicitly-labeled buttons and its own
+// manual disable/confirm/try-finally guard (mirroring the established
+// `onDeviceRevoke()` pattern). S's two-button design is arc §14's own
+// explicit direction ("prefer separate semantics... rather than one
+// ambiguous toggle") -- kept below; U's competing single-toggle handler
+// was dropped as dead code rather than kept alongside it.
 async function onCommercePublishAction(productId: string, action: "publish" | "unpublish", btn: HTMLButtonElement): Promise<void> {
   // A product only ever offers "Unpublish" while `status === "active"` (see
   // `commerceMerchantProductRow` above), so every unpublish action IS a
@@ -1173,10 +1431,10 @@ async function onCommercePublishAction(productId: string, action: "publish" | "u
 }
 
 async function refreshCommerceMerchantProductsList(): Promise<void> {
-  clearError("commerce-merchant-products-error");
-  const result = await window.fedosApp.commerceMerchantProductsList(commerceActingAsPubkey);
+  const result = await runCommerceAction([], "commerce-merchant-products-error", () => window.fedosApp.commerceMerchantProductsList(commerceActingAsPubkey));
   const list = byId("commerce-merchant-products-list");
   list.textContent = "";
+  if (result === undefined) return;
   if (result.outcome !== "ok") {
     showCommerceError("commerce-merchant-products-error", result);
     return;
@@ -1261,8 +1519,15 @@ async function onCommerceMerchantEditSave(): Promise<void> {
 function commerceMerchantOrderRow(order: FedosCommerceOrder): HTMLLIElement {
   const li = document.createElement("li");
   const title = document.createElement("div");
-  title.textContent = `Order ${order.id.slice(0, 12)}… — ${order.status}`;
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9:
+  // friendly buyer name as the primary label -- this is exactly the "who
+  // ordered?" case the friction ledger calls out for sellers specifically.
+  title.textContent = `${commerceActorLabel(order.buyerPubkey)} — ${order.status}`;
   li.appendChild(title);
+  const idLine = document.createElement("div");
+  idLine.className = "muted";
+  idLine.textContent = `Order ${order.id.slice(0, 12)}…`;
+  li.appendChild(idLine);
   const summary = document.createElement("div");
   summary.className = "muted";
   summary.textContent = commerceOrderSummaryText(order);
@@ -1318,17 +1583,23 @@ function renderCommerceMerchantAttention(orders: readonly FedosCommerceOrder[]):
 }
 
 async function refreshCommerceMerchantOrdersList(): Promise<void> {
-  clearError("commerce-merchant-orders-error");
-  const result = await window.fedosApp.commerceOrdersListIncoming(commerceActingAsPubkey);
+  const result = await runCommerceAction([], "commerce-merchant-orders-error", () => window.fedosApp.commerceOrdersListIncoming(commerceActingAsPubkey));
   const list = byId("commerce-merchant-orders-list");
   list.textContent = "";
+  if (result === undefined) {
+    renderCommerceMerchantAttention([]);
+    updateCommerceNavBadge("commerce-incoming-orders-badge", []);
+    return;
+  }
   if (result.outcome !== "ok") {
     showCommerceError("commerce-merchant-orders-error", result);
     renderCommerceMerchantAttention([]);
+    updateCommerceNavBadge("commerce-incoming-orders-badge", []);
     return;
   }
   const orders = result.orders ?? [];
   renderCommerceMerchantAttention(orders);
+  updateCommerceNavBadge("commerce-incoming-orders-badge", orders);
   if (orders.length === 0) {
     const li = document.createElement("li");
     li.textContent = "No incoming orders yet.";
@@ -1338,8 +1609,15 @@ async function refreshCommerceMerchantOrdersList(): Promise<void> {
   for (const order of orders) list.appendChild(commerceMerchantOrderRow(order));
 }
 
+// Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge note):
+// Agent S wrote the merchant-role UI guard + the real `actorRole`-carrying
+// `commerceProductCreate()` call (matching `handleCommerceProductCreate()`'s
+// own new 3-argument signature, friction ledger row #2 P0). Agent U,
+// without visibility into S's sibling worktree, wrapped a copy of the OLD
+// 2-argument call in the general `runCommerceAction()` robustness helper
+// (friction ledger row #21 / arc §22). Both are real and both are kept:
+// S's guard/signature, U's disable-while-in-flight + error-catch wrapper.
 async function onCommerceMerchantCreateSubmit(): Promise<void> {
-  clearError("commerce-merchant-create-error");
   // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
   // ledger row #2 P0: UI-level guard (fast, no IPC round trip) blocking
   // creation while the currently "Acting as" identity is not asserting a
@@ -1365,12 +1643,15 @@ async function onCommerceMerchantCreateSubmit(): Promise<void> {
   const title = byId<HTMLInputElement>("commerce-merchant-create-title").value;
   const description = byId<HTMLTextAreaElement>("commerce-merchant-create-description").value;
   const currency = byId<HTMLSelectElement>("commerce-merchant-create-currency").value;
-  const result = await window.fedosApp.commerceProductCreate(commerceActingAsPubkey, actorRole, {
-    title,
-    description: description.length > 0 ? description : undefined,
-    priceCents,
-    currency,
-  });
+  const result = await runCommerceAction(["commerce-merchant-create-submit"], "commerce-merchant-create-error", () =>
+    window.fedosApp.commerceProductCreate(commerceActingAsPubkey, actorRole, {
+      title,
+      description: description.length > 0 ? description : undefined,
+      priceCents,
+      currency,
+    }),
+  );
+  if (result === undefined) return;
   if (result.outcome !== "ok") {
     showCommerceError("commerce-merchant-create-error", result);
     return;
@@ -2215,8 +2496,12 @@ async function refreshSettings(): Promise<void> {
 // ---------------------------------------------------------------------
 
 async function refreshCommerceNetworkProfile(): Promise<void> {
-  clearError("commerce-network-profile-error");
-  const result = await window.fedosApp.commerceNetworkProfileGet();
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 21
+  // robustness sweep, applied here too (this is a Commerce IPC call site
+  // like any other); the underlying Network Profile feature/copy itself
+  // remains Agent N's own territory, untouched beyond this wrapper.
+  const result = await runCommerceAction([], "commerce-network-profile-error", () => window.fedosApp.commerceNetworkProfileGet());
+  if (result === undefined) return;
   if (result.outcome !== "ok" || result.profile === undefined) {
     showError("commerce-network-profile-error", result);
     return;
@@ -2225,10 +2510,10 @@ async function refreshCommerceNetworkProfile(): Promise<void> {
 }
 
 async function onCommerceNetworkProfileSave(): Promise<void> {
-  clearError("commerce-network-profile-error");
   byId("commerce-network-profile-report").textContent = "";
   const value = byId<HTMLSelectElement>("commerce-network-profile-select").value as FedosCommerceNetworkProfile;
-  const result = await window.fedosApp.commerceNetworkProfileSet(value);
+  const result = await runCommerceAction(["commerce-network-profile-save"], "commerce-network-profile-error", () => window.fedosApp.commerceNetworkProfileSet(value));
+  if (result === undefined) return;
   if (result.outcome !== "ok") {
     showError("commerce-network-profile-error", result);
     return;
@@ -2323,6 +2608,15 @@ function renderReady(ready: FedosProfileCommandResult["ready"]): void {
   void refreshConversationsList();
   setAppStatus("");
   startRelayStatusPolling();
+  // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 8 /
+  // arc §32 (buyer order recovery): fetch order activity ONCE at Ready
+  // (not a recurring poll -- this is the SAME one-shot pattern
+  // `refreshConversationsList()` above already uses, just extended to
+  // Commerce) so the nav-bar "Shop"/"My Store" badges are already correct
+  // the moment a returning user reaches the Ready screen after a restart,
+  // rather than only after they manually visit either tab once.
+  void refreshCommerceMyOrdersList();
+  void refreshCommerceMerchantOrdersList();
 }
 
 function routeByStatus(status: FedosProfileStatusResult): void {
@@ -2338,6 +2632,10 @@ function routeByStatus(status: FedosProfileStatusResult): void {
     showAppScreen("conversations");
     void refreshConversationsList();
     startRelayStatusPolling();
+    // Commerce Real Two-Party UX Closure (Agent U) -- see `renderReady()`'s
+    // own identical comment above (this is the OTHER Ready-routing path).
+    void refreshCommerceMyOrdersList();
+    void refreshCommerceMerchantOrdersList();
     return;
   }
   if (status.presence === "absent") {
@@ -2783,17 +3081,17 @@ byId<HTMLButtonElement>("commerce-order-back").addEventListener("click", () => {
   void refreshCommerceCatalogList();
 });
 byId<HTMLButtonElement>("commerce-order-submit-btn").addEventListener("click", () =>
-  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderSubmit(id, actor), "commerce-order-error"),
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderSubmit(id, actor), "commerce-order-error", "commerce-order-submit-btn"),
 );
 byId<HTMLButtonElement>("commerce-order-cancel-btn").addEventListener("click", () =>
-  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderCancel(id, actor), "commerce-order-error"),
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderCancel(id, actor), "commerce-order-error", "commerce-order-cancel-btn"),
 );
 byId<HTMLButtonElement>("commerce-order-accept-btn").addEventListener("click", () =>
-  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderAccept(id, actor), "commerce-order-error"),
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderAccept(id, actor), "commerce-order-error", "commerce-order-accept-btn"),
 );
 byId<HTMLButtonElement>("commerce-order-reject-btn").addEventListener("click", () => void onCommerceOrderRejectClick());
 byId<HTMLButtonElement>("commerce-order-fulfill-btn").addEventListener("click", () =>
-  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderFulfill(id, actor), "commerce-order-error"),
+  void onCommerceOrderActionClick((id, actor) => window.fedosApp.commerceOrderFulfill(id, actor), "commerce-order-error", "commerce-order-fulfill-btn"),
 );
 byId<HTMLButtonElement>("commerce-order-payment-request-btn").addEventListener("click", () => void onCommercePaymentRequestClick());
 byId<HTMLButtonElement>("commerce-order-payment-simulate-btn").addEventListener("click", () => void onCommercePaymentSimulateClick());
@@ -2863,6 +3161,16 @@ populateCommerceActorSelect("commerce-merchant-acting-as");
 // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — initial live
 // price preview for the Create Product form's default "0.00" value.
 commerceUpdatePricePreview("commerce-merchant-create-price", "commerce-merchant-create-currency", "commerce-merchant-create-price-preview");
+
+// Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 12
+// (arc §26): reveal the `Current screen: <state>` debug label ONLY when a
+// test harness set `FEDOS_ELECTRON_BETA_AUTOTEST` (see `showScreen()`'s own
+// comment above and `fedosBeta.debugInstrumentationEnabled`'s doc comment
+// in `fedos_electron_beta_window.d.ts`). A plain synchronous property read
+// -- no IPC round-trip, no race with the very first `showScreen()` call.
+if (window.fedosBeta.debugInstrumentationEnabled) {
+  byId("current-screen-row").hidden = false;
+}
 
 void refreshFromStatus();
 })();

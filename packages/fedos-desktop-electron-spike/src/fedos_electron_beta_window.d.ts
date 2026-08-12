@@ -48,6 +48,21 @@ interface FedosBetaBridge {
   readonly status: () => Promise<FedosBetaStatusResult>;
   readonly settingsPlan: (candidate: unknown) => Promise<unknown>;
   readonly settingsApply: (candidate: unknown) => Promise<unknown>;
+  /**
+   * Commerce Real Two-Party UX Closure (Agent U) -- a plain, synchronous
+   * boolean (never a Promise/IPC round-trip; mirrors this file's own
+   * `ACCEPTANCE_MODE_ENABLED` pattern), true whenever
+   * `FEDOS_ELECTRON_BETA_AUTOTEST` is set to ANY non-empty value in the main
+   * process (create/unlock/acceptance/ui-script -- every existing test mode,
+   * never true on an ordinary production launch). The ONLY consumer today is
+   * the renderer's own `Current screen: <state>` debug label (Commerce
+   * Friction Ledger row 12) -- gated behind this flag rather than deleted,
+   * since several real E2E tests read `#current-screen`'s `textContent`
+   * directly via `document.querySelector` (unaffected by this flag either
+   * way -- only VISIBILITY is gated, the text itself is always kept
+   * up to date).
+   */
+  readonly debugInstrumentationEnabled: boolean;
 }
 
 /**
@@ -204,6 +219,19 @@ interface FedosCommerceOrderResult {
   readonly outcome: string;
   readonly reason?: string;
   readonly order?: FedosCommerceOrder;
+  /**
+   * Commerce Real Two-Party UX Closure (Agent U) -- ONLY ever set by
+   * `commerceOrderComplete`'s own result (every other order-action result
+   * sharing this interface simply omits it). Truthfully reports whether the
+   * secondary, non-fatal reputation-attestation issuance
+   * (`issueReputationAttestationsForCompletedOrderNonFatal` in
+   * `fedos_electron_beta_main.cts`) actually succeeded for BOTH parties --
+   * never silently swallowed (Commerce Friction Ledger row 21, arc §42).
+   * The Order itself reaches `"completed"` (this result's own `outcome`)
+   * regardless of this field's value -- the core transaction is never
+   * blocked by the secondary one failing.
+   */
+  readonly reputationSyncStatus?: "recorded" | "unavailable";
 }
 
 interface FedosCommerceOrdersListResult {
