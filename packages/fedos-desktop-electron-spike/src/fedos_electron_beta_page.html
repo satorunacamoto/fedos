@@ -67,19 +67,55 @@
       .commerce-detail-media-fallback { display: flex; align-items: center; justify-content: center; background: #23262b; color: #9bd; font-weight: 600; font-size: 2rem; }
       .commerce-price { font-weight: 600; }
       /* Commerce E2E Completion arc. */
-      .commerce-actor-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; border: 1px dashed #445; border-radius: 4px; background: #1a1d22; }
+      /* Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 19 (arc §43):
+         the "Acting as" <select> previously had a bare `width: auto`, which sizes to its
+         SELECTED option's own text and can exceed a narrow window's content area with no
+         way to shrink -- the real ~380px horizontal-overflow bug. `min-width: 0` is
+         required for a flex item to be allowed to shrink below its content size at all;
+         `flex-wrap: wrap` on the bar itself lets the select drop to its own line rather
+         than forcing horizontal scroll. Applies to BOTH the Commerce and Merchant screens
+         symmetrically -- they share this one class. */
+      .commerce-actor-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.5rem 0.75rem; border: 1px dashed #445; border-radius: 4px; background: #1a1d22; }
       .commerce-actor-bar label { margin: 0; flex: none; }
-      .commerce-actor-bar select { width: auto; }
+      .commerce-actor-bar select { width: 100%; max-width: 22rem; flex: 1 1 12rem; min-width: 0; }
       .commerce-sim-pill { display: inline-block; padding: 0 0.35rem; border-radius: 3px; font-size: 0.7rem; background: #3a341a; color: #fd7; margin-left: 0.4rem; }
       .commerce-order-status { font-weight: 600; }
       .commerce-order-status-paid, .commerce-order-status-completed, .commerce-order-status-delivered { color: #7fd; }
       .commerce-order-status-rejected, .commerce-order-status-cancelled { color: #f97; }
       #commerce-order-history { font-size: 0.8rem; color: #9bd; }
+      /* Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 23 (arc §44):
+         primary/secondary/destructive actions must be visually distinguishable by MORE
+         than color alone (contrast, weight, and size all differ here too). */
+      button.commerce-btn-primary { background: #1c4a7a; border-color: #6cf; color: #eef6ff; font-weight: 700; padding: 0.55rem 1.15rem; }
+      button.commerce-btn-secondary { opacity: 0.82; font-weight: 400; }
+      button.commerce-btn-danger { background: #3a1a1a; border-color: #a55; color: #fbb; font-weight: 600; margin-left: 0.75rem; }
+      /* Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 14 (badge UI
+         half only; Agent D owns the underlying activity data this reads). Reuses the
+         SAME already-fetched My Orders / Incoming Orders lists -- no new polling. */
+      .commerce-nav-badge { display: inline-block; min-width: 1.1rem; padding: 0 0.3rem; margin-left: 0.3rem; border-radius: 999px; background: #6cf; color: #0f1114; font-size: 0.68rem; font-weight: 700; text-align: center; }
+      /* Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 7 (arc §25):
+         symmetric per-status "waiting on the other party" copy, never state-machine jargon. */
+      #commerce-order-waiting { padding: 0.5rem 0.75rem; border: 1px dashed #445; border-radius: 4px; background: #1a1d22; margin: 0.5rem 0; }
+      #commerce-order-waiting:empty { display: none; }
+      /* Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9 (arc §27):
+         friendly buyer/seller/product names as the PRIMARY label; raw hex ids move into
+         this <details> disclosure instead of being deleted (cryptographic traceability
+         stays reachable, just not primary). */
+      #commerce-order-technical-details { margin-top: 0.75rem; }
+      #commerce-order-technical-details summary { cursor: pointer; font-size: 0.8rem; color: #9bd; }
     </style>
   </head>
   <body>
     <h1>FedOS Desktop <span class="warn">— Beta</span></h1>
-    <p class="muted">Current screen: <span id="current-screen">loading</span></p>
+    <!-- Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 12 (arc §26):
+         this debug/state-machine label is production-invisible by default (`hidden` in the
+         markup itself, never relying on JS to hide it). The renderer removes `hidden` ONLY
+         when `window.fedosBeta.debugInstrumentationEnabled` is true (any non-empty
+         FEDOS_ELECTRON_BETA_AUTOTEST value -- every existing test mode). The underlying
+         `#current-screen` element and its `textContent` update are NEVER removed: several
+         real E2E tests read it directly via `document.querySelector`/`.textContent`, which
+         works identically whether or not this row is visually hidden. -->
+    <p class="muted" id="current-screen-row" hidden>Current screen: <span id="current-screen">loading</span></p>
 
     <section id="screen-loading" class="active">
       <p>Loading…</p>
@@ -149,10 +185,19 @@
         <p class="muted" id="release-info"></p>
       </details>
 
+      <!-- Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 8 (arc §28):
+           "Commerce"/"Merchant" renamed to "Shop"/"My Store" (buyer vs. seller reads
+           immediately, unlike the prior pair). NOTE FOR COORDINATOR: Agent S may ALSO
+           touch this nav-language item in a sibling worktree this agent cannot see --
+           if S already renamed these independently, reconcile on merge (last writer's
+           chosen wording wins; both aim at the same friction-ledger row). The badge
+           spans reuse the SAME already-fetched My Orders / Incoming Orders lists (no new
+           IPC, no new polling) -- friction ledger row 14's badge-UI half; Agent D owns
+           the underlying activity DATA this only renders a count from. -->
       <nav id="app-nav" aria-label="Primary">
         <button id="nav-conversations" type="button">Conversations</button>
-        <button id="nav-commerce" type="button">Commerce</button>
-        <button id="nav-commerce-merchant" type="button">Merchant</button>
+        <button id="nav-commerce" type="button">Shop<span id="commerce-my-orders-badge" class="commerce-nav-badge" role="status" aria-live="polite" hidden></span></button>
+        <button id="nav-commerce-merchant" type="button">My Store<span id="commerce-incoming-orders-badge" class="commerce-nav-badge" role="status" aria-live="polite" hidden></span></button>
         <button id="nav-search" type="button">Search</button>
         <button id="nav-archive" type="button">Archive</button>
         <button id="nav-devices" type="button">Devices</button>
@@ -224,7 +269,7 @@
             <label for="commerce-order-quantity">Quantity</label>
             <input id="commerce-order-quantity" type="number" min="1" step="1" value="1" />
             <div id="commerce-order-create-error" class="error" role="alert"></div>
-            <button id="commerce-order-create-submit" type="button">Create Order</button>
+            <button id="commerce-order-create-submit" type="button" class="commerce-btn-primary">Create Order</button>
           </div>
           <p class="muted" id="commerce-detail-order-unavailable-note" hidden>Switch "Acting as" to a customer identity on the Commerce screen to create an order for this product.</p>
         </div>
@@ -233,31 +278,41 @@
           <button id="commerce-order-back" type="button">&larr; Back to Commerce</button>
           <h2>Order</h2>
           <div id="commerce-order-error" class="error" role="alert"></div>
-          <p class="field" id="commerce-order-id"></p>
+          <!-- Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 9 (arc §27):
+               friendly buyer/seller/product names are now the PRIMARY label (reusing the
+               SAME name resolution the Commerce/Product Detail screens already use), with
+               the raw hex ids moved into the <details> disclosure below rather than shown
+               up front. -->
+          <p id="commerce-order-parties"><strong id="commerce-order-parties-text"></strong></p>
           <p>Status: <span class="commerce-order-status" id="commerce-order-status-text"></span></p>
           <p id="commerce-order-summary"></p>
+          <div id="commerce-order-waiting" class="muted" role="status" aria-live="polite"></div>
 
           <div id="commerce-order-review-actions">
             <p class="muted">Review your order, then submit it to the merchant.</p>
-            <button id="commerce-order-submit-btn" type="button">Submit Order</button>
-            <button id="commerce-order-cancel-btn" type="button">Cancel Order</button>
+            <button id="commerce-order-submit-btn" type="button" class="commerce-btn-primary">Submit Order</button>
+            <button id="commerce-order-cancel-btn" type="button" class="commerce-btn-secondary">Cancel Order</button>
           </div>
 
           <div id="commerce-order-merchant-actions">
             <p class="muted">Incoming order — accept to proceed, or reject with an optional reason.</p>
-            <button id="commerce-order-accept-btn" type="button">Accept</button>
+            <button id="commerce-order-accept-btn" type="button" class="commerce-btn-primary">Accept</button>
             <label for="commerce-order-reject-reason">Rejection reason (optional)</label>
             <input id="commerce-order-reject-reason" type="text" maxlength="500" />
-            <button id="commerce-order-reject-btn" type="button">Reject</button>
+            <button id="commerce-order-reject-btn" type="button" class="commerce-btn-danger">Reject</button>
           </div>
 
           <div id="commerce-order-payment-actions">
-            <p class="muted">Merchant accepted — request payment, then (local demo only) simulate an authoritative payment confirmation.</p>
-            <button id="commerce-order-payment-request-btn" type="button">Request Payment</button>
+            <p class="muted">Merchant accepted — pay now, then (local demo only) simulate an authoritative payment confirmation.</p>
+            <!-- Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 6 (arc §24):
+                 renamed from "Request Payment" (a seller-oriented phrase inverted onto the
+                 buyer) to ordinary buyer language. Never exposes PaymentEvidence/
+                 SettlementLedger/provider internals -- see this button's own click handler. -->
+            <button id="commerce-order-payment-request-btn" type="button" class="commerce-btn-primary">Pay Now</button>
             <div id="commerce-order-payment-error" class="error" role="alert"></div>
             <div id="commerce-order-payment-pending" hidden>
               <p class="muted">Payment requested: <span class="field" id="commerce-order-payment-id"></span> — <span id="commerce-order-payment-amount"></span></p>
-              <button id="commerce-order-payment-simulate-btn" type="button">Simulate Payment (TEST/LOCAL) <span class="commerce-sim-pill">NOT REAL MONEY</span></button>
+              <button id="commerce-order-payment-simulate-btn" type="button" class="commerce-btn-primary">Simulate Payment (TEST/LOCAL) <span class="commerce-sim-pill">NOT REAL MONEY</span></button>
             </div>
           </div>
 
@@ -267,24 +322,30 @@
 
           <div id="commerce-order-fulfill-actions">
             <p class="muted">Payment confirmed — fulfill this order.</p>
-            <button id="commerce-order-fulfill-btn" type="button">Mark Fulfilling</button>
+            <button id="commerce-order-fulfill-btn" type="button" class="commerce-btn-primary">Mark Fulfilling</button>
           </div>
 
           <div id="commerce-order-delivery-status" class="muted"></div>
 
           <div id="commerce-order-acknowledge-actions">
             <p class="muted">Merchant has fulfilled this order — once you receive it, confirm receipt yourself. Only your own confirmation (never a merchant claim alone) can mark this delivered.</p>
-            <button id="commerce-order-acknowledge-receipt-btn" type="button">I Received This</button>
+            <button id="commerce-order-acknowledge-receipt-btn" type="button" class="commerce-btn-primary">I Received This</button>
           </div>
 
           <div id="commerce-order-complete-actions">
             <p class="muted">Delivery confirmed — either party may close this order.</p>
-            <button id="commerce-order-complete-btn" type="button">Complete Order</button>
+            <button id="commerce-order-complete-btn" type="button" class="commerce-btn-primary">Complete Order</button>
           </div>
 
           <div id="commerce-order-receipt-actions">
             <p class="muted">Order completed — issue a signed trade receipt and encode it as a QR-transportable proof.</p>
-            <button id="commerce-order-receipt-issue-btn" type="button">Issue Signed Receipt</button>
+            <!-- Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 21 / arc §42:
+                 truthfully reports whether the SECONDARY, non-fatal reputation-record save
+                 succeeded, never silently swallowed. The order itself is already "completed"
+                 regardless of this note's content -- the core transaction was never blocked
+                 by the secondary one. -->
+            <p class="muted" id="commerce-order-completion-note"></p>
+            <button id="commerce-order-receipt-issue-btn" type="button" class="commerce-btn-primary">Issue Signed Receipt</button>
             <div id="commerce-order-receipt-error" class="error" role="alert"></div>
             <div id="commerce-order-receipt-result" hidden>
               <p class="muted">Verification status: <span class="field" id="commerce-order-receipt-verify-status"></span></p>
@@ -293,7 +354,11 @@
             </div>
           </div>
 
-          <p class="muted" id="commerce-order-history"></p>
+          <details id="commerce-order-technical-details">
+            <summary>Technical details (order/product/party ids)</summary>
+            <p class="muted" id="commerce-order-id"></p>
+            <p class="muted" id="commerce-order-history"></p>
+          </details>
         </div>
 
         <div class="app-screen" id="app-screen-commerce-merchant">
@@ -314,7 +379,7 @@
           <label for="commerce-merchant-create-currency">Currency</label>
           <input id="commerce-merchant-create-currency" type="text" maxlength="8" value="USD" />
           <div id="commerce-merchant-create-error" class="error" role="alert"></div>
-          <button id="commerce-merchant-create-submit" type="button">Create Product (draft)</button>
+          <button id="commerce-merchant-create-submit" type="button" class="commerce-btn-primary">Create Product (draft)</button>
 
           <h3>My Products</h3>
           <div id="commerce-merchant-products-error" class="error" role="alert"></div>

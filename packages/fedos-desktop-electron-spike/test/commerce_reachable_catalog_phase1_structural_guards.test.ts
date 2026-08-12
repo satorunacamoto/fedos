@@ -343,7 +343,13 @@ describe("Commerce Reachable Catalog Phase 1 -- synthetic demo catalog shape", (
 describe("Commerce Reachable Catalog Phase 1 -- navigation + Messenger regression", () => {
   it("20. a Commerce nav entry exists alongside Conversations, and the catalog/detail screens are present with a back-to-Commerce control", () => {
     const html = read(HTML_PATH);
-    expect(html).toMatch(/<button id="nav-commerce" type="button">Commerce<\/button>/);
+    // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 8
+    // (arc §28): the VISIBLE label was intentionally renamed "Commerce" ->
+    // "Shop" (immediately readable as the buyer-facing tab, distinct from
+    // "My Store"); the `#nav-commerce` id/wiring/screen ids this test
+    // actually cares about are structurally UNCHANGED -- only this one
+    // literal-text assertion is updated to match the new intentional copy.
+    expect(html).toMatch(/<button id="nav-commerce" type="button">Shop/);
     expect(html).toMatch(/id="app-screen-commerce"/);
     expect(html).toMatch(/id="app-screen-commerce-detail"/);
     expect(html).toMatch(/id="commerce-detail-back"/);

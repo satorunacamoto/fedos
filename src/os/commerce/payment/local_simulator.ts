@@ -111,6 +111,18 @@ export class DeterministicLocalPaymentProvider implements PaymentProvider {
   #ledger = new Map<string, SimulatorLedgerEntry>();
   #nextId = 0;
   /**
+   * Commerce Real Two-Party UX Closure (Agent U) — dedup key -> paymentId.
+   * Mirrors `PlaceholderPaymentProvider`'s own `#idempotency` map
+   * (`../noop_payment.ts`) field-for-field: this provider previously never
+   * read `request.idempotencyKey` at all (a real, confirmed gap — the
+   * Commerce Friction Ledger's row 6 found a double-click on "Request
+   * Payment" mints a second, orphaned `paymentId` in the durable
+   * settlement ledger). `PaymentRequest.idempotencyKey`'s own contract
+   * (`./types.ts`) already required every provider to treat repeat keys as
+   * the same logical request; this class alone had never implemented it.
+   */
+  #idempotency = new Map<string, string>();
+  /**
    * A random-per-instance salt mixed into every generated payment id.
    *
    * Real callers (e.g. the Electron main process) construct a FRESH
@@ -160,6 +172,25 @@ export class DeterministicLocalPaymentProvider implements PaymentProvider {
     if (!Number.isFinite(request.amountCents) || request.amountCents < 0) {
       return this.#decision(request, "rejected", false, "amount must be a non-negative number");
     }
+
+    // Idempotency (Commerce Real Two-Party UX Closure, Agent U): a repeated
+    // key returns the SAME paymentId's current decision, never mints a
+    // second simulator payment -- identical contract and shape to
+    // `PlaceholderPaymentProvider.requestPayment()`'s own established
+    // handling (`../noop_payment.ts`), deliberately not reinvented here.
+    if (request.idempotencyKey !== undefined) {
+      const existingId = this.#idempotency.get(request.idempotencyKey);
+      if (existingId !== undefined) {
+        const existing = this.#ledger.get(existingId);
+        return {
+          ...this.#decision(request, "accepted_placeholder", true, "TEST/LOCAL SIMULATOR: idempotent replay -- same payment as the original request"),
+          paymentId: existingId,
+          idempotencyKey: request.idempotencyKey,
+          ...(existing?.expiresAt !== undefined ? { expiresAt: existing.expiresAt } : {}),
+        };
+      }
+    }
+
     const now = Math.floor(Date.now() / 1000);
     if (request.expiresAt !== undefined && request.expiresAt <= now) {
       return this.#decision(request, "expired", false, "request's expiresAt is already in the past");
@@ -172,6 +203,9 @@ export class DeterministicLocalPaymentProvider implements PaymentProvider {
       status: "pending",
       expiresAt: request.expiresAt,
     });
+    if (request.idempotencyKey !== undefined) {
+      this.#idempotency.set(request.idempotencyKey, paymentId);
+    }
 
     return {
       ...this.#decision(
@@ -181,6 +215,7 @@ export class DeterministicLocalPaymentProvider implements PaymentProvider {
         "TEST/LOCAL SIMULATOR: request accepted, awaiting an explicit simulateSettlement() call -- never auto-confirmed",
       ),
       paymentId,
+      ...(request.idempotencyKey !== undefined ? { idempotencyKey: request.idempotencyKey } : {}),
       ...(request.expiresAt !== undefined ? { expiresAt: request.expiresAt } : {}),
     };
   }

@@ -890,7 +890,17 @@ interface CommercePaymentEvidenceLike {
   readonly verification?: { readonly source: string; readonly authoritative: boolean };
 }
 interface CommerceLocalPaymentProviderLike {
-  requestPayment(request: { readonly productId: string; readonly orderId?: string; readonly buyerPubkey?: string; readonly amountCents: number; readonly currency: string; readonly expiresAt?: number }): Promise<{
+  /**
+   * Commerce Real Two-Party UX Closure (Agent U) — `idempotencyKey` added to
+   * the request shape this file passes through. `os/commerce/payment/types.ts`'s
+   * own `PaymentRequest.idempotencyKey` already existed; this local `*Like`
+   * structural mirror had simply never been updated to carry it, which is
+   * the entire reason `handleCommercePaymentRequest()` below could never
+   * honor it even though `DeterministicLocalPaymentProvider` (once fixed the
+   * SAME arc, see `payment/local_simulator.ts`) now implements it exactly
+   * like its sibling `PlaceholderPaymentProvider` already did.
+   */
+  requestPayment(request: { readonly productId: string; readonly orderId?: string; readonly buyerPubkey?: string; readonly amountCents: number; readonly currency: string; readonly expiresAt?: number; readonly idempotencyKey?: string }): Promise<{
     readonly allowed: boolean;
     readonly status: string;
     readonly reason: string;
@@ -898,6 +908,7 @@ interface CommerceLocalPaymentProviderLike {
     readonly orderId?: string;
     readonly paymentId?: string;
     readonly expiresAt?: number;
+    readonly idempotencyKey?: string;
   }>;
   simulateSettlement(paymentId: string, outcome: "settled" | "failed" | "expired" | "refunded"): Promise<CommercePaymentEvidenceLike>;
 }
@@ -1685,19 +1696,30 @@ function commerceReputationCategoryForProductKind(kind: string): "digital_good" 
  * after a retried IPC call) never blocks, rolls back, or corrupts the
  * Order/Payment/Delivery state that already committed before this is
  * called. See `handleCommerceOrderComplete()`'s own call site.
+ *
+ * Commerce Real Two-Party UX Closure (Agent U) -- this used to return
+ * `Promise<void>` and both `issueTradeCompletionAttestation()` results were
+ * discarded entirely, so a failure here (or an early "no persona epoch"
+ * return) was 100% invisible to the caller and, in turn, to the renderer
+ * (Commerce Friction Ledger row 21 / arc §42: "reputation-attestation...
+ * failures are 100% silently swallowed"). Still non-fatal to the Order
+ * itself (the try/catch below still never rethrows, and the caller still
+ * never rolls back an already-committed Order) -- but now returns whether
+ * BOTH attestations genuinely succeeded, so `handleCommerceOrderComplete()`
+ * can tell the renderer the truth instead of staying silent either way.
  */
-async function issueReputationAttestationsForCompletedOrderNonFatal(order: CommerceOrderLike, now: number): Promise<void> {
+async function issueReputationAttestationsForCompletedOrderNonFatal(order: CommerceOrderLike, now: number): Promise<boolean> {
   try {
     const m = requireModules();
     const state = commerceState();
     const { store } = commerceReputationState();
     const buyer = await commercePersonaEpochForPubkey(order.buyerPubkey, true);
     const seller = await commercePersonaEpochForPubkey(order.sellerPubkey, true);
-    if (buyer === undefined || seller === undefined) return;
+    if (buyer === undefined || seller === undefined) return false;
     const product = state.products.get(order.productId);
     const category = commerceReputationCategoryForProductKind(product?.kind ?? "other");
     const deps = { orderRepository: state.orders, store };
-    m.Reputation.issueTradeCompletionAttestation(
+    const buyerAttestation = m.Reputation.issueTradeCompletionAttestation(
       deps,
       {
         orderId: order.id,
@@ -1711,7 +1733,7 @@ async function issueReputationAttestationsForCompletedOrderNonFatal(order: Comme
       },
       now,
     );
-    m.Reputation.issueTradeCompletionAttestation(
+    const sellerAttestation = m.Reputation.issueTradeCompletionAttestation(
       deps,
       {
         orderId: order.id,
@@ -1725,8 +1747,10 @@ async function issueReputationAttestationsForCompletedOrderNonFatal(order: Comme
       },
       now,
     );
+    return buyerAttestation.ok && sellerAttestation.ok;
   } catch (err) {
     console.error("fedos-beta: reputation attestation issuance failed (non-fatal, Commerce completion unaffected):", err);
+    return false;
   }
 }
 
@@ -3173,15 +3197,33 @@ async function handleCommercePaymentRequest(payload: unknown) {
   if (order === undefined) return { outcome: "not-found", reason: "no such order" };
   if (order.status !== "accepted") return { outcome: "rejected", reason: `order must be "accepted" before a payment request can be made (currently "${order.status}")` };
 
+  // Commerce Real Two-Party UX Closure (Agent U) -- `order.id` is the
+  // idempotency key: this is a request to pay THIS order, so any repeat
+  // request for the same order (double-click before the button-disable
+  // below takes effect, or a retried IPC call) must resolve to the SAME
+  // paymentId, never mint a second orphaned one in the durable
+  // `DurablePaymentSettlementLedger`. Mirrors `PlaceholderPaymentProvider`'s
+  // own established idempotency contract exactly (see
+  // `os/commerce/payment/noop_payment.ts`) -- no new mechanism invented.
   const decision = await state.payments.requestPayment({
     productId: order.productId,
     orderId: order.id,
     buyerPubkey: order.buyerPubkey,
     amountCents: order.unitPriceCents * order.quantity,
     currency: order.currency,
+    idempotencyKey: order.id,
   });
   if (!decision.allowed || decision.paymentId === undefined) return { outcome: "rejected", reason: decision.reason };
-  state.ledger.bind(decision.paymentId, order.id, order.productId);
+  // Commerce Real Two-Party UX Closure (Agent U) -- an idempotent replay
+  // (same `decision.paymentId` as an already-bound request for this same
+  // order) must NOT call `bind()` again: `DurablePaymentSettlementLedger`/
+  // `PaymentSettlementLedger.bind()` both throw on a duplicate paymentId
+  // (see that class's own doc comment) -- without this guard, honoring
+  // `idempotencyKey` above would just move the double-click crash from "two
+  // orphaned paymentIds" to "an unhandled bind() throw on the second click."
+  if (state.ledger.get(decision.paymentId) === undefined) {
+    state.ledger.bind(decision.paymentId, order.id, order.productId);
+  }
   return { outcome: "ok", paymentId: decision.paymentId, amountCents: order.unitPriceCents * order.quantity, currency: order.currency, reason: decision.reason };
 }
 
@@ -3303,12 +3345,21 @@ async function handleCommerceOrderComplete(payload: unknown) {
   // -- AFTER the real Order (and, if present, Delivery) state has already
   // committed above. Awaited (so a test can observe it deterministically)
   // but wrapped in its own total try/catch (see that function's own doc
-  // comment) -- a reputation-issuance failure can only ever be logged
-  // here, never surfaced as this call's own `outcome`, never able to
-  // revert `orderResult.order` having already been saved.
-  await issueReputationAttestationsForCompletedOrderNonFatal(orderResult.order, now);
+  // comment) -- a reputation-issuance failure can never revert
+  // `orderResult.order` having already been saved, and never changes this
+  // call's own `outcome` (the CORE transaction -- the Order reaching
+  // "completed" -- succeeds either way, per arc §42). Commerce Real
+  // Two-Party UX Closure (Agent U): the outcome is no longer discarded --
+  // `reputationSyncStatus` below lets the renderer say so truthfully
+  // instead of staying silent regardless of what actually happened
+  // (Commerce Friction Ledger row 21).
+  const reputationRecorded = await issueReputationAttestationsForCompletedOrderNonFatal(orderResult.order, now);
 
-  return { outcome: "ok", order: commerceOrderDto(orderResult.order) };
+  return {
+    outcome: "ok",
+    order: commerceOrderDto(orderResult.order),
+    reputationSyncStatus: reputationRecorded ? "recorded" : "unavailable",
+  };
 }
 
 /**

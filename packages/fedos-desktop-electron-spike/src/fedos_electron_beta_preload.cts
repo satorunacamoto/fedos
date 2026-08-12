@@ -30,6 +30,18 @@ import { contextBridge, ipcRenderer } from "electron";
  */
 const ACCEPTANCE_MODE_ENABLED = process.env.FEDOS_ELECTRON_BETA_AUTOTEST === "acceptance";
 
+/**
+ * Commerce Real Two-Party UX Closure (Agent U) -- mirrors
+ * `ACCEPTANCE_MODE_ENABLED` immediately above (same env var, same "preload
+ * has its own real `process.env` snapshot" precedent), but widened to ANY
+ * non-empty `FEDOS_ELECTRON_BETA_AUTOTEST` value, not just `"acceptance"` --
+ * every existing test mode (`create`/`unlock`/`acceptance`/`ui-script`) sets
+ * this, and none of them is ever set on an ordinary production launch. See
+ * `fedosBeta.debugInstrumentationEnabled`'s own doc comment
+ * (`fedos_electron_beta_window.d.ts`) for what this gates and why.
+ */
+const AUTOTEST_MODE_ACTIVE = (process.env.FEDOS_ELECTRON_BETA_AUTOTEST ?? "").length > 0;
+
 const MAX_PASSPHRASE_CHARS = 4096;
 const MAX_LABEL_CHARS = 256;
 /** Secure Runtime Alpha 7001-7080 — mirrors `MAX_LABEL_CHARS` above; sized for an id/conversationId/deviceId, never a secret. */
@@ -67,6 +79,7 @@ const fedosBeta: FedosBetaBridge = Object.freeze({
   status: () => ipcRenderer.invoke("fedos-beta:status"),
   settingsPlan: (candidate: unknown) => ipcRenderer.invoke("fedos-beta:settings-plan", candidate),
   settingsApply: (candidate: unknown) => ipcRenderer.invoke("fedos-beta:settings-apply", candidate),
+  debugInstrumentationEnabled: AUTOTEST_MODE_ACTIVE,
 });
 
 const fedosAcceptance: FedosAcceptanceBridge = Object.freeze({
