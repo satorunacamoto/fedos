@@ -991,6 +991,54 @@ interface RootModules {
     }>;
     readonly COMMERCE_PRIVATE_ORDER_SYNC_TAG: string;
     readonly PRIVATE_ORDER_SYNC_STATUS_ACTION: Readonly<Record<string, { readonly action: string; readonly actorKind: "customer" | "merchant" | "either" }>>;
+    /**
+     * FedOS Commerce Purchase Completion mega-arc (Agent D) -- the PRIVATE
+     * `Delivery`/status transport (arc "Cross-process delivery"
+     * requirement). Same shape/design as `RealCommercePrivateOrderTransport`/
+     * `verifyAndDecryptInboundPrivateOrderEnvelope` above -- see
+     * `commerce_private_delivery_bridge.ts`'s own header for why this
+     * reuses the SAME NIP-44-direct + real signing/relay primitives rather
+     * than a second transport stack.
+     */
+    readonly RealCommercePrivateDeliveryTransport: new (options: {
+      readonly signingAuthority: unknown;
+      readonly relayPublisher: unknown;
+      readonly nip44Wire: unknown;
+      readonly accountIndex: number;
+    }) => { send(payload: unknown, counterpartyPublicKeyHex: string): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }> };
+    readonly verifyAndDecryptInboundPrivateDeliveryEnvelope: (
+      event: unknown,
+      options: { readonly nip44Wire: unknown; readonly localAccountIndex: number },
+    ) => Promise<{
+      readonly outcome: string;
+      readonly eventId: string;
+      readonly senderPubkeyHex: string;
+      readonly payload?: {
+        readonly deliveryId: string;
+        readonly orderId: string;
+        readonly buyerPubkey: string;
+        readonly sellerPubkey: string;
+        readonly action: string;
+        readonly reason?: string;
+        readonly at: number;
+      };
+    }>;
+    readonly COMMERCE_PRIVATE_DELIVERY_SYNC_TAG: string;
+    /** Pure reconciliation logic, `src/os/commerce/events/commerce_private_delivery_apply.ts` -- see that file's own header. Loaded here (not `Commerce`) since it is a private-sync-only concern, mirroring where `RealCommercePrivateDeliveryTransport` itself lives. */
+    readonly applyInboundPrivateDeliverySyncPayload: (input: {
+      readonly existingDelivery: CommerceDeliveryRecordLike | undefined;
+      readonly orderPaymentConfirmed: boolean;
+      readonly senderPubkeyHex: string;
+      readonly payload: {
+        readonly deliveryId: string;
+        readonly orderId: string;
+        readonly buyerPubkey: string;
+        readonly sellerPubkey: string;
+        readonly action: string;
+        readonly reason?: string;
+        readonly at: number;
+      };
+    }) => { readonly outcome: "applied"; readonly delivery: CommerceDeliveryRecordLike } | { readonly outcome: "no-op" } | { readonly outcome: "rejected"; readonly reason: string };
   };
 }
 
@@ -1533,6 +1581,21 @@ async function loadRootModules(): Promise<RootModules> {
   const commercePrivateOrderSyncShapes = (await import(distUrl("os", "commerce", "events", "commerce_private_order_sync.js"))) as {
     PRIVATE_ORDER_SYNC_STATUS_ACTION: RootModules["CommerceNostr"]["PRIVATE_ORDER_SYNC_STATUS_ACTION"];
   };
+  // FedOS Commerce Purchase Completion mega-arc (Agent D) -- private
+  // Delivery/status transport (arc "Cross-process delivery" requirement).
+  // Two new `tsconfig.beta-runtime.json` entries, mirroring the private
+  // Order transport's own two exactly, plus the pure reconciliation
+  // function's own module.
+  const commercePrivateDeliveryBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_private_delivery_bridge.js")
+  )) as {
+    RealCommercePrivateDeliveryTransport: RootModules["CommerceNostr"]["RealCommercePrivateDeliveryTransport"];
+    verifyAndDecryptInboundPrivateDeliveryEnvelope: RootModules["CommerceNostr"]["verifyAndDecryptInboundPrivateDeliveryEnvelope"];
+    COMMERCE_PRIVATE_DELIVERY_SYNC_TAG: string;
+  };
+  const commercePrivateDeliveryApply = (await import(distUrl("os", "commerce", "events", "commerce_private_delivery_apply.js"))) as {
+    applyInboundPrivateDeliverySyncPayload: RootModules["CommerceNostr"]["applyInboundPrivateDeliverySyncPayload"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
@@ -1620,6 +1683,10 @@ async function loadRootModules(): Promise<RootModules> {
       verifyAndDecryptInboundPrivateOrderEnvelope: commercePrivateOrderBridge.verifyAndDecryptInboundPrivateOrderEnvelope,
       COMMERCE_PRIVATE_ORDER_SYNC_TAG: commercePrivateOrderBridge.COMMERCE_PRIVATE_ORDER_SYNC_TAG,
       PRIVATE_ORDER_SYNC_STATUS_ACTION: commercePrivateOrderSyncShapes.PRIVATE_ORDER_SYNC_STATUS_ACTION,
+      RealCommercePrivateDeliveryTransport: commercePrivateDeliveryBridge.RealCommercePrivateDeliveryTransport,
+      verifyAndDecryptInboundPrivateDeliveryEnvelope: commercePrivateDeliveryBridge.verifyAndDecryptInboundPrivateDeliveryEnvelope,
+      COMMERCE_PRIVATE_DELIVERY_SYNC_TAG: commercePrivateDeliveryBridge.COMMERCE_PRIVATE_DELIVERY_SYNC_TAG,
+      applyInboundPrivateDeliverySyncPayload: commercePrivateDeliveryApply.applyInboundPrivateDeliverySyncPayload,
     },
   };
 }
@@ -2602,6 +2669,208 @@ async function commercePrivateOrderDiscoverAndApplyNonFatal(): Promise<void> {
     }
   } catch (err) {
     console.error("fedos-beta: private Order sync discovery query failed (non-fatal, local Orders unaffected):", err);
+  }
+}
+
+// ---------------------------------------------------------------------
+// FedOS Commerce Purchase Completion mega-arc (Agent D) -- PRIVATE
+// Delivery/status transport ("Cross-process delivery" requirement). Mirrors
+// the private Order transport immediately above exactly: same lazy
+// construction/gating, same non-fatal "local state already committed,
+// this is best-effort notification only" discipline. Closes a real,
+// confirmed gap: before this pass, `DeliveryRecord` never left the
+// process that created it (the buyer's own independent process never
+// materialized one at all, and `handleCommerceDeliveryAcknowledgeReceipt`
+// never notified the seller's process either) -- see
+// `commerce_private_delivery_sync.ts`'s own header for exactly which
+// three Delivery actions are safe to relay this way and why, and
+// `commerce_private_delivery_apply.ts` for the receive-side reconciliation
+// this section only wires I/O around.
+// ---------------------------------------------------------------------
+
+interface CommercePrivateDeliveryTransportLike {
+  send(payload: unknown, counterpartyPublicKeyHex: string): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+}
+
+let commercePrivateDeliveryTransport: CommercePrivateDeliveryTransportLike | null = null;
+let commercePrivateDeliveryTransportProfileRef: CommerceNetworkProfileValue | null = null;
+let commercePrivateDeliveryTransportSignerRef: NostrSigningAuthorityLike | null = null;
+/** Same process-lifetime dedup discipline as `commercePrivateOrderAppliedEventIds`. */
+const commercePrivateDeliveryAppliedEventIds = new Set<string>();
+
+function commercePrivateDeliveryTransportFor(): CommercePrivateDeliveryTransportLike | null {
+  if (commerceNetworkProfile === "local-only") return null;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return null;
+  const m = requireModules();
+  if (
+    commercePrivateDeliveryTransport === null ||
+    commercePrivateDeliveryTransportProfileRef !== commerceNetworkProfile ||
+    commercePrivateDeliveryTransportSignerRef !== activeNostrSigningAuthority
+  ) {
+    const relayUrl = activeRelays[0]?.url ?? "";
+    const relayPublisher = new m.CommerceNostr.WebSocketRelayPublisher(relayUrl, { factory: m.createNodeWebSocketRelaySocketFactory() });
+    commercePrivateDeliveryTransport = new m.CommerceNostr.RealCommercePrivateDeliveryTransport({
+      signingAuthority: activeNostrSigningAuthority,
+      relayPublisher,
+      nip44Wire: activeMasterSeedAuthority,
+      accountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+    });
+    commercePrivateDeliveryTransportProfileRef = commerceNetworkProfile;
+    commercePrivateDeliveryTransportSignerRef = activeNostrSigningAuthority;
+  }
+  return commercePrivateDeliveryTransport;
+}
+
+/**
+ * Best-effort, non-fatal private notification to `recipientPubkeyHex` after
+ * a LOCAL Delivery transition already committed. Mirrors
+ * `sendPrivateOrderSyncNonFatal()`'s own discipline exactly -- a failure
+ * here never unwinds the already-saved local Delivery.
+ */
+async function sendPrivateDeliverySyncNonFatal(
+  delivery: CommerceDeliveryRecordLike,
+  action: "fulfilling" | "recipient_acknowledged" | "completed",
+  recipientPubkeyHex: string,
+  now: number,
+  reason?: string,
+): Promise<string> {
+  const transport = commercePrivateDeliveryTransportFor();
+  if (transport === null) return "network-disabled";
+  try {
+    const payload: Record<string, unknown> = {
+      category: "private-delivery-sync",
+      formatVersion: 1,
+      deliveryId: delivery.id,
+      orderId: delivery.orderId,
+      buyerPubkey: delivery.buyerPubkey,
+      sellerPubkey: delivery.sellerPubkey,
+      action,
+      at: now,
+    };
+    if (reason !== undefined) payload.reason = reason;
+    const result = await transport.send(payload, recipientPubkeyHex);
+    if (result.accepted) return "published";
+    return result.message.length > 0 ? result.message : "transport-error";
+  } catch (err) {
+    console.error("fedos-beta: private Delivery sync attempt failed (non-fatal, local Delivery state unaffected):", err);
+    return "transport-error";
+  }
+}
+
+/**
+ * Applies ONE already-decrypted, already-signature-verified inbound
+ * private-delivery envelope to this process's own authoritative
+ * `commerceState().deliveries` -- via the pure
+ * `applyInboundPrivateDeliverySyncPayload()`
+ * (`commerce_private_delivery_apply.ts`), never a direct field write. Also
+ * mirrors the Order-side "delivered" transition onto this process's own
+ * `commerceState().orders` when the Delivery itself just reached
+ * `"delivered"` -- the exact same two-domain update
+ * `handleCommerceDeliveryAcknowledgeReceipt` already performs for a LOCAL
+ * acknowledgment, now also performed for a REMOTE one. Never throws; any
+ * rejection is a silent, safe drop (no human is waiting on an inbound
+ * event's own result).
+ */
+function applyInboundPrivateDeliverySyncNonFatal(envelope: {
+  readonly outcome: string;
+  readonly eventId: string;
+  readonly senderPubkeyHex: string;
+  readonly payload?: {
+    readonly deliveryId: string;
+    readonly orderId: string;
+    readonly buyerPubkey: string;
+    readonly sellerPubkey: string;
+    readonly action: string;
+    readonly reason?: string;
+    readonly at: number;
+  };
+}): void {
+  if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
+  if (commercePrivateDeliveryAppliedEventIds.has(envelope.eventId)) return;
+  commercePrivateDeliveryAppliedEventIds.add(envelope.eventId);
+
+  const payload = envelope.payload;
+  const m = requireModules();
+  const state = commerceState();
+  const existingDelivery = state.deliveries.findByOrderId(payload.orderId);
+  const localOrder = state.orders.findById(payload.orderId);
+  const orderPaymentConfirmed = localOrder !== undefined && m.Commerce.isQualifyingOrderStatusForMediaAccess(localOrder.status);
+
+  const result = m.CommerceNostr.applyInboundPrivateDeliverySyncPayload({
+    existingDelivery,
+    orderPaymentConfirmed,
+    senderPubkeyHex: envelope.senderPubkeyHex,
+    payload,
+  });
+  if (result.outcome !== "applied") return;
+  state.deliveries.save(result.delivery);
+
+  // Mirror onto the local Order, exactly like `handleCommerceDeliveryAcknowledgeReceipt`
+  // does for a same-process acknowledgment -- only when the Delivery
+  // genuinely just reached "delivered" (never re-derived from the wire
+  // payload's own `action` string alone; re-checked against the REAL,
+  // just-applied Delivery status).
+  if (result.delivery.status === "delivered" && localOrder !== undefined && localOrder.status === "fulfilling") {
+    const orderEvidence = {
+      orderId: localOrder.id,
+      deliveryId: result.delivery.id,
+      status: "delivered" as const,
+      observedAt: payload.at,
+      reason: payload.reason ?? "customer acknowledged receipt",
+    };
+    const orderResult = m.Commerce.applyOrderAction(
+      localOrder,
+      { type: "confirm_delivery", actor: { kind: "delivery_evidence" }, evidence: orderEvidence } as CommerceOrderActionLike,
+      payload.at,
+    );
+    if (orderResult.ok && orderResult.order !== undefined) state.orders.save(orderResult.order);
+  }
+}
+
+/**
+ * The receive-side counterpart of `commercePrivateOrderDiscoverAndApplyNonFatal()`,
+ * for Delivery sync events. Called from the same "bounded reliable-refresh"
+ * points: the Orders list handlers, the Delivery-status poll, and before a
+ * buyer's own acknowledge-receipt action (so it always acts against a
+ * freshly-materialized local Delivery record, never a stale/missing one).
+ */
+async function commercePrivateDeliveryDiscoverAndApplyNonFatal(): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return;
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return;
+
+  const m = requireModules();
+  const signer = activeNostrSigningAuthority;
+  const nip44Wire = activeMasterSeedAuthority;
+  try {
+    const ownIdentity = await signer.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      { kinds: [1], "#t": [m.CommerceNostr.COMMERCE_PRIVATE_DELIVERY_SYNC_TAG], "#p": [ownIdentity.publicKeyHex], limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT },
+    ]);
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndDecryptInboundPrivateDeliveryEnvelope(event, {
+          nip44Wire,
+          localAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+        });
+        applyInboundPrivateDeliverySyncNonFatal(envelope);
+      } catch (err) {
+        console.error("fedos-beta: private Delivery sync -- one candidate event failed to decrypt/apply (non-fatal, skipped):", err);
+      }
+    }
+  } catch (err) {
+    console.error("fedos-beta: private Delivery sync discovery query failed (non-fatal, local Delivery state unaffected):", err);
   }
 }
 
@@ -4177,7 +4446,17 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
         { type: "start_fulfillment", actor: { kind: "merchant", pubkey: result.order.sellerPubkey }, claim: { deliveryId: delivery.id, orderId: result.order.id, claimedAt: now } },
         now,
       );
-      if (started.ok && started.delivery !== undefined) state.deliveries.save(started.delivery);
+      if (started.ok && started.delivery !== undefined) {
+        state.deliveries.save(started.delivery);
+        // FedOS Commerce Purchase Completion mega-arc (Agent D) --
+        // "Cross-process delivery": privately notify the REAL buyer's own
+        // independent process of this Delivery, so their process can
+        // materialize its own local `DeliveryRecord` (it never had one
+        // before this call) rather than staying stuck at "no delivery
+        // record for this order yet" forever. Best-effort/non-fatal, same
+        // posture as `sendPrivateOrderSyncNonFatal()` immediately below.
+        await sendPrivateDeliverySyncNonFatal(started.delivery, "fulfilling", result.order.buyerPubkey, now);
+      }
     }
     // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
     // (Agent D) -- arc §35-37 / friction-ledger row #15: the ONE real
@@ -4271,6 +4550,9 @@ async function handleCommerceOrdersListMine(payload: unknown) {
   // before listing, same posture as the public catalog's own
   // discovery-on-load.
   await commercePrivateOrderDiscoverAndApplyNonFatal();
+  // FedOS Commerce Purchase Completion mega-arc (Agent D) -- same bounded
+  // refresh, for the Delivery-sync channel (arc "Cross-process delivery").
+  await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listByBuyer(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -4280,6 +4562,7 @@ async function handleCommerceOrdersListIncoming(payload: unknown) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
   await commercePrivateOrderDiscoverAndApplyNonFatal();
+  await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listBySeller(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -4380,6 +4663,19 @@ function commerceDeliveryDto(delivery: CommerceDeliveryRecordLike) {
 async function handleCommerceDeliveryStatus(payload: unknown) {
   const orderId = (payload as { orderId?: unknown } | null)?.orderId;
   if (!isBoundedString(orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
+  // FedOS Commerce Purchase Completion mega-arc (Agent D) -- bounded
+  // reliable-refresh, same posture as `commercePrivateOrderDiscoverAndApplyNonFatal()`'s
+  // own callers: pull any private Order- AND Delivery-sync updates this
+  // process's own pubkey has received (e.g. the seller's "fulfilling"
+  // claim materializing this process's own local `DeliveryRecord` for the
+  // very first time) before reading local state. Order-sync runs FIRST so
+  // that when a "recipient_acknowledged" Delivery event is reconciled
+  // below, this process's own local Order has already had its best chance
+  // to reach "fulfilling" first -- `applyInboundPrivateDeliverySyncNonFatal()`'s
+  // own Order-mirror only fires when that is already true (never blindly
+  // trusts wire-event ordering).
+  await commercePrivateOrderDiscoverAndApplyNonFatal();
+  await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   const delivery = commerceState().deliveries.findByOrderId(orderId);
   if (delivery === undefined) return { outcome: "not-found", reason: "no delivery record for this order yet" };
   return { outcome: "ok", delivery: commerceDeliveryDto(delivery) };
@@ -4390,6 +4686,11 @@ async function handleCommerceDeliveryAcknowledgeReceipt(payload: unknown) {
   if (!isBoundedString(body?.orderId, MAX_ID_LENGTH) || !isBoundedString(body.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
     return { outcome: "invalid-input", reason: "malformed orderId/actorPubkey" };
   }
+  // Same bounded refresh as `handleCommerceDeliveryStatus()` -- acts
+  // against a freshly-materialized local Delivery record, never a stale or
+  // entirely-missing one.
+  await commercePrivateOrderDiscoverAndApplyNonFatal();
+  await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   const state = commerceState();
   const order = state.orders.findById(body.orderId);
   if (order === undefined) return { outcome: "not-found", reason: "no such order" };
@@ -4408,6 +4709,17 @@ async function handleCommerceDeliveryAcknowledgeReceipt(payload: unknown) {
   const orderResult = m.Commerce.applyOrderAction(order, { type: "confirm_delivery", actor: { kind: "delivery_evidence" }, evidence: orderEvidence } as CommerceOrderActionLike, now);
   if (!orderResult.ok || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
   state.orders.save(orderResult.order);
+
+  // FedOS Commerce Purchase Completion mega-arc (Agent D) -- "Cross-process
+  // delivery" / "Delivery authority": privately notify the REAL seller's
+  // own independent process that the buyer genuinely acknowledged receipt
+  // -- this is the ONE call site anywhere that ever sends a
+  // "recipient_acknowledged" wire payload, and it only runs AFTER
+  // `body.actorPubkey` has already been confirmed to equal `order.buyerPubkey`
+  // above, so a seller's own process can never trigger this send for
+  // itself. Best-effort/non-fatal, same posture as every other private
+  // sync send in this file.
+  await sendPrivateDeliverySyncNonFatal(deliveryResult.delivery, "recipient_acknowledged", order.sellerPubkey, now, "customer acknowledged receipt");
 
   return { outcome: "ok", order: commerceOrderDto(orderResult.order), delivery: commerceDeliveryDto(deliveryResult.delivery) };
 }
@@ -4429,9 +4741,13 @@ async function handleCommerceOrderComplete(payload: unknown) {
   state.orders.save(orderResult.order);
 
   const delivery = state.deliveries.findByOrderId(body.orderId);
+  let deliveryJustCompleted: CommerceDeliveryRecordLike | undefined;
   if (delivery !== undefined) {
     const deliveryResult = m.Commerce.applyDeliveryAction(delivery, { type: "acknowledge", actor: { kind: actorKind, pubkey: body.actorPubkey } }, now);
-    if (deliveryResult.ok && deliveryResult.delivery !== undefined) state.deliveries.save(deliveryResult.delivery);
+    if (deliveryResult.ok && deliveryResult.delivery !== undefined) {
+      state.deliveries.save(deliveryResult.delivery);
+      deliveryJustCompleted = deliveryResult.delivery;
+    }
   }
 
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator, Agent R's own
@@ -4453,6 +4769,12 @@ async function handleCommerceOrderComplete(payload: unknown) {
   // Coordinator-directed pass) -- arc items #4/#5: notify the OTHER party.
   const recipientPubkey = actorKind === "customer" ? orderResult.order.sellerPubkey : orderResult.order.buyerPubkey;
   const nostrSyncOutcome = await sendPrivateOrderSyncNonFatal(orderResult.order, "completed", recipientPubkey, now);
+  // FedOS Commerce Purchase Completion mega-arc (Agent D) -- mirror onto
+  // the Delivery-sync channel too, when a real local Delivery record just
+  // closed out alongside the Order.
+  if (deliveryJustCompleted !== undefined) {
+    await sendPrivateDeliverySyncNonFatal(deliveryJustCompleted, "completed", recipientPubkey, now);
+  }
 
   return {
     outcome: "ok",
