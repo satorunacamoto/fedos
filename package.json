@@ -38,7 +38,8 @@
     "start:electron-unlock": "npm run start:unlock --prefix packages/fedos-desktop-electron-spike",
     "start:electron-settings": "npm run start:settings --prefix packages/fedos-desktop-electron-spike",
     "start:electron-beta": "npm run start:beta --prefix packages/fedos-desktop-electron-spike",
-    "trust:issuer": "tsc -p tsconfig.trust-issuer.json && node scripts/fedos_trust_issuer_cli.mjs"
+    "trust:issuer": "tsc -p tsconfig.trust-issuer.json && node scripts/fedos_trust_issuer_cli.mjs",
+    "guard:release-node-modules": "node scripts/release/guard_no_junctioned_node_modules.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",

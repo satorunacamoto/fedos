@@ -141,10 +141,15 @@ roadmap's own optimism:
   any real application boundary (`archiveDirectory`, `autoStart`,
   `autoLockTimeoutMinutes`, `windowLayout` — present in the settings
   descriptor, not yet exposed in the Settings UI form).
-- Board/Marketplace/Commerce/Creator/Federation verticals — real
-  scaffolding exists from before the product pivot; reviving any of them
-  is a strategic product decision requiring explicit authorization, not
-  a technical task.
+- Board/Marketplace/Creator (beyond what Commerce reuses)/Federation
+  verticals — real scaffolding exists from before the product pivot;
+  reviving any of them is a strategic product decision requiring explicit
+  authorization, not a technical task. **Commerce is a partial exception**:
+  as of the Commerce E2E Completion arc, a real Order → TEST/LOCAL payment
+  → Delivery → signed Trust receipt vertical slice is already reachable
+  from the shipped Desktop app (see `README.md`'s "Commerce" section) — a
+  real payment rail, Nostr publication, and reputation/persona UI remain
+  future, authorization-requiring work.
 
 ## Explicitly recommended AGAINST
 

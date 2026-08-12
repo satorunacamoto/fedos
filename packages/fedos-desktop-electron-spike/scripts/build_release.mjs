@@ -13,18 +13,23 @@
 // script is pure npm/Node, run strictly AFTER any Cargo step completes).
 //
 // Order (real steps this script performs):
-//   1. verify a clean working tree (dirty-tree public artifacts forbidden)
-//   2. verify the package allowlist config
-//   3. build the root beta-runtime dist/ graph
-//   4. build the Electron package (main/preload/renderer/static assets)
-//   5. run electron-builder (NSIS + ZIP), via the EXISTING
+//   1. verify node_modules integrity (no junction/symlink, added by the
+//      Commerce Mainline Integration arc — see
+//      `scripts/release/guard_no_junctioned_node_modules.mjs`'s own
+//      header for why a junctioned node_modules is genuinely dangerous
+//      here, not merely a style preference)
+//   2. verify a clean working tree (dirty-tree public artifacts forbidden)
+//   3. verify the package allowlist config
+//   4. build the root beta-runtime dist/ graph
+//   5. build the Electron package (main/preload/renderer/static assets)
+//   6. run electron-builder (NSIS + ZIP), via the EXISTING
 //      package.json-snapshot/restore-protected wrapper
 //      (`run_electron_builder_package_beta.mjs`, unmodified)
-//   6. generate the release manifest
-//   7. generate the release checksums
-//   8. verify the release checksums (re-derived, not merely re-read)
-//   9. scan the staging inputs for prohibited content
-//  10. print the final artifact summary
+//   7. generate the release manifest
+//   8. generate the release checksums
+//   9. verify the release checksums (re-derived, not merely re-read)
+//  10. scan the staging inputs for prohibited content
+//  11. print the final artifact summary
 //
 // Root/Electron typecheck, cargo test, and `npm test` are run SEPARATELY
 // (this Arc's own VERIFICATION sequence) -- this script is the release
@@ -74,15 +79,16 @@ function verifyCleanTree() {
 }
 
 function main() {
-  step("1/9 verify clean working tree", verifyCleanTree);
-  step("2/9 verify package allowlist", () => run(process.execPath, ["scripts/verify_release_package_allowlist.mjs"], PACKAGE_ROOT));
-  step("3/9 build root beta-runtime dist/", () => run("npm", ["run", "build:beta-runtime"], ROOT));
-  step("4/9 build Electron package", () => run("npm", ["run", "build"], PACKAGE_ROOT));
-  step("5/9 run electron-builder (NSIS + ZIP)", () => run(process.execPath, ["scripts/run_electron_builder_package_beta.mjs"], PACKAGE_ROOT));
-  step("6/9 generate release manifest", () => run(process.execPath, ["scripts/generate_release_manifest.mjs"], PACKAGE_ROOT));
-  step("7/9 generate release checksums", () => run(process.execPath, ["scripts/generate_release_checksums.mjs"], PACKAGE_ROOT));
-  step("8/9 verify release checksums", () => run(process.execPath, ["scripts/verify_release_checksums.mjs"], PACKAGE_ROOT));
-  step("9/9 scan staging inputs for prohibited content", () => run(process.execPath, ["scripts/scan_release_artifacts_for_secrets.mjs"], PACKAGE_ROOT));
+  step("1/10 verify node_modules integrity (no junction/symlink)", () => run(process.execPath, ["../../scripts/release/guard_no_junctioned_node_modules.mjs"], PACKAGE_ROOT));
+  step("2/10 verify clean working tree", verifyCleanTree);
+  step("3/10 verify package allowlist", () => run(process.execPath, ["scripts/verify_release_package_allowlist.mjs"], PACKAGE_ROOT));
+  step("4/10 build root beta-runtime dist/", () => run("npm", ["run", "build:beta-runtime"], ROOT));
+  step("5/10 build Electron package", () => run("npm", ["run", "build"], PACKAGE_ROOT));
+  step("6/10 run electron-builder (NSIS + ZIP)", () => run(process.execPath, ["scripts/run_electron_builder_package_beta.mjs"], PACKAGE_ROOT));
+  step("7/10 generate release manifest", () => run(process.execPath, ["scripts/generate_release_manifest.mjs"], PACKAGE_ROOT));
+  step("8/10 generate release checksums", () => run(process.execPath, ["scripts/generate_release_checksums.mjs"], PACKAGE_ROOT));
+  step("9/10 verify release checksums", () => run(process.execPath, ["scripts/verify_release_checksums.mjs"], PACKAGE_ROOT));
+  step("10/10 scan staging inputs for prohibited content", () => run(process.execPath, ["scripts/scan_release_artifacts_for_secrets.mjs"], PACKAGE_ROOT));
 
   console.log("\n[build-release] === final artifact summary ===");
   const manifest = JSON.parse(readFileSync(join(RELEASE_DIR, "release-manifest.v1.json"), "utf8"));

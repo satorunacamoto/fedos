@@ -62,6 +62,36 @@ jobs:
       - name: Verify OSS release surface
         run: node scripts/release/verify_oss_release.mjs
 
+      # Cheap, always-real regression guard for the node_modules-junction
+      # policy (see BUILDING.md's "Fresh-worktree node_modules without a
+      # full npm install" section and CONTRIBUTING.md step 5's
+      # exception). This runner's own npm ci above never produces a
+      # junction, so this step mainly proves the guard script itself
+      # stays working (no typo/syntax regression) — it is NOT a
+      # substitute for a real Windows packaging-integrity run. See the
+      # "Intentionally NOT implemented" note below for why that larger
+      # check is documented, not built, in this workflow.
+      - name: Verify node_modules is not a junction/symlink (regression guard)
+        run: node scripts/release/guard_no_junctioned_node_modules.mjs
+
+# Intentionally NOT implemented in this workflow: a real Windows
+# packaging-integrity job that runs `npm run release:beta` (or
+# `package:beta`) end-to-end and asserts, via `npx asar list`, that every
+# expected runtime dependency actually landed in app.asar. This is a real,
+# recurring failure class this repository has hit locally (see
+# docs/commerce/evidence/commerce_e2e_packaged_binary/packaged_binary_bootstrap_investigation_2026-08-12_agent_x_p1.md)
+# and a genuinely bounded, bootable check to write — but it needs a
+# windows-latest runner, the pinned Rust toolchain, wasm-bindgen-cli, and
+# Electron binary provisioning, none of which this arc could stand up and
+# verify actually executes successfully inside GitHub Actions without a
+# real run to confirm against (this environment has no way to trigger and
+# observe an Actions run). Per this repository's own discipline against
+# faking a check that never actually exercises what it claims to, this is
+# named here as a recommended follow-up rather than added unverified.
+# Until it exists, run `npm run release:beta --prefix
+# packages/fedos-desktop-electron-spike` locally on Windows before cutting
+# a release, per BUILDING.md's "Release pipeline" section.
+
 # Intentionally NOT gated in this workflow: `npm run typecheck` /
 # `npm run typecheck:core`. As of this workflow being authored,
 # typecheck:core has pre-existing errors (841, unrelated to this arc's

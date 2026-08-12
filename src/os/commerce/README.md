@@ -1,18 +1,26 @@
 # Commerce (`src/os/commerce/`)
 
-## Status: inert scaffolding
+## Status: reachable end-to-end (as of the Commerce E2E Completion arc)
 
-Everything under this directory is **carried forward from a pre-pivot
-prototype** ("nostr-window," a Reddit-style window into Nostr) and is **not
-reachable from the shipped FedOS Desktop Electron app**. FedOS today ships
-as a focused, end-to-end encrypted Direct-message messenger; none of this
-capability is wired into that product's runtime, IPC surface, or packaging
-tsconfigs (`tsconfig.runtime.json`, `tsconfig.beta-runtime.json`,
-`tsconfig.host-bridge.json`, `tsconfig.settings-host-bridge.json`,
-`tsconfig.unlock-runtime.json`). It exists to give the commerce-shaped
-subset of that prototype a real, forward-looking home instead of leaving it
-scattered across top-level `src/` directories — nothing here has been
-redesigned, re-validated, or newly implemented as part of this move.
+The `catalog/`, `marketplace/`, `creator/` subdirectories below were
+originally **carried forward from a pre-pivot prototype** ("nostr-window,"
+a Reddit-style window into Nostr). That is no longer the whole story: this
+directory now also contains real, newly-implemented `order/`, `delivery/`,
+`payment/local_simulator.ts`, `reputation/`, `events/`, and `receipt/`
+modules, and a real Order → TEST/LOCAL payment → Delivery → signed Trust
+receipt vertical slice **is reachable from the shipped FedOS Desktop
+Electron app** — a merchant can create/publish a product, a customer can
+discover/order/pay (TEST/LOCAL simulator only, never a real payment rail)
+it, and the merchant can fulfill it, all through real IPC channels and
+composition-root wiring (`fedos_electron_beta_main.cts`), not just unit
+tests. See top-level [`README.md`](../../../README.md)'s "Commerce" section
+and [`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`](../../../docs/commerce/FEDOS-COMMERCE-END-TO-END.md)
+for the authoritative, code-audited account, including exactly what
+remains unwired (a real payment rail, Nostr publication of Commerce
+events, and pseudonymous reputation/persona UI surface — see below).
+Nothing in the originally-relocated `catalog/`/`marketplace/`/`creator/`
+subset itself was redesigned as part of the original move; the reachable
+slice above was built on top of it in later arcs.
 
 ## Subdirectories
 
@@ -49,13 +57,17 @@ repository. These are reserved locations only.
 
 ## What does not exist yet
 
-No **Order**, **Support** (ticketing), **Delivery**, or **Seller State**
-concept is defined anywhere in this capability. `catalog/types.ts`'s
-`PurchaseGrant` records only the *result* of an already-decided external
-entitlement (a manual gift, a settled payment, a promo) — it is not an
-order, and nothing here models fulfillment, delivery, refunds, or a
-seller-side state machine. Building any of those is future work with no
-committed design yet.
+**Order** (`order/`) and **Delivery** (`delivery/`) concepts now exist and
+are real, guarded state machines wired into the shipped app — this
+section's older claim that neither existed anywhere is stale and kept only
+for context. `catalog/types.ts`'s `PurchaseGrant` is unrelated to and
+predates both — it still only records the *result* of an already-decided
+external entitlement (a manual gift, a settled payment, a promo), not an
+order.
+
+**Support** (ticketing) and a general **Seller State** concept beyond what
+`order/`/`delivery/` already model still do not exist anywhere in this
+capability; building either is future work with no committed design yet.
 
 ## Dependency rule: Commerce depends on Messenger only through Ports
 

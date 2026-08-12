@@ -29,9 +29,18 @@ This repository contains **two, mostly disconnected products**:
 
 Board, Marketplace, Commerce, Creator, Payment, Promotion, Community, and
 Federation code all exist somewhere in this repository's history as
-real-but-dormant scaffolding from before the pivot — never built out,
-never wired into the Desktop UI. Treat any reference to them elsewhere in
-this repository's docs as historical, not shipped.
+real-but-dormant scaffolding from before the pivot. **Commerce is now a
+partial exception**: as of the Commerce E2E Completion arc, a real Order →
+TEST/LOCAL payment → Delivery → signed Trust receipt vertical slice under
+`src/os/commerce/` is wired into the Desktop UI and reachable from the
+shipped Electron app (see `README.md`'s "Commerce" section and
+`docs/commerce/FEDOS-COMMERCE-END-TO-END.md`) — a real payment rail,
+Nostr publication of Commerce events, and reputation/persona UI remain
+unwired. Board, Marketplace, Creator (beyond what Commerce reuses),
+Promotion, Community, and Federation remain fully dormant and never wired
+into the Desktop UI. Treat any other reference to them elsewhere in this
+repository's docs as historical, not shipped, unless that doc says
+otherwise.
 
 ## The shipped product's real architecture
 
