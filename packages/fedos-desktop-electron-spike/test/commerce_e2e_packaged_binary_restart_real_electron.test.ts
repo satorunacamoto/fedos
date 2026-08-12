@@ -56,11 +56,16 @@
  *      CREATE): asserts Product/Order/Payment/Delivery/Reputation/Persona-
  *      epoch identity all survive the restart, that the historical receipt
  *      from Launch 1 still independently verifies `VALID`, and that
- *      issuer-key continuity holds. Then issues a SECOND real signed
- *      receipt ("Trade B") for the SAME, already-completed order —
- *      concrete "new signed artifact post-restart" proof (satisfies the
- *      mandate's own "a new receipt OR a new reputation attestation"
- *      wording), plus an independent, non-secret on-disk line-count check
+ *      issuer-key continuity holds. Then RE-ISSUES a receipt for the SAME,
+ *      already-completed order — Real Two-Party Commerce + UX P0/P1
+ *      Closure arc (Agent D) made receipt issuance durable AND idempotent
+ *      (friction ledger row #5 / arc §33: "exactly ONE receipt per
+ *      completed Order" is now the domain invariant), so this returns the
+ *      IDENTICAL persisted envelope, not a second differently-signed one —
+ *      a STRONGER "new signed artifact post-restart" proof than the
+ *      mandate's original minimum bar asked for (the exact same artifact
+ *      durably survives, not merely "a new one can still be minted"),
+ *      plus an independent, non-secret on-disk line-count check
  *      confirming `trade_attestations.ndjson`'s original attestation pair
  *      survived the restart byte-for-byte.
  *
@@ -734,9 +739,9 @@ realSuite(
         );
 
         checkpoint(
-          "8. NEW signed artifact post-restart: a SECOND real signed receipt (\"Trade B\") issued for the SAME, already-completed Order One, on the SAME installed exe, after a real restart",
+          "8. RECEIPT DURABILITY post-restart (design changed since this checkpoint was first written -- see below): re-issuing a receipt for the SAME, already-completed Order One, on the SAME installed exe, after a real restart, returns the SAME durably-persisted receipt -- not a second, differently-signed artifact",
           "PASS",
-          `orderId=${orderIdAfterRestart} (unchanged), new receipt verifyStatus=VALID, qrText length=${qrTextTradeB.length}`,
+          `orderId=${orderIdAfterRestart} (unchanged), re-issued receipt verifyStatus=VALID, qrText length=${qrTextTradeB.length}`,
         );
 
         readAt(steps2, out2, 31); // Conversations still reachable.
@@ -797,10 +802,20 @@ realSuite(
         expect(decodedTradeA.issuer).toBe(decodedTradeB.issuer);
         expect(decodedTradeA.keyId).toBe(decodedTradeB.keyId);
         expect(decodedTradeA.keyId).toMatch(/^[0-9a-f]{64}$/);
-        // Different issuedAt -> different signed artifact digest, proving
-        // these are two REAL, distinct signing events, not a cached
-        // duplicate of the same envelope re-read twice.
-        expect(decodedTradeA.payload.artifactDigestHex).not.toBe(decodedTradeB.payload.artifactDigestHex);
+        // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent D, coordinator
+        // merge fix) -- friction ledger row #5 / arc §33: receipt issuance is
+        // now durable AND idempotent (`DurableReceiptStore.putIfAbsent()`,
+        // "exactly ONE receipt per completed Order" is the domain invariant,
+        // not "a fresh signature on every click"). Re-issuing for the SAME
+        // already-completed order therefore returns the IDENTICAL
+        // persisted envelope -- same `issuedAt`, same signature, same
+        // artifact digest -- across a real restart. This is now the
+        // stronger, INTENDED proof of restart durability (the exact same
+        // artifact survives, not merely "a new one can still be minted"),
+        // superseding this checkpoint's original pre-arc assumption that a
+        // second issuance call should mint a second, differently-signed
+        // artifact (that older behavior was itself the bug row #5 fixed).
+        expect(decodedTradeA.payload.artifactDigestHex).toBe(decodedTradeB.payload.artifactDigestHex);
 
         const policyFromLaunch2Issuer = createSingleIssuerFedosTrustPolicy({
           issuerId: decodedTradeB.issuer,
@@ -817,9 +832,9 @@ realSuite(
         expect(verifiedTradeBAgainstLaunch1Issuer.status, JSON.stringify(verifiedTradeBAgainstLaunch1Issuer)).toBe("VALID");
 
         checkpoint(
-          "8c. Historical (pre-restart, Trade A) receipt STILL verifies VALID; the NEW (post-restart, Trade B) receipt ALSO verifies VALID; issuer/persona identity continuity holds across old+new, independently decoded/verified outside Electron",
+          "8c. Historical (pre-restart, Trade A) receipt STILL verifies VALID; the re-issued (post-restart) receipt ALSO verifies VALID; issuer/persona identity continuity holds across the restart; the two receipts are BYTE-IDENTICAL (same artifact digest), independently decoded/verified outside Electron -- proof of durable, idempotent persistence, not two distinct signing events",
           "PASS",
-          `issuer=${decodedTradeA.issuer}, keyId=${decodedTradeA.keyId}, both receipts cross-verify VALID under each other's issuer, distinct artifact digests confirm two real signing events`,
+          `issuer=${decodedTradeA.issuer}, keyId=${decodedTradeA.keyId}, both receipts cross-verify VALID under each other's issuer, identical artifact digest confirms durable idempotent persistence across the restart`,
         );
 
         // -----------------------------------------------------------------
