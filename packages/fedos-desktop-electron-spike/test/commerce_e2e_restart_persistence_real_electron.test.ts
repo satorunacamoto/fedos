@@ -341,24 +341,40 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
         { action: "read", selector: "#commerce-order-status-text" }, // 14 -- expect "completed" (survived restart; reachable ONLY via the guarded chain: submitted->accepted->paid[verified evidence only]->fulfilling->delivered->completed, so this alone proves Payment+Delivery consistency too)
         { action: "read", selector: "#commerce-order-delivery-status" }, // 15 -- expect "Delivery status: completed" (the persisted DeliveryRecord's own terminal status, independently confirming Delivery durability -- Order completion also finalizes the linked Delivery record to its own "completed" state, not merely "delivered")
 
+        // FedOS Commerce Purchase Completion mega-arc (Agent R) -- the
+        // ACTUAL dev-vs-packaged restart-discrepancy proof: read the
+        // receipt panel's live DOM state IMMEDIATELY on opening this order
+        // post-restart, BEFORE clicking "Issue Signed Receipt" again. Prior
+        // to this arc's fix, `renderCommerceOrderScreen()` never queried an
+        // existing receipt on open, so these would read empty/blank here --
+        // exactly the live-reproduced buyer-tabletop finding
+        // (`docs/commerce/usability-v2/BUYER-TABLETOP-AFTER.md`, "Signed
+        // receipt is not durably persisted across a restart, with no
+        // warning"). `handleCommerceReceiptLookup()` (read-only, never
+        // mints) now populates this automatically.
+        { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 16 -- expect Trade A's ORIGINAL qrText, auto-restored, no click yet
+        { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 17 -- expect "VALID", auto-restored, no click yet
+
         // Issue a SECOND real signed, QR-encoded Trust receipt for the SAME
         // order ("Trade B") -- a brand new Electron process, after a real
         // restart+unlock, still on this SAME Order's detail screen (still
         // "completed", so `#commerce-order-receipt-actions` is visible
         // again). Proves issuer-key continuity below (same `keyId` as
-        // Trade A's receipt from launch 1).
-        { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 16
-        { action: "wait", ms: 500 }, // 17
-        { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 18 -- expect "VALID"
-        { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 19 -- non-empty real signed envelope text ("Trade B")
+        // Trade A's receipt from launch 1) AND (per `DurableReceiptStore`'s
+        // idempotency) that clicking again returns the SAME artifact, not a
+        // second differently-signed one.
+        { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 18
+        { action: "wait", ms: 500 }, // 19
+        { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 20 -- expect "VALID"
+        { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 21 -- non-empty real signed envelope text ("Trade B")
 
         // Seller Reputation panel: re-open the SAME product's detail screen.
-        { action: "click", selector: "#nav-commerce" }, // 20
-        { action: "wait", ms: 300 }, // 21
-        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 22
-        { action: "wait", ms: 400 }, // 23
-        { action: "read", selector: "#commerce-detail-title" }, // 24 -- expect "Restart-Durability Test Mug"
-        { action: "read", selector: "#commerce-detail-reputation-summary" }, // 25 -- expect the SAME real reputation text, NOT "no history"
+        { action: "click", selector: "#nav-commerce" }, // 22
+        { action: "wait", ms: 300 }, // 23
+        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 24
+        { action: "wait", ms: 400 }, // 25
+        { action: "read", selector: "#commerce-detail-title" }, // 26 -- expect "Restart-Durability Test Mug"
+        { action: "read", selector: "#commerce-detail-reputation-summary" }, // 27 -- expect the SAME real reputation text, NOT "no history"
 
         // Duplicate-attestation-after-restart rejection: attempting the SAME
         // completed order's reputation issuance again must not be reachable
@@ -370,9 +386,9 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
         // show a "no history yet" board for a pubkey that already has one).
 
         // Messenger regression: still reachable after a real restart+unlock.
-        { action: "click", selector: "#nav-conversations" }, // 26
-        { action: "wait", ms: 300 }, // 27
-        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 28
+        { action: "click", selector: "#nav-conversations" }, // 28
+        { action: "wait", ms: 300 }, // 29
+        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 30
       ]);
 
       expect(readAt(run2, 1)).toBe("unlock");
@@ -387,15 +403,34 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
       expect(readAt(run2, 14)).toBe("completed");
       expect(readAt(run2, 15)).toMatch(/Delivery status: completed/);
 
+      // THE CORE FIX PROOF: the receipt issued in launch 1 ("Trade A") is
+      // visible on this order's detail screen the INSTANT it opens after a
+      // real restart -- byte-identical to the original QR text, already
+      // "VALID" -- with NO click on "Issue Signed Receipt" required. This is
+      // the "remain visible... not require re-issuance" requirement, proven
+      // live, not merely inferred from the idempotent-store's own unit tests.
+      expect(readAt(run2, 17)).toBe("VALID");
+      const qrTextAutoRestoredOnOpen = readAt(run2, 16);
+      expect(qrTextAutoRestoredOnOpen.length).toBeGreaterThan(0);
+      expect(qrTextAutoRestoredOnOpen).toBe(qrTextTradeA);
+
       // "Trade B" receipt -- issued and independently verified VALID by the
       // real in-app pipeline, in launch 2, AFTER the restart, for the SAME
       // order.
-      expect(readAt(run2, 18)).toBe("VALID");
-      const qrTextTradeB = readAt(run2, 19);
+      expect(readAt(run2, 20)).toBe("VALID");
+      const qrTextTradeB = readAt(run2, 21);
       expect(qrTextTradeB.length).toBeGreaterThan(0);
+      // DurableReceiptStore's idempotency: re-clicking "Issue" for an
+      // already-issued order returns the IDENTICAL persisted artifact, not
+      // a second, differently-signed one -- same proof
+      // `commerce_e2e_packaged_binary_restart_real_electron.test.ts`
+      // already makes for the installed binary (`artifactDigestHex`
+      // equality); here it is byte-equality of the encoded QR text itself,
+      // the same-strength claim at the transport layer.
+      expect(qrTextTradeB).toBe(qrTextTradeA);
 
-      expect(readAt(run2, 24)).toBe("Restart-Durability Test Mug");
-      const reputationAfterRestart = readAt(run2, 25);
+      expect(readAt(run2, 26)).toBe("Restart-Durability Test Mug");
+      const reputationAfterRestart = readAt(run2, 27);
       // FORMERLY A KNOWN, DISCLOSED GAP (Commerce Durability arc final
       // report, "REPUTATION PERSISTENCE: PARTIAL") -- NOW CLOSED (FedOS
       // Commerce FINAL P1 Closure arc, Agent K1). The underlying
@@ -426,7 +461,7 @@ realSuite("FedOS Commerce End-to-End -- restart durability, REAL dev Electron pr
       expect(reputationAfterRestart).toMatch(/verified trades/i);
       expect(reputationAfterRestart).toBe(reputationBeforeRestart);
 
-      readAt(run2, 28); // Conversations still reachable.
+      readAt(run2, 30); // Conversations still reachable.
 
       // --- Receipt-issuer continuity, decoded+cross-verified OUTSIDE Electron. ---
       // Uses the SAME production `decodeCommerceReceiptProofFromQrText`/

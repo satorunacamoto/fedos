@@ -4598,6 +4598,64 @@ async function handleCommerceReceiptIssue(payload: unknown) {
 }
 
 /**
+ * FedOS Commerce Purchase Completion mega-arc (Agent R) -- READ-ONLY
+ * companion to `handleCommerceReceiptIssue()` above, closing the real,
+ * live-reproduced dev-vs-packaged restart discrepancy this arc
+ * investigated: `DurableReceiptStore.putIfAbsent()` (Agent D, friction
+ * ledger row #5 / arc §33) already makes an issued receipt survive a real
+ * restart byte-for-byte -- confirmed identical between a dev-style launch
+ * and the installed NSIS binary, since both run this exact file against
+ * the exact same `dataDir()`/`commerceDurableFilePath()` logic. The
+ * ACTUAL first divergence was never a storage-path/environment mismatch
+ * between dev and packaged launches at all: it was that the renderer had
+ * NO way to discover an already-issued receipt except by clicking "Issue
+ * Signed Receipt" again (`renderCommerceOrderScreen()` never queried one).
+ * A real user -- unlike this arc's own scripted E2E harnesses, which
+ * always click "Issue" explicitly in every launch -- reopening a
+ * `"completed"` order (after a restart, or simply after navigating away
+ * and back) therefore always saw a pristine, unissued-looking panel, even
+ * though the backend had never lost anything (`docs/commerce/usability-v2/
+ * BUYER-TABLETOP-AFTER.md`'s live-reproduced P1 finding, "Signed receipt is
+ * not durably persisted across a restart, with no warning").
+ *
+ * This handler looks up `DurableReceiptStore.getByOrderId()` and, if a
+ * receipt already exists, decodes+verifies it (the SAME production
+ * pipeline `handleCommerceReceiptIssue()` uses) so the renderer can render
+ * it immediately on open -- but it NEVER calls
+ * `issueSignedTradeReceiptProof()` and NEVER calls `putIfAbsent()`: an
+ * order that genuinely never had a receipt issued stays that way, never
+ * silently minted one just by being viewed.
+ */
+async function handleCommerceReceiptLookup(payload: unknown) {
+  const orderId = (payload as { orderId?: unknown } | null)?.orderId;
+  if (!isBoundedString(orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
+
+  const receiptStore = commerceReceiptState();
+  const existing = receiptStore.getByOrderId(orderId);
+  if (existing === undefined) return { outcome: "not-found" };
+
+  const m = requireModules();
+  const signingState = await commerceReceiptSigningState();
+  if (signingState.outcome === "issuer-identity-corrupted") {
+    return { outcome: "rejected", reason: `receipt issuer identity is corrupted and cannot safely issue new receipts: ${signingState.reason}` };
+  }
+  const { policy } = signingState;
+
+  const qrText = m.Commerce.encodeCommerceReceiptProofToQrText(existing.envelope);
+  const decoded = m.Commerce.decodeCommerceReceiptProofFromQrText(qrText);
+  const verified = m.Commerce.verifySignedTradeReceiptProof(decoded, policy);
+
+  let qrImageDataUrl: string | undefined;
+  try {
+    qrImageDataUrl = await m.Trust.renderFedosTrustQrTextToPngDataUrl(qrText);
+  } catch (err) {
+    console.error("fedos-beta: QR image rendering failed (non-fatal, the signed text receipt above remains authoritative):", err);
+  }
+
+  return { outcome: "ok", qrText, qrImageDataUrl, verifyStatus: verified.status };
+}
+
+/**
  * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
  * (Agent D) -- friction-ledger row #15 / arc §35-37: the buyer-side
  * REDEEM path, the ONLY code reaching `commerceMediaStoreFor().getProtected()`
@@ -5072,6 +5130,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-app:commerce-delivery-acknowledge-receipt", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceDeliveryAcknowledgeReceipt(payload));
   ipcMain.handle("fedos-app:commerce-order-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderComplete(payload));
   ipcMain.handle("fedos-app:commerce-receipt-issue", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptIssue(payload));
+  // FedOS Commerce Purchase Completion mega-arc (Agent R) -- read-only receipt lookup (never mints), closes the dev-vs-packaged restart-visibility gap.
+  ipcMain.handle("fedos-app:commerce-receipt-lookup", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptLookup(payload));
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's read-only Persona Board query.
   ipcMain.handle("fedos-app:commerce-persona-board-query", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePersonaBoardQuery(payload));
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface.
