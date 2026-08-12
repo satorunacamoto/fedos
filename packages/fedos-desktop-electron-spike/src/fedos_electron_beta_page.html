@@ -327,6 +327,19 @@
                reputation note. Never blocks/reverts the action itself (the Order
                transition above is already committed regardless). -->
           <p id="commerce-order-sync-note" class="muted" role="status" aria-live="polite"></p>
+          <!-- FedOS Commerce "Purchase Completion" mega-arc (Coordinator, integration
+               phase) -- the order channel above is no longer the only cross-process
+               channel: Agent P's private PaymentEvidence transport and Agent D's
+               private Delivery transport are each their own independent send, with
+               their own independent success/failure. They get their own elements
+               (rather than reusing `#commerce-order-sync-note`) precisely so one
+               channel's note can never overwrite and silently hide another's on the
+               same action -- e.g. an order update that reached the counterparty while
+               the delivery update did NOT must show both facts, not just the
+               reassuring one. Each is prefixed with its own channel name by
+               `describeCommerceSyncOutcome()`. -->
+          <p id="commerce-order-payment-sync-note" class="muted" role="status" aria-live="polite"></p>
+          <p id="commerce-order-delivery-sync-note" class="muted" role="status" aria-live="polite"></p>
 
           <div id="commerce-order-review-actions">
             <p class="muted">Review your order, then submit it to the merchant.</p>

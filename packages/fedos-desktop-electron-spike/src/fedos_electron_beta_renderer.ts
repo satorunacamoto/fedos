@@ -183,17 +183,44 @@ const COMMERCE_SYNC_OUTCOME_TEXT: Readonly<Record<string, string>> = {
   rejected: "The Relay rejected this update. Your local copy is unaffected — you can try again later.",
   "transport-error": "Couldn't reach your configured Relay just now. Your local copy is unaffected — this will not retry automatically.",
   "network-disabled": "Network sync is off for this profile (see Settings → Network). Your local copy is unaffected.",
+  // FedOS Commerce "Purchase Completion" mega-arc (Coordinator, integration
+  // phase) -- two outcomes only the payment-evidence channel can produce.
+  // `"evidence-not-transportable"` is the OUTBOUND authority gate refusing
+  // to package non-authoritative evidence (a security refusal, NOT a
+  // network failure -- describing it as one would be dishonest in exactly
+  // the direction that matters).
+  "evidence-not-transportable":
+    "Not sent: this was not backed by authoritative settlement evidence, so it was refused before anything left this device. Your local copy is unaffected.",
+  "no-counterparty": "Not sent: no counterparty identity is known for this order yet. Your local copy is unaffected.",
+};
+
+/**
+ * FedOS Commerce "Purchase Completion" mega-arc (Coordinator, integration
+ * phase) -- which real cross-process channel an outcome came from. Three
+ * exist post-integration (order / Agent P's PaymentEvidence / Agent D's
+ * Delivery), each an independent send with an independent result; the
+ * prefix is what lets a user tell which one a note is about when several
+ * are shown on the same order screen. `"order"` maps to the empty string
+ * so the pre-integration channel's text is unchanged.
+ */
+type CommerceSyncChannel = "order" | "payment-evidence" | "delivery";
+
+const COMMERCE_SYNC_CHANNEL_PREFIX: Readonly<Record<CommerceSyncChannel, string>> = {
+  order: "",
+  "payment-evidence": "Payment confirmation — ",
+  delivery: "Delivery update — ",
 };
 
 /** `undefined` in (no sync attempt happened) -> `undefined` out, never a fabricated claim either way. Any other unrecognized string -> the safe generic fallback, never echoed verbatim. */
-function describeCommerceSyncOutcome(outcome: string | undefined): string | undefined {
+function describeCommerceSyncOutcome(outcome: string | undefined, channel: CommerceSyncChannel = "order"): string | undefined {
   if (outcome === undefined) return undefined;
-  return COMMERCE_SYNC_OUTCOME_TEXT[outcome] ?? "Couldn't confirm this synced to your configured Relay. Your local copy is unaffected.";
+  const base = COMMERCE_SYNC_OUTCOME_TEXT[outcome] ?? "Couldn't confirm this synced to your configured Relay. Your local copy is unaffected.";
+  return `${COMMERCE_SYNC_CHANNEL_PREFIX[channel] ?? ""}${base}`;
 }
 
-/** Renders a `nostrSyncOutcome` note into `elementId`, or clears it when `outcome` is `undefined` (no attempt happened -- never leaves a stale note from a prior action visible). */
-function renderCommerceSyncOutcomeNote(elementId: string, outcome: string | undefined): void {
-  byId(elementId).textContent = describeCommerceSyncOutcome(outcome) ?? "";
+/** Renders one channel's sync-outcome note into `elementId`, or clears it when `outcome` is `undefined` (no attempt happened -- never leaves a stale note from a prior action visible). */
+function renderCommerceSyncOutcomeNote(elementId: string, outcome: string | undefined, channel: CommerceSyncChannel = "order"): void {
+  byId(elementId).textContent = describeCommerceSyncOutcome(outcome, channel) ?? "";
 }
 
 /**
@@ -1322,6 +1349,10 @@ function openCommerceOrderScreen(order: FedosCommerceOrder): void {
   // (Agent U) Same reasoning for the cross-process sync note: it is
   // per-order, so a prior order's note must never survive into this one.
   byId("commerce-order-sync-note").textContent = "";
+  // (Coordinator, integration phase) ...and the same for the two other
+  // cross-process channels' notes, for the identical reason.
+  byId("commerce-order-payment-sync-note").textContent = "";
+  byId("commerce-order-delivery-sync-note").textContent = "";
   showAppScreen("commerce-order");
   renderCommerceOrderScreen();
   void refreshCommerceDeliveryStatus();
@@ -1342,6 +1373,10 @@ async function onCommerceDeliveryAcknowledgeReceiptClick(): Promise<void> {
   currentCommerceOrder = result.order;
   currentCommerceDelivery = result.delivery ?? currentCommerceDelivery;
   renderCommerceOrderScreen();
+  // (Coordinator, integration phase) Agent D performed this send but
+  // discarded its result -- a buyer whose "I received it" never reached
+  // the seller's process was told nothing at all. Now reported honestly.
+  renderCommerceSyncOutcomeNote("commerce-order-delivery-sync-note", result.deliverySyncOutcome, "delivery");
   void refreshCommerceMyOrdersList();
 }
 
@@ -1372,6 +1407,11 @@ async function onCommerceOrderCompleteClick(): Promise<void> {
       ? "Order completed. Note: a reputation record for this trade could not be saved just now — your completed order itself is unaffected."
       : "Order completed. Reputation records were saved for both parties.";
   renderCommerceSyncOutcomeNote("commerce-order-sync-note", result.nostrSyncOutcome);
+  // (Coordinator, integration phase) Agent D's delivery channel is an
+  // INDEPENDENT send with an independent result -- `undefined` here clears
+  // the element rather than claiming anything, so an action that attempted
+  // no delivery send shows no delivery note.
+  renderCommerceSyncOutcomeNote("commerce-order-delivery-sync-note", result.deliverySyncOutcome, "delivery");
   void refreshCommerceDeliveryStatus();
   void refreshCommerceMyOrdersList();
 }
@@ -1477,6 +1517,11 @@ async function onCommerceOrderActionClick(
   // already committed above -- mirrors `reputationSyncStatus`'s own
   // established "core transaction succeeds regardless" discipline).
   renderCommerceSyncOutcomeNote("commerce-order-sync-note", result.nostrSyncOutcome);
+  // (Coordinator, integration phase) Agent D's delivery channel is an
+  // INDEPENDENT send with an independent result -- `undefined` here clears
+  // the element rather than claiming anything, so an action that attempted
+  // no delivery send shows no delivery note.
+  renderCommerceSyncOutcomeNote("commerce-order-delivery-sync-note", result.deliverySyncOutcome, "delivery");
   void refreshCommerceDeliveryStatus();
   void refreshCommerceMyOrdersList();
 }
@@ -1496,6 +1541,11 @@ async function onCommerceOrderRejectClick(): Promise<void> {
   currentCommerceOrder = result.order;
   renderCommerceOrderScreen();
   renderCommerceSyncOutcomeNote("commerce-order-sync-note", result.nostrSyncOutcome);
+  // (Coordinator, integration phase) Agent D's delivery channel is an
+  // INDEPENDENT send with an independent result -- `undefined` here clears
+  // the element rather than claiming anything, so an action that attempted
+  // no delivery send shows no delivery note.
+  renderCommerceSyncOutcomeNote("commerce-order-delivery-sync-note", result.deliverySyncOutcome, "delivery");
   void refreshCommerceMyOrdersList();
 }
 
@@ -1537,6 +1587,13 @@ async function onCommercePaymentSimulateClick(): Promise<void> {
   currentCommerceOrder = result.order;
   currentCommercePendingPayment = null;
   renderCommerceOrderScreen();
+  // FedOS Commerce "Purchase Completion" mega-arc (Coordinator, integration
+  // phase) -- Agent P's PaymentEvidence channel. This is the ONE action in
+  // the whole app that ever sends payment evidence, and the buyer needs to
+  // know honestly whether the seller's independent process was actually
+  // told: "your local order says paid" and "the seller knows you paid" are
+  // genuinely different facts, and only the first is guaranteed here.
+  renderCommerceSyncOutcomeNote("commerce-order-payment-sync-note", result.paymentSyncOutcome, "payment-evidence");
   void refreshCommerceMyOrdersList();
 }
 

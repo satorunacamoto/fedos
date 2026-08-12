@@ -41,9 +41,44 @@
  * `COMMERCE_SYNC_OUTCOME_FALLBACK` below rather than crashing or leaking —
  * add a specific entry to `COMMERCE_SYNC_OUTCOME_TEXT` once each real
  * vocabulary is known; this function's contract does not need to change.
+ *
+ * COORDINATOR INTEGRATION (Purchase Completion mega-arc, integration
+ * phase) — that seam is now taken up. Three real cross-process channels
+ * exist post-integration, not one, and a user who is told only "Synced to
+ * your configured Relay." cannot tell WHICH of the three actually synced:
+ *  - `"order"` — `sendPrivateOrderSyncNonFatal()` (submit/accept/reject/
+ *    fulfill/complete), the pre-existing channel this module was built
+ *    against.
+ *  - `"payment-evidence"` — the Coordinator's own
+ *    `sendPrivatePaymentEvidenceSyncNonFatal()`, wiring Agent P's
+ *    `RealPaymentEvidenceTransport`/`PaymentEvidenceSendPort`
+ *    (`../payment/payment_evidence_port.ts`) into the Electron main
+ *    process. Adds ONE genuinely new outcome string beyond the shared
+ *    vocabulary: `"evidence-not-transportable"`, produced when
+ *    `buildOutboundPaymentEvidenceSyncPayload()` REFUSES to package
+ *    non-authoritative evidence — a refusal that is a security feature,
+ *    not a network failure, and must never be described as one.
+ *  - `"delivery"` — Agent D's `sendPrivateDeliverySyncNonFatal()`, which
+ *    reuses the shared vocabulary exactly (`"published"`/
+ *    `"transport-error"`/`"network-disabled"`/arbitrary transport
+ *    message).
+ *
+ * The `channel` parameter is OPTIONAL and defaults to `"order"`, so every
+ * pre-integration call site and every pre-integration assertion keeps
+ * byte-identical output. Only a caller that explicitly names a non-order
+ * channel gets the channel-attributing prefix.
  */
 
-export type KnownCommerceSyncOutcome = "published" | "duplicate" | "rejected" | "transport-error" | "network-disabled";
+export type KnownCommerceSyncOutcome =
+  | "published"
+  | "duplicate"
+  | "rejected"
+  | "transport-error"
+  | "network-disabled"
+  /** Payment-evidence channel only: the OUTBOUND authority gate refused to package this evidence for transport at all (see this file's own header). */
+  | "evidence-not-transportable"
+  /** This process does not know a counterparty identity to send to, so nothing was transmitted. Never a network failure. */
+  | "no-counterparty";
 
 const COMMERCE_SYNC_OUTCOME_TEXT: Readonly<Record<KnownCommerceSyncOutcome, string>> = {
   published: "Synced to your configured Relay.",
@@ -51,6 +86,29 @@ const COMMERCE_SYNC_OUTCOME_TEXT: Readonly<Record<KnownCommerceSyncOutcome, stri
   rejected: "The Relay rejected this update. Your local copy is unaffected — you can try again later.",
   "transport-error": "Couldn't reach your configured Relay just now. Your local copy is unaffected — this will not retry automatically.",
   "network-disabled": "Network sync is off for this profile (see Settings → Network). Your local copy is unaffected.",
+  "evidence-not-transportable":
+    "Not sent: this was not backed by authoritative settlement evidence, so it was refused before anything left this device. Your local copy is unaffected.",
+  "no-counterparty": "Not sent: no counterparty identity is known for this order yet. Your local copy is unaffected.",
+};
+
+/**
+ * Which real cross-process channel an outcome came from. See this file's
+ * own header for what each one is and which code produces it. `"order"` is
+ * the default precisely so pre-integration callers are unaffected.
+ */
+export type CommerceSyncChannel = "order" | "payment-evidence" | "delivery";
+
+/**
+ * Channel-attributing prefix. `"order"` maps to the empty string so the
+ * order channel's text stays exactly what it was before the integration
+ * phase — the other two are prefixed so the user can tell WHICH
+ * cross-process channel a note is about when several are shown on the
+ * same order screen at once.
+ */
+const COMMERCE_SYNC_CHANNEL_PREFIX: Readonly<Record<CommerceSyncChannel, string>> = {
+  order: "",
+  "payment-evidence": "Payment confirmation — ",
+  delivery: "Delivery update — ",
 };
 
 /** Safe generic fallback for ANY outcome string not in the closed vocabulary above — including an arbitrary transport-supplied message (see this file's own header). Never leaks the raw input. */
@@ -64,12 +122,18 @@ const COMMERCE_SYNC_OUTCOME_FALLBACK = "Couldn't confirm this synced to your con
  * caller can cleanly render "no supplementary sync note" — never a
  * fabricated "synced" claim.
  */
-export function describeCommerceSyncOutcome(outcome: string | undefined): string | undefined {
+export function describeCommerceSyncOutcome(outcome: string | undefined, channel: CommerceSyncChannel = "order"): string | undefined {
   if (outcome === undefined) return undefined;
-  if (Object.prototype.hasOwnProperty.call(COMMERCE_SYNC_OUTCOME_TEXT, outcome)) {
-    return COMMERCE_SYNC_OUTCOME_TEXT[outcome as KnownCommerceSyncOutcome];
-  }
-  return COMMERCE_SYNC_OUTCOME_FALLBACK;
+  const base = Object.prototype.hasOwnProperty.call(COMMERCE_SYNC_OUTCOME_TEXT, outcome)
+    ? COMMERCE_SYNC_OUTCOME_TEXT[outcome as KnownCommerceSyncOutcome]
+    : COMMERCE_SYNC_OUTCOME_FALLBACK;
+  // Prefix lookup is over a closed, statically-declared union -- an
+  // out-of-vocabulary `channel` (only reachable from untyped JS) falls
+  // back to no prefix rather than `undefined` leaking into the text.
+  const prefix = Object.prototype.hasOwnProperty.call(COMMERCE_SYNC_CHANNEL_PREFIX, channel)
+    ? COMMERCE_SYNC_CHANNEL_PREFIX[channel]
+    : "";
+  return `${prefix}${base}`;
 }
 
 /**

@@ -96,7 +96,24 @@ describe("Agent U -- row 21: systematic action-handler robustness", () => {
     // #4/#5) now sits between `order:` and `reputationSyncStatus:` --
     // both are genuinely truthful, additive, non-blocking fields on the
     // SAME response, not a regression of either.
-    expect(mainSource).toMatch(/outcome: "ok",\s*\n\s*order: commerceOrderDto\(orderResult\.order\),\s*\n\s*nostrSyncOutcome,\s*\n\s*reputationSyncStatus:/);
+    //
+    // PURCHASE COMPLETION INTEGRATION PHASE (Coordinator): a THIRD such
+    // field, `deliverySyncOutcome`, now also sits on this same response
+    // (Agent D performed that delivery-sync send but discarded its result;
+    // it is captured and reported honestly now). The assertion below was
+    // pinning the exact ADJACENCY of two specific fields, which made every
+    // future additive non-blocking field a false failure even though the
+    // property actually under test was unaffected. It now asserts the real
+    // invariant instead -- `outcome: "ok"` plus the order, with each
+    // additive field genuinely present on this SAME response object --
+    // while still allowing further truthful additive siblings between
+    // them. Strictly more faithful to this test's own stated intent, and
+    // it still fails if any of the three fields is dropped.
+    const completeReturn = mainSource.match(/return \{\s*\n\s*outcome: "ok",\s*\n\s*order: commerceOrderDto\(orderResult\.order\),[\s\S]{0,400}?\n\s*\};/);
+    expect(completeReturn).not.toBeNull();
+    expect(completeReturn![0]).toMatch(/\n\s*nostrSyncOutcome,/);
+    expect(completeReturn![0]).toMatch(/\n\s*deliverySyncOutcome,/);
+    expect(completeReturn![0]).toMatch(/\n\s*reputationSyncStatus: reputationRecorded \? "recorded" : "unavailable",/);
   });
 });
 

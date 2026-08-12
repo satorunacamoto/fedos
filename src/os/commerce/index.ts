@@ -368,6 +368,10 @@ export {
   describeCommerceSyncOutcome,
   isCommerceSyncOutcomeConcerning,
   type KnownCommerceSyncOutcome,
+  // Purchase Completion mega-arc, integration phase: three real
+  // cross-process channels now feed this vocabulary, not one -- see
+  // `cross_process_outcome_text.ts`'s own header.
+  type CommerceSyncChannel,
 } from "./order/cross_process_outcome_text.js";
 
 export {

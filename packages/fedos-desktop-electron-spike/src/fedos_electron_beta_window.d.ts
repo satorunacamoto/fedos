@@ -248,6 +248,35 @@ interface FedosCommerceOrderResult {
    * transport-supplied message), never rendered verbatim.
    */
   readonly nostrSyncOutcome?: string;
+  /**
+   * FedOS Commerce "Purchase Completion" mega-arc (Coordinator, integration
+   * phase) -- the SECOND cross-process channel's outcome, distinct from
+   * `nostrSyncOutcome` above: Agent P's private `PaymentEvidence`
+   * transport, carrying an already-authoritative settlement confirmation
+   * from the buyer's process (which owns the payment rail) to the seller's
+   * independent process. Set only by `commercePaymentSimulate`; `undefined`
+   * on every other order action, meaning "no payment-evidence send was
+   * attempted here" -- never "it succeeded".
+   *
+   * Rendered through the same closed-vocabulary
+   * `describeCommerceSyncOutcome()` as `nostrSyncOutcome`, on its own
+   * `"payment-evidence"` channel. Carries ONE outcome the order channel
+   * never produces: `"evidence-not-transportable"`, the OUTBOUND authority
+   * gate refusing to package non-authoritative evidence -- a security
+   * refusal that must never be presented as a network failure.
+   */
+  readonly paymentSyncOutcome?: string;
+  /**
+   * FedOS Commerce "Purchase Completion" mega-arc (Coordinator, integration
+   * phase) -- the THIRD cross-process channel's outcome: Agent D's private
+   * Delivery/status transport. Agent D already performed these sends but
+   * DISCARDED their results, so a buyer/seller whose delivery update never
+   * actually reached the counterparty's process was told nothing. Set by
+   * the `"fulfill"` order action and by `commerceOrderComplete` (only when
+   * a real local Delivery record closed out alongside the Order);
+   * `undefined` otherwise, meaning "no delivery send was attempted here".
+   */
+  readonly deliverySyncOutcome?: string;
 }
 
 interface FedosCommerceOrdersListResult {
@@ -282,6 +311,8 @@ interface FedosCommerceDeliveryAcknowledgeResult {
   readonly reason?: string;
   readonly order?: FedosCommerceOrder;
   readonly delivery?: FedosCommerceDelivery;
+  /** (Coordinator, integration phase) See `FedosCommerceOrderResult.deliverySyncOutcome`'s own doc -- same field, same `"delivery"` channel, here for the buyer's "I received it" notification to the seller's process. */
+  readonly deliverySyncOutcome?: string;
 }
 
 interface FedosCommerceReceiptIssueResult {

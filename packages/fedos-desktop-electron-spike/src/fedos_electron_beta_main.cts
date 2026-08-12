@@ -723,6 +723,17 @@ interface RootModules {
     readonly createOrder: (input: CommerceCreateOrderInputLike, actor: CommerceOrderActorLike, now: number) => CommerceOrderTransitionResultLike;
     readonly applyOrderAction: (order: CommerceOrderLike, action: CommerceOrderActionLike, now: number) => CommerceOrderTransitionResultLike;
     readonly DeterministicLocalPaymentProvider: new (options: { readonly acknowledgeTestOnly: true; readonly runtimeProfile?: string }) => CommerceLocalPaymentProviderLike;
+    /**
+     * `payment/local_simulator.ts`'s own exported constant -- the exact,
+     * unmistakable name every `test_simulator` evidence that class produces
+     * carries in `verification.simulator`. Loaded here (Purchase Completion
+     * mega-arc, integration phase) so the INBOUND payment-evidence gate can
+     * pin `expectedProviderIdentity` to the one rail this build actually
+     * has, rather than accepting any authoritative-looking provider name.
+     * Read from the real module, never re-typed as a literal here, so the
+     * two can never silently drift apart.
+     */
+    readonly TEST_SIMULATOR_NAME: string;
     readonly PaymentSettlementLedger: new () => CommercePaymentLedgerLike;
     readonly DurablePaymentSettlementLedger: new (filePath: string) => CommercePaymentLedgerLike;
     readonly LocalDeliveryRepository: new () => CommerceDeliveryRepositoryLike;
@@ -1041,6 +1052,67 @@ interface RootModules {
         readonly at: number;
       };
     }) => { readonly outcome: "applied"; readonly delivery: CommerceDeliveryRecordLike } | { readonly outcome: "no-op" } | { readonly outcome: "rejected"; readonly reason: string };
+    /**
+     * FedOS Commerce Purchase Completion mega-arc (Agent P, wired here by
+     * the Coordinator's integration phase) -- the PRIVATE
+     * `PaymentEvidence` transport. Agent P built and tested the transport,
+     * the wire schema and the receiver-validation gate but deliberately
+     * left the Electron-main wiring to integration; these four entries are
+     * that wiring's module surface, mirroring the Delivery block
+     * immediately above one-for-one.
+     *
+     * `RealPaymentEvidenceTransport` (NOT the lower-level
+     * `RealCommercePrivatePaymentEvidenceTransport`) is the one loaded
+     * here on purpose: it is the domain-facing adapter that runs
+     * `buildOutboundPaymentEvidenceSyncPayload()`'s OUTBOUND authority
+     * re-check before anything touches the network, so this file cannot
+     * accidentally bypass that gate by constructing a wire payload itself.
+     */
+    readonly RealPaymentEvidenceTransport: new (options: {
+      readonly signingAuthority: unknown;
+      readonly relayPublisher: unknown;
+      readonly nip44Wire: unknown;
+      readonly accountIndex: number;
+    }) => {
+      send(
+        evidence: CommercePaymentEvidenceLike,
+        binding: { readonly orderId: string; readonly amountCents: number; readonly currency: string },
+        counterpartyPubkeyHex: string,
+      ): Promise<{ readonly accepted: boolean; readonly message: string }>;
+    };
+    readonly verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope: (
+      event: unknown,
+      options: { readonly nip44Wire: unknown; readonly localAccountIndex: number },
+    ) => Promise<{
+      readonly outcome: string;
+      readonly eventId: string;
+      readonly senderPubkeyHex: string;
+      /** Deliberately typed as the raw wire shape only -- `applyInboundPaymentEvidenceSync` below re-validates it from scratch and this file never reads a field off it directly. */
+      readonly payload?: { readonly orderId: string; readonly paymentId: string; readonly productId: string; readonly amountCents: number; readonly currency: string };
+    }>;
+    readonly COMMERCE_PRIVATE_PAYMENT_EVIDENCE_SYNC_TAG: string;
+    /**
+     * Agent P's RECEIVER-side validation gate
+     * (`src/os/commerce/payment/payment_evidence_port.ts`). Every check it
+     * performs runs BEFORE `ledger.apply()` is ever called; a rejection at
+     * any step leaves the settlement ledger completely untouched. This
+     * file must never reconstruct a `PaymentEvidence` from a wire payload
+     * itself -- only this function may.
+     */
+    readonly applyInboundPaymentEvidenceSync: (
+      senderPubkeyHex: string,
+      payload: unknown,
+      expectation: {
+        readonly expectedOrderId: string;
+        readonly expectedCounterpartyPubkeyHex: string;
+        readonly expectedAmountCents: number;
+        readonly expectedCurrency: string;
+        readonly expectedProviderIdentity?: string;
+      },
+      ledger: { apply(evidence: CommercePaymentEvidenceLike, expectedOrderId: string): CommerceSettlementApplyResultLike },
+    ) =>
+      | { readonly accepted: true; readonly result: CommerceSettlementApplyResultLike }
+      | { readonly accepted: false; readonly reason: string };
   };
 }
 
@@ -1480,6 +1552,7 @@ async function loadRootModules(): Promise<RootModules> {
     createOrder: RootModules["Commerce"]["createOrder"];
     applyOrderAction: RootModules["Commerce"]["applyOrderAction"];
     DeterministicLocalPaymentProvider: RootModules["Commerce"]["DeterministicLocalPaymentProvider"];
+    TEST_SIMULATOR_NAME: RootModules["Commerce"]["TEST_SIMULATOR_NAME"];
     PaymentSettlementLedger: RootModules["Commerce"]["PaymentSettlementLedger"];
     DurablePaymentSettlementLedger: RootModules["Commerce"]["DurablePaymentSettlementLedger"];
     LocalDeliveryRepository: RootModules["Commerce"]["LocalDeliveryRepository"];
@@ -1598,6 +1671,20 @@ async function loadRootModules(): Promise<RootModules> {
   const commercePrivateDeliveryApply = (await import(distUrl("os", "commerce", "events", "commerce_private_delivery_apply.js"))) as {
     applyInboundPrivateDeliverySyncPayload: RootModules["CommerceNostr"]["applyInboundPrivateDeliverySyncPayload"];
   };
+  // FedOS Commerce Purchase Completion mega-arc (Agent P, wired by the
+  // Coordinator's integration phase) -- private PaymentEvidence transport
+  // + receiver-validation gate. Three new `tsconfig.beta-runtime.json`
+  // entries, mirroring the Delivery pair immediately above.
+  const commercePrivatePaymentEvidenceBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_private_payment_evidence_bridge.js")
+  )) as {
+    RealPaymentEvidenceTransport: RootModules["CommerceNostr"]["RealPaymentEvidenceTransport"];
+    verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope: RootModules["CommerceNostr"]["verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope"];
+    COMMERCE_PRIVATE_PAYMENT_EVIDENCE_SYNC_TAG: string;
+  };
+  const commercePaymentEvidencePort = (await import(distUrl("os", "commerce", "payment", "payment_evidence_port.js"))) as {
+    applyInboundPaymentEvidenceSync: RootModules["CommerceNostr"]["applyInboundPaymentEvidenceSync"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
@@ -1626,6 +1713,7 @@ async function loadRootModules(): Promise<RootModules> {
       createOrder: commerce.createOrder,
       applyOrderAction: commerce.applyOrderAction,
       DeterministicLocalPaymentProvider: commerce.DeterministicLocalPaymentProvider,
+      TEST_SIMULATOR_NAME: commerce.TEST_SIMULATOR_NAME,
       PaymentSettlementLedger: commerce.PaymentSettlementLedger,
       DurablePaymentSettlementLedger: commerce.DurablePaymentSettlementLedger,
       LocalDeliveryRepository: commerce.LocalDeliveryRepository,
@@ -1689,6 +1777,11 @@ async function loadRootModules(): Promise<RootModules> {
       verifyAndDecryptInboundPrivateDeliveryEnvelope: commercePrivateDeliveryBridge.verifyAndDecryptInboundPrivateDeliveryEnvelope,
       COMMERCE_PRIVATE_DELIVERY_SYNC_TAG: commercePrivateDeliveryBridge.COMMERCE_PRIVATE_DELIVERY_SYNC_TAG,
       applyInboundPrivateDeliverySyncPayload: commercePrivateDeliveryApply.applyInboundPrivateDeliverySyncPayload,
+      RealPaymentEvidenceTransport: commercePrivatePaymentEvidenceBridge.RealPaymentEvidenceTransport,
+      verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope:
+        commercePrivatePaymentEvidenceBridge.verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope,
+      COMMERCE_PRIVATE_PAYMENT_EVIDENCE_SYNC_TAG: commercePrivatePaymentEvidenceBridge.COMMERCE_PRIVATE_PAYMENT_EVIDENCE_SYNC_TAG,
+      applyInboundPaymentEvidenceSync: commercePaymentEvidencePort.applyInboundPaymentEvidenceSync,
     },
   };
 }
@@ -2873,6 +2966,291 @@ async function commercePrivateDeliveryDiscoverAndApplyNonFatal(): Promise<void> 
     }
   } catch (err) {
     console.error("fedos-beta: private Delivery sync discovery query failed (non-fatal, local Delivery state unaffected):", err);
+  }
+}
+
+// ---------------------------------------------------------------------
+// FedOS Commerce Purchase Completion mega-arc (Agent P's transport, wired
+// here by the Coordinator's integration phase) -- PRIVATE PaymentEvidence
+// transport. Structurally mirrors the private Delivery section
+// immediately above (same lazy construction/gating, same non-fatal
+// "local state already committed, this is best-effort notification only"
+// discipline), but the AUTHORITY story is deliberately different and
+// narrower. Read this whole block before changing any of it.
+//
+// WHICH PROCESS OWNS THE PAYMENT RAIL (and therefore who may ever send)
+// ---------------------------------------------------------------------
+// In this build the ONLY payment rail is `DeterministicLocalPaymentProvider`
+// (`payment/local_simulator.ts`), a LOUDLY-labeled TEST/LOCAL simulator.
+// It is only ever driven from `handleCommercePaymentRequest` /
+// `handleCommercePaymentSimulate`, and those are reachable only from the
+// BUYER's own process: the renderer gates the payment controls on
+// `order.status === "accepted" && isBuyer`
+// (`renderCommerceOrderScreen()`), and `handleCommercePaymentRequest`
+// independently re-checks `order.status === "accepted"`. So the buyer's
+// process is the one that observes settlement first, and the SELLER's
+// independent process is the one that previously had no way at all to
+// learn the payment happened.
+//
+// That is the exact opposite of the "typically the seller/merchant owns
+// the rail" case `payment_evidence_port.ts`'s own header describes as the
+// usual shape. The Port is agnostic -- it only ever compares against
+// whatever `expectedCounterpartyPubkeyHex` the caller supplies -- so this
+// wiring supplies the direction THIS build actually has, and enforces it
+// in one direction only (see `commercePaymentEvidenceExpectationFor()`).
+//
+// WHAT IS AND IS NOT TRUSTED HERE
+// ---------------------------------------------------------------------
+// Inbound evidence is accepted ONLY when ALL of these hold, and each is
+// checked against state this process independently already had, never
+// against anything read out of the wire payload:
+//   1. the event's REAL, signature-verified, NIP-44-decryptable sender
+//      (`verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope`),
+//   2. this process is the order's OWN seller (never the buyer -- a
+//      buyer's process already ran the rail itself and must never take a
+//      remote party's word for its own payment),
+//   3. the sender is exactly that order's `buyerPubkey`,
+//   4. order id / amount / currency all match this process's own local
+//      Order record,
+//   5. the evidence's provider identity is pinned to this build's one
+//      real rail (`TEST_SIMULATOR_NAME`),
+//   6. the wire `productId` matches this process's own local Order's
+//      `productId` (an extra check on top of the Port's own six -- the
+//      Port has no `productId` in its expectation shape),
+// and only THEN does `applyInboundPaymentEvidenceSync()` (Agent P) run,
+// which re-checks 1/3/4/5 itself and hands off to the SAME
+// `DurablePaymentSettlementLedger.apply()` a local settlement goes
+// through -- which independently re-derives legality (idempotent no-op on
+// a duplicate, rejected on a replayed/stale/out-of-order transition).
+//
+// HONEST LIMITATION, deliberately NOT papered over: because the one rail
+// in this build is a test simulator whose evidence is nonetheless in
+// `AUTHORITATIVE_PAYMENT_EVIDENCE_SOURCES` (`payment/types.ts`), the
+// seller's process is ultimately trusting the buyer's process's own
+// simulator. That is a property of shipping a simulator as the only rail,
+// NOT something this transport introduces -- the identical trust already
+// existed single-process. Replacing the simulator with a genuinely
+// `provider_verified` rail is what makes this transport carry real
+// settlement authority; until then check 5 above pins it to the simulator
+// so the trust root stays visible rather than implicit.
+// ---------------------------------------------------------------------
+
+interface CommercePaymentEvidenceTransportLike {
+  send(
+    evidence: CommercePaymentEvidenceLike,
+    binding: { readonly orderId: string; readonly amountCents: number; readonly currency: string },
+    counterpartyPubkeyHex: string,
+  ): Promise<{ readonly accepted: boolean; readonly message: string }>;
+}
+
+let commercePaymentEvidenceTransport: CommercePaymentEvidenceTransportLike | null = null;
+let commercePaymentEvidenceTransportProfileRef: CommerceNetworkProfileValue | null = null;
+let commercePaymentEvidenceTransportSignerRef: NostrSigningAuthorityLike | null = null;
+/** Same process-lifetime dedup discipline as `commercePrivateOrderAppliedEventIds`/`commercePrivateDeliveryAppliedEventIds`. Note this is only a cheap short-circuit: the settlement ledger itself is the real replay authority (`applySettlementEvidence()` returns `no_op`/`rejected` for duplicate/stale evidence regardless). */
+const commercePrivatePaymentEvidenceAppliedEventIds = new Set<string>();
+
+function commercePaymentEvidenceTransportFor(): CommercePaymentEvidenceTransportLike | null {
+  if (commerceNetworkProfile === "local-only") return null;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return null;
+  const m = requireModules();
+  if (
+    commercePaymentEvidenceTransport === null ||
+    commercePaymentEvidenceTransportProfileRef !== commerceNetworkProfile ||
+    commercePaymentEvidenceTransportSignerRef !== activeNostrSigningAuthority
+  ) {
+    const relayUrl = activeRelays[0]?.url ?? "";
+    const relayPublisher = new m.CommerceNostr.WebSocketRelayPublisher(relayUrl, { factory: m.createNodeWebSocketRelaySocketFactory() });
+    commercePaymentEvidenceTransport = new m.CommerceNostr.RealPaymentEvidenceTransport({
+      signingAuthority: activeNostrSigningAuthority,
+      relayPublisher,
+      nip44Wire: activeMasterSeedAuthority,
+      accountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+    });
+    commercePaymentEvidenceTransportProfileRef = commerceNetworkProfile;
+    commercePaymentEvidenceTransportSignerRef = activeNostrSigningAuthority;
+  }
+  return commercePaymentEvidenceTransport;
+}
+
+/**
+ * Best-effort, non-fatal private notification carrying an
+ * ALREADY-AUTHORITATIVE, ALREADY-APPLIED `PaymentEvidence` to the seller's
+ * own independent process. Returns one of the closed
+ * `describeCommerceSyncOutcome()` vocabulary strings
+ * (`src/os/commerce/order/cross_process_outcome_text.ts`, `"payment-evidence"`
+ * channel) so the UI can honestly report what happened -- including the
+ * `"evidence-not-transportable"` case, which is the OUTBOUND authority
+ * gate refusing to package non-authoritative evidence and must never be
+ * shown to a user as an ordinary network failure.
+ *
+ * A failure here NEVER unwinds the already-saved local settlement/Order --
+ * same posture as every other private sync send in this file.
+ */
+async function sendPrivatePaymentEvidenceSyncNonFatal(
+  evidence: CommercePaymentEvidenceLike,
+  binding: { readonly orderId: string; readonly amountCents: number; readonly currency: string },
+  recipientPubkeyHex: string,
+): Promise<string> {
+  if (recipientPubkeyHex.length === 0) return "no-counterparty";
+  const transport = commercePaymentEvidenceTransportFor();
+  if (transport === null) return "network-disabled";
+  try {
+    const result = await transport.send(evidence, binding, recipientPubkeyHex);
+    if (result.accepted) return "published";
+    // `RealPaymentEvidenceTransport.send()` returns this exact message when
+    // `buildOutboundPaymentEvidenceSyncPayload()` refused the evidence --
+    // a security refusal, surfaced as its own outcome rather than being
+    // flattened into the generic transport-error bucket.
+    if (result.message.startsWith("evidence is not authoritative")) return "evidence-not-transportable";
+    return result.message.length > 0 ? result.message : "transport-error";
+  } catch (err) {
+    console.error("fedos-beta: private PaymentEvidence sync attempt failed (non-fatal, local settlement state unaffected):", err);
+    return "transport-error";
+  }
+}
+
+/**
+ * Builds the receiver-side expectation for ONE inbound payment-evidence
+ * event, from this process's OWN local Order record and OWN identity --
+ * returns `null` (drop the event) whenever this process has no standing to
+ * accept payment evidence for that order at all. See the section header
+ * for why acceptance is one-directional (seller-receiving-from-buyer only).
+ */
+function commercePaymentEvidenceExpectationFor(
+  localOrder: CommerceOrderLike | undefined,
+  ownPubkeyHex: string,
+): { readonly expectedOrderId: string; readonly expectedCounterpartyPubkeyHex: string; readonly expectedAmountCents: number; readonly expectedCurrency: string; readonly expectedProviderIdentity: string } | null {
+  if (localOrder === undefined) return null;
+  // ONE direction only: this process must be the order's own SELLER. A
+  // buyer's process ran the payment rail itself and must never adopt a
+  // remote party's claim about its own payment.
+  if (ownPubkeyHex.length === 0 || ownPubkeyHex !== localOrder.sellerPubkey) return null;
+  if (localOrder.buyerPubkey.length === 0) return null;
+  return {
+    expectedOrderId: localOrder.id,
+    expectedCounterpartyPubkeyHex: localOrder.buyerPubkey,
+    expectedAmountCents: localOrder.unitPriceCents * localOrder.quantity,
+    expectedCurrency: localOrder.currency,
+    expectedProviderIdentity: requireModules().Commerce.TEST_SIMULATOR_NAME,
+  };
+}
+
+/**
+ * Applies ONE already-decrypted, already-signature-verified inbound
+ * private-payment-evidence envelope. Never throws; any rejection is a
+ * silent, safe drop (no human is waiting on an inbound event's own
+ * result). Every authority check lives either here (order/identity
+ * standing, `productId`) or inside `applyInboundPaymentEvidenceSync()` +
+ * the settlement ledger -- this function never reconstructs a
+ * `PaymentEvidence` from the wire itself.
+ */
+function applyInboundPrivatePaymentEvidenceNonFatal(
+  envelope: { readonly outcome: string; readonly eventId: string; readonly senderPubkeyHex: string; readonly payload?: { readonly orderId: string; readonly productId: string } },
+  ownPubkeyHex: string,
+): void {
+  if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
+  if (commercePrivatePaymentEvidenceAppliedEventIds.has(envelope.eventId)) return;
+  commercePrivatePaymentEvidenceAppliedEventIds.add(envelope.eventId);
+
+  const m = requireModules();
+  const state = commerceState();
+  const localOrder = state.orders.findById(envelope.payload.orderId);
+  const expectation = commercePaymentEvidenceExpectationFor(localOrder, ownPubkeyHex);
+  if (expectation === null || localOrder === undefined) return;
+  // Extra receiver check the Port's own expectation shape has no field for:
+  // the product this payment claims to be for must be THIS order's product.
+  if (envelope.payload.productId !== localOrder.productId) return;
+
+  // The settlement ledger REJECTS evidence for a paymentId it never
+  // `bind()`-ed (`PaymentSettlementLedger.apply()`), and this process --
+  // the seller's -- never ran `handleCommercePaymentRequest`, so it has no
+  // binding for the buyer's paymentId. Register one first, using only THIS
+  // process's own local order id/productId (never the wire's), so the
+  // subsequent apply is judged against a binding this process authored.
+  // `bind()` throws on a duplicate paymentId, so it is only ever called
+  // when the ledger genuinely has nothing for it; a paymentId already
+  // bound to a DIFFERENT order is left alone and `applySettlementEvidence()`
+  // rejects it as "wrong-order evidence" rather than being rebound here.
+  const paymentId = (envelope.payload as { readonly paymentId?: unknown }).paymentId;
+  if (typeof paymentId !== "string" || paymentId.length === 0) return;
+  if (state.ledger.get(paymentId) === undefined) {
+    try {
+      state.ledger.bind(paymentId, localOrder.id, localOrder.productId);
+    } catch (err) {
+      console.error("fedos-beta: inbound PaymentEvidence -- settlement bind failed (non-fatal, event dropped):", err);
+      return;
+    }
+  }
+
+  const applied = m.CommerceNostr.applyInboundPaymentEvidenceSync(envelope.senderPubkeyHex, envelope.payload, expectation, state.ledger);
+  if (!applied.accepted) {
+    console.error("fedos-beta: inbound PaymentEvidence rejected by receiver validation (non-fatal, ledger untouched):", applied.reason);
+    return;
+  }
+  // Only a genuine ledger TRANSITION may move the Order -- never a
+  // `no_op` (duplicate/idempotent) and never a `rejected`. This is the
+  // second and last place in this file that constructs a
+  // `{ kind: "payment_evidence" }` order actor, and like
+  // `handleCommercePaymentSimulate` it does so only AFTER the settlement
+  // ledger has independently agreed.
+  if (applied.result.outcome !== "transitioned") return;
+  const now = Math.floor(Date.now() / 1000);
+  const paymentEvidenceAction: Record<string, unknown> = {
+    type: "confirm_payment",
+    actor: { kind: "payment_evidence" },
+    evidence: { orderId: localOrder.id, paymentId, status: "settled", observedAt: now },
+  };
+  const orderResult = m.Commerce.applyOrderAction(localOrder, paymentEvidenceAction as CommerceOrderActionLike, now);
+  if (orderResult.ok && orderResult.order !== undefined) state.orders.save(orderResult.order);
+}
+
+/**
+ * The receive-side counterpart of
+ * `commercePrivateDeliveryDiscoverAndApplyNonFatal()`, for payment-evidence
+ * events. Called from the same bounded reliable-refresh points, and always
+ * BEFORE the Delivery pass -- a Delivery event's own reconciliation
+ * depends on whether this process's Order has already reached a
+ * payment-confirmed status (`applyInboundPrivateDeliverySyncNonFatal()`'s
+ * `orderPaymentConfirmed`), so payment must land first or a legitimate
+ * "fulfilling" event would be dropped and never retried within the pass.
+ */
+async function commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal(): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return;
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return;
+
+  const m = requireModules();
+  const signer = activeNostrSigningAuthority;
+  const nip44Wire = activeMasterSeedAuthority;
+  try {
+    const ownIdentity = await signer.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      { kinds: [1], "#t": [m.CommerceNostr.COMMERCE_PRIVATE_PAYMENT_EVIDENCE_SYNC_TAG], "#p": [ownIdentity.publicKeyHex], limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT },
+    ]);
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope(event, {
+          nip44Wire,
+          localAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+        });
+        applyInboundPrivatePaymentEvidenceNonFatal(envelope, ownIdentity.publicKeyHex);
+      } catch (err) {
+        console.error("fedos-beta: private PaymentEvidence sync -- one candidate event failed to decrypt/apply (non-fatal, skipped):", err);
+      }
+    }
+  } catch (err) {
+    console.error("fedos-beta: private PaymentEvidence sync discovery query failed (non-fatal, local settlement state unaffected):", err);
   }
 }
 
@@ -4417,6 +4795,8 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
   const result = m.Commerce.applyOrderAction(order, action as CommerceOrderActionLike, Math.floor(Date.now() / 1000));
   if (!result.ok || result.order === undefined) return { outcome: "rejected", reason: result.reason };
   orders.save(result.order);
+  /** (Coordinator, integration phase) Agent D's `"fulfilling"` delivery-sync outcome, previously discarded -- see `handleCommerceDeliveryAcknowledgeReceipt`'s own note. Stays `undefined` for every non-fulfill action, so the UI shows no delivery note where no delivery send was ever attempted. */
+  let deliverySyncOutcome: string | undefined;
   if (actionType === "fulfill") {
     // Commerce E2E Completion arc (coordinator) -- a successful "fulfill" on
     // the Order side ALSO creates+starts the real Delivery record (Agent
@@ -4457,7 +4837,7 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
         // before this call) rather than staying stuck at "no delivery
         // record for this order yet" forever. Best-effort/non-fatal, same
         // posture as `sendPrivateOrderSyncNonFatal()` immediately below.
-        await sendPrivateDeliverySyncNonFatal(started.delivery, "fulfilling", result.order.buyerPubkey, now);
+        deliverySyncOutcome = await sendPrivateDeliverySyncNonFatal(started.delivery, "fulfilling", result.order.buyerPubkey, now);
       }
     }
     // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
@@ -4478,7 +4858,7 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
   const syncStatus = ORDER_ACTION_TO_PRIVATE_SYNC_STATUS[actionType] ?? actionType;
   const reasonForSync = typeof action.reason === "string" ? action.reason : undefined;
   const nostrSyncOutcome = await sendPrivateOrderSyncNonFatal(result.order, syncStatus, recipientPubkey, Math.floor(Date.now() / 1000), reasonForSync);
-  return { outcome: "ok", order: commerceOrderDto(result.order), nostrSyncOutcome };
+  return { outcome: "ok", order: commerceOrderDto(result.order), nostrSyncOutcome, deliverySyncOutcome };
 }
 
 /**
@@ -4554,6 +4934,12 @@ async function handleCommerceOrdersListMine(payload: unknown) {
   await commercePrivateOrderDiscoverAndApplyNonFatal();
   // FedOS Commerce Purchase Completion mega-arc (Agent D) -- same bounded
   // refresh, for the Delivery-sync channel (arc "Cross-process delivery").
+  // FedOS Commerce Purchase Completion mega-arc (Agent P's transport,
+  // wired by the Coordinator) -- payment evidence is pulled BEFORE the
+  // Delivery pass on purpose: a Delivery event's reconciliation depends on
+  // this process's Order having already reached a payment-confirmed status
+  // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
+  await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listByBuyer(actorPubkey).map(commerceOrderDto) };
 }
@@ -4564,6 +4950,12 @@ async function handleCommerceOrdersListIncoming(payload: unknown) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
   await commercePrivateOrderDiscoverAndApplyNonFatal();
+  // FedOS Commerce Purchase Completion mega-arc (Agent P's transport,
+  // wired by the Coordinator) -- payment evidence is pulled BEFORE the
+  // Delivery pass on purpose: a Delivery event's reconciliation depends on
+  // this process's Order having already reached a payment-confirmed status
+  // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
+  await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listBySeller(actorPubkey).map(commerceOrderDto) };
 }
@@ -4641,7 +5033,32 @@ async function handleCommercePaymentSimulate(payload: unknown) {
   const result = m.Commerce.applyOrderAction(order, paymentEvidenceAction as CommerceOrderActionLike, Math.floor(Date.now() / 1000));
   if (!result.ok || result.order === undefined) return { outcome: "rejected", reason: result.reason };
   state.orders.save(result.order);
-  return { outcome: "ok", order: commerceOrderDto(result.order) };
+
+  // FedOS Commerce Purchase Completion mega-arc (Agent P's transport,
+  // wired by the Coordinator's integration phase) -- this process's own
+  // local Payment authority has now reached a terminal `paid` state, and
+  // BOTH independent gates above already agreed (the ledger genuinely
+  // transitioned, and `applyOrderAction` accepted the
+  // `{ kind: "payment_evidence" }` actor). Only now may the evidence
+  // leave this device, and only to the ONE counterparty that has any
+  // standing to receive it: this order's own seller, whose independent
+  // process previously had no way at all to learn the payment happened.
+  //
+  // `evidence` here is the object this process's OWN
+  // `DeterministicLocalPaymentProvider.simulateSettlement()` produced --
+  // never anything renderer-supplied (the preload bridge sends only
+  // `orderId`/`paymentId`) -- and `RealPaymentEvidenceTransport` re-checks
+  // its authoritativeness once more before packaging it. Best-effort and
+  // non-fatal: a send failure leaves the already-saved local settlement
+  // and Order completely untouched, and is reported honestly to the UI
+  // rather than swallowed.
+  const paymentSyncOutcome = await sendPrivatePaymentEvidenceSyncNonFatal(
+    evidence,
+    { orderId: order.id, amountCents: order.unitPriceCents * order.quantity, currency: order.currency },
+    order.sellerPubkey,
+  );
+
+  return { outcome: "ok", order: commerceOrderDto(result.order), paymentSyncOutcome };
 }
 
 // ---------------------------------------------------------------------
@@ -4677,6 +5094,12 @@ async function handleCommerceDeliveryStatus(payload: unknown) {
   // own Order-mirror only fires when that is already true (never blindly
   // trusts wire-event ordering).
   await commercePrivateOrderDiscoverAndApplyNonFatal();
+  // FedOS Commerce Purchase Completion mega-arc (Agent P's transport,
+  // wired by the Coordinator) -- payment evidence is pulled BEFORE the
+  // Delivery pass on purpose: a Delivery event's reconciliation depends on
+  // this process's Order having already reached a payment-confirmed status
+  // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
+  await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   const delivery = commerceState().deliveries.findByOrderId(orderId);
   if (delivery === undefined) return { outcome: "not-found", reason: "no delivery record for this order yet" };
@@ -4692,6 +5115,12 @@ async function handleCommerceDeliveryAcknowledgeReceipt(payload: unknown) {
   // against a freshly-materialized local Delivery record, never a stale or
   // entirely-missing one.
   await commercePrivateOrderDiscoverAndApplyNonFatal();
+  // FedOS Commerce Purchase Completion mega-arc (Agent P's transport,
+  // wired by the Coordinator) -- payment evidence is pulled BEFORE the
+  // Delivery pass on purpose: a Delivery event's reconciliation depends on
+  // this process's Order having already reached a payment-confirmed status
+  // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
+  await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
   const state = commerceState();
   const order = state.orders.findById(body.orderId);
@@ -4721,9 +5150,14 @@ async function handleCommerceDeliveryAcknowledgeReceipt(payload: unknown) {
   // above, so a seller's own process can never trigger this send for
   // itself. Best-effort/non-fatal, same posture as every other private
   // sync send in this file.
-  await sendPrivateDeliverySyncNonFatal(deliveryResult.delivery, "recipient_acknowledged", order.sellerPubkey, now, "customer acknowledged receipt");
+  // (Coordinator, integration phase) Agent D already sent this; its
+  // outcome was previously DISCARDED, so a buyer whose "I received it"
+  // never actually reached the seller's process was told nothing at all.
+  // Captured and returned now so the UI can report it honestly on the
+  // `"delivery"` channel (`cross_process_outcome_text.ts`).
+  const deliverySyncOutcome = await sendPrivateDeliverySyncNonFatal(deliveryResult.delivery, "recipient_acknowledged", order.sellerPubkey, now, "customer acknowledged receipt");
 
-  return { outcome: "ok", order: commerceOrderDto(orderResult.order), delivery: commerceDeliveryDto(deliveryResult.delivery) };
+  return { outcome: "ok", order: commerceOrderDto(orderResult.order), delivery: commerceDeliveryDto(deliveryResult.delivery), deliverySyncOutcome };
 }
 
 async function handleCommerceOrderComplete(payload: unknown) {
@@ -4774,14 +5208,21 @@ async function handleCommerceOrderComplete(payload: unknown) {
   // FedOS Commerce Purchase Completion mega-arc (Agent D) -- mirror onto
   // the Delivery-sync channel too, when a real local Delivery record just
   // closed out alongside the Order.
-  if (deliveryJustCompleted !== undefined) {
-    await sendPrivateDeliverySyncNonFatal(deliveryJustCompleted, "completed", recipientPubkey, now);
-  }
+  // (Coordinator, integration phase) outcome captured rather than
+  // discarded -- see `handleCommerceDeliveryAcknowledgeReceipt`'s own note.
+  // `undefined` (not a fabricated success string) when no local Delivery
+  // record closed out alongside the Order, so the UI renders no delivery
+  // note at all rather than claiming an attempt that never happened.
+  const deliverySyncOutcome =
+    deliveryJustCompleted !== undefined
+      ? await sendPrivateDeliverySyncNonFatal(deliveryJustCompleted, "completed", recipientPubkey, now)
+      : undefined;
 
   return {
     outcome: "ok",
     order: commerceOrderDto(orderResult.order),
     nostrSyncOutcome,
+    deliverySyncOutcome,
     reputationSyncStatus: reputationRecorded ? "recorded" : "unavailable",
   };
 }
