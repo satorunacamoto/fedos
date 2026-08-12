@@ -232,6 +232,8 @@ interface FedosCommerceReceiptIssueResult {
   readonly outcome: string;
   readonly reason?: string;
   readonly qrText?: string;
+  /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- a real, scannable QR PNG data URL rendered from `qrText` (friction-ledger row #11 / arc §34). Omitted (never a fabricated placeholder) if rendering failed -- `qrText` alone remains the authoritative proof either way. */
+  readonly qrImageDataUrl?: string;
   readonly verifyStatus?: string;
 }
 
@@ -273,6 +275,48 @@ interface FedosCommerceNetworkProfileResult {
   readonly outcome: string;
   readonly reason?: string;
   readonly profile?: FedosCommerceNetworkProfile;
+}
+
+/** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §38 / friction-ledger row #17. */
+interface FedosCommerceProductImageAttachResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly media?: { readonly id: string; readonly productId: string; readonly contentType: string; readonly altText: string };
+}
+
+/**
+ * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+ * (Agent D) -- arc §35-37 / friction-ledger row #15. Deliberately carries
+ * ONLY opaque `contentBase64`/`contentType` on success, or a
+ * closed-vocabulary `reason` on denial -- never a `MediaAccessGrant`
+ * envelope, a content key, AEAD internals, or a CID/storageRef.
+ */
+interface FedosCommerceMediaGrantRedeemResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly contentBase64?: string;
+  readonly contentType?: string;
+}
+
+/** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §32/§36 / friction-ledger row #14. */
+interface FedosCommerceActivitySummaryResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly asBuyer?: {
+    readonly draft: number;
+    readonly awaitingSellerAcceptance: number;
+    readonly readyToPay: number;
+    readonly inFulfillment: number;
+    readonly readyToAcknowledge: number;
+    readonly readyToComplete: number;
+    readonly readyReceipts: number;
+  };
+  readonly asSeller?: {
+    readonly newSubmitted: number;
+    readonly paidReadyToFulfill: number;
+    readonly fulfillingInProgress: number;
+    readonly completedAwaitingReceipt: number;
+  };
 }
 
 interface FedosAppBridge {
@@ -349,6 +393,12 @@ interface FedosAppBridge {
   /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface. */
   readonly commerceNetworkProfileGet: () => Promise<FedosCommerceNetworkProfileResult>;
   readonly commerceNetworkProfileSet: (profile: FedosCommerceNetworkProfile) => Promise<FedosCommerceNetworkProfileResult>;
+  /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §38 / friction-ledger row #17: attach a real, public product image. */
+  readonly commerceProductImageAttach: (actorPubkey: string, productId: string, imageBase64: string, contentType: string, altText?: string) => Promise<FedosCommerceProductImageAttachResult>;
+  /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §35-37 / friction-ledger row #15: redeem a grant-gated purchased digital content item. */
+  readonly commerceMediaGrantRedeem: (orderId: string, actorPubkey: string) => Promise<FedosCommerceMediaGrantRedeemResult>;
+  /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §32/§36 / friction-ledger row #14: real activity/badge counts for both buyer and seller roles. */
+  readonly commerceActivitySummary: (actorPubkey: string) => Promise<FedosCommerceActivitySummaryResult>;
 }
 
 interface Window {

@@ -45,6 +45,10 @@ const MAX_PRODUCT_TITLE_CHARS = 200;
 const MAX_PRODUCT_DESCRIPTION_CHARS = 4000;
 const MAX_CURRENCY_CHARS = 8;
 const MAX_ORDER_REJECTION_REASON_CHARS = 500;
+/** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- mirrors `fedos_electron_beta_main.cts`'s own identical constants exactly (bounds are enforced independently on both sides of the IPC boundary, same discipline as every other bound in this file). */
+const MAX_PRODUCT_IMAGE_BASE64_CHARS = 12_000_000;
+const MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS = 300;
+const MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS = 64;
 
 function boundedString(value: unknown, max: number): string {
   return typeof value === "string" ? value.slice(0, max) : "";
@@ -268,6 +272,26 @@ const fedosApp: FedosAppBridge = Object.freeze({
   commerceNetworkProfileGet: () => ipcRenderer.invoke("fedos-app:commerce-network-profile-get"),
   commerceNetworkProfileSet: (profile: "local-only" | "direct" | "tor-optional") =>
     ipcRenderer.invoke("fedos-app:commerce-network-profile-set", { profile }),
+  // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+  // (Agent D) -- product-image attach (arc §38), protected-media redeem
+  // (arc §35-37), and the real activity/badge data query (arc §32/§36).
+  // Same bounded-string discipline as every method above; image bytes
+  // travel as base64 text over IPC (Electron's structured-clone channel
+  // does not efficiently support raw `ArrayBuffer`/`Uint8Array` transfer
+  // in this codebase's existing IPC convention -- every other binary-ish
+  // payload in this file, e.g. Device-pairing envelopes, is also a
+  // bounded string, not a raw buffer).
+  commerceProductImageAttach: (actorPubkey: string, productId: string, imageBase64: string, contentType: string, altText?: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-product-image-attach", {
+      actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS),
+      productId: boundedString(productId, MAX_ID_CHARS),
+      imageBase64: boundedString(imageBase64, MAX_PRODUCT_IMAGE_BASE64_CHARS),
+      contentType: boundedString(contentType, MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS),
+      altText: altText === undefined ? undefined : boundedString(altText, MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS),
+    }),
+  commerceMediaGrantRedeem: (orderId: string, actorPubkey: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-media-grant-redeem", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
+  commerceActivitySummary: (actorPubkey: string) => ipcRenderer.invoke("fedos-app:commerce-activity-summary", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
 });
 
 contextBridge.exposeInMainWorld("fedosProfile", fedosProfile);

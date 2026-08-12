@@ -218,6 +218,28 @@ export {
   type UnwrapMediaAccessGrantReleaseInput,
 } from "./media_grant/media_access_grant_key_release.js";
 
+// FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+// (Agent D) -- the first REAL production caller wiring for the
+// MediaAccessGrant system above: merchant-side issuance orchestration, and
+// durable, sealed-at-rest custody for the merchant's real grant-signing
+// keypair. See each file's own header for the full design + the disclosed
+// "seller-not-grant-capable" limitation for the shipped Commerce demo's
+// fixed, non-cryptographic actor pubkeys.
+export {
+  issueMediaAccessGrantsForOrder,
+  type IssueMediaAccessGrantsForOrderInput,
+  type IssueMediaAccessGrantsForOrderOutcome,
+  type IssueMediaAccessGrantsForOrderOrderLike,
+  type IssueMediaAccessGrantsForOrderMediaLike,
+} from "./media_grant/media_access_grant_issuance.js";
+export {
+  resolveCommerceMediaGrantSigningKeypair,
+  COMMERCE_MEDIA_GRANT_SIGNING_KEY_PURPOSE,
+  COMMERCE_MEDIA_GRANT_SIGNING_KEY_ID,
+  type MediaGrantSigningKeyResolveResult,
+  type MediaGrantSigningKeySealingAuthorityLike,
+} from "./media_grant/persistence/durable_media_grant_signing_key_store.js";
+
 export type {
   PaymentProvider,
   PaymentProviderStatus,
@@ -317,6 +339,17 @@ export {
   type OrderStatusViewModel,
 } from "./order/index.js";
 
+// FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+// (Agent D) -- friction-ledger row #14 / arc §32/§36: the real,
+// repository-derived activity/badge counting logic.
+export {
+  computeCommerceBuyerActivitySummary,
+  computeCommerceSellerActivitySummary,
+  type CommerceActivitySummaryOrderLike,
+  type CommerceBuyerActivitySummary,
+  type CommerceSellerActivitySummary,
+} from "./order/activity_summary.js";
+
 export {
   AUTHORITATIVE_DELIVERY_EVIDENCE_SOURCES,
   DELIVERY_STATUSES,
@@ -366,6 +399,18 @@ export {
   type CommerceReceiptVerifyStatus,
   type CommerceReceiptVerifyResult,
 } from "./receipt/index.js";
+
+// FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
+// (Agent D) -- durable, idempotent persistence for an ISSUED receipt
+// envelope, closing friction-ledger row #5 ("receipt regenerates on every
+// call, never separately stored"). See the file's own header for the full
+// account of what was already fixed (the issuer's signing KEY) vs. what
+// this file fixes (the envelope ITSELF).
+export {
+  DurableReceiptStore,
+  type PersistedCommerceReceiptRecordV1,
+  type DurableReceiptStorePutResult,
+} from "./receipt/persistence/durable_receipt_store.js";
 
 export type {
   MarketplaceProvider,
