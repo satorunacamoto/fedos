@@ -72,7 +72,13 @@ describe("Commerce Reachable Catalog Phase 1 -- composition root wiring", () => 
     expect(source).toMatch(/distUrl\("os", "commerce", "index\.js"\)/);
     expect(source).toMatch(/listViewableProducts:\s*RootModules\["Commerce"\]\["listViewableProducts"\]/);
     // The commerce dynamic-import block's destructured shape names exactly the arc's own widened, reviewed set.
-    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,1600}?)\};/);
+    // Coordinator merge note: window widened from 1600 -- later arcs (Agent
+    // N's CommerceNostr surface, Agent D's media-grant/receipt-store/
+    // activity-summary imports) legitimately grew this block to ~2620
+    // chars; this test still only positively asserts the ORIGINAL name
+    // set is present and the forbidden names absent, so widening the
+    // capture window doesn't weaken it.
+    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,3200}?)\};/);
     expect(importBlockMatch, source).not.toBeNull();
     const importBlock = importBlockMatch![1];
     for (const name of [
@@ -91,7 +97,9 @@ describe("Commerce Reachable Catalog Phase 1 -- composition root wiring", () => 
 
   it("3. RootModules.Commerce exposes exactly the Commerce E2E Completion arc's own reviewed name set -- no PlaceholderPaymentProvider/marketplace field, never the raw createCommerce() factory", () => {
     const source = stripComments(read(MAIN_PATH));
-    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,1900}?)\n  \};/);
+    // Coordinator merge note: window widened from 1900 -- same growth
+    // reason as test 2 above; real length is now ~5500 chars.
+    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,6200}?)\n  \};/);
     expect(fieldMatch, source).not.toBeNull();
     const field = fieldMatch![1];
     for (const name of [
@@ -139,6 +147,13 @@ describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
       "commerce-persona-board-query",
       "commerce-network-profile-get",
       "commerce-network-profile-set",
+      // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent D) -- friction
+      // ledger row #17 (public product image attach), row #14 (activity
+      // summary data for badges/attention), and the digital-content
+      // authorization redeem path (arc §36/§37).
+      "commerce-product-image-attach",
+      "commerce-media-grant-redeem",
+      "commerce-activity-summary",
     ];
     expect(channelMatches.length).toBe(EXPECTED_CHANNELS.length);
     for (const channel of EXPECTED_CHANNELS) {
