@@ -18,11 +18,8 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { join, dirname } from "node:path";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
 import {

@@ -47,7 +47,6 @@ import type { FedosDirectRatchetSuite } from "../../../../conversations/ratchet/
 import { isWellFormedFedosDirectRatchetSessionResetReason, type FedosDirectRatchetSessionResetReason } from "../../../../conversations/ratchet/fedos_direct_ratchet_session_reset_reason.js";
 import { isWellFormedFedosDeviceSchnorrSignatureHex } from "../../../../device/crypto/fedos_device_signing_keypair.js";
 
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 
 const SCHEMA_VERSION = 1;

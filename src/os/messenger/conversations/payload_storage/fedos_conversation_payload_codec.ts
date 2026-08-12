@@ -30,7 +30,6 @@
  *     byte content anywhere in this file (Alpha 805).
  */
 
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 import {
   validateFedosConversationPayloadDescriptor,

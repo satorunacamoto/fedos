@@ -38,7 +38,6 @@
  *     type/timestamp only.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 
 export type FedosDesktopNavigationEventType = "last-opened" | "pin" | "unpin" | "recent-touch";

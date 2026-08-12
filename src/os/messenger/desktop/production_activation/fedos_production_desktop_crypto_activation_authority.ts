@@ -37,9 +37,7 @@ import {
   type FedosProductionMasterSeedFacade,
 } from "./fedos_production_wasm_master_seed_facade.js";
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, existsSync } from "node:fs";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
 declare const process: { cwd(): string };

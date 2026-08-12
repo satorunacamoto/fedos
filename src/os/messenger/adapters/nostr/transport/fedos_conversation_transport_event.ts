@@ -64,7 +64,6 @@
  *     `fedos_conversation_message_envelope.ts`'s own header).
  */
 
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 import type { FedosConversationMessageEnvelope } from "../../../conversations/envelope/fedos_conversation_message_envelope.js";
 import type { FedosNostrUnsignedEventRequest } from "../protocol/sign/fedos_nostr_signing_authority.js";

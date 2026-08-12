@@ -8,13 +8,9 @@
  * ordinary packaged production mode.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { join, dirname } from "node:path";
-// @ts-expect-error see above.
 import { fileURLToPath } from "node:url";
-// @ts-expect-error see above.
 import { execFileSync } from "node:child_process";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");

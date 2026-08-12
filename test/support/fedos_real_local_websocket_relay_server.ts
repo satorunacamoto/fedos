@@ -33,11 +33,8 @@
  * `src/`.
  */
 
-// @ts-expect-error `node:http` has no type declarations without `@types/node` in this project's tsconfig.
 import { createServer, type Server, type IncomingMessage } from "node:http";
-// @ts-expect-error see above.
 import type { Socket } from "node:net";
-// @ts-expect-error see above.
 import { createHash, randomUUID } from "node:crypto";
 
 const RFC6455_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";

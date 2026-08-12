@@ -5,7 +5,6 @@
  * fail-closed on corruption, keyed by `transferSessionId`.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   fedosPersistedDeviceRelaySyncOutboxRecordsAreEqual,

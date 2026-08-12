@@ -40,7 +40,6 @@
  * replay, that exact situation throws unconditionally as corruption.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import { isWellFormedTradeCompletionAttestationPayload } from "../attestation_types.js";
 import type { TradeCompletionAttestationEnvelope } from "../attestation_sign_verify.js";

@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
-// @ts-expect-error see above.
 import { dirname, join, relative, resolve as pathResolve } from "node:path";
 // @ts-expect-error `.mjs` modules have no declaration file in this project's tsconfig.
 import { analyzeArchitectureCycles } from "../scripts/architecture_cycle_detector.mjs";

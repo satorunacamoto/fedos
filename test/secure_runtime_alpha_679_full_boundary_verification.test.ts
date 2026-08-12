@@ -15,7 +15,6 @@ import eligibilityEvaluatorSource from "../src/os/messenger/board/runtime/eligib
 import desktopRuntimeSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime.ts?raw";
 // @ts-expect-error see above.
 import runtimeConfigSource from "../src/os/messenger/desktop/runtime/fedos_desktop_runtime_config.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
 import { assertFedosRootDependencyInvariant, assertFedosRootDevDependencyInvariant } from "./helpers/fedos_root_dependency_invariant.js";
 

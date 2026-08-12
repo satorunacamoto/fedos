@@ -17,11 +17,8 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error node:fs types
 import { existsSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
-// @ts-expect-error node:path types
 import { join } from "node:path";
-// @ts-expect-error node:os types
 import { tmpdir } from "node:os";
 
 import {

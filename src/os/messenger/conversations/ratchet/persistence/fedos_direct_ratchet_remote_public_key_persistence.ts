@@ -24,7 +24,6 @@
  *     public key" fact at any moment, unlike counters/skipped keys which
  *     are genuinely event-sourced elsewhere).
  */
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 
 export interface FedosDirectRatchetRemotePublicKeyPersistence {

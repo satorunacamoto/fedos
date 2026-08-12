@@ -138,11 +138,8 @@ describe("Secure Runtime Alpha 6201-6280 -- failure matrix", () => {
   });
 
   it("10. corrupt append-only pending-review log line -- fails closed (throws), never silently skips or fabricates", async () => {
-    // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
     const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
-    // @ts-expect-error see above.
     const { tmpdir } = await import("node:os");
-    // @ts-expect-error see above.
     const { join } = await import("node:path");
     const dir = mkdtempSync(join(tmpdir(), "fedos-pending-review-corrupt-"));
     try {

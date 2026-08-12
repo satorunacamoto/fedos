@@ -52,7 +52,6 @@
  * never a partial field update.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import type { Order } from "../order_types.js";
 import type { OrderRepository } from "../order_repository_port.js";

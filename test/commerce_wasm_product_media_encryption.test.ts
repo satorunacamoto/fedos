@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig — same pattern `test/architecture_boundary_commerce.test.ts` already uses.
 import { existsSync } from "node:fs";
 
 import {

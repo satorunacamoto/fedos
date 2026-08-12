@@ -99,9 +99,7 @@
  * ever exposed to a caller.
  */
 
-// @ts-expect-error `node:fs`/`node:path` have no type declarations without `@types/node` in this project's tsconfig.
 import { mkdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { dirname } from "node:path";
 import type { FedosDesktopHost } from "../host/fedos_desktop_host.js";
 import { createFedosDesktopHost } from "../host/create_fedos_desktop_host.js";

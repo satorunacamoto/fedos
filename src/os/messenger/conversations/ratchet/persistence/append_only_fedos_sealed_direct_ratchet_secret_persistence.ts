@@ -9,7 +9,6 @@
  * field is already opaque, Rust-produced ciphertext
  * (`../fedos_sealed_direct_ratchet_secret_record.ts`'s own header).
  */
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   fedosSealedDirectRatchetSecretRecordKey,

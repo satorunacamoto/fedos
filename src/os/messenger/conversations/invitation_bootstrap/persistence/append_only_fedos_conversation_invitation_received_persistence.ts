@@ -9,7 +9,6 @@
  * `listReceived()` replays this same log.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   decodeFedosConversationInvitationReceivedRecordV1 as decodeFromLine,

@@ -69,7 +69,6 @@ import {
   type FedosPrivateNostrImportRecordPersistence,
 } from "./fedos_private_nostr_import_record.js";
 
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 
 export type FedosPrivateNostrInboundReceiveResult =

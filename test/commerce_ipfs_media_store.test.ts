@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig — same pattern `test/commerce_wasm_product_media_encryption.test.ts` already uses.
 import { existsSync } from "node:fs";
 import { IpfsMediaStore, InMemoryIpfsTransport } from "../src/os/commerce/catalog/ipfs_media_store.js";
 import { computeCommerceMediaContentHash } from "../src/os/commerce/catalog/product_media_content_address.js";

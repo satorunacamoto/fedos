@@ -86,7 +86,6 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
   });
 
   it("2. outside Development Runtime, Rust is never reached even with real artifacts present", async () => {
-    // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
     const nodeFs = await import("node:fs");
     vi.mocked(nodeFs.existsSync).mockReturnValue(true);
     try {
@@ -243,7 +242,6 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
     // its first pending promise, not once that promise resolves (the
     // SAME timing already documented in test/runtime_wasm_loader_dev_only_rust_version_call_execution.test.ts
     // test 9's own comment).
-    // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
     const nodeFs = await import("node:fs");
     vi.mocked(nodeFs.existsSync).mockReturnValue(true);
     try {
@@ -263,7 +261,6 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
   });
 
   it("23. version retrieval FAILS closed through an injected loader whose module lacks version -- reachedRust false, rustVersion null, no throw", async () => {
-    // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
     const nodeFs = await import("node:fs");
     vi.mocked(nodeFs.existsSync).mockReturnValue(true);
     try {
@@ -281,7 +278,6 @@ describe("FedOS Runtime Integration -- attemptDevOnlyRuntimeRustIntegration() co
   });
 
   it("24. version retrieval FAILS closed when module.version() throws -- reachedRust false, rustVersion null, no throw out of attemptDevOnlyRuntimeRustIntegration()", async () => {
-    // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
     const nodeFs = await import("node:fs");
     vi.mocked(nodeFs.existsSync).mockReturnValue(true);
     try {

@@ -9,9 +9,7 @@
  * own Absolute Prohibitions list forbids wiring into.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error node:fs has no type declarations without @types/node in this tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import {

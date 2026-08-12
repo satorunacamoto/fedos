@@ -1,7 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { existsSync, readFileSync } from "node:fs";
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { execFileSync } from "node:child_process";
 import { FedosRuntimeCryptoProvider } from "../src/runtime/fedos_runtime_crypto_provider.js";
 import { createFedosWasmArtifact } from "../src/runtime/fedos_wasm_artifact.js";

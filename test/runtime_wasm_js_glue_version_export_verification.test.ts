@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { existsSync, readFileSync } from "node:fs";
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { execFileSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import verificationDocSource from "../docs/runtime_wasm_js_glue_version_export_verification.md?raw";

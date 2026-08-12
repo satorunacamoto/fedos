@@ -15,11 +15,8 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
 
 // @ts-expect-error this repo's own packaging `.mjs` scripts carry no `.d.ts` declaration file.

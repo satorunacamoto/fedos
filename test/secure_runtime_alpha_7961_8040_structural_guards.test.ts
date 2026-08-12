@@ -4,13 +4,9 @@
  * ARC_BASE (`81b5f0d1`) is this Arc's own true starting point.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, existsSync } from "node:fs";
-// @ts-expect-error see above.
 import { join, dirname } from "node:path";
-// @ts-expect-error see above.
 import { fileURLToPath } from "node:url";
-// @ts-expect-error see above.
 import { execFileSync } from "node:child_process";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");

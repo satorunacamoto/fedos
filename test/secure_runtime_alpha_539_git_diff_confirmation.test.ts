@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` in this project's tsconfig.
 import { execSync } from "node:child_process";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import doc from "../docs/secure_runtime_alpha_539_git_diff_confirmation.md?raw";

@@ -6,11 +6,8 @@
  * Runtime/Shell/Host Bridge/Electron owner, and no second Device Registry.
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { join, dirname } from "node:path";
-// @ts-expect-error see above.
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");

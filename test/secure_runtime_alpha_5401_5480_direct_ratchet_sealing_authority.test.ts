@@ -11,9 +11,7 @@
  * `npm run build:wasm` first).
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import { FedosWasmMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.js";

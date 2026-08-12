@@ -6,9 +6,7 @@
  * `test/secure_runtime_alpha_5801_5880_structural_guards.test.ts`).
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error node:fs has no type declarations without @types/node in this tsconfig.
 import { readFileSync, readdirSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import { FEDOS_DIRECT_RATCHET_SESSION_RESET_REASONS } from "../src/os/messenger/conversations/ratchet/fedos_direct_ratchet_session_reset_reason.js";

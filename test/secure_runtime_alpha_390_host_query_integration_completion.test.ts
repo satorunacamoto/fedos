@@ -13,11 +13,8 @@ import querySource from "../src/os/messenger/board/query/fedos_board_query.ts?ra
 import serviceSource from "../src/os/messenger/board/repository/fedos_board_service.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import persistenceSource from "../src/os/messenger/board/persistence/fedos_board_persistence.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-// @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
 import { tmpdir } from "node:os";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 
 import { FedosDesktopHost } from "../src/os/messenger/desktop/host/fedos_desktop_host.js";

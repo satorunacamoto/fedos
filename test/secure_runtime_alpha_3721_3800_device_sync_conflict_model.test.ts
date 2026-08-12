@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync } from "node:fs";
-// @ts-expect-error `node:os` has no type declarations without `@types/node` in this project's tsconfig.
 import { tmpdir } from "node:os";
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join } from "node:path";
 import { classifyFedosSyncConflict } from "../src/sync/fedos_sync_conflict.js";
 import type { FedosSyncJournalEntryV1 } from "../src/sync/fedos_sync_journal.js";

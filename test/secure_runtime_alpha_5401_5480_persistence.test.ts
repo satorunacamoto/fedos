@@ -6,11 +6,8 @@
  * restart after interrupted append (Phase K).
  */
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error node:fs has no type declarations without @types/node in this tsconfig.
 import { mkdtempSync, rmSync, appendFileSync, readFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 
 import { InMemoryFedosDirectRatchetSessionPersistence } from "../src/os/messenger/conversations/ratchet/persistence/in_memory_fedos_direct_ratchet_session_persistence.js";

@@ -24,13 +24,9 @@
  * documented subprocess-boundary precedent, reused here).
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, readFileSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error see above.
 import { Buffer } from "node:buffer";
 
 import { createFedosConversationRuntime, type FedosConversationRuntime } from "../src/os/messenger/conversations/runtime/fedos_conversation_runtime.js";
@@ -309,7 +305,6 @@ describe("Alpha 1279–1288/1305 -- real, no-Fake-Authority Direct Conversation 
       const rawBytes = Buffer.from(record.bytesBase64, "base64");
       rawBytes[rawBytes.length - 1] = (rawBytes[rawBytes.length - 1]! ^ 0xff) & 0xff;
       const tamperedRecord = { ...record, bytesBase64: rawBytes.toString("base64") };
-      // @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
       const { writeFileSync } = await import("node:fs");
       writeFileSync(join(backendDir, "payload.log"), JSON.stringify(tamperedRecord) + "\n", "utf8");
 

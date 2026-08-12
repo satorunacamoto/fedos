@@ -18,7 +18,6 @@
  * `pkg/fedos_core_rust_bg.wasm` never appears here; a real, deliberately
  * committed fixture would.
  */
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` in this project's root tsconfig (test-only usage, no new dependency) -- mirrors this repo's own established convention (e.g. `test/runtime_wasm_artifact.test.ts`).
 import { execFileSync } from "node:child_process";
 
 /**

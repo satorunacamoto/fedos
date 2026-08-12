@@ -4,7 +4,6 @@
  * append-only backend in this domain (`5641-5720`, unmodified) exactly:
  * one independent NDJSON log, insert-only, fail-closed on corruption.
  */
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   evaluateFedosDeletionRequestInboxSummaryWrite,

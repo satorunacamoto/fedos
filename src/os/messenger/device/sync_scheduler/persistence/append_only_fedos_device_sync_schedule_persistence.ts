@@ -5,7 +5,6 @@
  * corruption, zero new dependency.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import { deserializeFedosDeviceSyncScheduleEvent } from "./fedos_device_sync_schedule_event_codec.js";
 import {

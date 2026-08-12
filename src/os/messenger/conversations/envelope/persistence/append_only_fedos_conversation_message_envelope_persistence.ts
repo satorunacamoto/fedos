@@ -28,7 +28,6 @@
  *   - No delete/compaction/rewrite method.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import {
   fedosPersistedConversationMessageEnvelopesAreEqual,

@@ -10,11 +10,8 @@
  * checked-out tree; see the integrated inventory's own §5).
  */
 import { describe, it, expect } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync } from "node:fs";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { join } from "node:path";
 import { FedosConversationDirectActivationCoordinator } from "../src/os/messenger/conversations/activation/fedos_conversation_direct_activation_coordinator.js";
 import { InMemoryFedosConversationActivationPersistence } from "../src/os/messenger/conversations/activation/in_memory_fedos_conversation_activation_persistence.js";

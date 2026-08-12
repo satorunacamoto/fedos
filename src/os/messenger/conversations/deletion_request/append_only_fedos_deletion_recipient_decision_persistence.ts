@@ -7,7 +7,6 @@
  * exactly, over the recipient-decision domain.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import type { FedosPersistedDeletionRecipientDecisionRecordV1 } from "./fedos_persisted_deletion_recipient_decision_record_v1.js";
 import {

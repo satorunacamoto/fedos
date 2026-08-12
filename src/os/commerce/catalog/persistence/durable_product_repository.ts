@@ -42,7 +42,6 @@
  * snapshot per call.
  */
 
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readFileSync, appendFileSync } from "node:fs";
 import { canEditProduct } from "../policy.js";
 import { listViewableProducts } from "../directory.js";

@@ -15,19 +15,12 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
-// @ts-expect-error see above.
 import { join } from "node:path";
-// @ts-expect-error see above.
 import { tmpdir } from "node:os";
-// @ts-expect-error see above.
 import { createHash } from "node:crypto";
-// @ts-expect-error see above.
 import http from "node:http";
-// @ts-expect-error see above.
 import { Buffer } from "node:buffer";
-// @ts-expect-error see above.
 import process from "node:process";
 
 // @ts-expect-error this repo's own packaging `.mjs` scripts carry no `.d.ts` declaration file.

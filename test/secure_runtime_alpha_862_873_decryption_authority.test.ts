@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-// @ts-expect-error `node:buffer` has no type declarations without `@types/node` in this project's tsconfig.
 import { Buffer } from "node:buffer";
 import {
   FedosWasmConversationEncryptionAuthority,

@@ -39,9 +39,7 @@ import wasmArtifactSource from "../../../src/runtime/fedos_wasm_artifact.ts?raw"
 import masterSeedWasmAuthoritySource from "../../../src/os/core/vault/wasm/fedos_wasm_master_seed_authority.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import publicAuthorAuthoritySource from "../../../src/os/messenger/board/runtime/identity/fedos_public_author_authority.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { readdirSync, readFileSync } from "node:fs";
-// @ts-expect-error `node:child_process` has no type declarations without `@types/node` (test-only usage, no new dependency).
 import { execFileSync } from "node:child_process";
 
 /**

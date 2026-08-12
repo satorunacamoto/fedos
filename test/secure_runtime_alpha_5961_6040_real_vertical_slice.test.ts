@@ -27,11 +27,8 @@
  * genuine-Ratchet-crypto path whenever `pkg/` is present.
  */
 import { describe, expect, it } from "vitest";
-// @ts-expect-error node:fs has no type declarations without @types/node in this tsconfig.
 import { existsSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
-// @ts-expect-error same as above.
 import { tmpdir } from "node:os";
-// @ts-expect-error same as above.
 import { join } from "node:path";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "@noble/hashes/utils.js";

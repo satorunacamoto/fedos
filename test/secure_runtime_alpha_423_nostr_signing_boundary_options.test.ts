@@ -5,7 +5,6 @@ import designDocSource from "../docs/secure_runtime_alpha_423_nostr_signing_boun
 import nip07Source from "../src/os/_legacy_prototype/sign/nip07.ts?raw";
 // @ts-expect-error `?raw` modules are untyped in this project's tsconfig.
 import nobleSignatureSource from "../src/os/messenger/adapters/nostr/protocol/noble_signature.ts?raw";
-// @ts-expect-error `node:fs` has no type declarations without `@types/node` in this project's tsconfig.
 import { existsSync } from "node:fs";
 
 /**

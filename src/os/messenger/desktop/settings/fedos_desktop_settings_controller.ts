@@ -24,7 +24,6 @@
  * `fedos_local_profile_paths.ts`.
  */
 
-// @ts-expect-error `node:path` has no type declarations without `@types/node` in this project's tsconfig.
 import { join, isAbsolute } from "node:path";
 import type { FedosSettingsDescriptorV1 } from "../../../core/settings/fedos_settings_descriptor.js";
 import {
