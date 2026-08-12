@@ -55,7 +55,7 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     expect(appBlockers).toEqual([]);
   });
 
-  it("does not regress past the currently-measured blocker baseline (16, up from 10 -- FedOS 'Real Two-Party Commerce + UX P0/P1 Closure' mega-arc, Agent N, Coordinator-directed pass -- a new violation must update this number deliberately, never silently)", () => {
+  it("does not regress past the currently-measured blocker baseline (28, up from 16 -- FedOS 'Real Two-Party Purchase Completion + UX Closure' mega-arc, Agents P/D, Coordinator-directed pass -- a new violation must update this number deliberately, never silently)", () => {
     // Commerce E2E Completion arc, Wave B: 4 new, DELIBERATE, reviewed blockers on
     // top of the pre-existing 3 (os/core -> packages/fedos-core-rust; the two
     // pre-existing catalog/adapters/nostr/{bridge,classify}.ts -> os/messenger
@@ -114,8 +114,35 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     //     adapter already uses, directly -- rather than the full NIP-17
     //     stack, which would have pulled in a Conversation-domain
     //     dependency instead of this already-sanctioned Nostr-protocol one)
+    //
+    // FedOS "Real Two-Party Purchase Completion + UX Closure" mega-arc
+    // (Agents P and D, Coordinator-directed pass): 12 more new, DELIBERATE,
+    // reviewed blockers on top of the prior 16 -- 6 each from TWO new files,
+    // both living in the SAME NOSTR_ADAPTER_DIR the pre-existing bridges
+    // already use, and both importing the IDENTICAL 6 os/messenger Nostr
+    // protocol symbols `commerce_private_order_bridge.ts` already
+    // established above (byte-for-byte the same import list: `event.js`'s
+    // `isNostrEvent`, `noble_signature.js`'s `NobleSignatureVerifier`,
+    // `signature.js`'s `SignatureVerifier` type, `types.js`'s `NostrEvent`
+    // type, `publish.js`'s `RelayPublisher` type, and
+    // `sign/fedos_nostr_signing_authority.js`'s signing-authority exports)
+    // -- not a new category of leak, the SAME already-reviewed pattern
+    // replicated for two more private-sync channels, per this arc's own
+    // explicit instruction to reuse the existing FedOS Nostr/NIP-44 stack
+    // rather than build a second crypto/messaging stack per channel:
+    //   - catalog/adapters/nostr/commerce_private_delivery_bridge.ts
+    //     (Agent D) -- the private Delivery-sync transport (fulfilling /
+    //     recipient_acknowledged / completed).
+    //   - catalog/adapters/nostr/commerce_private_payment_evidence_bridge.ts
+    //     (Agent P) -- the private PaymentEvidence transport, this arc's
+    //     primary blocker closure (receiver-side-verified PAID crossing
+    //     process for the first time).
+    // Verified mechanically, not just by inspection: 28 - 16 = 12, and 12
+    // is exactly 2 x 6 -- confirmed by running
+    // `node scripts/package_extraction_boundary_scan.mjs` directly and
+    // diffing its output against the pre-existing 16-line blocker list.
     const { blockers } = runScan();
-    expect(blockers.length).toBeLessThanOrEqual(16);
+    expect(blockers.length).toBeLessThanOrEqual(28);
   });
 
   it("every blocker belongs to one of the three os/* roots (never the already-clean Electron app)", () => {
