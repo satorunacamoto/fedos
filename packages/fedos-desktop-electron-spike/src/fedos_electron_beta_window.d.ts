@@ -436,6 +436,8 @@ interface FedosAppBridge {
   readonly commerceDeliveryAcknowledgeReceipt: (orderId: string, actorPubkey: string) => Promise<FedosCommerceDeliveryAcknowledgeResult>;
   readonly commerceOrderComplete: (orderId: string, actorPubkey: string) => Promise<FedosCommerceOrderResult>;
   readonly commerceReceiptIssue: (orderId: string) => Promise<FedosCommerceReceiptIssueResult>;
+  /** FedOS Commerce Purchase Completion mega-arc (Agent R) -- read-only companion to `commerceReceiptIssue`: looks up an already-issued receipt without ever minting one (`outcome: "not-found"` if none exists yet). */
+  readonly commerceReceiptLookup: (orderId: string) => Promise<FedosCommerceReceiptIssueResult>;
   /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's read-only Persona Board query, always the "PUBLIC" disclosure layer. */
   readonly commercePersonaBoardQuery: (subjectPubkey: string) => Promise<FedosCommercePersonaBoardQueryResult>;
   /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface. */

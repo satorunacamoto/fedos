@@ -1132,9 +1132,17 @@ function openCommerceOrderScreen(order: FedosCommerceOrder): void {
   currentCommercePendingPayment = null;
   currentCommerceDelivery = null;
   byId("commerce-order-completion-note").textContent = "";
+  // Reset unconditionally (not just when `order.status !== "completed"`,
+  // which `renderCommerceOrderScreen()` already handles) -- otherwise a
+  // PRIOR completed order's receipt panel could stay visibly stale for a
+  // few ms while THIS order's own `refreshCommerceReceiptStatus()` lookup
+  // is still in flight, or permanently if this order turns out to have no
+  // receipt of its own yet.
+  byId("commerce-order-receipt-result").setAttribute("hidden", "");
   showAppScreen("commerce-order");
   renderCommerceOrderScreen();
   void refreshCommerceDeliveryStatus();
+  void refreshCommerceReceiptStatus();
 }
 
 async function onCommerceDeliveryAcknowledgeReceiptClick(): Promise<void> {
@@ -1184,17 +1192,14 @@ async function onCommerceOrderCompleteClick(): Promise<void> {
   void refreshCommerceMyOrdersList();
 }
 
-async function onCommerceReceiptIssueClick(): Promise<void> {
-  if (currentCommerceOrder === null) return;
-  const orderId = currentCommerceOrder.id;
-  const result = await runCommerceAction(["commerce-order-receipt-issue-btn"], "commerce-order-receipt-error", () =>
-    window.fedosApp.commerceReceiptIssue(orderId),
-  );
-  if (result === undefined) return;
-  if (result.outcome !== "ok" || result.qrText === undefined) {
-    showCommerceError("commerce-order-receipt-error", result);
-    return;
-  }
+/**
+ * Shared render step for both `onCommerceReceiptIssueClick()` (explicit
+ * click, may mint a new receipt) and `refreshCommerceReceiptStatus()`
+ * (silent auto-lookup on order open, never mints) -- same fields, same
+ * DOM targets, so the "already issued, restored on open" case renders
+ * byte-identically to the "just issued" case.
+ */
+function renderCommerceReceiptResult(result: { readonly qrText: string; readonly qrImageDataUrl?: string; readonly verifyStatus?: string }): void {
   byId("commerce-order-receipt-result").removeAttribute("hidden");
   byId("commerce-order-receipt-verify-status").textContent = result.verifyStatus ?? "";
   byId<HTMLTextAreaElement>("commerce-order-receipt-qr-text").value = result.qrText;
@@ -1209,6 +1214,42 @@ async function onCommerceReceiptIssueClick(): Promise<void> {
     qrImage.setAttribute("hidden", "");
     qrImage.removeAttribute("src");
   }
+}
+
+async function onCommerceReceiptIssueClick(): Promise<void> {
+  if (currentCommerceOrder === null) return;
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction(["commerce-order-receipt-issue-btn"], "commerce-order-receipt-error", () =>
+    window.fedosApp.commerceReceiptIssue(orderId),
+  );
+  if (result === undefined) return;
+  if (result.outcome !== "ok" || result.qrText === undefined) {
+    showCommerceError("commerce-order-receipt-error", result);
+    return;
+  }
+  renderCommerceReceiptResult({ qrText: result.qrText, qrImageDataUrl: result.qrImageDataUrl, verifyStatus: result.verifyStatus });
+}
+
+/**
+ * FedOS Commerce Purchase Completion mega-arc (Agent R) -- automatically
+ * checks whether the currently open, `"completed"` order already has a
+ * durably-persisted receipt (`DurableReceiptStore`, survives a real
+ * restart byte-for-byte -- see `handleCommerceReceiptLookup()`,
+ * `fedos_electron_beta_main.cts`) and, if so, renders it immediately --
+ * WITHOUT the user needing to click "Issue Signed Receipt" again. Purely
+ * read-only: never mints a receipt for an order that was never issued
+ * one (`outcome: "not-found"` is a normal, silent no-op here). Mirrors
+ * `refreshCommerceDeliveryStatus()`'s own "fetch on open, re-render"
+ * pattern. Guards against a stale response landing after the user has
+ * already navigated away to a different order.
+ */
+async function refreshCommerceReceiptStatus(): Promise<void> {
+  if (currentCommerceOrder === null || currentCommerceOrder.status !== "completed") return;
+  const orderId = currentCommerceOrder.id;
+  const result = await runCommerceAction([], "commerce-order-receipt-error", () => window.fedosApp.commerceReceiptLookup(orderId));
+  if (result === undefined || result.outcome !== "ok" || result.qrText === undefined) return;
+  if (currentCommerceOrder === null || currentCommerceOrder.id !== orderId) return; // stale -- user navigated to a different order while this was in flight
+  renderCommerceReceiptResult({ qrText: result.qrText, qrImageDataUrl: result.qrImageDataUrl, verifyStatus: result.verifyStatus });
 }
 
 async function onCommerceOrderCreateSubmit(): Promise<void> {

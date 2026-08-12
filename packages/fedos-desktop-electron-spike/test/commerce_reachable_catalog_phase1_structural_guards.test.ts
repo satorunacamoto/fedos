@@ -141,6 +141,8 @@ describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
       "commerce-delivery-acknowledge-receipt",
       "commerce-order-complete",
       "commerce-receipt-issue",
+      // FedOS Commerce Purchase Completion mega-arc (Agent R) -- read-only receipt lookup (never mints), dev-vs-packaged restart-visibility fix.
+      "commerce-receipt-lookup",
       // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's
       // read-only Persona Board query and Agent N's minimal NetworkProfile
       // Settings surface, added by this arc's own central-integration pass.
