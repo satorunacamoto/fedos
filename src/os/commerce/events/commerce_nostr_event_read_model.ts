@@ -7,10 +7,22 @@
  * them — the "a second FedOS instance/read model consumes it" half of
  * this wave's own proof requirement.
  *
- * DESIGN + TYPE-ONLY SCAFFOLDING, same status as the rest of
- * `src/os/commerce` (see `../README.md`): nothing here is wired into
- * `createCommerce()` or the shipped Electron app. Not reachable from the
- * shipped app.
+ * STATUS UPDATE (FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc,
+ * Agent N) — this file is NOT wired into `createCommerce()`'s own barrel
+ * (still true, unchanged), but IS now reachable from the shipped Electron
+ * app through a DIFFERENT path: `packages/fedos-desktop-electron-spike/src/
+ * fedos_electron_beta_main.cts`'s own `commerceNostrReadModelFor()` +
+ * `commerceNostrDiscoverAndIngestProductsNonFatal()` construct and feed a
+ * real instance of this class from a REAL bounded `WebSocketRelayAdapter`
+ * query against the user's configured Relay, merged into
+ * `fedos-app:commerce-catalog-list`'s own response
+ * (`commerceNostrDiscoveredActiveProducts()`, same file). The "nothing
+ * currently subscribes to a relay's inbound event stream and feeds it
+ * here" gap this file's own header used to describe is CLOSED — see that
+ * main-process file's own doc comments for the exact wiring, gating (the
+ * SAME `commerceNetworkProfile "local-only"` default that already gated
+ * outbound publish now also gates this inbound read), and non-fatal
+ * failure discipline.
  *
  * WHY THIS FILE STAYS TRANSPORT/PROTOCOL-AGNOSTIC
  * ----------------------------------------------------------------------
@@ -321,6 +333,21 @@ export class CommerceNostrProductReadModel {
 
   getProduct(productId: string): CommerceReadModelProductView | undefined {
     return this.#products.get(productId);
+  }
+
+  /**
+   * FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) —
+   * every currently-applied product view, for a caller (the Electron main
+   * process composition root) that needs to MERGE this read model's own
+   * discovered-via-Nostr products into a local catalog listing — the exact
+   * seam `commerce-catalog-list` needs and did not have before this pass.
+   * Returns a fresh array (defensive copy, same discipline as every other
+   * `list*()` in this codebase, e.g. `LocalProductRepository.listPublished()`)
+   * — never the internal `Map`'s own values iterator, so a caller can never
+   * mutate this read model's state through the returned array.
+   */
+  listProducts(): readonly CommerceReadModelProductView[] {
+    return [...this.#products.values()];
   }
 
   /** Test/introspection helper — total count of distinct event ids ever

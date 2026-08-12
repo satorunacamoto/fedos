@@ -34,9 +34,15 @@
  * claiming someone else's `creatorPubkey` inside the content is still
  * caught downstream, defense in depth.
  *
- * STATUS: inert scaffolding, not reachable from the shipped Electron app —
- * same status as every other file in `src/os/commerce`. Not wired into
- * `createCommerce()`.
+ * STATUS UPDATE (FedOS "Real Two-Party Commerce + UX P0/P1 Closure"
+ * mega-arc, Agent N) — this function IS now reachable from the shipped
+ * Electron app: `fedos_electron_beta_main.cts`'s own
+ * `commerceNostrDiscoverAndIngestProductsNonFatal()` calls it, real
+ * production code, for every candidate event a real bounded Relay query
+ * returns on Catalog load. Still not wired into `createCommerce()`'s own
+ * barrel — reached through the main-process composition root instead,
+ * same pattern `commerce_event_bridge.ts`'s own `RealCommerceNostrEventTransport`
+ * already used for the outbound/publish side.
  */
 
 import { isNostrEvent } from "../../../../messenger/adapters/nostr/protocol/event.js";

@@ -42,6 +42,7 @@
     "src/os/commerce/catalog/adapters/nostr/commerce_event_bridge.ts",
     "src/os/commerce/catalog/adapters/nostr/commerce_inbound_event_bridge.ts",
     "src/os/messenger/adapters/nostr/protocol/publish.ts",
+    "src/os/messenger/adapters/nostr/protocol/ws_relay.ts",
     "src/os/trust/index.ts",
     "src/runtime/master_seed/fedos_sealed_master_seed_envelope_persistence.ts",
     "src/desktop/beta/fedos_desktop_beta_capability_manifest.ts",

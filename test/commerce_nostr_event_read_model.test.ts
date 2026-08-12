@@ -285,3 +285,35 @@ describe("CommerceNostrProductReadModel: relay/merchant/customer offline resilie
     expect(model.otherRecordCount).toBe(0);
   });
 });
+
+describe("CommerceNostrProductReadModel: listProducts() (FedOS Real Two-Party Commerce arc, Agent N -- discovery/catalog-merge seam)", () => {
+  it("18. an empty read model lists zero products", () => {
+    const model = new CommerceNostrProductReadModel();
+    expect(model.listProducts()).toEqual([]);
+  });
+
+  it("19. lists every currently-applied product, and only the CURRENT (latest) view of each -- not a duplicate per event", () => {
+    const model = new CommerceNostrProductReadModel();
+    model.ingest(envelope({ eventId: "evt-1", rawContent: validProductPublication({ productId: "prod-1" }) }));
+    model.ingest(envelope({ eventId: "evt-2", rawContent: validProductPublication({ productId: "prod-2" }) }));
+    model.ingest(
+      envelope({
+        eventId: "evt-3",
+        rawContent: validProductUpdate({ productId: "prod-1", priceCents: 3333, updatedAt: 1_700_000_500 }),
+      }),
+    );
+
+    const listed = model.listProducts();
+    expect(listed).toHaveLength(2);
+    expect(listed.find((p) => p.productId === "prod-1")?.priceCents).toBe(3333); // latest, not the original publication's price
+    expect(listed.find((p) => p.productId === "prod-2")?.productId).toBe("prod-2");
+  });
+
+  it("20. returns a defensive copy -- mutating the returned array never affects the read model's own state", () => {
+    const model = new CommerceNostrProductReadModel();
+    model.ingest(envelope({ eventId: "evt-1", rawContent: validProductPublication({ productId: "prod-1" }) }));
+    const listed = model.listProducts() as unknown as unknown[];
+    listed.push({ productId: "injected" });
+    expect(model.listProducts()).toHaveLength(1);
+  });
+});
