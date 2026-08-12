@@ -350,6 +350,31 @@ export {
   type CommerceSellerActivitySummary,
 } from "./order/activity_summary.js";
 
+// FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- honest
+// sync/connection-state derivation, cross-process sync-outcome copy, and
+// the bounded "where is my order?" landing pointer. Same "pure, tested;
+// the composition root only wires it in" discipline as the activity
+// summary above.
+export {
+  deriveCommerceSyncStatus,
+  describeCommerceSyncStatus,
+  CommerceSyncTracker,
+  type CommerceSyncStatus,
+  type CommerceSyncSnapshot,
+  type CommerceSyncStatusText,
+} from "./order/sync_state.js";
+
+export {
+  describeCommerceSyncOutcome,
+  isCommerceSyncOutcomeConcerning,
+  type KnownCommerceSyncOutcome,
+} from "./order/cross_process_outcome_text.js";
+
+export {
+  buildCommerceLandingPointer,
+  type CommerceLandingPointer,
+} from "./order/landing_pointer.js";
+
 export {
   AUTHORITATIVE_DELIVERY_EVIDENCE_SOURCES,
   DELIVERY_STATUSES,

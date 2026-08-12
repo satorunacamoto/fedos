@@ -226,6 +226,14 @@
       <div id="app-content">
         <div class="app-screen" id="app-screen-conversations">
           <h2>Conversations</h2>
+          <!-- FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- "where is
+               my order?" landing pointer (AFTER usability report row #7, P2: "no
+               pointer back to an in-progress or just-completed order" after unlock
+               or restart). Built ONLY from the SAME already-fetched activity summary
+               the Shop/My Store nav badges already use -- no new IPC call. Empty/
+               hidden whenever nothing needs attention (never a fabricated "all clear"
+               line). -->
+          <p class="muted" id="commerce-landing-pointer" role="status" aria-live="polite" hidden></p>
           <div id="conversations-error" class="error" role="alert"></div>
           <label for="conversations-filter">Filter</label>
           <input id="conversations-filter" type="text" placeholder="Filter by title or id" />
@@ -265,6 +273,12 @@
           <h3>My Orders</h3>
           <p class="muted">Orders you created as the currently selected "Acting as" customer identity.</p>
           <p class="muted" id="commerce-my-orders-activity-summary" role="status" aria-live="polite"></p>
+          <!-- FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- honest
+               sync-state text (no push/poll exists for this list -- see
+               `sync_state.ts`'s own header) + an explicit manual refresh, so this
+               list never silently goes stale with no visible signal either way. -->
+          <p class="muted" id="commerce-my-orders-sync-status" role="status" aria-live="polite"></p>
+          <button id="commerce-my-orders-refresh" type="button">Refresh</button>
           <ul class="plain-list" id="commerce-my-orders-list"></ul>
         </div>
 
@@ -305,6 +319,14 @@
           <p>Status: <span class="commerce-order-status" id="commerce-order-status-text"></span></p>
           <p id="commerce-order-summary"></p>
           <div id="commerce-order-waiting" class="muted" role="status" aria-live="polite"></div>
+          <!-- FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- honest,
+               non-blocking note on whether the counterparty was actually notified
+               of this action over the configured Relay (`nostrSyncOutcome`) --
+               previously computed by the main process but silently dropped at the
+               UI layer for every order action except order-complete's own separate
+               reputation note. Never blocks/reverts the action itself (the Order
+               transition above is already committed regardless). -->
+          <p id="commerce-order-sync-note" class="muted" role="status" aria-live="polite"></p>
 
           <div id="commerce-order-review-actions">
             <p class="muted">Review your order, then submit it to the merchant.</p>
@@ -431,6 +453,10 @@
 
           <h3>My Products</h3>
           <div id="commerce-merchant-products-error" class="error" role="alert"></div>
+          <!-- FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- see
+               `#commerce-order-sync-note`'s own comment above; same honest,
+               non-blocking `nostrSyncOutcome` note, here for publish/unpublish/update. -->
+          <p id="commerce-merchant-products-sync-note" class="muted" role="status" aria-live="polite"></p>
           <ul class="plain-list" id="commerce-merchant-products-list"></ul>
 
           <!-- friction ledger row #16, arc §13: product edit. Hidden until an Edit button (added
@@ -459,6 +485,11 @@
 
           <h3>Incoming Orders</h3>
           <p class="muted" id="commerce-merchant-orders-activity-summary" role="status" aria-live="polite"></p>
+          <!-- FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- see
+               `#commerce-my-orders-sync-status`'s own comment above; same honest
+               sync-state text + manual refresh, here for Incoming Orders. -->
+          <p class="muted" id="commerce-merchant-orders-sync-status" role="status" aria-live="polite"></p>
+          <button id="commerce-merchant-orders-refresh" type="button">Refresh</button>
           <div id="commerce-merchant-orders-error" class="error" role="alert"></div>
           <ul class="plain-list" id="commerce-merchant-orders-list"></ul>
         </div>

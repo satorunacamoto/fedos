@@ -811,6 +811,8 @@ interface RootModules {
       hasReceipt: (orderId: string) => boolean,
     ) => {
       readonly newSubmitted: number;
+      /** FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- seller's own "which are unpaid?" bucket (`OrderStatus === "accepted"`). See `activity_summary.ts`'s own header. */
+      readonly unpaid: number;
       readonly paidReadyToFulfill: number;
       readonly fulfillingInProgress: number;
       readonly completedAwaitingReceipt: number;

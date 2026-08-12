@@ -199,6 +199,8 @@ interface FedosCommerceProductMutationResult {
   readonly outcome: string;
   readonly reason?: string;
   readonly product?: FedosCommerceMerchantProduct;
+  /** FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- see `FedosCommerceOrderResult.nostrSyncOutcome`'s own doc comment above; same field, same discipline, set by publish/unpublish/update. */
+  readonly nostrSyncOutcome?: string;
 }
 
 interface FedosCommerceOrder {
@@ -232,6 +234,20 @@ interface FedosCommerceOrderResult {
    * blocked by the secondary one failing.
    */
   readonly reputationSyncStatus?: "recorded" | "unavailable";
+  /**
+   * FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- the main
+   * process has computed and returned this field on every order-action
+   * result since the prior arc (product publish/update carries the same
+   * field on `FedosCommerceProductMutationResult` below), but it was never
+   * declared here or read by the renderer -- a real cross-process sync
+   * failure (the counterparty was never actually notified) was silently
+   * dropped at the UI layer. See `describeCommerceSyncOutcome()`
+   * (`src/os/commerce/order/cross_process_outcome_text.ts`) for the honest,
+   * closed-vocabulary-with-safe-fallback copy this field is rendered
+   * through -- this is an ARBITRARY string in the worst case (a
+   * transport-supplied message), never rendered verbatim.
+   */
+  readonly nostrSyncOutcome?: string;
 }
 
 interface FedosCommerceOrdersListResult {
@@ -353,6 +369,8 @@ interface FedosCommerceActivitySummaryResult {
   };
   readonly asSeller?: {
     readonly newSubmitted: number;
+    /** FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- seller's own "which are unpaid?" bucket. */
+    readonly unpaid: number;
     readonly paidReadyToFulfill: number;
     readonly fulfillingInProgress: number;
     readonly completedAwaitingReceipt: number;

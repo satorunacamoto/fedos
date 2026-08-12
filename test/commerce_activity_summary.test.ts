@@ -115,6 +115,8 @@ describe("computeCommerceSellerActivitySummary — real repository fixture", () 
   it("produces the correct count in EVERY bucket, and 'completedAwaitingReceipt' is the INVERSE of the buyer's readyReceipts condition", () => {
     const repo = new LocalOrderRepository();
     makeOrder(repo, "s-submitted", "submitted");
+    makeOrder(repo, "s-accepted-1", "accepted");
+    makeOrder(repo, "s-accepted-2", "accepted");
     makeOrder(repo, "s-paid-1", "paid");
     makeOrder(repo, "s-paid-2", "paid");
     makeOrder(repo, "s-fulfilling", "fulfilling");
@@ -127,8 +129,22 @@ describe("computeCommerceSellerActivitySummary — real repository fixture", () 
     const summary = computeCommerceSellerActivitySummary(orders, hasReceipt);
 
     expect(summary.newSubmitted).toBe(1);
+    // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- the
+    // seller's own "which are unpaid?" bucket (`OrderStatus === "accepted"`).
+    expect(summary.unpaid).toBe(2);
     expect(summary.paidReadyToFulfill).toBe(2);
     expect(summary.fulfillingInProgress).toBe(1);
     expect(summary.completedAwaitingReceipt).toBe(2);
+  });
+
+  it("an empty order list produces all-zero counts including 'unpaid', never throws", () => {
+    const summary = computeCommerceSellerActivitySummary([], () => false);
+    expect(summary).toEqual({
+      newSubmitted: 0,
+      unpaid: 0,
+      paidReadyToFulfill: 0,
+      fulfillingInProgress: 0,
+      completedAwaitingReceipt: 0,
+    });
   });
 });
