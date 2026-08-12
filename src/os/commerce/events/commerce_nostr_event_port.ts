@@ -67,6 +67,19 @@
  * signature-verifying bridge from a signed `NostrEvent` into that read
  * model's input shape). This Port itself remains publish-side only.
  *
+ * FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N)
+ * update — that read model + bridge pair is now ALSO genuinely reachable
+ * from the shipped Electron app (not merely unit-tested): see
+ * `commerceNostrDiscoverAndIngestProductsNonFatal()` in
+ * `packages/fedos-desktop-electron-spike/src/fedos_electron_beta_main.cts`,
+ * which runs a real, bounded `WebSocketRelayAdapter` query against the
+ * user's configured Relay on every Catalog load and feeds every candidate
+ * event through the same real verifying bridge into a real read model
+ * instance, merged into `fedos-app:commerce-catalog-list`'s response. This
+ * Port (the publish side) and that discovery function (the read side) are
+ * gated by the SAME `commerceNetworkProfile` value — see that file's own
+ * doc comments.
+ *
  * NETWORK PROFILE GATING (this same wave) — Nostr publication is now
  * explicitly gated by this repo's existing `NetworkProfile` seam
  * (`../catalog/network_profile.ts`, already real, tested code — reused

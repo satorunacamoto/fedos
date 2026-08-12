@@ -47,13 +47,25 @@
  * never retries a failed publish or selects which relay to use — both are
  * the injected `RelayPublisher`'s job.
  *
- * STATUS: inert scaffolding, not reachable from the shipped Electron app —
- * same status as every other file in `src/os/commerce`. Not wired into
- * `createCommerce()`, and not exercised by this wave's own test files
- * (`test/commerce_nostr_event_*.test.ts` all use
- * `InMemoryFakeCommerceNostrTransport` instead — this file needs a real
- * `FedosNostrSigningAuthority`, i.e. real WASM, which those tests
- * deliberately never touch).
+ * STATUS UPDATE (FedOS "Real Two-Party Commerce + UX P0/P1 Closure"
+ * mega-arc, Agent N, re-verified live rather than trusted from this
+ * comment's own prior claim) — `RealCommerceNostrEventTransport` IS
+ * reachable from the shipped Electron app: `fedos_electron_beta_main.cts`'s
+ * `commerceNostrOutboundPortFor()` constructs a real instance of it (real
+ * signing authority + real `WebSocketRelayPublisher`) whenever a signer is
+ * unlocked and a Relay is configured, and `handleCommerceProductPublish()`/
+ * `handleCommerceProductUpdate()` both call through it on a real
+ * publish/unpublish/field-edit. Still gated by `commerceNetworkProfile`
+ * (`"local-only"` by default — see that file's own doc comments) and still
+ * not part of `createCommerce()`'s own barrel. This wave's own automated
+ * tests still cannot exercise THIS file directly (it needs a real,
+ * compiled `FedosNostrSigningAuthority` WASM artifact this worktree does
+ * not have) — `test/commerce_nostr_real_relay_two_party_discovery.test.ts`
+ * proves the same publish->relay->discover pipeline for real over a real
+ * local socket using real `@noble/curves` Schnorr signing instead (no
+ * WASM dependency), which is what `test/commerce_nostr_event_*.test.ts`'s
+ * own `InMemoryFakeCommerceNostrTransport`-based tests already established
+ * as this codebase's precedent for testing this seam without WASM.
  */
 
 import type { NostrEvent } from "../../../../messenger/adapters/nostr/protocol/types.js";

@@ -31,6 +31,28 @@
  *
  * Test/acceptance-fixture code only — never imported by anything under
  * `src/`.
+ *
+ * FedOS Commerce FINAL Closure Mega-Arc (Agent N) — ADDITIVE, OPT-IN
+ * `historyEnabled` option (default `false`, IDENTICAL behavior to every
+ * pre-existing caller of `startFedosRealLocalWebSocketRelayServer()` —
+ * none of the ~17 existing consumers pass this option, so none of them
+ * observe any behavior change from this addition). Discovered while
+ * building real cross-process Commerce catalog discovery: this fixture,
+ * as originally written, forwards a published `EVENT` only to
+ * subscriptions that are ALREADY open at publish time — a `REQ` sent
+ * AFTER an event was published receives an immediate `EOSE` with NO
+ * history, unlike a real Nostr relay (NIP-01), which stores events and
+ * replays matching ones to a new `REQ` before `EOSE`. That gap is
+ * harmless for every existing consumer (all of them subscribe first,
+ * then publish, mirroring a live conversation), but it makes this
+ * fixture unable to prove the "publish while offline, discover after
+ * reconnecting" case Commerce needs. `historyEnabled: true` closes
+ * exactly that gap: every published event is retained, and a NEW `REQ`
+ * replays the full retained history (still with this fixture's own
+ * already-disclosed "no server-side filter matching" simplification —
+ * every stored event is replayed to every new `REQ`, exactly like live
+ * delivery already broadcasts to every open subscription) before its
+ * `EOSE`.
  */
 
 import { createServer, type Server, type IncomingMessage } from "node:http";
@@ -148,9 +170,18 @@ export interface FedosRealLocalWebSocketRelayServer {
  * `connect()`/next-unlock path, never a second, different relay URL
  * scripted into the client mid-test). Resolves once genuinely listening.
  */
-export async function startFedosRealLocalWebSocketRelayServer(options?: { readonly port?: number }): Promise<FedosRealLocalWebSocketRelayServer> {
+export async function startFedosRealLocalWebSocketRelayServer(options?: {
+  readonly port?: number;
+  /** Default `false` — preserves this fixture's original behavior exactly
+   * for every pre-existing caller. `true` retains every published event
+   * and replays the full retained history to each NEW `REQ` before its
+   * `EOSE` — see this file's own header for why. */
+  readonly historyEnabled?: boolean;
+}): Promise<FedosRealLocalWebSocketRelayServer> {
   const connections = new Map<Socket, Connection>();
   let lastDeliveries: ReadonlyArray<{ readonly subId: string; readonly eventObj: unknown }> = [];
+  const historyEnabled = options?.historyEnabled ?? false;
+  const storedEvents: unknown[] = [];
 
   const httpServer: Server = createServer((_req: IncomingMessage, res: { writeHead(code: number): { end(): void } }) => {
     res.writeHead(404).end();
@@ -216,6 +247,9 @@ export async function startFedosRealLocalWebSocketRelayServer(options?: { readon
     const tag = parsed[0];
     if (tag === "REQ" && typeof parsed[1] === "string") {
       connection.subscriptions.add(parsed[1]);
+      if (historyEnabled) {
+        for (const stored of storedEvents) sendTo(connection, ["EVENT", parsed[1], stored]);
+      }
       sendTo(connection, ["EOSE", parsed[1]]);
       return;
     }
@@ -226,6 +260,7 @@ export async function startFedosRealLocalWebSocketRelayServer(options?: { readon
     if (tag === "EVENT" && parsed.length === 2) {
       const eventObj = parsed[1] as Record<string, unknown>;
       const eventId = typeof eventObj?.id === "string" ? eventObj.id : randomUUID();
+      if (historyEnabled) storedEvents.push(eventObj);
       // Real per-publish ACK, tracked separately from recipient import (Phase F/H).
       sendTo(connection, ["OK", eventId, true, ""]);
       // Deliberately simplified (disclosed above): broadcast to every open

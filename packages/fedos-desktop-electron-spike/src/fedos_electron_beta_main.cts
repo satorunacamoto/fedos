@@ -346,6 +346,19 @@ interface MasterSeedAuthorityLike {
    */
   resolveCommerceMediaKey?(): Promise<unknown>;
   /**
+   * FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+   * Coordinator-directed pass) -- present (as real, callable functions) on
+   * the SAME canonical production `FedosProductionMasterSeedAuthority`
+   * this Coordinator already activates (Secure Runtime Alpha 1761-1840
+   * Phase B); OPTIONAL for the same "other non-Commerce-aware callers
+   * satisfy this structural interface too" reason as `resolveCommerceMediaKey?`
+   * above. `RealCommercePrivateOrderTransport`/`verifyAndDecryptInboundPrivateOrderEnvelope`
+   * (`commercePrivateOrderTransportFor()`/`commercePrivateOrderDiscoverAndApplyNonFatal()`
+   * below) are the only callers.
+   */
+  encryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, plaintext: Uint8Array): Promise<string | null>;
+  decryptNip44Wire?(accountIndex: number, counterpartyPublicKeyHex: string, payload: string): Promise<Uint8Array | null>;
+  /**
    * FedOS Commerce FINAL P1 Closure (coordinator, shared foundation) --
    * present (as real, callable functions) on the SAME canonical production
    * `FedosProductionMasterSeedAuthority` this Coordinator already
@@ -802,6 +815,59 @@ interface RootModules {
     readonly CommerceNostrProductReadModel: new () => CommerceNostrReadModelLike;
     readonly verifyAndBuildInboundCommerceNostrEnvelope: (event: unknown, options?: unknown) => Promise<unknown>;
     readonly WebSocketRelayPublisher: new (url: string, options: { readonly factory: (url: string) => Promise<unknown> }) => unknown;
+    /**
+     * FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring
+     * pass) -- the READ-ONLY sibling of `WebSocketRelayPublisher` above:
+     * this repo's own real, already-tested NIP-01 `REQ`/`EVENT`/`EOSE`
+     * subscription client (`WebSocketRelayAdapter`,
+     * `src/os/messenger/adapters/nostr/protocol/ws_relay.ts`, unmodified
+     * by this pass, newly added to `tsconfig.beta-runtime.json`'s include
+     * list). This is the ONE new collaborator this pass adds to close the
+     * "no SUBSCRIBE/inbound path anywhere" gap `commerce_nostr_event_port.ts`'s
+     * own header explicitly flagged -- no second relay client, no new
+     * protocol implementation, reuse only.
+     */
+    readonly WebSocketRelayAdapter: new (
+      url: string,
+      options: { readonly factory: (url: string) => Promise<unknown>; readonly timeoutMs?: number },
+    ) => { query(filters: readonly unknown[]): Promise<readonly unknown[]> };
+    /**
+     * FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent
+     * N, Coordinator-directed pass) -- the PRIVATE Order/status transport
+     * (arc items #4/#5). Calls `FedosMasterSeedAuthority.encryptNip44Wire()`/
+     * `decryptNip44Wire()` directly (the SAME real NIP-44 primitive the
+     * Gift-Wrap adapter uses underneath) -- see
+     * `commerce_private_order_bridge.ts`'s own header for exactly why the
+     * full NIP-17 Gift-Wrap stack was evaluated and rejected for Commerce.
+     */
+    readonly RealCommercePrivateOrderTransport: new (options: {
+      readonly signingAuthority: unknown;
+      readonly relayPublisher: unknown;
+      readonly nip44Wire: unknown;
+      readonly accountIndex: number;
+    }) => { send(payload: unknown, counterpartyPublicKeyHex: string): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }> };
+    readonly verifyAndDecryptInboundPrivateOrderEnvelope: (
+      event: unknown,
+      options: { readonly nip44Wire: unknown; readonly localAccountIndex: number },
+    ) => Promise<{
+      readonly outcome: string;
+      readonly eventId: string;
+      readonly senderPubkeyHex: string;
+      readonly payload?: {
+        readonly orderId: string;
+        readonly productId: string;
+        readonly buyerPubkey: string;
+        readonly sellerPubkey: string;
+        readonly quantity: number;
+        readonly unitPriceCents: number;
+        readonly currency: string;
+        readonly status: string;
+        readonly reason?: string;
+        readonly at: number;
+      };
+    }>;
+    readonly COMMERCE_PRIVATE_ORDER_SYNC_TAG: string;
+    readonly PRIVATE_ORDER_SYNC_STATUS_ACTION: Readonly<Record<string, { readonly action: string; readonly actorKind: "customer" | "merchant" | "either" }>>;
   };
 }
 
@@ -1046,6 +1112,20 @@ interface CommerceNostrEventPortLike {
 interface CommerceNostrReadModelLike {
   ingest(envelope: unknown): { readonly outcome: string; readonly reason: string; readonly productId?: string };
   getProduct(productId: string): unknown;
+  /** FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) -- structural mirror of `CommerceNostrProductReadModel.listProducts()`, used to merge Nostr-discovered products into `fedos-app:commerce-catalog-list`'s response. */
+  listProducts(): readonly CommerceReadModelProductViewLike[];
+}
+
+/** Structural mirror of `CommerceReadModelProductView` (`os/commerce/events/commerce_nostr_event_read_model.ts`) -- same discipline as every other `*Like` interface in this file: never `import type`s the real shape, re-declares it structurally once. */
+interface CommerceReadModelProductViewLike {
+  readonly productId: string;
+  readonly creatorPubkeyHex: string;
+  readonly productKind: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly priceCents: number;
+  readonly currency: string;
+  readonly status: string;
 }
 
 async function loadRootModules(): Promise<RootModules> {
@@ -1192,6 +1272,25 @@ async function loadRootModules(): Promise<RootModules> {
   const commerceNostrRelayPublisher = (await import(distUrl("os", "messenger", "adapters", "nostr", "protocol", "publish.js"))) as {
     WebSocketRelayPublisher: RootModules["CommerceNostr"]["WebSocketRelayPublisher"];
   };
+  // FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass)
+  // -- the read-only counterpart, closing the "no SUBSCRIBE/inbound path"
+  // gap. New `tsconfig.beta-runtime.json` entry (`ws_relay.ts`).
+  const commerceNostrRelaySubscriber = (await import(distUrl("os", "messenger", "adapters", "nostr", "protocol", "ws_relay.js"))) as {
+    WebSocketRelayAdapter: RootModules["CommerceNostr"]["WebSocketRelayAdapter"];
+  };
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- private Order/status transport (arc
+  // items #4/#5). Two new `tsconfig.beta-runtime.json` entries.
+  const commercePrivateOrderBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_private_order_bridge.js")
+  )) as {
+    RealCommercePrivateOrderTransport: RootModules["CommerceNostr"]["RealCommercePrivateOrderTransport"];
+    verifyAndDecryptInboundPrivateOrderEnvelope: RootModules["CommerceNostr"]["verifyAndDecryptInboundPrivateOrderEnvelope"];
+    COMMERCE_PRIVATE_ORDER_SYNC_TAG: string;
+  };
+  const commercePrivateOrderSyncShapes = (await import(distUrl("os", "commerce", "events", "commerce_private_order_sync.js"))) as {
+    PRIVATE_ORDER_SYNC_STATUS_ACTION: RootModules["CommerceNostr"]["PRIVATE_ORDER_SYNC_STATUS_ACTION"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
@@ -1261,6 +1360,11 @@ async function loadRootModules(): Promise<RootModules> {
       CommerceNostrProductReadModel: commerceNostrReadModel.CommerceNostrProductReadModel,
       verifyAndBuildInboundCommerceNostrEnvelope: commerceNostrInboundBridge.verifyAndBuildInboundCommerceNostrEnvelope,
       WebSocketRelayPublisher: commerceNostrRelayPublisher.WebSocketRelayPublisher,
+      WebSocketRelayAdapter: commerceNostrRelaySubscriber.WebSocketRelayAdapter,
+      RealCommercePrivateOrderTransport: commercePrivateOrderBridge.RealCommercePrivateOrderTransport,
+      verifyAndDecryptInboundPrivateOrderEnvelope: commercePrivateOrderBridge.verifyAndDecryptInboundPrivateOrderEnvelope,
+      COMMERCE_PRIVATE_ORDER_SYNC_TAG: commercePrivateOrderBridge.COMMERCE_PRIVATE_ORDER_SYNC_TAG,
+      PRIVATE_ORDER_SYNC_STATUS_ACTION: commercePrivateOrderSyncShapes.PRIVATE_ORDER_SYNC_STATUS_ACTION,
     },
   };
 }
@@ -1788,6 +1892,11 @@ type CommerceNetworkProfileValue = "local-only" | "direct" | "tor-optional";
 const COMMERCE_NETWORK_PROFILE_VALUES: readonly CommerceNetworkProfileValue[] = ["local-only", "direct", "tor-optional"];
 let commerceNetworkProfile: CommerceNetworkProfileValue = "local-only";
 const COMMERCE_NOSTR_ACCOUNT_INDEX = 0;
+/** Bounded wait for a catalog-load discovery query -- short enough that a
+ * slow/unreachable Relay never makes the Catalog view feel hung; the
+ * caller's own LOCAL products are always returned regardless. */
+const COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS = 3000;
+const COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT = 500;
 
 let commerceNostrOutboundPort: CommerceNostrEventPortLike | null = null;
 let commerceNostrOutboundPortProfileRef: CommerceNetworkProfileValue | null = null;
@@ -1839,13 +1948,352 @@ function commerceNostrOutboundPortFor(): CommerceNostrEventPortLike {
   return commerceNostrOutboundPort;
 }
 
-/** Lazily constructs the ONE real, transport-agnostic inbound read-model this process holds -- purely local/in-memory, no dependency on a signer or Relay (see `CommerceNostrProductReadModel`'s own header: nothing in this process currently subscribes to a relay's inbound event stream and feeds it here -- that real subscription loop is an explicit follow-up, not built this pass). */
+/** Lazily constructs the ONE real, transport-agnostic inbound read-model this process holds -- purely local/in-memory, no dependency on a signer or Relay. FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) -- the "nothing currently subscribes to a relay's inbound event stream and feeds it here" gap this comment used to describe is now closed by `commerceNostrDiscoverAndIngestProductsNonFatal()` below, called from `handleCommerceCatalogList()`/`handleCommerceProductDetail()`. */
 function commerceNostrReadModelFor(): CommerceNostrReadModelLike {
   const m = requireModules();
   if (commerceNostrReadModelSingleton === null) {
     commerceNostrReadModelSingleton = new m.CommerceNostr.CommerceNostrProductReadModel();
   }
   return commerceNostrReadModelSingleton;
+}
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) --
+ * the ONE real inbound-subscription loop this process runs: a bounded,
+ * one-shot `REQ`/`EOSE` query (`WebSocketRelayAdapter`, this repo's own
+ * real NIP-01 read client -- see `RootModules["CommerceNostr"]`'s own doc
+ * comment) against the SAME first-configured Relay `commerceNostrOutboundPortFor()`
+ * already publishes to, for the two Commerce Nostr product topic tags
+ * (`fedos-commerce:product-publication:v1`/`fedos-commerce:product-update:v1`
+ * -- the SAME `commerceNostrEventTopicTag()` convention
+ * `commerce_event_bridge.ts` already publishes under, not a new one).
+ * Every candidate event is run through the REAL verifying bridge
+ * (`verifyAndBuildInboundCommerceNostrEnvelope`, real Schnorr signature
+ * check, no new crypto) before ever reaching the read model's `ingest()` --
+ * this function itself performs no trust decision of its own, exactly the
+ * "Nostr event presence alone is not authority" discipline the read model's
+ * own header already establishes.
+ *
+ * GATING: mirrors `commerceNostrOutboundPortFor()`'s own network posture --
+ * `commerceNetworkProfile === "local-only"` (the safe default) or no
+ * configured Relay means this function returns immediately, ZERO network
+ * reach, exactly like publish already does. This is deliberately the SAME
+ * gate on the READ side as the WRITE side already has -- "local-only"
+ * means no Nostr contact at all, not just no publish.
+ *
+ * NON-FATAL: a relay timeout/refusal/malformed reply never throws and never
+ * blocks the caller's own local-only catalog data -- `handleCommerceCatalogList()`
+ * still returns a fully correct LOCAL result even if this call fails
+ * outright (mirrors `publishCommerceNostrProductEventNonFatal()`'s own
+ * discipline on the write side).
+ *
+ * BOUNDED, NOT PUSH: this is a request/response query triggered by a
+ * catalog load (or an explicit future "check for updates" affordance),
+ * never a standing subscription/live push -- the arc's own accepted
+ * "bounded reliable-refresh" fallback (see this Agent's final report).
+ */
+async function commerceNostrDiscoverAndIngestProductsNonFatal(): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return;
+
+  const m = requireModules();
+  const readModel = commerceNostrReadModelFor();
+  try {
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      {
+        kinds: [1],
+        "#t": ["fedos-commerce:product-publication:v1", "fedos-commerce:product-update:v1"],
+        limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT,
+      },
+    ]);
+    // Chronological order (oldest first) so the read model's own
+    // monotonic-version guard (`rejected-stale-version`) converges to the
+    // TRUE latest state regardless of relay/network delivery order -- this
+    // process's own query result order is not a trustworthy ordering on
+    // its own (a real relay/NIP-01 makes no such ordering guarantee).
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndBuildInboundCommerceNostrEnvelope(event);
+        readModel.ingest(envelope);
+      } catch (err) {
+        console.error("fedos-beta: Nostr Commerce discovery -- one candidate event failed to verify/ingest (non-fatal, skipped):", err);
+      }
+    }
+  } catch (err) {
+    console.error("fedos-beta: Nostr Commerce discovery query failed (non-fatal, local catalog unaffected):", err);
+  }
+}
+
+// ---------------------------------------------------------------------
+// FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+// Coordinator-directed pass) -- PRIVATE Order/status transport (arc items
+// #4/#5). See `commerce_private_order_bridge.ts`'s own header for the
+// honest privacy boundary (content encrypted; sender/recipient pubkeys and
+// rough timing are NOT hidden) and for why the full NIP-17 Gift-Wrap stack
+// was evaluated and rejected in favor of calling
+// `FedosMasterSeedAuthority.encryptNip44Wire()`/`decryptNip44Wire()`
+// directly. Gated by the SAME `commerceNetworkProfile` as the public
+// discovery/publish paths -- "local-only" means zero network reach here
+// too.
+//
+// SAFELY-SYNCED TRANSITIONS ONLY: `submit`/`cancel`/`accept`/`reject`/
+// `fulfill`/`complete` -- every one a `"customer"`/`"merchant"` actor-kind
+// action `order_state_machine.ts`'s own `AUTHORIZED_ACTOR_KINDS` already
+// pubkey-checks. `confirm_payment`/`confirm_delivery` (the `"paid"`/
+// `"delivered"` transitions) are DELIBERATELY NEVER synced this way --
+// `PrivateOrderSyncPayload`'s own validator structurally cannot even
+// construct a `"paid"`/`"delivered"` payload (see that file's header) --
+// because only a `payment_evidence`/`delivery_evidence` actor, constructed
+// from THIS process's own locally-verified evidence at exactly ONE call
+// site each (`handleCommercePaymentSimulate`/
+// `handleCommerceDeliveryAcknowledgeReceipt`, this file's own existing
+// "CORE INVARIANT" comments), may ever cause those two transitions --
+// accepting a remote peer's bare claim here would let a compromised or
+// buggy counterparty falsely advance MY OWN process's authoritative Order
+// state, exactly the "never trust a bare inbound event's claimed status"
+// failure this arc's own trust-boundary discipline (§55) prohibits.
+// ---------------------------------------------------------------------
+
+/** `order_state_machine.ts` `OrderActionType` -> the `PrivateOrderSyncStatus`
+ * this process privately reports after a successful local transition --
+ * the send-side inverse of `PRIVATE_ORDER_SYNC_STATUS_ACTION`
+ * (`commerce_private_order_sync.ts`), which the RECEIVING side consults. */
+const ORDER_ACTION_TO_PRIVATE_SYNC_STATUS: Readonly<Record<string, string>> = {
+  submit: "submitted",
+  cancel: "cancelled",
+  accept: "accepted",
+  reject: "rejected",
+  fulfill: "fulfilling",
+  complete: "completed",
+};
+
+interface CommercePrivateOrderTransportLike {
+  send(payload: unknown, counterpartyPublicKeyHex: string): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+}
+
+let commercePrivateOrderTransport: CommercePrivateOrderTransportLike | null = null;
+let commercePrivateOrderTransportProfileRef: CommerceNetworkProfileValue | null = null;
+let commercePrivateOrderTransportSignerRef: NostrSigningAuthorityLike | null = null;
+/** In-memory, process-lifetime dedup of private-order event ids already
+ * applied -- same discipline as the public read model's own
+ * `#appliedEventIds`. A duplicate/replayed event is a safe no-op either
+ * way (the real state machine's own status guard also rejects a
+ * re-applied transition with `invalid_state`), this Set just avoids
+ * redundant re-processing work on every bounded refresh. */
+const commercePrivateOrderAppliedEventIds = new Set<string>();
+
+/**
+ * Lazily constructs (and rebuilds on a profile/signer change) the ONE real
+ * private-order transport this process holds -- `null` whenever
+ * `commerceNetworkProfile` is `"local-only"`, no signer is unlocked, no
+ * Relay is configured, or no Master Seed authority is held (mirrors
+ * `commerceNostrOutboundPortFor()`'s own gating exactly, plus the
+ * additional Master Seed requirement `encryptNip44Wire`/`decryptNip44Wire`
+ * need).
+ */
+function commercePrivateOrderTransportFor(): CommercePrivateOrderTransportLike | null {
+  if (commerceNetworkProfile === "local-only") return null;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return null;
+  const m = requireModules();
+  if (
+    commercePrivateOrderTransport === null ||
+    commercePrivateOrderTransportProfileRef !== commerceNetworkProfile ||
+    commercePrivateOrderTransportSignerRef !== activeNostrSigningAuthority
+  ) {
+    const relayUrl = activeRelays[0]?.url ?? "";
+    const relayPublisher = new m.CommerceNostr.WebSocketRelayPublisher(relayUrl, { factory: m.createNodeWebSocketRelaySocketFactory() });
+    commercePrivateOrderTransport = new m.CommerceNostr.RealCommercePrivateOrderTransport({
+      signingAuthority: activeNostrSigningAuthority,
+      relayPublisher,
+      nip44Wire: activeMasterSeedAuthority,
+      accountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+    });
+    commercePrivateOrderTransportProfileRef = commerceNetworkProfile;
+    commercePrivateOrderTransportSignerRef = activeNostrSigningAuthority;
+  }
+  return commercePrivateOrderTransport;
+}
+
+/**
+ * Best-effort, non-fatal private notification to `recipientPubkeyHex`
+ * after a LOCAL Order transition already committed. Mirrors
+ * `publishCommerceNostrProductEventNonFatal()`'s own discipline exactly:
+ * a failure here NEVER unwinds the already-saved local Order -- the
+ * caller only surfaces this outcome as an OPTIONAL, truthful sync-status
+ * field, never a silent "delivered to the counterparty" claim.
+ */
+async function sendPrivateOrderSyncNonFatal(
+  order: CommerceOrderLike,
+  syncStatus: string,
+  recipientPubkeyHex: string,
+  now: number,
+  reason?: string,
+): Promise<string> {
+  const transport = commercePrivateOrderTransportFor();
+  if (transport === null) return "network-disabled";
+  try {
+    const payload: Record<string, unknown> = {
+      category: "private-order-sync",
+      formatVersion: 1,
+      orderId: order.id,
+      productId: order.productId,
+      buyerPubkey: order.buyerPubkey,
+      sellerPubkey: order.sellerPubkey,
+      quantity: order.quantity,
+      unitPriceCents: order.unitPriceCents,
+      currency: order.currency,
+      status: syncStatus,
+      at: now,
+    };
+    if (reason !== undefined) payload.reason = reason;
+    const result = await transport.send(payload, recipientPubkeyHex);
+    if (result.accepted) return "published";
+    return result.message.length > 0 ? result.message : "transport-error";
+  } catch (err) {
+    console.error("fedos-beta: private Order sync attempt failed (non-fatal, local Order state unaffected):", err);
+    return "transport-error";
+  }
+}
+
+/**
+ * Applies ONE already-decrypted, already-signature-verified inbound
+ * private-order envelope to this process's own authoritative
+ * `commerceState().orders` -- via the REAL `order_state_machine.ts`
+ * (`m.Commerce.createOrder()`/`applyOrderAction()`), never a direct field
+ * write. Trust boundary (arc §55, re-checked here even though the bridge
+ * already verified the signature): the REAL verified `senderPubkeyHex`
+ * must match the party this specific transition authorizes
+ * (`order_state_machine.ts`'s own `isActorIdentityAuthorized` — re-derived
+ * here since this function constructs the `actor` the state machine will
+ * itself ALSO re-check, defense in depth, same posture
+ * `CommerceNostrProductReadModel.ingest()`'s own `"rejected-signer-mismatch"`
+ * check already established for the public path). NEVER throws; any
+ * rejection (unknown status mapping, out-of-order "not a submit but the
+ * order doesn't exist locally yet", economics mismatch against an
+ * already-known local order, or actor-identity mismatch) is a silent,
+ * safe drop -- this function has no return value because there is no
+ * caller-visible outcome to report for an inbound event a human never
+ * directly requested.
+ */
+function applyInboundPrivateOrderSyncNonFatal(envelope: {
+  readonly outcome: string;
+  readonly eventId: string;
+  readonly senderPubkeyHex: string;
+  readonly payload?: {
+    readonly orderId: string;
+    readonly productId: string;
+    readonly buyerPubkey: string;
+    readonly sellerPubkey: string;
+    readonly quantity: number;
+    readonly unitPriceCents: number;
+    readonly currency: string;
+    readonly status: string;
+    readonly reason?: string;
+    readonly at: number;
+  };
+}): void {
+  if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
+  if (commercePrivateOrderAppliedEventIds.has(envelope.eventId)) return;
+  commercePrivateOrderAppliedEventIds.add(envelope.eventId);
+
+  const payload = envelope.payload;
+  const m = requireModules();
+  const mapping = m.CommerceNostr.PRIVATE_ORDER_SYNC_STATUS_ACTION[payload.status];
+  if (mapping === undefined) return;
+
+  const state = commerceState();
+  let order = state.orders.findById(payload.orderId);
+  if (order === undefined) {
+    if (mapping.action !== "submit") return; // out-of-order: dropped safely, never corrupts state
+    if (envelope.senderPubkeyHex !== payload.buyerPubkey) return; // trust boundary: only the real buyer may materialize a new order
+    const created = m.Commerce.createOrder(
+      { id: payload.orderId, productId: payload.productId, sellerPubkey: payload.sellerPubkey, unitPriceCents: payload.unitPriceCents, currency: payload.currency, quantity: payload.quantity },
+      { kind: "customer", pubkey: envelope.senderPubkeyHex },
+      payload.at,
+    );
+    if (!created.ok || created.order === undefined) return;
+    order = created.order;
+  } else if (
+    order.productId !== payload.productId ||
+    order.buyerPubkey !== payload.buyerPubkey ||
+    order.sellerPubkey !== payload.sellerPubkey ||
+    order.unitPriceCents !== payload.unitPriceCents ||
+    order.currency !== payload.currency ||
+    order.quantity !== payload.quantity
+  ) {
+    return; // defense in depth: a status-sync must never also silently change the order's own established economics
+  }
+
+  const actorKind: "customer" | "merchant" =
+    mapping.actorKind === "either" ? (envelope.senderPubkeyHex === order.buyerPubkey ? "customer" : "merchant") : mapping.actorKind;
+  const expectedPubkey = actorKind === "customer" ? order.buyerPubkey : order.sellerPubkey;
+  if (envelope.senderPubkeyHex !== expectedPubkey) return; // trust boundary
+
+  const action: Record<string, unknown> = { type: mapping.action, actor: { kind: actorKind, pubkey: envelope.senderPubkeyHex } };
+  if ((mapping.action === "reject" || mapping.action === "cancel") && payload.reason !== undefined) action.reason = payload.reason;
+
+  const result = m.Commerce.applyOrderAction(order, action as CommerceOrderActionLike, payload.at);
+  if (!result.ok || result.order === undefined) return; // e.g. a replayed/out-of-order transition -- rejected by the state machine's own status guard, never corrupted
+  state.orders.save(result.order);
+}
+
+/**
+ * The receive-side counterpart of `commerceNostrDiscoverAndIngestProductsNonFatal()`
+ * -- a bounded, non-fatal `REQ`/`EOSE` query filtered to THIS process's
+ * own real pubkey (`"#p"`) and the private-order tag, decrypting and
+ * applying every candidate through `applyInboundPrivateOrderSyncNonFatal()`.
+ * Called from the Orders list handlers below (arc's own accepted "bounded
+ * reliable-refresh" fallback, same posture as the public catalog's own
+ * discovery -- not a standing live subscription).
+ */
+async function commercePrivateOrderDiscoverAndApplyNonFatal(): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return;
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return;
+
+  const m = requireModules();
+  const signer = activeNostrSigningAuthority;
+  const nip44Wire = activeMasterSeedAuthority;
+  try {
+    const ownIdentity = await signer.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      { kinds: [1], "#t": [m.CommerceNostr.COMMERCE_PRIVATE_ORDER_SYNC_TAG], "#p": [ownIdentity.publicKeyHex], limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT },
+    ]);
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndDecryptInboundPrivateOrderEnvelope(event, {
+          nip44Wire,
+          localAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+        });
+        applyInboundPrivateOrderSyncNonFatal(envelope);
+      } catch (err) {
+        console.error("fedos-beta: private Order sync -- one candidate event failed to decrypt/apply (non-fatal, skipped):", err);
+      }
+    }
+  } catch (err) {
+    console.error("fedos-beta: private Order sync discovery query failed (non-fatal, local Orders unaffected):", err);
+  }
 }
 
 function requireModules(): RootModules {
@@ -2829,19 +3277,54 @@ function commerceProductMediaFor(productId: string): { readonly dataUri: string;
   return FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA[productId] ?? null;
 }
 
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) --
+ * every product this process's OWN Nostr read model currently has applied,
+ * `status === "active"` only (an `"archived"` Nostr-discovered product is
+ * deliberately excluded from a public catalog listing, same as a local
+ * product's own `listPublished()` filter already excludes non-`"active"`
+ * local products), EXCLUDING any id already present in `localIds` -- a
+ * product this process already has locally (e.g. the merchant's own
+ * listing, on the merchant's own process) is always shown from the LOCAL,
+ * authoritative copy, never a redundant Nostr-mirrored duplicate.
+ */
+function commerceNostrDiscoveredActiveProducts(localIds: ReadonlySet<string>): readonly CommerceReadModelProductViewLike[] {
+  return commerceNostrReadModelFor()
+    .listProducts()
+    .filter((view) => view.status === "active" && !localIds.has(view.productId));
+}
+
 async function handleCommerceCatalogList() {
-  const products = commerceState().products.listPublished();
+  await commerceNostrDiscoverAndIngestProductsNonFatal();
+  const localProducts = commerceState().products.listPublished();
+  const localIds = new Set(localProducts.map((product) => product.id));
+  const discovered = commerceNostrDiscoveredActiveProducts(localIds);
   return {
     outcome: "ok",
-    products: products.map((product) => ({
-      id: product.id,
-      title: product.title,
-      priceCents: product.priceCents,
-      currency: product.currency,
-      merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
-      status: product.status,
-      hasImage: commerceProductMediaFor(product.id) !== null,
-    })),
+    products: [
+      ...localProducts.map((product) => ({
+        id: product.id,
+        title: product.title,
+        priceCents: product.priceCents,
+        currency: product.currency,
+        merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
+        status: product.status,
+        hasImage: commerceProductMediaFor(product.id) !== null,
+      })),
+      ...discovered.map((product) => ({
+        id: product.productId,
+        title: product.title,
+        priceCents: product.priceCents,
+        currency: product.currency,
+        merchantLabel: commerceMerchantLabelFor(product.creatorPubkeyHex),
+        status: product.status,
+        // No wired media path for a Nostr-discovered listing yet (same
+        // scoping decision `commerceProductMediaFor()`'s own comment
+        // already states for an un-imaged local product) -- never a fake
+        // placeholder photo.
+        hasImage: false,
+      })),
+    ],
   };
 }
 
@@ -2849,27 +3332,54 @@ async function handleCommerceProductDetail(payload: unknown) {
   const productId = (payload as { productId?: unknown } | null)?.productId;
   if (!isBoundedString(productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
   const product = commerceState().products.listPublished().find((candidate) => candidate.id === productId);
-  if (product === undefined) return { outcome: "not-found", reason: "no such product" };
-  const media = commerceProductMediaFor(product.id);
+  if (product !== undefined) {
+    const media = commerceProductMediaFor(product.id);
+    return {
+      outcome: "ok",
+      product: {
+        id: product.id,
+        title: product.title,
+        description: product.description ?? "",
+        priceCents: product.priceCents,
+        currency: product.currency,
+        merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
+        // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- additive
+        // field, needed by the renderer's new Seller Reputation panel to
+        // query `fedos-app:commerce-persona-board-query` for this product's
+        // seller. Never a secret -- `creatorPubkey` is already exposed
+        // (indirectly, via `merchantLabel`'s own lookup) and is the same
+        // pubkey every Order this product produces already carries as
+        // `sellerPubkey`.
+        creatorPubkey: product.creatorPubkey,
+        status: product.status,
+        media: media === null ? null : { dataUri: media.dataUri, mimeType: media.mimeType, altText: media.altText },
+      },
+    };
+  }
+
+  // FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass)
+  // -- fall back to a Nostr-discovered listing (e.g. a buyer opening the
+  // detail view of a product their OWN process never locally created).
+  // `handleCommerceCatalogList()` already ran discovery on catalog load, so
+  // this re-runs it too (idempotent, cheap given the read model's own
+  // dedup) rather than assuming the read model is already populated --
+  // deep-linking straight to a detail view without visiting the catalog
+  // first must still work.
+  await commerceNostrDiscoverAndIngestProductsNonFatal();
+  const discovered = commerceNostrReadModelFor().getProduct(productId) as CommerceReadModelProductViewLike | undefined;
+  if (discovered === undefined || discovered.status !== "active") return { outcome: "not-found", reason: "no such product" };
   return {
     outcome: "ok",
     product: {
-      id: product.id,
-      title: product.title,
-      description: product.description ?? "",
-      priceCents: product.priceCents,
-      currency: product.currency,
-      merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
-      // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- additive
-      // field, needed by the renderer's new Seller Reputation panel to
-      // query `fedos-app:commerce-persona-board-query` for this product's
-      // seller. Never a secret -- `creatorPubkey` is already exposed
-      // (indirectly, via `merchantLabel`'s own lookup) and is the same
-      // pubkey every Order this product produces already carries as
-      // `sellerPubkey`.
-      creatorPubkey: product.creatorPubkey,
-      status: product.status,
-      media: media === null ? null : { dataUri: media.dataUri, mimeType: media.mimeType, altText: media.altText },
+      id: discovered.productId,
+      title: discovered.title,
+      description: discovered.description ?? "",
+      priceCents: discovered.priceCents,
+      currency: discovered.currency,
+      merchantLabel: commerceMerchantLabelFor(discovered.creatorPubkeyHex),
+      creatorPubkey: discovered.creatorPubkeyHex,
+      status: discovered.status,
+      media: null,
     },
   };
 }
@@ -2966,7 +3476,19 @@ async function handleCommerceProductUpdate(payload: unknown) {
   }
   const result = commerceState().products.update(body.actorPubkey, body.productId, patch);
   if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
-  return { outcome: "ok", product: commerceProductDto(result.product) };
+  // FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass)
+  // -- arc §10 "create/update/unpublish-archive sync": editing an ALREADY
+  // PUBLIC product (`status !== "draft"`) must ALSO sync the changed
+  // fields to Nostr, exactly like `handleCommerceProductPublish()` already
+  // does for publish/unpublish. A still-`"draft"` product's edit is never
+  // published -- its metadata is not yet the creator's public word (same
+  // discipline `commerce_nostr_event_drafts.ts`'s own header states for
+  // why `"draft"` is excluded from `CommercePublicProductStatus`).
+  let nostrSyncOutcome: string | undefined;
+  if (result.product.status !== "draft" && Object.keys(patch).length > 0) {
+    nostrSyncOutcome = await publishCommerceNostrProductFieldUpdateNonFatal(result.product, patch, Math.floor(Date.now() / 1000));
+  }
+  return { outcome: "ok", product: commerceProductDto(result.product), nostrSyncOutcome };
 }
 
 const COMMERCE_NOSTR_PRODUCT_KIND_MIRROR_VALUES: readonly string[] = ["pdf", "zip", "template", "software", "link", "other"];
@@ -2983,7 +3505,7 @@ const COMMERCE_NOSTR_PRODUCT_KIND_MIRROR_VALUES: readonly string[] = ["pdf", "zi
  * (`CommerceNostrEventPortImpl.publish()`'s own `evaluateNetworkAccess()`
  * gate refuses it before the transport is ever touched).
  */
-async function publishCommerceNostrProductEventNonFatal(product: CommerceProductLike, isPublish: boolean, now: number): Promise<void> {
+async function publishCommerceNostrProductEventNonFatal(product: CommerceProductLike, isPublish: boolean, now: number): Promise<string> {
   try {
     const port = commerceNostrOutboundPortFor();
     const productKind = COMMERCE_NOSTR_PRODUCT_KIND_MIRROR_VALUES.includes(product.kind) ? product.kind : "other";
@@ -3008,9 +3530,42 @@ async function publishCommerceNostrProductEventNonFatal(product: CommerceProduct
           status: "archived" as const,
           updatedAt: now,
         };
-    await port.publish(draft);
+    const result = await port.publish(draft);
+    return result.outcome;
   } catch (err) {
     console.error("fedos-beta: Nostr Commerce publication attempt failed (non-fatal, local Commerce state unaffected):", err);
+    return "transport-error";
+  }
+}
+
+/**
+ * FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) --
+ * the `product-update` sibling of `publishCommerceNostrProductEventNonFatal`
+ * above, used when an ALREADY-PUBLIC product's fields change (title/
+ * description/priceCents/currency), as opposed to a bare publish/unpublish
+ * status flip. Same non-fatal discipline: a failure here NEVER unwinds the
+ * already-committed local `LocalProductRepository.update()` -- it only
+ * affects the OPTIONAL `nostrSyncOutcome` this function's own return value
+ * feeds back to the caller (arc §42 "sync pending", never a silent false
+ * "published everywhere" claim).
+ */
+async function publishCommerceNostrProductFieldUpdateNonFatal(
+  product: CommerceProductLike,
+  patch: Record<string, unknown>,
+  now: number,
+): Promise<string> {
+  try {
+    const port = commerceNostrOutboundPortFor();
+    const draft: Record<string, unknown> = { category: "product-update", formatVersion: 1, productId: product.id, updatedAt: now };
+    if (typeof patch.title === "string") draft.title = patch.title;
+    if (typeof patch.description === "string") draft.description = patch.description;
+    if (typeof patch.priceCents === "number") draft.priceCents = patch.priceCents;
+    if (typeof patch.currency === "string") draft.currency = patch.currency;
+    const result = await port.publish(draft);
+    return result.outcome;
+  } catch (err) {
+    console.error("fedos-beta: Nostr Commerce update-sync attempt failed (non-fatal, local Commerce state unaffected):", err);
+    return "transport-error";
   }
 }
 
@@ -3023,8 +3578,8 @@ async function handleCommerceProductPublish(payload: unknown, publish: boolean) 
   const repo = commerceState().products;
   const result = publish ? repo.publish(body.actorPubkey, body.productId) : repo.unpublish(body.actorPubkey, body.productId);
   if (result.outcome !== "ok" || result.product === undefined) return { outcome: result.outcome, reason: result.reason };
-  await publishCommerceNostrProductEventNonFatal(result.product, publish, Math.floor(Date.now() / 1000));
-  return { outcome: "ok", product: commerceProductDto(result.product) };
+  const nostrSyncOutcome = await publishCommerceNostrProductEventNonFatal(result.product, publish, Math.floor(Date.now() / 1000));
+  return { outcome: "ok", product: commerceProductDto(result.product), nostrSyncOutcome };
 }
 
 // ---------------------------------------------------------------------
@@ -3146,7 +3701,16 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
       if (started.ok && started.delivery !== undefined) state.deliveries.save(started.delivery);
     }
   }
-  return { outcome: "ok", order: commerceOrderDto(result.order) };
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- arc items #4/#5: privately notify the
+  // OTHER party of this real, already-committed transition. Recipient is
+  // always the counterparty of whichever role just acted -- never the
+  // acting party themselves.
+  const recipientPubkey = actorKind === "customer" ? result.order.sellerPubkey : result.order.buyerPubkey;
+  const syncStatus = ORDER_ACTION_TO_PRIVATE_SYNC_STATUS[actionType] ?? actionType;
+  const reasonForSync = typeof action.reason === "string" ? action.reason : undefined;
+  const nostrSyncOutcome = await sendPrivateOrderSyncNonFatal(result.order, syncStatus, recipientPubkey, Math.floor(Date.now() / 1000), reasonForSync);
+  return { outcome: "ok", order: commerceOrderDto(result.order), nostrSyncOutcome };
 }
 
 async function handleCommerceOrdersListMine(payload: unknown) {
@@ -3154,6 +3718,12 @@ async function handleCommerceOrdersListMine(payload: unknown) {
   if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- bounded reliable-refresh: pull any
+  // private Order/status updates this process's own pubkey has received
+  // before listing, same posture as the public catalog's own
+  // discovery-on-load.
+  await commercePrivateOrderDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listByBuyer(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -3162,6 +3732,7 @@ async function handleCommerceOrdersListIncoming(payload: unknown) {
   if (!isBoundedString(actorPubkey, MAX_ID_LENGTH) || actorPubkey.length === 0) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
+  await commercePrivateOrderDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listBySeller(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -3308,7 +3879,12 @@ async function handleCommerceOrderComplete(payload: unknown) {
   // revert `orderResult.order` having already been saved.
   await issueReputationAttestationsForCompletedOrderNonFatal(orderResult.order, now);
 
-  return { outcome: "ok", order: commerceOrderDto(orderResult.order) };
+  // FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N,
+  // Coordinator-directed pass) -- arc items #4/#5: notify the OTHER party.
+  const recipientPubkey = actorKind === "customer" ? orderResult.order.sellerPubkey : orderResult.order.buyerPubkey;
+  const nostrSyncOutcome = await sendPrivateOrderSyncNonFatal(orderResult.order, "completed", recipientPubkey, now);
+
+  return { outcome: "ok", order: commerceOrderDto(orderResult.order), nostrSyncOutcome };
 }
 
 /**

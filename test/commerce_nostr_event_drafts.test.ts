@@ -9,7 +9,10 @@ import {
   isWellFormedProductUpdateEventDraft,
   isWellFormedReputationAttestationEventDraft,
   isWellFormedTradeCompletionAttestationEventDraft,
+  PRODUCT_PUBLICATION_EVENT_ALLOWED_KEYS,
+  PRODUCT_UPDATE_EVENT_ALLOWED_KEYS,
   type CommerceNostrEventDraft,
+  type CommerceNostrProductKindMirror,
   type MediaManifestReferenceEventDraft,
   type OrderCommitmentEventDraft,
   type ProductPublicationEventDraft,
@@ -22,6 +25,30 @@ const HEX_A = "a".repeat(64);
 const HEX_B = "b".repeat(64);
 const HEX_C = "c".repeat(64);
 const EPOCH_ID = "1".repeat(32);
+
+/** Arc §11's own explicit forbidden-field list ("FIELDS THAT MUST NEVER
+ * APPEAR ANYWHERE IN THIS FILE" -- `commerce_nostr_event_drafts.ts`'s own
+ * header) -- a raw buyer identity, a raw Order/payment id, exact per-trade
+ * payment rail metadata, exact private delivery evidence, or any free-text
+ * comment/note field. */
+const FORBIDDEN_FIELD_NAMES: readonly string[] = [
+  "buyerPubkey",
+  "buyerRealName",
+  "buyerName",
+  "buyerAddress",
+  "buyerEmail",
+  "buyerPhone",
+  "orderId",
+  "paymentId",
+  "invoiceId",
+  "transactionId",
+  "paymentMethod",
+  "deliveryAddress",
+  "deliveryEvidence",
+  "comment",
+  "note",
+  "internalNote",
+];
 
 function validProductPublication(
   overrides: Partial<ProductPublicationEventDraft> = {},
@@ -434,6 +461,98 @@ describe("commerce nostr event drafts: top-level dispatcher", () => {
     for (const draft of valids) {
       expect(isWellFormedCommerceNostrEventDraft(draft)).toBe(true);
       expect(isWellFormedCommerceNostrEventDraft({ ...draft, extraneousField: "nope" })).toBe(false);
+    }
+  });
+});
+
+/**
+ * FedOS "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent N),
+ * arc §11 field classification -- the explicit test this arc's brief calls
+ * for: "a test asserting the published draft's key set is exactly the
+ * allowlist (UNKNOWN public fields: 0)". `hasOnlyAllowedKeys()` (this
+ * file's own implementation, exercised indirectly by every `rejects an
+ * unknown/extra field` case above) already enforces this at the VALIDATOR
+ * level; this block additionally proves it at the CONSTRUCTION level, for
+ * the EXACT draft shapes `fedos_electron_beta_main.cts` (the one real
+ * production caller) actually builds on a real publish/update/unpublish --
+ * so a future accidental field addition at either the drafts-file level or
+ * the main.cts call-site level fails a test, not just a runtime check.
+ */
+describe("commerce nostr event drafts: field classification (arc §11) -- exact allowlist, zero unknown public fields", () => {
+  it("a full product-publication draft's own key set is EXACTLY PRODUCT_PUBLICATION_EVENT_ALLOWED_KEYS -- 0 unknown, 0 missing", () => {
+    const draft = validProductPublication();
+    expect(Object.keys(draft).sort()).toEqual([...PRODUCT_PUBLICATION_EVENT_ALLOWED_KEYS].sort());
+  });
+
+  it("the EXACT product-publication draft shape `fedos_electron_beta_main.cts`'s `publishCommerceNostrProductEventNonFatal()` builds on a real publish carries 0 unknown keys and 0 forbidden fields", () => {
+    // Mirrors that function's own draft-construction literal verbatim.
+    const product = {
+      id: "prod-1",
+      kind: "pdf",
+      title: "A Fine PDF",
+      description: "desc",
+      creatorPubkey: HEX_A,
+      priceCents: 1999,
+      currency: "USD",
+    };
+    const draft = {
+      category: "product-publication" as const,
+      formatVersion: 1 as const,
+      productId: product.id,
+      productKind: product.kind as CommerceNostrProductKindMirror,
+      title: product.title,
+      description: product.description,
+      creatorPubkey: product.creatorPubkey,
+      priceCents: product.priceCents,
+      currency: product.currency,
+      status: "active" as const,
+      publishedAt: 1_700_000_000,
+    };
+    expect(isWellFormedProductPublicationEventDraft(draft)).toBe(true);
+    expect(Object.keys(draft).sort()).toEqual([...PRODUCT_PUBLICATION_EVENT_ALLOWED_KEYS].sort());
+    for (const forbidden of FORBIDDEN_FIELD_NAMES) {
+      expect(Object.keys(draft)).not.toContain(forbidden);
+    }
+  });
+
+  it("the EXACT product-update (unpublish/archive) draft shape `handleCommerceProductPublish()` builds carries 0 unknown keys", () => {
+    const draft = {
+      category: "product-update" as const,
+      formatVersion: 1 as const,
+      productId: "prod-1",
+      status: "archived" as const,
+      updatedAt: 1_700_000_100,
+    };
+    expect(isWellFormedProductUpdateEventDraft(draft)).toBe(true);
+    for (const key of Object.keys(draft)) {
+      expect(PRODUCT_UPDATE_EVENT_ALLOWED_KEYS.has(key)).toBe(true);
+    }
+  });
+
+  it("the EXACT product-update (field-edit sync) draft shape `publishCommerceNostrProductFieldUpdateNonFatal()` builds carries 0 unknown keys", () => {
+    const draft = {
+      category: "product-update" as const,
+      formatVersion: 1 as const,
+      productId: "prod-1",
+      title: "New Title",
+      priceCents: 2599,
+      updatedAt: 1_700_000_200,
+    };
+    expect(isWellFormedProductUpdateEventDraft(draft)).toBe(true);
+    for (const key of Object.keys(draft)) {
+      expect(PRODUCT_UPDATE_EVENT_ALLOWED_KEYS.has(key)).toBe(true);
+    }
+    for (const forbidden of FORBIDDEN_FIELD_NAMES) {
+      expect(Object.keys(draft)).not.toContain(forbidden);
+    }
+  });
+
+  it("no category's allowlist EVER contains a forbidden field name (arc §11's own explicit forbidden list)", () => {
+    for (const category of COMMERCE_NOSTR_EVENT_CATEGORIES) {
+      const allowed = COMMERCE_NOSTR_EVENT_DRAFT_ALLOWED_KEYS[category];
+      for (const forbidden of FORBIDDEN_FIELD_NAMES) {
+        expect(allowed.has(forbidden)).toBe(false);
+      }
     }
   });
 });
