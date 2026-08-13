@@ -1850,6 +1850,22 @@ async function loadRootModules(): Promise<RootModules> {
     applyDeliveryAction: RootModules["Commerce"]["applyDeliveryAction"];
     issueSignedTradeReceiptProof: RootModules["Commerce"]["issueSignedTradeReceiptProof"];
     verifySignedTradeReceiptProof: RootModules["Commerce"]["verifySignedTradeReceiptProof"];
+    // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator,
+    // post-security-review BUILD gate fix) -- Agent A's 6 new Commerce
+    // exports were correctly added to `RootModules["Commerce"]` (below)
+    // and to the canonical barrel (`src/os/commerce/index.ts`), but this
+    // separate, hand-maintained `as {...}` import-projection literal was
+    // never updated to match -- so every downstream `commerce.xxx` access
+    // failed to typecheck even though the runtime value was always
+    // present. Same category of staleness this comment block's own
+    // sibling entries already guard against; fixed the same way, no
+    // architecture change.
+    issueSignedDeliveryReceiptProof: RootModules["Commerce"]["issueSignedDeliveryReceiptProof"];
+    verifySignedDeliveryReceiptProof: RootModules["Commerce"]["verifySignedDeliveryReceiptProof"];
+    evaluateInboundMediaReleaseRequestAuthorization: RootModules["Commerce"]["evaluateInboundMediaReleaseRequestAuthorization"];
+    evaluateInboundMediaReleaseResponseAuthorization: RootModules["Commerce"]["evaluateInboundMediaReleaseResponseAuthorization"];
+    evaluateDigitalContentDeliveryInvariantForOrderCompletion: RootModules["Commerce"]["evaluateDigitalContentDeliveryInvariantForOrderCompletion"];
+    DurableMediaReleaseContentCache: RootModules["Commerce"]["DurableMediaReleaseContentCache"];
     encodeCommerceReceiptProofToQrText: RootModules["Commerce"]["encodeCommerceReceiptProofToQrText"];
     decodeCommerceReceiptProofFromQrText: RootModules["Commerce"]["decodeCommerceReceiptProofFromQrText"];
     issueSignedProductShareProof: RootModules["Commerce"]["issueSignedProductShareProof"];

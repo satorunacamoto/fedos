@@ -65,6 +65,16 @@ const CURRENT_SUPPORTED_TEST_FILES = [
   "test/commerce_bridge.test.ts",
   "test/commerce_classify.test.ts",
   "test/commerce_activity_summary.test.ts",
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator, BUILD
+  // gate fix) -- 9 test files added by Agents D/A and the Coordinator
+  // integration pass that were never added to this curated surface, so
+  // `test:current` silently never ran them despite them covering genuinely
+  // new production code. Added here in the same alphabetical-within-section
+  // convention as every existing entry; each independently verified passing
+  // (`npx vitest run <file>` against the default full-wildcard config)
+  // before being added.
+  "test/commerce_coordinator_integration_effects.test.ts",
+  "test/commerce_discovery_state.test.ts",
   "test/commerce_delivery_evidence.test.ts",
   "test/commerce_delivery_repository.test.ts",
   "test/commerce_delivery_state_machine.test.ts",
@@ -78,14 +88,17 @@ const CURRENT_SUPPORTED_TEST_FILES = [
   "test/commerce_media_access_grant_persistence.test.ts",
   "test/commerce_media_access_grant_policy.test.ts",
   "test/commerce_media_access_grant_redeem_bypass.test.ts",
+  "test/commerce_media_access_grant_release_channel_policy.test.ts",
   "test/commerce_media_access_grant_sign_verify.test.ts",
   "test/commerce_media_grant_signing_key_store.test.ts",
+  "test/commerce_media_release_content_cache.test.ts",
   "test/commerce_media_store.test.ts",
   "test/commerce_network_profile.test.ts",
   "test/commerce_nostr_event_drafts.test.ts",
   "test/commerce_nostr_event_port.test.ts",
   "test/commerce_nostr_event_read_model.test.ts",
   "test/commerce_nostr_fake_transport.test.ts",
+  "test/commerce_offline_reconnect_discovery.test.ts",
   "test/commerce_order_authority.test.ts",
   "test/commerce_order_repository.test.ts",
   "test/commerce_order_state_machine.test.ts",
@@ -95,6 +108,9 @@ const CURRENT_SUPPORTED_TEST_FILES = [
   "test/commerce_payment_state_machine.test.ts",
   "test/commerce_persona_epoch_signing_key_durability.test.ts",
   "test/commerce_policy.test.ts",
+  "test/commerce_private_media_release_bridge_fake_crypto.test.ts",
+  "test/commerce_private_media_release_end_to_end.test.ts",
+  "test/commerce_private_media_release_sync.test.ts",
   "test/commerce_product_media_safety.test.ts",
   "test/commerce_product_repository.test.ts",
   "test/commerce_receipt_durable_store.test.ts",
@@ -107,6 +123,7 @@ const CURRENT_SUPPORTED_TEST_FILES = [
   "test/commerce_reputation_persona_epoch.test.ts",
   "test/commerce_reputation_signing.test.ts",
   "test/commerce_trade_receipt_proof.test.ts",
+  "test/commerce_trust_share_adapter.test.ts",
   "test/commerce_wasm_product_media_decryption.test.ts",
   "test/commerce_wasm_product_media_encryption.test.ts",
   "test/community_classify.test.ts",
