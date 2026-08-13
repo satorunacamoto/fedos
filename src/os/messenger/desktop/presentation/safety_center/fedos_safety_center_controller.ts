@@ -138,6 +138,13 @@ export class FedosSafetyCenterController {
     const identityRuntimeConfigured = identityListResult.outcome !== "unavailable";
     const pendingIdentityReplacementCount =
       identityListResult.outcome === "ok" ? identityListResult.value.filter((v) => !v.superseded && v.acceptanceState !== "accepted" && v.acceptanceState !== "rejected").length : 0;
+    // Wave A (Agent S) Task 1 — old-key continuity auto-accept visibility
+    // recovery. Counted SEPARATELY from `pendingIdentityReplacementCount`
+    // above: these are NOT pending (they already reached "accepted"), so
+    // without this they would never surface anywhere in the Safety Center
+    // at all. See `fedos_identity_transition_silent_acceptance_detection.ts`.
+    const accountSilentlyAcceptedIdentityReplacementCount =
+      identityListResult.outcome === "ok" ? identityListResult.value.filter((v) => v.silentlyAutoAcceptedWithoutAsking).length : 0;
 
     const deletionListResult = this.#shell.deletionRequestListReceived();
     const deletionRuntimeConfigured = deletionListResult.outcome !== "unavailable";
@@ -162,6 +169,7 @@ export class FedosSafetyCenterController {
       peerCapabilityStatuses,
       peerCapabilityRuntimeConfigured: peerCapabilityResult.outcome !== "unavailable",
       pendingIdentityReplacementCount,
+      accountSilentlyAcceptedIdentityReplacementCount,
       identityReplacementRuntimeConfigured: identityRuntimeConfigured,
       pendingDeletionConsentCount,
       mixedOrUnknownDeletionOutcomeCount,
@@ -215,6 +223,21 @@ export class FedosSafetyCenterController {
       if (!this.#notifiedFacts.has(key)) {
         this.#notifiedFacts.add(key);
         await this.#notificationCoordinator.notify({ kind: "identity-replacement-pending-review", detail: `${summary.pendingIdentityReplacementCount} pending` });
+      }
+    }
+    // Wave A (Agent S) Task 1 — old-key continuity auto-accept visibility
+    // recovery. This fact has NO existing per-domain notification anywhere
+    // in this codebase (it is not "pending", so the block immediately
+    // above never covers it) -- fires exactly once per process lifetime,
+    // same in-memory dedup discipline as every other fact in this method.
+    if (summary.accountSilentlyAcceptedIdentityReplacementCount > 0) {
+      const key = "identity-replacement-accepted-without-asking";
+      if (!this.#notifiedFacts.has(key)) {
+        this.#notifiedFacts.add(key);
+        await this.#notificationCoordinator.notify({
+          kind: "identity-replacement-accepted-without-asking",
+          detail: `${summary.accountSilentlyAcceptedIdentityReplacementCount} auto-accepted`,
+        });
       }
     }
     // Deliberately NOT firing for `summary.pendingDeletionConsentCount` — `FedosDeletionRequestController` already raises `"deletion-request-received"` for the SAME underlying fact (Phase L "no double-fire").

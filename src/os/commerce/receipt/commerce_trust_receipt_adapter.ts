@@ -75,6 +75,11 @@ import {
   type TradeReceiptProofPayload,
   type DeliveryReceiptProofPayload,
 } from "./receipt_types.js";
+import {
+  evaluateCommerceReceiptTruthfulness,
+  type OpaqueDigitalContentDeliveryInvariantResult,
+  type CommerceReceiptTruthfulnessDecision,
+} from "./commerce_receipt_truthfulness_gate.js";
 
 /** The signed envelope type every function in this file produces/consumes —
  * always `fedos.contract-artifact.v1` under the hood; see this file's header. */
@@ -194,6 +199,58 @@ export function issueSignedDeliveryReceiptProof(
   const artifactDigestHex = computeFedosTrustArtifactDigestHexSha256(new TextEncoder().encode(canonical));
   const metadata = deliveryReceiptPayloadToMetadata(payload);
   return issueFedosTrustContractArtifactProof({ artifactDigestHex, metadata }, buildEnvelopeInput(keys, options));
+}
+
+/**
+ * Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) —
+ * result of a GUARDED issuance attempt: either a genuinely issued envelope,
+ * or the exact `CommerceReceiptTruthfulnessDecision` denial that stopped it
+ * (never a thrown error, never a bare signed envelope for an untruthful
+ * claim).
+ */
+export type GuardedCommerceReceiptIssuanceResult =
+  | { readonly issued: true; readonly envelope: SignedCommerceReceiptProofEnvelope }
+  | { readonly issued: false; readonly decision: Exclude<CommerceReceiptTruthfulnessDecision, { readonly permitted: true }> };
+
+/**
+ * Truthfulness-GUARDED sibling of `issueSignedTradeReceiptProof()` — same
+ * signing, but ONLY after `evaluateCommerceReceiptTruthfulness()`
+ * (`./commerce_receipt_truthfulness_gate.js`) independently confirms
+ * `orderStatus === "completed"`. This is the function a real composition
+ * root SHOULD call instead of the bare signer whenever it already has the
+ * real Order status in hand (see that gate's own header for why the bare
+ * signer intentionally does not do this check itself).
+ */
+export function issueSignedTradeReceiptProofIfTruthful(
+  payload: TradeReceiptProofPayload,
+  orderStatus: string,
+  keys: CommerceReceiptSigningKeys,
+  options: IssueCommerceReceiptProofOptions,
+): GuardedCommerceReceiptIssuanceResult {
+  const decision = evaluateCommerceReceiptTruthfulness({ kind: "trade_completion", orderStatus });
+  if (!decision.permitted) return { issued: false, decision };
+  return { issued: true, envelope: issueSignedTradeReceiptProof(payload, keys, options) };
+}
+
+/**
+ * Truthfulness-GUARDED sibling of `issueSignedDeliveryReceiptProof()`. In
+ * addition to `orderStatus === "completed"`, REQUIRES the caller's own
+ * freshly-computed `digitalContentDeliveryInvariant` result to be
+ * `satisfied: true` before ever signing a `"delivery_confirmation"` claim —
+ * see `commerce_receipt_truthfulness_gate.ts`'s own header for exactly what
+ * this closes (arc requirement 3: a receipt must never claim delivery on
+ * evidence that only proves order-completed or seller-claimed fulfillment).
+ */
+export function issueSignedDeliveryReceiptProofIfTruthful(
+  payload: DeliveryReceiptProofPayload,
+  orderStatus: string,
+  digitalContentDeliveryInvariant: OpaqueDigitalContentDeliveryInvariantResult,
+  keys: CommerceReceiptSigningKeys,
+  options: IssueCommerceReceiptProofOptions,
+): GuardedCommerceReceiptIssuanceResult {
+  const decision = evaluateCommerceReceiptTruthfulness({ kind: "delivery_confirmation", orderStatus, digitalContentDeliveryInvariant });
+  if (!decision.permitted) return { issued: false, decision };
+  return { issued: true, envelope: issueSignedDeliveryReceiptProof(payload, keys, options) };
 }
 
 /** Every status this module's verify functions can return. `"VALID"` plus

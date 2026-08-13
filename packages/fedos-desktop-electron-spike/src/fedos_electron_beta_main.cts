@@ -62,7 +62,8 @@
  * assembly (`activeAssembly`) exist at a time, constructed ONLY after a
  * successful create/unlock. `lock()` stops background sync + the ONE
  * Runtime (via `activeAssembly.shutdown()`), THEN drops both references.
- * Concurrent create/unlock/lock are serialized by `inFlight`.
+ * Concurrent create/unlock/lock are serialized by `ipcCommands`' shared
+ * "profile-lifecycle" group (see fedos_electron_ipc_command_registry.ts).
  *
  * SECURITY: identical `contextIsolation`/`nodeIntegration`/`sandbox`/
  * `webSecurity` mandatory literals as every prior package's own main.cts.
@@ -111,6 +112,12 @@ import { randomBytes as nodeRandomBytes } from "node:crypto";
 import { FedosElectronNotificationAdapter } from "./fedos_electron_notification_adapter.js";
 import { FedosElectronTrayAdapter } from "./fedos_electron_tray_adapter.js";
 import { FedosElectronBadgeAdapter, type FedosElectronBadgeTrayMenuItemLike } from "./fedos_electron_badge_adapter.js";
+import { FedosIpcCommandRegistry } from "./fedos_electron_ipc_command_registry.js";
+import { createFedosDeletionRequestSendHandler } from "./fedos_electron_deletion_request_send_ipc.js";
+import {
+  createFedosIdentityTransitionAssessContinuityHandler,
+  createFedosIdentityTransitionAuthorizeRatchetResetHandler,
+} from "./fedos_electron_identity_transition_ratchet_reset_ipc.js";
 import {
   FEDOS_COMMERCE_DEMO_PRODUCTS,
   FEDOS_COMMERCE_DEMO_PRODUCT_MEDIA,
@@ -704,6 +711,8 @@ interface ShellDiagnosticLike {
   /** Secure Runtime Alpha 8041-8120 — narrows `peerCapabilityListObserved()`/`identityTransitionStatus()`, used ONLY to reconcile an Identity Transition inbox item's own `transitionId` back to the `(peerAccountRef, peerDeviceRef)` pair `identityTransitionOpen()`/`Accept()`/`Reject()`/`Defer()` require as input — the Shell/Controller layer has no listing call that returns that pair directly (see this Arc's own Phase A reconciliation report); this main-process-only cross-reference invents no new identity-transition business rule, it only composes two already-public read-only calls, mirroring `FedosSafetyCenterController`'s own established cross-domain reconciliation style. */
   peerCapabilityListObserved(): { readonly outcome: string; readonly [key: string]: unknown };
   identityTransitionStatus(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): { readonly outcome: string; readonly [key: string]: unknown };
+  /** Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) — narrows `FedosDesktopApplicationShell.identityTransitionRatchetImpact()`, additive this Arc; see that method's own doc comment. */
+  identityTransitionRatchetImpact(oldAccountIdentity: unknown): { readonly outcome: string; readonly [key: string]: unknown };
 }
 /** Secure Runtime Alpha 7321-7400 — narrows `FedosSafetyCenterController` (`src/desktop/presentation/safety_center/`, unmodified). Secure Runtime Alpha 8041-8120 — widened (never redesigned) to narrow the REST of `FedosDesktopConversationUiPresentationBoundary`'s own already-real ViewModels/Controllers (`src/desktop/presentation/`, unmodified) this file never read before this Arc: conversation list/detail, message list/compose, membership/invitations, search, archive, device inventory, Identity Transition, Signed Deletion. Every accessor below already exists on the real class; this interface only narrows the TYPE, granting no new capability. */
 interface BoundaryLike {
@@ -764,6 +773,14 @@ interface BoundaryLike {
     defer(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): Promise<void>;
     recordManualVerification(method: unknown, verifiedAt: number, noteCode: unknown): Promise<void>;
     readonly manualVerificationState: { readonly status: string; readonly [key: string]: unknown };
+    // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+    // narrows the Identity Replacement two-step Ratchet-reset confirmation
+    // (`FedosIdentityTransitionController.assessContinuity()`/
+    // `.authorizeRatchetReset()`, already real, previously never called
+    // from any IPC channel).
+    assessContinuity(pairs: readonly { readonly conversationId: string; readonly remoteDeviceRef: string }[]): Promise<void>;
+    readonly ratchetResetConfirmationState: { readonly status: string; readonly [key: string]: unknown };
+    authorizeRatchetReset(acceptanceState: unknown, affectedSessions: readonly unknown[]): Promise<void>;
   };
   readonly deletionRequests: {
     openReceivedInbox(): Promise<void>;
@@ -775,6 +792,11 @@ interface BoundaryLike {
     // Secure Runtime Alpha 8121-8200 -- Security Finding 3: the real, exact-id authorization boundary.
     approve(requestId: string): Promise<void>;
     reject(requestId: string): Promise<void>;
+    // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+    // narrows the Signed Deletion sender-side (`FedosDeletionRequestController.createRequest()`,
+    // already real, previously never called from any IPC channel).
+    createRequest(params: unknown): Promise<void>;
+    readonly createState: { readonly status: string; readonly [key: string]: unknown };
   };
 }
 interface AssemblyLike {
@@ -829,8 +851,20 @@ interface RootModules {
   readonly activateFedosProductionProfileMasterSeed: (request: {
     attestation: unknown;
     artifactDir?: string;
+    expectedCrate?: { readonly name?: string; readonly version?: string };
     importGlue?: (specifier: string) => Promise<unknown>;
   }) => Promise<Activation>;
+  /**
+   * Commerce Product-Media Sync + Truthful Completion mega-arc (Agent S
+   * Task 3 / Wave B) — gates `FEDOS_ELECTRON_BETA_ARTIFACT_DIR` behind an
+   * explicit test-mode signal instead of honoring it unconditionally.
+   */
+  readonly fedosResolveProductionArtifactDir: (request: {
+    readonly overrideArtifactDirEnvValue: string | undefined;
+    readonly testGateActive: boolean;
+    readonly defaultArtifactDir: string;
+  }) => { readonly artifactDir: string; readonly outcome: string; readonly reason: string };
+  readonly fedosExpectedProductionWasmCrate: () => { readonly name: string };
   readonly NostrSigningAuthority: new (handleSource: unknown) => unknown;
   readonly planFedosLocalProfilePaths: (root: string) => PathsLike | null;
   readonly ensureFedosLocalProfileDirectories: (paths: PathsLike) => boolean;
@@ -1032,9 +1066,12 @@ interface RootModules {
       readonly productId: string;
       readonly productMedia: readonly { readonly id: string; readonly productId: string; readonly classification: "public" | "protected" }[];
       readonly hasReleasedContent: (mediaId: string) => boolean;
+      /** Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) — `"authoritative"` (default) for a process's own self-populated local repository (the seller's own process); `"unsynced"` wherever `productMedia` was merged in from a read-model view this process cannot prove is complete (a buyer's process). See media_access_grant_release_channel_policy.ts's own header. */
+      readonly productMediaKnowledge?: "authoritative" | "unsynced";
     }) =>
       | { readonly satisfied: true }
-      | { readonly satisfied: false; readonly reason: "digital-content-not-delivered"; readonly missingMediaIds: readonly string[] };
+      | { readonly satisfied: false; readonly reason: "digital-content-not-delivered"; readonly missingMediaIds: readonly string[] }
+      | { readonly satisfied: false; readonly reason: "product-media-knowledge-unsynced" };
     /**
      * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) --
      * buyer-side durable, restart-surviving cache for an already
@@ -1460,6 +1497,20 @@ interface RootModules {
       | { readonly outcome: "wrap-unavailable" }
       | { readonly outcome: "content-corrupt" }
     >;
+    // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+    // Agent M's protocol. See product_media_sync_bridge.ts /
+    // product_media_declaration_types.ts.
+    readonly NostrProductMediaSyncPort: new (port: CommerceNostrEventPortLike) => {
+      publishDeclaration(declaration: unknown): Promise<{ readonly outcome: string; readonly reason?: string; readonly eventId?: string }>;
+      publishRetraction(retraction: unknown): Promise<{ readonly outcome: string; readonly reason?: string; readonly eventId?: string }>;
+    };
+    readonly deriveProductMediaDeclaration: (
+      media: { readonly id: string; readonly productId: string; readonly role: string; readonly classification: "public" | "protected"; readonly contentType: string; readonly sizeBytes: number; readonly checksum: string; readonly checksumSubject: "plaintext" | "ciphertext"; readonly altText?: string },
+      sellerPubkey: string,
+      version: number,
+      declaredAt: number,
+    ) => unknown;
+    readonly buildProductMediaRetraction: (productId: string, mediaId: string, sellerPubkey: string, version: number, retractedAt: number) => unknown;
   };
 }
 
@@ -1886,6 +1937,24 @@ interface CommerceNostrReadModelLike {
   getProduct(productId: string): unknown;
   /** FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) -- structural mirror of `CommerceNostrProductReadModel.listProducts()`, used to merge Nostr-discovered products into `fedos-app:commerce-catalog-list`'s response. */
   listProducts(): readonly CommerceReadModelProductViewLike[];
+  /** Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) — a buyer's ONLY source of truth for a Product's protected-content declaration; the seller's own process instead uses its authoritative local `commerceProductMediaState()`. */
+  listProductMedia(productId: string): readonly CommerceReadModelProductMediaViewLike[];
+  isProductMediaRetracted(mediaId: string): boolean;
+}
+interface CommerceReadModelProductMediaViewLike {
+  readonly mediaId: string;
+  readonly productId: string;
+  readonly sellerPubkey: string;
+  readonly role: string;
+  readonly classification: "public" | "protected";
+  readonly contentType: string;
+  readonly sizeClass: string;
+  readonly checksum: string;
+  readonly checksumSubject: "plaintext" | "ciphertext";
+  readonly altText?: string;
+  readonly version: number;
+  readonly declaredAt: number;
+  readonly retracted: boolean;
 }
 
 /** Structural mirror of `CommerceReadModelProductView` (`os/commerce/events/commerce_nostr_event_read_model.ts`) -- same discipline as every other `*Like` interface in this file: never `import type`s the real shape, re-declares it structurally once. */
@@ -1906,6 +1975,10 @@ async function loadRootModules(): Promise<RootModules> {
   };
   const activation = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_profile_activation.js"))) as {
     activateFedosProductionProfileMasterSeed: RootModules["activateFedosProductionProfileMasterSeed"];
+  };
+  const artifactVerify = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_wasm_artifact_verify_before_execute.js"))) as {
+    fedosResolveProductionArtifactDir: RootModules["fedosResolveProductionArtifactDir"];
+    fedosExpectedProductionWasmCrate: RootModules["fedosExpectedProductionWasmCrate"];
   };
   const signer = (await import(distUrl("os", "messenger", "desktop", "production_activation", "fedos_production_nostr_signing_authority.js"))) as {
     FedosProductionNostrSigningAuthority: RootModules["NostrSigningAuthority"];
@@ -2153,9 +2226,18 @@ async function loadRootModules(): Promise<RootModules> {
     buildOutboundPrivateMediaReleaseResponse: RootModules["CommerceNostr"]["buildOutboundPrivateMediaReleaseResponse"];
     applyInboundPrivateMediaReleaseResponse: RootModules["CommerceNostr"]["applyInboundPrivateMediaReleaseResponse"];
   };
+  const productMediaSyncBridge = (await import(distUrl("os", "commerce", "catalog", "adapters", "nostr", "product_media_sync_bridge.js"))) as {
+    NostrProductMediaSyncPort: RootModules["CommerceNostr"]["NostrProductMediaSyncPort"];
+  };
+  const productMediaDeclarationTypes = (await import(distUrl("os", "commerce", "catalog", "product_media_declaration_types.js"))) as {
+    deriveProductMediaDeclaration: RootModules["CommerceNostr"]["deriveProductMediaDeclaration"];
+    buildProductMediaRetraction: RootModules["CommerceNostr"]["buildProductMediaRetraction"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
+    fedosResolveProductionArtifactDir: artifactVerify.fedosResolveProductionArtifactDir,
+    fedosExpectedProductionWasmCrate: artifactVerify.fedosExpectedProductionWasmCrate,
     NostrSigningAuthority: signer.FedosProductionNostrSigningAuthority,
     planFedosLocalProfilePaths: paths.planFedosLocalProfilePaths,
     ensureFedosLocalProfileDirectories: paths.ensureFedosLocalProfileDirectories,
@@ -2269,6 +2351,9 @@ async function loadRootModules(): Promise<RootModules> {
       COMMERCE_PRIVATE_MEDIA_RELEASE_TAG: commercePrivateMediaReleaseBridge.COMMERCE_PRIVATE_MEDIA_RELEASE_TAG,
       buildOutboundPrivateMediaReleaseResponse: commercePrivateMediaReleaseApply.buildOutboundPrivateMediaReleaseResponse,
       applyInboundPrivateMediaReleaseResponse: commercePrivateMediaReleaseApply.applyInboundPrivateMediaReleaseResponse,
+      NostrProductMediaSyncPort: productMediaSyncBridge.NostrProductMediaSyncPort,
+      deriveProductMediaDeclaration: productMediaDeclarationTypes.deriveProductMediaDeclaration,
+      buildProductMediaRetraction: productMediaDeclarationTypes.buildProductMediaRetraction,
     },
   };
 }
@@ -2317,7 +2402,11 @@ let activeLocalIdentity: { readonly displayLabel: string; readonly accountPublic
 const notificationAdapter = new FedosElectronNotificationAdapter();
 const trayAdapter = new FedosElectronTrayAdapter();
 let badgeAdapter: FedosElectronBadgeAdapter | null = null;
-let inFlight = false;
+// Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+// single command-registration seam replacing the old global `inFlight`
+// boolean everywhere; see fedos_electron_ipc_command_registry.ts for the
+// full audit/design rationale and this file's own per-channel table below.
+const ipcCommands = new FedosIpcCommandRegistry();
 let shutdownInitiated = false;
 let trayCreated = false;
 
@@ -3032,6 +3121,37 @@ let commerceNostrOutboundPort: CommerceNostrEventPortLike | null = null;
 let commerceNostrOutboundPortProfileRef: CommerceNetworkProfileValue | null = null;
 let commerceNostrOutboundPortSignerRef: NostrSigningAuthorityLike | null = null;
 let commerceNostrReadModelSingleton: CommerceNostrReadModelLike | null = null;
+/**
+ * Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+ * per-mediaId monotonic version watermark for THIS process's own
+ * publications (design doc's own `nextVersionFor()`, deliberately
+ * unspecified beyond "strictly greater than the last version this process
+ * itself last published for this id" — in-memory is sufficient since each
+ * `mediaId` is a fresh id this same process just minted via
+ * `commerceProductMediaState().add()`; a real durable counter is unneeded
+ * for a value that only ever needs to start at 1 for a brand-new id).
+ */
+const commerceProductMediaVersionByMediaId = new Map<string, number>();
+function nextCommerceProductMediaVersionFor(mediaId: string): number {
+  const next = (commerceProductMediaVersionByMediaId.get(mediaId) ?? 0) + 1;
+  commerceProductMediaVersionByMediaId.set(mediaId, next);
+  return next;
+}
+/** Best-effort, non-fatal — mirrors every other private/public Nostr publish call site in this file (e.g. `sendPrivateDeliverySyncNonFatal`); a sync failure never blocks the local attach/detach action that already succeeded. */
+async function publishCommerceProductMediaDeclarationNonFatal(media: { readonly id: string; readonly productId: string; readonly role: string; readonly classification: "public" | "protected"; readonly contentType: string; readonly sizeBytes: number; readonly checksum: string; readonly checksumSubject: "plaintext" | "ciphertext"; readonly altText?: string }, sellerPubkey: string): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  const m = requireModules();
+  try {
+    const port = new m.CommerceNostr.NostrProductMediaSyncPort(commerceNostrOutboundPortFor());
+    const declaration = m.CommerceNostr.deriveProductMediaDeclaration(media, sellerPubkey, nextCommerceProductMediaVersionFor(media.id), Math.floor(Date.now() / 1000));
+    const result = await port.publishDeclaration(declaration);
+    if (result.outcome !== "ok" && result.outcome !== "published") {
+      recordDiagnosticEvent("commerce-product-media-declaration-publish-failed", { mediaId: media.id, productId: media.productId, outcome: result.outcome, reason: result.reason });
+    }
+  } catch (error) {
+    recordDiagnosticEvent("commerce-product-media-declaration-publish-failed", { mediaId: media.id, productId: media.productId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
 
 /**
  * Lazily constructs (and rebuilds on a profile/signer change) the ONE real
@@ -3085,6 +3205,60 @@ function commerceNostrReadModelFor(): CommerceNostrReadModelLike {
     commerceNostrReadModelSingleton = new m.CommerceNostr.CommerceNostrProductReadModel();
   }
   return commerceNostrReadModelSingleton;
+}
+
+/**
+ * Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+ * the ONE seam that turns Agent M's real cross-process declaration sync
+ * and Agent C's `productMediaKnowledge` signal into a single call the
+ * digital-content-delivery completion invariant (and the buyer-facing
+ * Product Detail declaration) both use. `sellerPubkey` is the Product's
+ * own `creatorPubkeyHex` — `"authoritative"` applies ONLY when this
+ * process's own unlocked identity IS that seller (its local repository is
+ * self-populated and complete, the SAME "own product" check
+ * `commerceMerchantLabelFor()` already establishes); every other process
+ * (a genuine buyer, or a seller viewing another seller's product) can only
+ * ever have `"unsynced"` knowledge, however much the Nostr read-model
+ * happens to already show — a successful sync of everything this process
+ * has SEEN is still not proof it has seen everything Bob ever published.
+ */
+/**
+ * Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+ * the buyer-facing truthful-declaration surface (§16/§67): "Includes
+ * protected digital content" before purchase, without ever exposing the
+ * content or a decryption key. `"unknown"` (never a false `"absent"`) is
+ * returned whenever this process's own knowledge is `"unsynced"` and it
+ * has not itself seen any protected declaration yet — the honest
+ * "we don't know" case the design doc's own read model distinguishes from
+ * a genuine, confirmed absence.
+ */
+function commerceProductMediaDeclarationSummaryFor(productId: string, sellerPubkey: string): { readonly protectedContent: "present" | "absent" | "unknown" } {
+  const { productMedia, productMediaKnowledge } = resolveProductMediaForCompletionInvariant(productId, sellerPubkey);
+  const hasProtected = productMedia.some((item) => item.classification === "protected");
+  if (hasProtected) return { protectedContent: "present" };
+  if (productMediaKnowledge === "authoritative") return { protectedContent: "absent" };
+  return { protectedContent: "unknown" };
+}
+
+function resolveProductMediaForCompletionInvariant(
+  productId: string,
+  sellerPubkey: string,
+): {
+  readonly productMedia: readonly { readonly id: string; readonly productId: string; readonly classification: "public" | "protected" }[];
+  readonly productMediaKnowledge: "authoritative" | "unsynced";
+} {
+  const isOwnProduct = activeLocalIdentity !== null && activeLocalIdentity.accountPublicIdentifier === sellerPubkey;
+  if (isOwnProduct) {
+    const local = commerceProductMediaState()
+      .listForProduct(productId)
+      .map((item) => ({ id: item.id, productId: item.productId, classification: item.classification }));
+    return { productMedia: local, productMediaKnowledge: "authoritative" };
+  }
+  const synced = commerceNostrReadModelFor()
+    .listProductMedia(productId)
+    .filter((item) => !item.retracted)
+    .map((item) => ({ id: item.mediaId, productId: item.productId, classification: item.classification }));
+  return { productMedia: synced, productMediaKnowledge: "unsynced" };
 }
 
 /**
@@ -3409,13 +3583,12 @@ function applyInboundPrivateOrderSyncNonFatal(envelope: {
   // since this process's own delivery-evidence state (not the remote
   // claim) may genuinely catch up on a later refresh.
   if (result.outcome === "applied" && existingOrder?.status !== "completed" && result.order.status === "completed") {
-    const productMediaForInvariant = commerceProductMediaState()
-      .listForProduct(result.order.productId)
-      .map((item) => ({ id: item.id, productId: item.productId, classification: item.classification }));
+    const { productMedia: productMediaForInvariant, productMediaKnowledge } = resolveProductMediaForCompletionInvariant(result.order.productId, result.order.sellerPubkey);
     const deliveryInvariant = m.Commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion({
       productId: result.order.productId,
       productMedia: productMediaForInvariant,
       hasReleasedContent: (mediaId) => commerceMediaReleaseContentCacheState().hasRelease(result.order.id, mediaId, result.order.buyerPubkey),
+      productMediaKnowledge,
     });
     if (!deliveryInvariant.satisfied) {
       console.warn(
@@ -4425,9 +4598,24 @@ async function buildFreshCoordinator(): Promise<{
 } | null> {
   const m = requireModules();
   const attestation = m.createElectronMainHostAttestation({ appId: APP_ID, appVersion: APP_VERSION });
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent S
+  // Task 3 / Wave B) — gate FEDOS_ELECTRON_BETA_ARTIFACT_DIR behind an
+  // explicit test-mode signal (never honored unconditionally in a normal
+  // production launch) and pin the expected crate identity, closing the
+  // previously-unexploited "self-consistent but unanchored" verification
+  // gap. See fedos_production_wasm_artifact_verify_before_execute.ts.
+  const artifactDirDecision = m.fedosResolveProductionArtifactDir({
+    overrideArtifactDirEnvValue: process.env.FEDOS_ELECTRON_BETA_ARTIFACT_DIR,
+    testGateActive: AUTOTEST_MODE.length > 0,
+    defaultArtifactDir: artifactDir(),
+  });
+  if (artifactDirDecision.outcome === "override-rejected-not-test-gated") {
+    recordDiagnosticEvent("artifact-dir-override-rejected", { reason: artifactDirDecision.reason });
+  }
   const activation = await m.activateFedosProductionProfileMasterSeed({
     attestation,
-    artifactDir: artifactDir(),
+    artifactDir: artifactDirDecision.artifactDir,
+    expectedCrate: m.fedosExpectedProductionWasmCrate(),
     importGlue: (specifier: string) => import(pathToFileURL(specifier).href),
   });
   if (activation.outcome !== "activated") {
@@ -4649,7 +4837,9 @@ async function attachPresentationLayer(assembly: AssemblyLike): Promise<void> {
 }
 
 async function handleCreate(payload: unknown) {
-  if (inFlight) return { outcome: "busy", reason: "another command is in progress" };
+  // The "profile-lifecycle" group guard on this channel's registerHandle()
+  // registration already serializes create/unlock/lock against each other —
+  // see fedos_electron_ipc_command_registry.ts.
   if (activeCoordinator !== null) return { outcome: "already-exists", reason: "a profile is already active" };
   const label = validatedLabel(payload);
   const secretBytes = validatedSecretBytes(payload, ["label", "secret"]);
@@ -4657,7 +4847,6 @@ async function handleCreate(payload: unknown) {
     if (secretBytes !== null) secretBytes.fill(0);
     return { outcome: "invalid-input", reason: "malformed create request" };
   }
-  inFlight = true;
   try {
     const built = await buildFreshCoordinator();
     if (built === null) {
@@ -4674,6 +4863,7 @@ async function handleCreate(payload: unknown) {
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      ipcCommands.bumpGeneration(); // a new assembly now exists — discard any stale-generation in-flight results
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
       activeLocalIdentity = { displayLabel: result.value.displayLabel, accountPublicIdentifier: result.value.accountPublicIdentifier };
       activeMasterSeedAuthority = built.masterSeedAuthority;
@@ -4694,16 +4884,17 @@ async function handleCreate(payload: unknown) {
     await built.masterSeedAuthority.clear();
     return { outcome: result.outcome, reason: "create did not complete" };
   } finally {
-    inFlight = false;
+    // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
   }
 }
 
 async function handleUnlock(payload: unknown) {
-  if (inFlight) return { outcome: "busy", reason: "another command is in progress" };
+  // The "profile-lifecycle" group guard on this channel's registerHandle()
+  // registration already serializes create/unlock/lock against each other —
+  // see fedos_electron_ipc_command_registry.ts.
   if (activeCoordinator !== null) return { outcome: "ok", reason: "already unlocked" };
   const secretBytes = validatedSecretBytes(payload, ["secret"]);
   if (secretBytes === null) return { outcome: "invalid-input", reason: "malformed unlock request" };
-  inFlight = true;
   try {
     const built = await buildFreshCoordinator();
     if (built === null) {
@@ -4721,6 +4912,7 @@ async function handleUnlock(payload: unknown) {
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      ipcCommands.bumpGeneration(); // a new assembly now exists — discard any stale-generation in-flight results
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
       activeLocalIdentity = { displayLabel: result.value.displayLabel, accountPublicIdentifier: result.value.accountPublicIdentifier };
       activeMasterSeedAuthority = built.masterSeedAuthority;
@@ -4741,20 +4933,31 @@ async function handleUnlock(payload: unknown) {
     await built.masterSeedAuthority.clear();
     return { outcome: result.outcome === "recovery-required" || result.outcome === "corrupt" ? result.outcome : "unlock-failed", reason: "unlock did not complete" };
   } finally {
-    inFlight = false;
+    // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
   }
 }
 
 /** Phase G — Lock: stops background sync + the ONE Runtime (via the assembly), clears badge/tray to their inert "no active sensitive work" state, THEN the Coordinator's own lock() (safe second call). */
 async function handleLock() {
-  if (inFlight) return { outcome: "busy", reason: "another command is in progress" };
+  // The "profile-lifecycle" group guard on this channel's registerHandle()
+  // registration already serializes create/unlock/lock against each other —
+  // see fedos_electron_ipc_command_registry.ts.
   if (activeCoordinator === null) return { outcome: "ok", reason: "already locked" };
-  inFlight = true;
+  // Bounded wait for any in-flight fedos-app:*/fedos-acceptance:* command to
+  // finish BEFORE the assembly is torn down — without this, a command that
+  // captured the (about-to-be-stale) assembly reference before Lock began
+  // could still return decrypted content read under the OLD profile after
+  // Lock completes. Bounded rather than unbounded: the page polls chat/relay
+  // status on timers, so an unbounded wait could hang Lock indefinitely.
+  // bumpGeneration() below is the second, independent backstop for anything
+  // still running past this deadline.
+  await ipcCommands.drain(2000);
   try {
     const coordinator = activeCoordinator;
     const assembly = activeAssembly;
     activeCoordinator = null;
     activeAssembly = null;
+    ipcCommands.bumpGeneration(); // the assembly is being destroyed — discard any still-in-flight results
     activeViewerParticipant = null;
     activeLocalIdentity = null;
     activeRelays = [];
@@ -4768,7 +4971,7 @@ async function handleLock() {
     refreshTrayMenu();
     return { outcome: "ok" };
   } finally {
-    inFlight = false;
+    // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
   }
 }
 
@@ -4879,6 +5082,14 @@ async function handleBadgeMarkViewed(payload: unknown) {
 }
 
 async function performCleanShutdown(): Promise<void> {
+  // Synchronously refuse every NEW IPC invocation from this instant on —
+  // closes the gap where a handleCreate()/handleUnlock() invoked after
+  // shutdown begins could still install a brand-new live assembly AFTER
+  // app.quit(), which this function's own `if (shutdownInitiated) return;`
+  // guard would then never run again to tear back down. Then bound-wait for
+  // whatever was already in flight when close() was called.
+  ipcCommands.close();
+  await ipcCommands.drain(2000);
   if (shutdownInitiated) return;
   shutdownInitiated = true;
   if (activeCoordinator !== null) {
@@ -4886,6 +5097,7 @@ async function performCleanShutdown(): Promise<void> {
     const assembly = activeAssembly;
     activeCoordinator = null;
     activeAssembly = null;
+    ipcCommands.bumpGeneration(); // the assembly is being destroyed — discard any still-in-flight results
     activeViewerParticipant = null;
     activeLocalIdentity = null;
     activeRelays = [];
@@ -5538,6 +5750,7 @@ async function handleCommerceProductDetail(payload: unknown) {
         status: product.status,
         media: media === null ? null : { dataUri: media.dataUri, mimeType: media.mimeType, altText: media.altText },
         isPreview,
+        ...commerceProductMediaDeclarationSummaryFor(product.id, product.creatorPubkey),
       },
     };
   }
@@ -5562,6 +5775,7 @@ async function handleCommerceProductDetail(payload: unknown) {
       // the `discovered.status !== "active"` guard above) -- never a
       // preview of the viewer's OWN draft, so this is always `false` here.
       isPreview: false,
+      ...commerceProductMediaDeclarationSummaryFor(discovered.productId, discovered.creatorPubkeyHex),
     },
   };
 }
@@ -5753,6 +5967,7 @@ async function handleCommerceProductImageAttach(payload: unknown) {
     storageRef: putResult.metadata.key,
   });
   if (addResult.outcome !== "ok") return { outcome: addResult.outcome, reason: addResult.reason };
+  await publishCommerceProductMediaDeclarationNonFatal(addResult.media, product.creatorPubkey);
 
   return {
     outcome: "ok",
@@ -5893,6 +6108,14 @@ async function handleCommerceProductContentAttach(payload: unknown) {
     storageRef: putResult.metadata.key,
   });
   if (addResult.outcome !== "ok") return { outcome: addResult.outcome, reason: addResult.reason };
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+  // THE fix for the arc's own headline gap: a buyer's independently-running
+  // process previously had no protocol-level way to learn a Product has
+  // protected purchased content at all. Best-effort/non-fatal, mirrors
+  // every other private/public Nostr publish call site in this file — the
+  // local attach itself already succeeded and is never rolled back on a
+  // sync failure.
+  await publishCommerceProductMediaDeclarationNonFatal(addResult.media, product.creatorPubkey);
 
   return {
     outcome: "ok",
@@ -6586,16 +6809,19 @@ async function handleCommerceOrderComplete(payload: unknown) {
   // Order (no protected media at all) is completely unaffected -- see that
   // function's own header for why this never touches
   // `order_state_machine.ts` itself.
-  const productMediaForInvariant = commerceProductMediaState()
-    .listForProduct(order.productId)
-    .map((item) => ({ id: item.id, productId: item.productId, classification: item.classification }));
+  const { productMedia: productMediaForInvariant, productMediaKnowledge } = resolveProductMediaForCompletionInvariant(order.productId, order.sellerPubkey);
   const deliveryInvariant = m.Commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion({
     productId: order.productId,
     productMedia: productMediaForInvariant,
     hasReleasedContent: (mediaId) => commerceMediaReleaseContentCacheState().hasRelease(order.id, mediaId, order.buyerPubkey),
+    productMediaKnowledge,
   });
   if (!deliveryInvariant.satisfied) {
-    return { outcome: "rejected", reason: deliveryInvariant.reason, missingMediaIds: deliveryInvariant.missingMediaIds };
+    return {
+      outcome: "rejected",
+      reason: deliveryInvariant.reason,
+      missingMediaIds: "missingMediaIds" in deliveryInvariant ? deliveryInvariant.missingMediaIds : [],
+    };
   }
 
   const orderResult = m.Commerce.applyOrderAction(order, { type: "complete", actor: { kind: actorKind, pubkey: body.actorPubkey } } as CommerceOrderActionLike, now);
@@ -7143,10 +7369,21 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
     return { outcome: "rejected", reason: "buyer-mismatch" };
   }
 
-  const protectedMedia = commerceProductMediaState()
-    .listForProduct(order.productId)
-    .filter((item) => item.classification === "protected");
-  if (protectedMedia.length === 0) return { outcome: "not-found", reason: "this product has no protected content" };
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) --
+  // was: "local-only `commerceProductMediaState()`", which made this
+  // short-circuit to "this product has no protected content" on a genuine
+  // buyer's own process before ever attempting a real release request --
+  // the exact false-negative this arc exists to close. Now merges in
+  // Agent M's real cross-process declaration sync (authoritative on the
+  // seller's own process, honestly "unsynced" everywhere else -- see
+  // `resolveProductMediaForCompletionInvariant()`'s own header).
+  const { productMedia: knownMedia, productMediaKnowledge } = resolveProductMediaForCompletionInvariant(order.productId, order.sellerPubkey);
+  const protectedMedia = knownMedia.filter((item) => item.classification === "protected");
+  if (protectedMedia.length === 0) {
+    return productMediaKnowledge === "unsynced"
+      ? { outcome: "not-found", reason: "availability-unknown" }
+      : { outcome: "not-found", reason: "this product has no protected content" };
+  }
   const media = protectedMedia[0];
   if (media === undefined) return { outcome: "not-found", reason: "this product has no protected content" };
 
@@ -7312,6 +7549,43 @@ async function handleAppIdentityTransitionRecordManualVerification(payload: unkn
   return resultFromViewModelState(boundary.identityTransitions.manualVerificationState);
 }
 
+/** Loosens `resultFromViewModelState`'s own (deliberately narrow, structural) parameter type to `unknown` for the dependency-injected handler factories below, which are written to accept any ViewModelState shape rather than import this file's own local type. Pure adapter — no behavior change. */
+const resultFromViewModelStateUnknown = (state: unknown): unknown => resultFromViewModelState(state as Parameters<typeof resultFromViewModelState>[0]);
+
+// Commerce Product-Media Sync + Truthful Completion mega-arc (Agent I /
+// Wave B) — Identity Replacement two-step Ratchet-reset confirmation. Step
+// 1 (assess-continuity) is read-only; step 2 (authorize-ratchet-reset) is
+// the ONE call that actually resets a Ratchet session, and refuses unless
+// step 1's own `canAuthorize` was true. See
+// fedos_electron_identity_transition_ratchet_reset_ipc.ts for the full
+// design/audit rationale.
+const identityTransitionRatchetResetDeps = {
+  requireBoundary,
+  isBoundedString,
+  resultFromViewModelState: resultFromViewModelStateUnknown,
+  acceptanceGateRejection,
+  maxIdLength: MAX_ID_LENGTH,
+  resolveAffectedSessions: async (
+    oldAccountIdentity: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null },
+    pairs: readonly { readonly conversationId: string; readonly remoteDeviceRef: string }[],
+  ) => {
+    const shell = requireShell();
+    if (shell === null) return [];
+    const result = shell.identityTransitionRatchetImpact(oldAccountIdentity);
+    if (result.outcome !== "ok") return [];
+    const sessions = result.value as readonly {
+      readonly sessionId: string;
+      readonly conversationId: string;
+      readonly remoteAccountRef: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null };
+      readonly remoteDeviceRef: string;
+    }[];
+    const wanted = new Set(pairs.map((p) => `${p.conversationId}:${p.remoteDeviceRef}`));
+    return sessions.filter((s) => wanted.has(`${s.conversationId}:${s.remoteDeviceRef}`));
+  },
+};
+const handleAppIdentityTransitionAssessContinuity = createFedosIdentityTransitionAssessContinuityHandler(identityTransitionRatchetResetDeps);
+const handleAppIdentityTransitionAuthorizeRatchetReset = createFedosIdentityTransitionAuthorizeRatchetResetHandler(identityTransitionRatchetResetDeps);
+
 /** Secure Runtime Alpha 8041-8120 — a dedicated `fedos-app:*` wrapper, distinct from `handleAcceptanceSafetyCenterOverview()` above: that handler returns `boundary.safetyCenter.overviewState` RAW (a `{status,data}` ViewModelState nested one level inside `value`, matching the `fedos-acceptance:*` vocabulary's own established shape for this one call) — flattened here via `resultFromViewModelState()` so `fedos-app:*` keeps ONE consistent `{outcome:"ok",value:<content>}` shape across every command, never two different unwrapping conventions for the ordinary page to guess between. */
 async function handleAppSafetyCenterOverview() {
   const boundary = requireBoundary();
@@ -7319,6 +7593,22 @@ async function handleAppSafetyCenterOverview() {
   await boundary.safetyCenter.refreshOverview([]);
   return resultFromViewModelState(boundary.safetyCenter.overviewState);
 }
+
+// Commerce Product-Media Sync + Truthful Completion mega-arc (Agent I /
+// Wave B) — Signed Deletion sender-side. The recipient side (approve/
+// reject, below) already exists; this supplies the missing send half. See
+// fedos_electron_deletion_request_send_ipc.ts for the full design/audit
+// rationale — NEVER claims "deleted everywhere," a remote peer/relay
+// accepting delivery of a request is not the same as complying with it.
+const handleAppDeletionRequestCreate = createFedosDeletionRequestSendHandler({
+  requireBoundary,
+  requireShell,
+  requireViewerParticipant,
+  isBoundedString,
+  resultFromViewModelState: resultFromViewModelStateUnknown,
+  acceptanceGateRejection,
+  maxIdLength: MAX_ID_LENGTH,
+});
 
 async function handleAppDeletionRequestListReceived() {
   const boundary = requireBoundary();
@@ -7433,20 +7723,20 @@ async function handleAcceptanceReadGlobal(payload: unknown) {
 // ---------------------------------------------------------------------
 
 function registerIpcHandlers(): void {
-  ipcMain.handle("fedos-profile:status", async () => handleStatus());
-  ipcMain.handle("fedos-profile:create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCreate(payload));
-  ipcMain.handle("fedos-profile:unlock", async (_e: IpcMainInvokeEvent, payload: unknown) => handleUnlock(payload));
-  ipcMain.handle("fedos-profile:lock", async () => handleLock());
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:status", async () => handleStatus(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:create", (payload: unknown) => handleCreate(payload), { group: "profile-lifecycle" });
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:unlock", (payload: unknown) => handleUnlock(payload), { group: "profile-lifecycle" });
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:lock", async () => handleLock(), { group: "profile-lifecycle" });
   ipcMain.handle("fedos-profile:quit", async () => {
     void performCleanShutdown();
     return { ok: true };
   });
 
-  ipcMain.handle("fedos-beta:status", async () => handleBetaStatus());
-  ipcMain.handle("fedos-beta:settings-plan", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleSettingsPlan(candidate));
-  ipcMain.handle("fedos-beta:settings-apply", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleSettingsApply(candidate));
-  ipcMain.handle("fedos-beta:tray-action", async (_e: IpcMainInvokeEvent, candidate: unknown) => handleTrayAction(candidate));
-  ipcMain.handle("fedos-beta:badge-mark-viewed", async (_e: IpcMainInvokeEvent, payload: unknown) => handleBadgeMarkViewed(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-beta:status", async () => handleBetaStatus(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-beta:settings-plan", (candidate: unknown) => handleSettingsPlan(candidate));
+  ipcCommands.registerHandle(ipcMain, "fedos-beta:settings-apply", (candidate: unknown) => handleSettingsApply(candidate));
+  ipcCommands.registerHandle(ipcMain, "fedos-beta:tray-action", (candidate: unknown) => handleTrayAction(candidate));
+  ipcCommands.registerHandle(ipcMain, "fedos-beta:badge-mark-viewed", (payload: unknown) => handleBadgeMarkViewed(payload));
 
   // Secure Runtime Alpha 7001-7080 — Phase C closed acceptance vocabulary.
   //
@@ -7465,17 +7755,17 @@ function registerIpcHandlers(): void {
   // narrows only the renderer-reachable IPC surface, never the test
   // harness's own internal capability.
   if (ACCEPTANCE_MODE_ENABLED) {
-    ipcMain.handle("fedos-acceptance:create-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateDirectConversation(payload));
-    ipcMain.handle("fedos-acceptance:activate-direct-conversation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
-    ipcMain.handle("fedos-acceptance:device-pairing-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
-    ipcMain.handle("fedos-acceptance:device-pairing-inspect", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
-    ipcMain.handle("fedos-acceptance:device-pairing-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
-    ipcMain.handle("fedos-acceptance:device-pairing-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
-    ipcMain.handle("fedos-acceptance:establish-direct-ratchet-session", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceEstablishDirectRatchetSession(payload));
-    ipcMain.handle("fedos-acceptance:send-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSendMessage(payload));
-    ipcMain.handle("fedos-acceptance:list-messages", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceListMessages(payload));
-    ipcMain.handle("fedos-acceptance:read-message", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceReadMessage(payload));
-    ipcMain.handle("fedos-acceptance:direct-ratchet-status", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDirectRatchetStatus(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:create-direct-conversation", (payload: unknown) => handleAcceptanceCreateDirectConversation(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:activate-direct-conversation", (payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:device-pairing-create", (payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:device-pairing-inspect", (payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:device-pairing-approve", (payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:device-pairing-complete", (payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:establish-direct-ratchet-session", (payload: unknown) => handleAcceptanceEstablishDirectRatchetSession(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:send-message", (payload: unknown) => handleAcceptanceSendMessage(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:list-messages", (payload: unknown) => handleAcceptanceListMessages(payload), { allowConcurrentSelf: true });
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:read-message", (payload: unknown) => handleAcceptanceReadMessage(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:direct-ratchet-status", (payload: unknown) => handleAcceptanceDirectRatchetStatus(payload), { allowConcurrentSelf: true });
     // Secure Runtime Alpha 7321-7400 -- these four channels close Release
     // Readiness Review B-2/B-7; Secure Runtime Alpha 8121-8200 narrows
     // "reachable whenever a real profile is unlocked, in ANY mode" (the
@@ -7485,10 +7775,10 @@ function registerIpcHandlers(): void {
     // each of these four since Alpha 8041-8120 (`create-invitation`,
     // `search`, `archive`, `safety-center-overview`), so no real
     // capability is lost, only the SECOND, acceptance-only path to it.
-    ipcMain.handle("fedos-acceptance:create-conversation-invitation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
-    ipcMain.handle("fedos-acceptance:search", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSearch(payload));
-    ipcMain.handle("fedos-acceptance:archive", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceArchive(payload));
-    ipcMain.handle("fedos-acceptance:safety-center-overview", async () => handleAcceptanceSafetyCenterOverview());
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:create-conversation-invitation", (payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:search", (payload: unknown) => handleAcceptanceSearch(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:archive", (payload: unknown) => handleAcceptanceArchive(payload));
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:safety-center-overview", async () => handleAcceptanceSafetyCenterOverview());
   }
 
   // Secure Runtime Alpha 8041-8120 -- Phase B-K: the ordinary, user-facing
@@ -7496,108 +7786,111 @@ function registerIpcHandlers(): void {
   // (mirrors every channel above); the security boundary is each handler's
   // own `requireShell()`/`requireBoundary()` runtime check, not whether the
   // channel itself was registered.
-  ipcMain.handle("fedos-app:conversations-list", async () => handleAppConversationsList());
-  ipcMain.handle("fedos-app:conversation-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppConversationOpen(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:conversations-list", async () => handleAppConversationsList(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:conversation-open", (payload: unknown) => handleAppConversationOpen(payload));
   // Phase E -- a genuinely restarted Runtime must re-activate a Direct
   // conversation before it can send/receive (a real, per-Runtime-lifetime
   // precondition -- Alpha 2041-2120, unmodified, unrelated to this Arc);
   // reuses the SAME handler `fedos-acceptance:activate-direct-conversation`
   // already dispatches to, never a second implementation.
-  ipcMain.handle("fedos-app:conversation-activate", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
-  ipcMain.handle("fedos-app:messages-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMessagesList(payload));
-  ipcMain.handle("fedos-app:message-reveal", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMessageReveal(payload));
-  ipcMain.handle("fedos-app:message-send", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMessageSend(payload));
-  ipcMain.handle("fedos-app:membership-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppMembershipList(payload));
-  ipcMain.handle("fedos-app:invitations-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppInvitationsList(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:conversation-activate", (payload: unknown) => handleAcceptanceActivateDirectConversation(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:messages-list", (payload: unknown) => handleAppMessagesList(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:message-reveal", (payload: unknown) => handleAppMessageReveal(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:message-send", (payload: unknown) => handleAppMessageSend(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:membership-list", (payload: unknown) => handleAppMembershipList(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:invitations-list", (payload: unknown) => handleAppInvitationsList(payload), { allowConcurrentSelf: true });
   // Phase D -- creating an invitation IS creating the Direct conversation and
   // sending it over the real relay; reuses the SAME handler
   // `fedos-acceptance:create-conversation-invitation` already dispatches to,
   // never a second implementation.
-  ipcMain.handle("fedos-app:create-invitation", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:create-invitation", (payload: unknown) => handleAcceptanceCreateConversationInvitation(payload));
   // Phase F/G -- reuse the SAME handlers `fedos-acceptance:search`/`:archive` already dispatch to.
-  ipcMain.handle("fedos-app:search", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceSearch(payload));
-  ipcMain.handle("fedos-app:archive", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceArchive(payload));
-  ipcMain.handle("fedos-app:archive-workflow-warnings", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppArchiveWorkflowWarnings(payload));
-  ipcMain.handle("fedos-app:archive-choose-export-destination", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppArchiveChooseExportDestination(payload));
-  ipcMain.handle("fedos-app:archive-choose-source", async () => handleAppArchiveChooseSource());
+  ipcCommands.registerHandle(ipcMain, "fedos-app:search", (payload: unknown) => handleAcceptanceSearch(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:archive", (payload: unknown) => handleAcceptanceArchive(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:archive-workflow-warnings", (payload: unknown) => handleAppArchiveWorkflowWarnings(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:archive-choose-export-destination", (payload: unknown) => handleAppArchiveChooseExportDestination(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:archive-choose-source", async () => handleAppArchiveChooseSource());
   // Phase H -- Device management.
-  ipcMain.handle("fedos-app:devices-list", async () => handleAppDevicesList());
-  ipcMain.handle("fedos-app:device-detail", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeviceDetail(payload));
-  ipcMain.handle("fedos-app:device-revoke", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeviceRevoke(payload));
-  ipcMain.handle("fedos-app:device-sync-status", async () => handleAppDeviceSyncStatus());
+  ipcCommands.registerHandle(ipcMain, "fedos-app:devices-list", async () => handleAppDevicesList(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-detail", (payload: unknown) => handleAppDeviceDetail(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-revoke", (payload: unknown) => handleAppDeviceRevoke(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-sync-status", async () => handleAppDeviceSyncStatus(), { allowConcurrentSelf: true });
   // Phase H (pairing) -- reuse the SAME handlers the acceptance vocabulary already dispatches to.
-  ipcMain.handle("fedos-app:device-pairing-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
-  ipcMain.handle("fedos-app:device-pairing-inspect", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
-  ipcMain.handle("fedos-app:device-pairing-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
-  ipcMain.handle("fedos-app:device-pairing-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-pairing-create", (payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-pairing-inspect", (payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-pairing-approve", (payload: unknown) => handleAcceptanceDevicePairingApprove(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-pairing-complete", (payload: unknown) => handleAcceptanceDevicePairingComplete(payload));
   // Phase I -- Identity Replacement.
-  ipcMain.handle("fedos-app:identity-transition-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionList(payload));
-  ipcMain.handle("fedos-app:identity-transition-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionOpen(payload));
-  ipcMain.handle("fedos-app:identity-transition-accept", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionDecide("accept", payload));
-  ipcMain.handle("fedos-app:identity-transition-reject", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionDecide("reject", payload));
-  ipcMain.handle("fedos-app:identity-transition-defer", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionDecide("defer", payload));
-  ipcMain.handle("fedos-app:identity-transition-record-manual-verification", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppIdentityTransitionRecordManualVerification(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-list", (payload: unknown) => handleAppIdentityTransitionList(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-open", (payload: unknown) => handleAppIdentityTransitionOpen(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-accept", (payload: unknown) => handleAppIdentityTransitionDecide("accept", payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-reject", (payload: unknown) => handleAppIdentityTransitionDecide("reject", payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-defer", (payload: unknown) => handleAppIdentityTransitionDecide("defer", payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-record-manual-verification", (payload: unknown) => handleAppIdentityTransitionRecordManualVerification(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-assess-continuity", (payload: unknown) => handleAppIdentityTransitionAssessContinuity(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:identity-transition-authorize-ratchet-reset", (payload: unknown) => handleAppIdentityTransitionAuthorizeRatchetReset(payload));
   // Phase J -- Signed Deletion.
-  ipcMain.handle("fedos-app:deletion-request-list-received", async () => handleAppDeletionRequestListReceived());
-  ipcMain.handle("fedos-app:deletion-request-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeletionRequestOpen(payload));
-  ipcMain.handle("fedos-app:deletion-request-approve", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeletionRequestDecide("approve", payload));
-  ipcMain.handle("fedos-app:deletion-request-reject", async (_e: IpcMainInvokeEvent, payload: unknown) => handleAppDeletionRequestDecide("reject", payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-list-received", async () => handleAppDeletionRequestListReceived(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-open", (payload: unknown) => handleAppDeletionRequestOpen(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-approve", (payload: unknown) => handleAppDeletionRequestDecide("approve", payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-reject", (payload: unknown) => handleAppDeletionRequestDecide("reject", payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-create", (payload: unknown) => handleAppDeletionRequestCreate(payload));
   // Phase K -- reuse the SAME handler `fedos-acceptance:safety-center-overview` already dispatches to.
-  ipcMain.handle("fedos-app:safety-center-overview", async () => handleAppSafetyCenterOverview());
+  ipcCommands.registerHandle(ipcMain, "fedos-app:safety-center-overview", async () => handleAppSafetyCenterOverview(), { allowConcurrentSelf: true });
   // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
-  ipcMain.handle("fedos-app:settings-load", async () => handleAppSettingsLoad());
-  ipcMain.handle("fedos-app:relay-status", async () => handleAppRelayStatus());
+  ipcCommands.registerHandle(ipcMain, "fedos-app:settings-load", async () => handleAppSettingsLoad(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:relay-status", async () => handleAppRelayStatus(), { allowConcurrentSelf: true });
   // Commerce Reachable Catalog + Product Surface Phase 1 -- exactly one
   // new, bounded IPC channel family. Read-only; never gated on shell/
   // profile readiness (see the handlers' own header comment).
-  ipcMain.handle("fedos-app:commerce-catalog-list", async () => handleCommerceCatalogList());
-  ipcMain.handle("fedos-app:commerce-product-detail", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductDetail(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-catalog-list", async () => handleCommerceCatalogList(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-product-detail", (payload: unknown) => handleCommerceProductDetail(payload), { allowConcurrentSelf: true });
   // Commerce E2E Completion arc (coordinator integration gate) — Merchant
   // Product CRUD + Order + local Payment simulator. Same bounded, named-
   // channel, single-purpose-handler discipline as every other `fedos-app:*`
   // registration in this function.
-  ipcMain.handle("fedos-app:commerce-merchant-products-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceMerchantProductsList(payload));
-  ipcMain.handle("fedos-app:commerce-product-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductCreate(payload));
-  ipcMain.handle("fedos-app:commerce-product-update", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductUpdate(payload));
-  ipcMain.handle("fedos-app:commerce-product-publish", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductPublish(payload, true));
-  ipcMain.handle("fedos-app:commerce-product-unpublish", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductPublish(payload, false));
-  ipcMain.handle("fedos-app:commerce-order-create", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderCreate(payload));
-  ipcMain.handle("fedos-app:commerce-order-submit", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "submit", "customer"));
-  ipcMain.handle("fedos-app:commerce-order-cancel", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "cancel", "customer"));
-  ipcMain.handle("fedos-app:commerce-order-accept", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "accept", "merchant"));
-  ipcMain.handle("fedos-app:commerce-order-reject", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "reject", "merchant"));
-  ipcMain.handle("fedos-app:commerce-order-fulfill", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderAction(payload, "fulfill", "merchant"));
-  ipcMain.handle("fedos-app:commerce-orders-list-mine", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrdersListMine(payload));
-  ipcMain.handle("fedos-app:commerce-orders-list-incoming", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrdersListIncoming(payload));
-  ipcMain.handle("fedos-app:commerce-payment-request", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePaymentRequest(payload));
-  ipcMain.handle("fedos-app:commerce-payment-simulate", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePaymentSimulate(payload));
-  ipcMain.handle("fedos-app:commerce-delivery-status", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceDeliveryStatus(payload));
-  ipcMain.handle("fedos-app:commerce-delivery-acknowledge-receipt", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceDeliveryAcknowledgeReceipt(payload));
-  ipcMain.handle("fedos-app:commerce-order-complete", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceOrderComplete(payload));
-  ipcMain.handle("fedos-app:commerce-receipt-issue", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptIssue(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-merchant-products-list", (payload: unknown) => handleCommerceMerchantProductsList(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-product-create", (payload: unknown) => handleCommerceProductCreate(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-product-update", (payload: unknown) => handleCommerceProductUpdate(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-product-publish", (payload: unknown) => handleCommerceProductPublish(payload, true));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-product-unpublish", (payload: unknown) => handleCommerceProductPublish(payload, false));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-order-create", (payload: unknown) => handleCommerceOrderCreate(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-order-submit", (payload: unknown) => handleCommerceOrderAction(payload, "submit", "customer"));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-order-cancel", (payload: unknown) => handleCommerceOrderAction(payload, "cancel", "customer"));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-order-accept", (payload: unknown) => handleCommerceOrderAction(payload, "accept", "merchant"));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-order-reject", (payload: unknown) => handleCommerceOrderAction(payload, "reject", "merchant"));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-order-fulfill", (payload: unknown) => handleCommerceOrderAction(payload, "fulfill", "merchant"));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-orders-list-mine", (payload: unknown) => handleCommerceOrdersListMine(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-orders-list-incoming", (payload: unknown) => handleCommerceOrdersListIncoming(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-payment-request", (payload: unknown) => handleCommercePaymentRequest(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-payment-simulate", (payload: unknown) => handleCommercePaymentSimulate(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-delivery-status", (payload: unknown) => handleCommerceDeliveryStatus(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-delivery-acknowledge-receipt", (payload: unknown) => handleCommerceDeliveryAcknowledgeReceipt(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-order-complete", (payload: unknown) => handleCommerceOrderComplete(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-receipt-issue", (payload: unknown) => handleCommerceReceiptIssue(payload));
   // FedOS Commerce Purchase Completion mega-arc (Agent R) -- read-only receipt lookup (never mints), closes the dev-vs-packaged restart-visibility gap.
-  ipcMain.handle("fedos-app:commerce-receipt-lookup", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptLookup(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-receipt-lookup", (payload: unknown) => handleCommerceReceiptLookup(payload), { allowConcurrentSelf: true });
   // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
   // arc mandate item 3: signed Product Share Proof issue (seller) + open (buyer).
-  ipcMain.handle("fedos-app:commerce-share-product-issue", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceShareProductIssue(payload));
-  ipcMain.handle("fedos-app:commerce-share-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceShareOpen(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-share-product-issue", (payload: unknown) => handleCommerceShareProductIssue(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-share-open", (payload: unknown) => handleCommerceShareOpen(payload));
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's read-only Persona Board query.
-  ipcMain.handle("fedos-app:commerce-persona-board-query", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePersonaBoardQuery(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-persona-board-query", (payload: unknown) => handleCommercePersonaBoardQuery(payload), { allowConcurrentSelf: true });
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface.
-  ipcMain.handle("fedos-app:commerce-network-profile-get", async () => handleCommerceNetworkProfileGet());
-  ipcMain.handle("fedos-app:commerce-network-profile-set", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceNetworkProfileSet(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-network-profile-get", async () => handleCommerceNetworkProfileGet(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-network-profile-set", (payload: unknown) => handleCommerceNetworkProfileSet(payload));
   // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
   // (Agent D) -- new production IPC channels: protected-media redemption
   // (arc §35-37), public product-image attach (arc §38), and the real
   // activity/badge data query (arc §32/§36).
-  ipcMain.handle("fedos-app:commerce-product-image-attach", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductImageAttach(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-product-image-attach", (payload: unknown) => handleCommerceProductImageAttach(payload));
   // Buyer Discovery + Digital Content Delivery mega-arc (Agent M) --
   // protected ("buyers only") content attach, and the creator-only
   // plain-language attached-content list.
-  ipcMain.handle("fedos-app:commerce-product-content-attach", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductContentAttach(payload));
-  ipcMain.handle("fedos-app:commerce-merchant-product-media-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceMerchantProductMediaList(payload));
-  ipcMain.handle("fedos-app:commerce-media-grant-redeem", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceMediaGrantRedeem(payload));
-  ipcMain.handle("fedos-app:commerce-activity-summary", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceActivitySummary(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-product-content-attach", (payload: unknown) => handleCommerceProductContentAttach(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-merchant-product-media-list", (payload: unknown) => handleCommerceMerchantProductMediaList(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-media-grant-redeem", (payload: unknown) => handleCommerceMediaGrantRedeem(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:commerce-activity-summary", (payload: unknown) => handleCommerceActivitySummary(payload), { allowConcurrentSelf: true });
 }
 
 // ---------------------------------------------------------------------

@@ -172,7 +172,7 @@ function validMediaManifestReference(
 }
 
 describe("commerce nostr event drafts: category enumeration", () => {
-  it("has exactly the six categories the brief scopes", () => {
+  it("has exactly the original six categories the brief scopes, PLUS the two ProductMedia Sync Protocol categories (Agent M, Commerce Product-Media Sync + Truthful Completion mega-arc, Wave A — see docs/commerce/PRODUCTMEDIA-SYNC-PROTOCOL-DESIGN.md)", () => {
     expect([...COMMERCE_NOSTR_EVENT_CATEGORIES].sort()).toEqual(
       [
         "product-publication",
@@ -181,6 +181,8 @@ describe("commerce nostr event drafts: category enumeration", () => {
         "trade-completion-attestation",
         "reputation-attestation",
         "media-manifest-reference",
+        "product-media-declaration",
+        "product-media-retraction",
       ].sort(),
     );
   });

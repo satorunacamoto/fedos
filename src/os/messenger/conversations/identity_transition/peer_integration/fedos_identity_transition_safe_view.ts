@@ -24,6 +24,7 @@ import type { FedosIdentityTransitionPeerObservationV1 } from "./fedos_identity_
 import type { FedosIdentityTransitionManualVerificationFactV1 } from "./fedos_identity_transition_manual_verification.js";
 import { fedosIdentityTransitionBuildDeviceEvidenceRows, type FedosIdentityTransitionDeviceEvidenceRowV1 } from "./fedos_identity_transition_device_evidence_display.js";
 import { type FedosIdentityTransitionWarningCode } from "./fedos_identity_transition_warning_codes.js";
+import { isFedosIdentityTransitionSilentlyAutoAcceptedOldKeyContinuity } from "./fedos_identity_transition_silent_acceptance_detection.js";
 
 export interface FedosIdentityTransitionSafeViewV1 {
   readonly transitionId: string;
@@ -36,6 +37,15 @@ export interface FedosIdentityTransitionSafeViewV1 {
   readonly superseded: boolean;
   /** `true` iff the evaluator specifically capped this transition at `"manual-verification-required"` — the one outcome that, by construction, means an old-key-only signature was judged insufficient. Never inferred any other way. */
   readonly oldKeyOnlyInsufficientWarning: boolean;
+  /**
+   * FedOS Commerce Product-Media Sync + Truthful Completion mega-arc, Wave
+   * A (Agent S) — Task 1. `true` iff this transition reached `"accepted"`
+   * purely from old-key continuity evidence under the default
+   * `autoAcceptOldKeyContinuity` policy, with NO explicit local decision
+   * ever required — see `fedos_identity_transition_silent_acceptance_detection.ts`.
+   * Never a policy change; a visibility fact only.
+   */
+  readonly silentlyAutoAcceptedWithoutAsking: boolean;
   readonly deviceEvidence: readonly FedosIdentityTransitionDeviceEvidenceRowV1[];
   readonly manualVerification: {
     readonly method: FedosIdentityTransitionManualVerificationFactV1["method"];
@@ -67,6 +77,9 @@ export function fedosIdentityTransitionWarningsFor(
   }
   if (acceptanceState === "conflicting") warnings.push("conflicting-claims-require-manual-review");
   if (superseded || acceptanceState === "superseded") warnings.push("conflicting-claims-require-manual-review");
+  if (isFedosIdentityTransitionSilentlyAutoAcceptedOldKeyContinuity({ evidenceOutcome, acceptanceState, superseded })) {
+    warnings.push("identity-replacement-auto-accepted-without-asking");
+  }
   if (acceptanceState === "accepted") {
     warnings.push(
       "continuity-acceptance-is-local-decision",
@@ -99,6 +112,11 @@ export function fedosIdentityTransitionBuildSafeView(params: {
     acceptanceState,
     superseded,
     oldKeyOnlyInsufficientWarning: observation.evidenceOutcome === "manual-verification-required",
+    silentlyAutoAcceptedWithoutAsking: isFedosIdentityTransitionSilentlyAutoAcceptedOldKeyContinuity({
+      evidenceOutcome: observation.evidenceOutcome,
+      acceptanceState,
+      superseded,
+    }),
     deviceEvidence: fedosIdentityTransitionBuildDeviceEvidenceRows(sameTransitionObservations, supersededTransitionIds),
     manualVerification:
       manualVerification === null

@@ -81,7 +81,14 @@ export type FedosDesktopNotificationKind =
   | "ratchet-reset-required"
   | "peer-capability-conflict"
   | "identity-replacement-pending-review"
-  | "safety-center-attention-summary";
+  | "safety-center-attention-summary"
+  // FedOS Commerce Product-Media Sync + Truthful Completion mega-arc, Wave
+  // A (Agent S) — Task 1: old-key continuity auto-accept visibility
+  // recovery. ONE new, additive, FIXED-template kind for a fact that
+  // previously had NO notification at all (it is not "pending" so it never
+  // triggered `"identity-replacement-pending-review"` above) -- never a
+  // double-fire of that existing kind, mirrors its own precedent exactly.
+  | "identity-replacement-accepted-without-asking";
 
 export const FEDOS_DESKTOP_NOTIFICATION_KINDS: readonly FedosDesktopNotificationKind[] = [
   "conversation-message",
@@ -103,6 +110,7 @@ export const FEDOS_DESKTOP_NOTIFICATION_KINDS: readonly FedosDesktopNotification
   "peer-capability-conflict",
   "identity-replacement-pending-review",
   "safety-center-attention-summary",
+  "identity-replacement-accepted-without-asking",
 ];
 
 /** This layer's own bound for id-shaped/detail strings — mirrors `FEDOS_DESKTOP_HOST_MAX_ID_LENGTH`'s own "512, non-empty" convention (`../host_boundary/fedos_desktop_host_command.ts`), restated here since this boundary sits beside, not under, the Host layer. */
@@ -146,6 +154,10 @@ const FEDOS_DESKTOP_NOTIFICATION_TEMPLATES: Readonly<Record<FedosDesktopNotifica
   "peer-capability-conflict": Object.freeze({ title: "Conflicting capability observed", body: "A peer Device reported a conflicting capability" }),
   "identity-replacement-pending-review": Object.freeze({ title: "Identity replacement pending", body: "An identity replacement is awaiting your review" }),
   "safety-center-attention-summary": Object.freeze({ title: "Safety Center", body: "There are items that may need your attention" }),
+  "identity-replacement-accepted-without-asking": Object.freeze({
+    title: "Identity replacement auto-accepted",
+    body: "FedOS accepted a contact's identity replacement automatically, without asking you first",
+  }),
 });
 
 export function fedosDesktopNotificationTemplateFor(kind: FedosDesktopNotificationKind): FedosDesktopNotificationTemplate {

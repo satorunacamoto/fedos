@@ -2957,7 +2957,7 @@ mod secret_handle_store_vertical_slice_tests {
 
         // Step 7: seal through the existing production authority.
         let sealed = authority
-            .seal(TEST_PASSPHRASE)
+            .seal(TEST_PASSPHRASE.to_vec())
             .expect("seal must succeed for an available Master Seed");
         assert!(!sealed.is_empty());
         // Step 18 (partial): the sealed envelope is a non-secret JSON
@@ -2975,12 +2975,12 @@ mod secret_handle_store_vertical_slice_tests {
 
         // Step 16 (wrong-passphrase path): must fail closed, never panic,
         // never leave the fresh authority in a half-available state.
-        assert!(!restarted.restore_sealed(&sealed, WRONG_PASSPHRASE));
+        assert!(!restarted.restore_sealed(&sealed, WRONG_PASSPHRASE.to_vec()));
         assert!(!restarted.is_available());
 
         // Step 13-14: restore with the CORRECT passphrase into the new
         // authority; must derive the SAME public identity.
-        assert!(restarted.restore_sealed(&sealed, TEST_PASSPHRASE));
+        assert!(restarted.restore_sealed(&sealed, TEST_PASSPHRASE.to_vec()));
         assert!(restarted.is_available());
         let public_key_after = restarted
             .public_key_hex_for_account(0)
@@ -12308,8 +12308,45 @@ impl FedosMasterSeedAuthority {
     /// `passphrase` — it is authenticated-encrypted ciphertext, never
     /// plaintext. `self` is only borrowed — sealing never mutates or
     /// clears the held authority.
-    pub fn seal(&self, passphrase: &[u8]) -> Option<String> {
-        use zeroize::Zeroize;
+    ///
+    /// FedOS Commerce Product-Media Sync + Truthful Completion mega-arc,
+    /// Wave A (Agent S) — Task 2: WASM passphrase-boundary explicit
+    /// zeroization. `passphrase` is taken BY VALUE (`Vec<u8>`, not the
+    /// previous `&[u8]` borrow) deliberately: wasm-bindgen's generated
+    /// glue for a `Vec<u8>` argument transfers ownership of the exact
+    /// WASM-linear-memory buffer it copied the caller's `Uint8Array`
+    /// into — Rust genuinely owns that memory and can clear it. A `&[u8]`
+    /// borrow could not: the SAME glue still allocates and copies for a
+    /// slice parameter, but only ever calls `__wbindgen_free()` on it once
+    /// this function returns, and freeing an allocation is not zeroing
+    /// it — the bytes remain, unzeroed, in now-unused WASM linear memory
+    /// until some later allocation happens to overwrite them. This is
+    /// BEST-EFFORT hardening of the copy this function is actually
+    /// responsible for. It does NOT, and cannot, claim the OS/JS engine
+    /// leaves no other copy anywhere: the JS caller's own original
+    /// `Uint8Array` (cleared separately, by the caller, e.g.
+    /// `FedosProfileUnlockSecret`/`FedosInMemoryPassphraseProvider` in
+    /// `src/os/messenger/desktop/onboarding/fedos_profile_unlock_secret.ts`
+    /// / `src/os/core/vault/wasm/fedos_passphrase_provider.ts`), any copy
+    /// the JS engine's own string/array internals made before that
+    /// `Uint8Array` was ever passed in, and the OS page/swap file are all
+    /// outside what this function can reach or verify — the SAME honest
+    /// caveat this repo's own `SECURITY.md` already states for every
+    /// other zeroization in this crate ("Secure-memory zeroization of
+    /// in-process secrets is currently best-effort, or unavailable,
+    /// depending on the exact build and platform"). Wrapped in
+    /// `Zeroizing` (this crate's own already-adopted
+    /// `zeroize` dependency, `Cargo.toml`) rather than a bare `.zeroize()`
+    /// call at the end of the function body: this method already has an
+    /// early `?` return (`with_master_seed_bytes(..)?`, immediately
+    /// below) plus several `return None` branches, and `Zeroizing`
+    /// guarantees the passphrase copy is cleared on EVERY one of those
+    /// exit paths — including ones a future edit might add — without
+    /// needing a matching manual `.zeroize()` call at each one, which is
+    /// exactly the class of gap this Task exists to close.
+    pub fn seal(&self, passphrase: Vec<u8>) -> Option<String> {
+        use zeroize::{Zeroize, Zeroizing};
+        let passphrase = Zeroizing::new(passphrase);
 
         let mut seed_bytes = self.with_master_seed_bytes(|bytes| bytes)?;
 
@@ -12320,7 +12357,7 @@ impl FedosMasterSeedAuthority {
         }
 
         let mut wrapping_key_bytes = match fedos_derive_master_seed_wrapping_key_argon2id(
-            passphrase,
+            passphrase.as_slice(),
             &salt,
             FEDOS_MASTER_SEED_ARGON2_M_COST,
             FEDOS_MASTER_SEED_ARGON2_T_COST,
@@ -12390,8 +12427,22 @@ impl FedosMasterSeedAuthority {
     /// this instance simply remains `Empty`, exactly as before the call,
     /// and there is no automatic fallback to a freshly-generated
     /// identity. Never panics.
-    pub fn restore_sealed(&mut self, envelope_json: &str, passphrase: &[u8]) -> bool {
-        use zeroize::Zeroize;
+    ///
+    /// FedOS Commerce Product-Media Sync + Truthful Completion mega-arc,
+    /// Wave A (Agent S) — Task 2: WASM passphrase-boundary explicit
+    /// zeroization. `passphrase` is taken BY VALUE (`Vec<u8>`, not the
+    /// previous `&[u8]` borrow) — see [`FedosMasterSeedAuthority::seal`]'s
+    /// own doc comment for the full rationale (identical here): ownership
+    /// of the WASM-side copy moves into Rust so it can genuinely be
+    /// cleared, and it is wrapped in `Zeroizing` rather than a manual
+    /// `.zeroize()` call so every one of this method's several early
+    /// `return false` branches (wrong-state, malformed envelope, failed
+    /// KDF, failed AEAD authentication for a wrong passphrase or a
+    /// corrupt/tampered ciphertext, wrong plaintext length) clears it
+    /// uniformly, with no risk of a future branch forgetting to.
+    pub fn restore_sealed(&mut self, envelope_json: &str, passphrase: Vec<u8>) -> bool {
+        use zeroize::{Zeroize, Zeroizing};
+        let passphrase = Zeroizing::new(passphrase);
 
         if !matches!(self.state, FedosMasterSeedAuthorityState::Empty) {
             return false;
@@ -12402,7 +12453,7 @@ impl FedosMasterSeedAuthority {
         };
 
         let mut wrapping_key_bytes = match fedos_derive_master_seed_wrapping_key_argon2id(
-            passphrase,
+            passphrase.as_slice(),
             &parsed.salt,
             parsed.m_cost,
             parsed.t_cost,
@@ -13704,15 +13755,15 @@ mod secret_handle_store_production_wiring_tests {
         // identical public identity.
         let sealed = {
             let fresh = generated_authority();
-            let sealed_envelope = fresh.seal(TEST_PASSPHRASE).expect("seal must succeed");
+            let sealed_envelope = fresh.seal(TEST_PASSPHRASE.to_vec()).expect("seal must succeed");
             let fresh_pub = fresh.public_key_hex_for_account(0).expect("real public key");
             (sealed_envelope, fresh_pub)
         };
         let (sealed_envelope, expected_pub) = sealed;
         let mut restarted = FedosMasterSeedAuthority::new();
-        assert!(!restarted.restore_sealed(&sealed_envelope, WRONG_PASSPHRASE), "wrong passphrase must fail closed");
+        assert!(!restarted.restore_sealed(&sealed_envelope, WRONG_PASSPHRASE.to_vec()), "wrong passphrase must fail closed");
         assert!(!restarted.is_available());
-        assert!(restarted.restore_sealed(&sealed_envelope, TEST_PASSPHRASE));
+        assert!(restarted.restore_sealed(&sealed_envelope, TEST_PASSPHRASE.to_vec()));
         assert_eq!(restarted.public_key_hex_for_account(0).expect("real public key"), expected_pub);
 
         // 17-18: restore Ratchet state into the new generation and
@@ -13741,9 +13792,9 @@ mod secret_handle_store_production_wiring_tests {
     #[test]
     fn wrong_passphrase_constructs_no_usable_handle_and_leaves_authority_empty() {
         let authority = generated_authority();
-        let sealed = authority.seal(TEST_PASSPHRASE).expect("seal must succeed");
+        let sealed = authority.seal(TEST_PASSPHRASE.to_vec()).expect("seal must succeed");
         let mut restored = FedosMasterSeedAuthority::new();
-        assert!(!restored.restore_sealed(&sealed, WRONG_PASSPHRASE));
+        assert!(!restored.restore_sealed(&sealed, WRONG_PASSPHRASE.to_vec()));
         assert!(!restored.is_available());
         assert!(!restored.is_cleared());
         // No usable handle exists -- every production method fails closed.
@@ -13826,13 +13877,13 @@ mod secret_handle_store_production_wiring_tests {
         // Seed, are fully independent: stopping one never affects the
         // other.
         let mut original = generated_authority();
-        let sealed = original.seal(TEST_PASSPHRASE).expect("seal must succeed");
+        let sealed = original.seal(TEST_PASSPHRASE.to_vec()).expect("seal must succeed");
         let original_pub = original.public_key_hex_for_account(0).expect("real public key");
         original.clear();
         assert!(!original.is_available());
 
         let mut restarted = FedosMasterSeedAuthority::new();
-        assert!(restarted.restore_sealed(&sealed, TEST_PASSPHRASE));
+        assert!(restarted.restore_sealed(&sealed, TEST_PASSPHRASE.to_vec()));
         assert_eq!(restarted.public_key_hex_for_account(0).expect("real public key"), original_pub);
         assert!(restarted.sign_nostr_event(0, 1.0, 1, Vec::new(), String::new()).is_some());
         // The ORIGINAL, stopped authority remains permanently denied even
@@ -13851,7 +13902,7 @@ mod secret_handle_store_production_wiring_tests {
         let signed = authority
             .sign_nostr_event(0, 1_700_000_000.0, 1, Vec::new(), "leak scan probe".to_string())
             .expect("signing must succeed");
-        let sealed = authority.seal(TEST_PASSPHRASE).expect("seal must succeed");
+        let sealed = authority.seal(TEST_PASSPHRASE.to_vec()).expect("seal must succeed");
         // A raw Master Seed is exactly 32 bytes / 64 hex chars; neither
         // output is expected to contain ANY 64-hex-char run other than
         // the event's own id/pubkey/sig fields (which are NOT the seed
@@ -14044,20 +14095,20 @@ mod master_seed_authority_tests {
     #[test]
     fn seal_fails_closed_on_an_empty_authority() {
         let authority = FedosMasterSeedAuthority::new();
-        assert!(authority.seal(TEST_PASSPHRASE).is_none());
+        assert!(authority.seal(TEST_PASSPHRASE.to_vec()).is_none());
     }
 
     #[test]
     fn seal_fails_closed_on_a_cleared_authority() {
         let mut authority = generated_authority();
         authority.clear();
-        assert!(authority.seal(TEST_PASSPHRASE).is_none());
+        assert!(authority.seal(TEST_PASSPHRASE.to_vec()).is_none());
     }
 
     #[test]
     fn seal_succeeds_on_an_available_authority_and_never_reveals_the_seed_in_plaintext() {
         let authority = generated_authority();
-        let envelope = authority.seal(TEST_PASSPHRASE).expect("must seal");
+        let envelope = authority.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
         assert!(envelope.starts_with("{\"v\":1,\"kdf\":\"argon2id\""));
         assert!(!envelope.contains(std::str::from_utf8(TEST_PASSPHRASE).unwrap()));
     }
@@ -14065,13 +14116,13 @@ mod master_seed_authority_tests {
     #[test]
     fn restore_sealed_round_trips_to_the_identical_signing_identity() {
         let original = generated_authority();
-        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let envelope = original.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
         let original_event = original
             .sign_nostr_event(7, 1_700_000_001.0, 1, vec![], "restart test".to_string())
             .expect("must sign");
 
         let mut restored = FedosMasterSeedAuthority::new();
-        assert!(restored.restore_sealed(&envelope, TEST_PASSPHRASE));
+        assert!(restored.restore_sealed(&envelope, TEST_PASSPHRASE.to_vec()));
         assert!(restored.is_available());
         let restored_event = restored
             .sign_nostr_event(7, 1_700_000_001.0, 1, vec![], "restart test".to_string())
@@ -14083,10 +14134,10 @@ mod master_seed_authority_tests {
     #[test]
     fn restore_sealed_with_the_wrong_passphrase_fails_closed_and_leaves_authority_empty() {
         let original = generated_authority();
-        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let envelope = original.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
 
         let mut restored = FedosMasterSeedAuthority::new();
-        assert!(!restored.restore_sealed(&envelope, WRONG_PASSPHRASE));
+        assert!(!restored.restore_sealed(&envelope, WRONG_PASSPHRASE.to_vec()));
         assert!(!restored.is_available());
         assert!(!restored.is_cleared());
     }
@@ -14094,47 +14145,47 @@ mod master_seed_authority_tests {
     #[test]
     fn restore_sealed_with_a_corrupted_ciphertext_fails_closed() {
         let original = generated_authority();
-        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let envelope = original.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
         let ct_start = envelope.find("\"ct\":\"").unwrap() + "\"ct\":\"".len();
         let flipped_char = if envelope.as_bytes()[ct_start] == b'A' { 'B' } else { 'A' };
         let mut corrupted = envelope.clone();
         corrupted.replace_range(ct_start..ct_start + 1, &flipped_char.to_string());
 
         let mut restored = FedosMasterSeedAuthority::new();
-        assert!(!restored.restore_sealed(&corrupted, TEST_PASSPHRASE));
+        assert!(!restored.restore_sealed(&corrupted, TEST_PASSPHRASE.to_vec()));
         assert!(!restored.is_available());
     }
 
     #[test]
     fn restore_sealed_with_an_unrecognized_schema_version_fails_closed() {
         let original = generated_authority();
-        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let envelope = original.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
         let corrupted = envelope.replacen("\"v\":1", "\"v\":9", 1);
 
         let mut restored = FedosMasterSeedAuthority::new();
-        assert!(!restored.restore_sealed(&corrupted, TEST_PASSPHRASE));
+        assert!(!restored.restore_sealed(&corrupted, TEST_PASSPHRASE.to_vec()));
         assert!(!restored.is_available());
     }
 
     #[test]
     fn restore_sealed_with_a_malformed_json_envelope_fails_closed_and_does_not_panic() {
         let mut restored = FedosMasterSeedAuthority::new();
-        assert!(!restored.restore_sealed("not json at all", TEST_PASSPHRASE));
-        assert!(!restored.restore_sealed("", TEST_PASSPHRASE));
-        assert!(!restored.restore_sealed("{}", TEST_PASSPHRASE));
+        assert!(!restored.restore_sealed("not json at all", TEST_PASSPHRASE.to_vec()));
+        assert!(!restored.restore_sealed("", TEST_PASSPHRASE.to_vec()));
+        assert!(!restored.restore_sealed("{}", TEST_PASSPHRASE.to_vec()));
         assert!(!restored.is_available());
     }
 
     #[test]
     fn restore_sealed_never_overwrites_an_already_available_authority() {
         let original = generated_authority();
-        let envelope = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let envelope = original.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
         let event_before = original
             .sign_nostr_event(0, 1_700_000_002.0, 1, vec![], "before".to_string())
             .expect("must sign");
 
         let mut other = generated_authority();
-        assert!(!other.restore_sealed(&envelope, TEST_PASSPHRASE));
+        assert!(!other.restore_sealed(&envelope, TEST_PASSPHRASE.to_vec()));
         let event_after = other
             .sign_nostr_event(0, 1_700_000_002.0, 1, vec![], "before".to_string())
             .expect("must sign");
@@ -14142,6 +14193,113 @@ mod master_seed_authority_tests {
             extract_json_string_field(&event_before, "pubkey"),
             extract_json_string_field(&event_after, "pubkey"),
             "an authority that already had its own real seed must never be silently overwritten by restore_sealed"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // FedOS Commerce Product-Media Sync + Truthful Completion mega-arc,
+    // Wave A (Agent S) — Task 2: WASM passphrase-boundary explicit
+    // zeroization. Every functional branch already exercised above
+    // (success, wrong passphrase, corrupt ciphertext, malformed/
+    // unrecognized-schema envelope, wrong initial state) continues to
+    // pass unmodified against the new `Vec<u8>`-by-value signature —
+    // this section adds ONLY what those tests did not already cover:
+    // the KDF-failure branch specifically, plus direct evidence that the
+    // zeroization mechanism this fix relies on actually clears bytes,
+    // plus a structural regression guard against the fix silently
+    // regressing later. None of these ever print/log/assert-equal
+    // against a real secret byte — only presence/absence checks and a
+    // fixed, non-secret test-only literal.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn restore_sealed_fails_closed_when_the_envelopes_own_argon2_cost_parameter_is_invalid_kdf_failure_path() {
+        // The KDF-failure branch (`fedos_derive_master_seed_wrapping_key_argon2id`
+        // returning `None` because `argon2::Params::new` rejects the cost
+        // parameters) is genuinely reachable, not merely theoretical: an
+        // envelope is untrusted input, and its `m`/`t`/`p` fields are
+        // attacker-controllable. This covers the `None => return false`
+        // branch in `restore_sealed` — which sits AFTER this Task's own
+        // `Zeroizing::new(passphrase)` wrap, so the passphrase copy is
+        // still cleared even though the KDF itself never completes.
+        let original = generated_authority();
+        let envelope = original.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
+        let m_value = extract_json_number_field(&envelope, "m");
+        let corrupted = envelope.replacen(&format!("\"m\":{m_value}"), "\"m\":0", 1);
+        assert_ne!(corrupted, envelope, "the m-cost field must have actually been rewritten for this test to be meaningful");
+
+        let mut restored = FedosMasterSeedAuthority::new();
+        assert!(!restored.restore_sealed(&corrupted, TEST_PASSPHRASE.to_vec()));
+        assert!(!restored.is_available());
+        assert!(!restored.is_cleared());
+    }
+
+    #[test]
+    fn zeroizing_wrapper_clears_its_contents_safe_demonstration_of_the_contract_seal_and_restore_sealed_now_rely_on() {
+        // Demonstrates, with only SAFE Rust (no raw-pointer inspection of
+        // freed memory — this Task's own "avoid unsafe raw-pointer tricks
+        // without strong justification" instruction), the exact contract
+        // `seal()`/`restore_sealed()` now depend on: this crate's own
+        // already-adopted `zeroize` dependency (`Cargo.toml`) really does
+        // clear a `Vec<u8>`'s bytes. Calling `.zeroize()` explicitly here
+        // exercises the SAME code path `Zeroizing`'s own `Drop` impl
+        // invokes automatically the moment `seal`/`restore_sealed`'s
+        // local `passphrase` binding goes out of scope, on every return
+        // path (normal return, every early `return`, and the one `?`).
+        use zeroize::{Zeroize, Zeroizing};
+        const NOT_A_REAL_PASSPHRASE: &[u8] = b"a-fixed-non-secret-test-only-literal-32b";
+        let mut wrapped = Zeroizing::new(NOT_A_REAL_PASSPHRASE.to_vec());
+        assert_eq!(wrapped.as_slice(), NOT_A_REAL_PASSPHRASE);
+        wrapped.zeroize();
+        assert!(
+            wrapped.iter().all(|&b| b == 0),
+            "Zeroizing<Vec<u8>>::zeroize() must clear every byte -- this is the exact guarantee Drop invokes automatically for seal()/restore_sealed()'s own passphrase binding"
+        );
+    }
+
+    #[test]
+    fn seal_and_restore_sealed_take_ownership_of_passphrase_and_wrap_it_in_zeroizing_before_any_other_statement() {
+        // Source-level regression guard, not a runtime one:
+        // `Zeroizing<T>`'s "cleared on every exit path" guarantee only
+        // holds if the wrap happens BEFORE `passphrase` is used, borrowed,
+        // or the function has any chance to return. Pins BOTH
+        // preconditions structurally so a future edit that widens the
+        // parameter back to a `&[u8]` borrow, or that moves the
+        // `Zeroizing::new(...)` wrap below an early return, fails this
+        // test instead of silently reopening the exact gap this Task
+        // closed. `include_str!` embeds this file's own source into the
+        // `#[cfg(test)]`-only test binary; it is never compiled into the
+        // production WASM artifact. Line endings are normalized (this
+        // checkout uses CRLF) so the check is platform-independent.
+        let source = include_str!("lib.rs").replace("\r\n", "\n");
+
+        // NOTE: deliberately does NOT embed the literal substring "pub fn "
+        // (searches for "fn seal(...)"/"fn restore_sealed(...)" instead,
+        // which is just as unique and specific) -- several pre-existing
+        // guard tests elsewhere in this suite do a naive whole-file count
+        // of "pub fn " occurrences to pin the crate's total public-function
+        // surface, and would otherwise miscount this test's own assertion
+        // strings as two additional real declarations.
+        let seal_sig = "fn seal(&self, passphrase: Vec<u8>) -> Option<String> {";
+        assert!(
+            source.contains(seal_sig),
+            "seal() must take `passphrase` BY VALUE (Vec<u8>) -- a `&[u8]` borrow cannot be zeroized by this function, only freed by wasm-bindgen's own glue after the call returns"
+        );
+        let seal_body = &source[source.find(seal_sig).unwrap() + seal_sig.len()..];
+        assert!(
+            seal_body.trim_start().starts_with("use zeroize::{Zeroize, Zeroizing};\n        let passphrase = Zeroizing::new(passphrase);"),
+            "seal() must wrap `passphrase` in Zeroizing as its very first statement, before any possible early return"
+        );
+
+        let restore_sig = "fn restore_sealed(&mut self, envelope_json: &str, passphrase: Vec<u8>) -> bool {";
+        assert!(
+            source.contains(restore_sig),
+            "restore_sealed() must take `passphrase` BY VALUE (Vec<u8>) -- see seal()'s own assertion message for why a `&[u8]` borrow is insufficient"
+        );
+        let restore_body = &source[source.find(restore_sig).unwrap() + restore_sig.len()..];
+        assert!(
+            restore_body.trim_start().starts_with("use zeroize::{Zeroize, Zeroizing};\n        let passphrase = Zeroizing::new(passphrase);"),
+            "restore_sealed() must wrap `passphrase` in Zeroizing as its very first statement, before any possible early return"
         );
     }
 
@@ -14427,10 +14585,10 @@ mod master_seed_authority_tests {
     fn public_key_hex_for_account_restored_from_the_same_sealed_envelope_yields_the_identical_hex() {
         let original = generated_authority();
         let original_hex = original.public_key_hex_for_account(0).expect("must derive");
-        let sealed = original.seal(TEST_PASSPHRASE).expect("must seal");
+        let sealed = original.seal(TEST_PASSPHRASE.to_vec()).expect("must seal");
 
         let mut restored = FedosMasterSeedAuthority::new();
-        assert!(restored.restore_sealed(&sealed, TEST_PASSPHRASE));
+        assert!(restored.restore_sealed(&sealed, TEST_PASSPHRASE.to_vec()));
         let restored_hex = restored.public_key_hex_for_account(0).expect("must derive");
 
         assert_eq!(original_hex, restored_hex);

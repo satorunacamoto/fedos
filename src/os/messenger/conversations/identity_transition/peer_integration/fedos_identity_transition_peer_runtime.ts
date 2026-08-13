@@ -54,6 +54,7 @@ import type {
 import { isFedosIdentityTransitionConversationContinuitySuperseded } from "./fedos_identity_transition_conversation_continuity.js";
 import { fedosIdentityTransitionBuildSafeView, type FedosIdentityTransitionSafeViewV1 } from "./fedos_identity_transition_safe_view.js";
 import type { FedosIdentityTransitionLocalDecisionPersistence } from "./fedos_identity_transition_local_decision.js";
+import { isFedosIdentityTransitionSilentlyAutoAcceptedOldKeyContinuity } from "./fedos_identity_transition_silent_acceptance_detection.js";
 
 export interface FedosIdentityTransitionPeerRuntimeDependencies {
   readonly deviceRegistry: FedosDeviceRegistryPersistence;
@@ -86,6 +87,12 @@ export interface FedosIdentityTransitionPeerStatusView {
   readonly evidenceOutcome: FedosIdentityTransitionPeerObservationV1["evidenceOutcome"];
   readonly acceptanceState: FedosIdentityTransitionAcceptanceState;
   readonly superseded: boolean;
+  /**
+   * FedOS Commerce Product-Media Sync + Truthful Completion mega-arc, Wave
+   * A (Agent S) — Task 1: visibility only, no policy change. See
+   * `fedos_identity_transition_silent_acceptance_detection.ts`.
+   */
+  readonly silentlyAutoAcceptedWithoutAsking: boolean;
 }
 
 export class FedosIdentityTransitionPeerRuntime {
@@ -187,6 +194,11 @@ export class FedosIdentityTransitionPeerRuntime {
       evidenceOutcome: observation.evidenceOutcome,
       acceptanceState,
       superseded,
+      silentlyAutoAcceptedWithoutAsking: isFedosIdentityTransitionSilentlyAutoAcceptedOldKeyContinuity({
+        evidenceOutcome: observation.evidenceOutcome,
+        acceptanceState,
+        superseded,
+      }),
     };
   }
 
@@ -246,6 +258,11 @@ export class FedosIdentityTransitionPeerRuntime {
         evidenceOutcome: observation.evidenceOutcome,
         acceptanceState,
         superseded,
+        silentlyAutoAcceptedWithoutAsking: isFedosIdentityTransitionSilentlyAutoAcceptedOldKeyContinuity({
+          evidenceOutcome: observation.evidenceOutcome,
+          acceptanceState,
+          superseded,
+        }),
       };
     });
   }

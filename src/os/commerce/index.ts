@@ -148,13 +148,17 @@ export type {
   AddProductMediaInput,
   ProductMediaRepositoryMutationResult,
 } from "./catalog/product_media_repository_port.js";
-export { validateProductMedia } from "./catalog/product_media_types.js";
+export { validateProductMedia, deriveProductDeliveryClassification } from "./catalog/product_media_types.js";
 export type {
   ProductMedia,
   ProductMediaRole,
   ProductMediaClassification,
   ProductMediaChecksumSubject,
   ProductMediaValidationDecision,
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) --
+  // the product-level "does this Product require a protected digital
+  // release?" classification. See that file's own header.
+  ProductDeliveryClassification,
 } from "./catalog/product_media_types.js";
 
 export { LocalMediaStore } from "./catalog/local_media_store.js";
@@ -281,6 +285,12 @@ export {
   type MediaReleaseResponseAuthorizationDecision,
   type MediaReleaseResponseAuthorizationDenialReason,
   type DigitalContentDeliveryInvariantResult,
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) --
+  // the "is this process's own productMedia view trustworthy/complete?"
+  // signal that closes the per-process vacuity documented in
+  // `docs/commerce/PROTECTED-MEDIA-CROSS-PROCESS-REACHABILITY.md`'s
+  // Addendum 2. See that function's own header.
+  type ProductMediaKnowledgeState,
 } from "./media_grant/media_access_grant_release_channel_policy.js";
 export {
   DurableMediaReleaseContentCache,
@@ -289,6 +299,17 @@ export {
   type MediaReleaseContentCache,
   type MediaReleaseContentCacheWriteResult,
 } from "./media_grant/persistence/durable_media_release_content_cache.js";
+
+// Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) --
+// role-aware, honest UI-state derivation for digital content delivery (arc
+// requirements 6/7). Pure, tested; the composition root only renders it --
+// same posture as `./order/cross_process_outcome_text.js` below.
+export {
+  deriveDigitalContentDeliveryDisplayState,
+  describeDigitalContentDeliveryDisplayState,
+  type DigitalContentDeliveryDisplayState,
+  type DigitalContentDeliveryDisplayCopy,
+} from "./media_grant/digital_content_delivery_display_state.js";
 
 export type {
   PaymentProvider,
@@ -477,6 +498,17 @@ export {
   type IssueCommerceReceiptProofOptions,
   type CommerceReceiptVerifyStatus,
   type CommerceReceiptVerifyResult,
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) --
+  // truthfulness-guarded issuance (arc requirement 3) and the pure gate it
+  // is built on. See `./receipt/commerce_receipt_truthfulness_gate.js`'s
+  // own header.
+  issueSignedTradeReceiptProofIfTruthful,
+  issueSignedDeliveryReceiptProofIfTruthful,
+  evaluateCommerceReceiptTruthfulness,
+  type GuardedCommerceReceiptIssuanceResult,
+  type CommerceReceiptTruthfulnessDenialReason,
+  type CommerceReceiptTruthfulnessDecision,
+  type OpaqueDigitalContentDeliveryInvariantResult,
 } from "./receipt/index.js";
 
 // FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc

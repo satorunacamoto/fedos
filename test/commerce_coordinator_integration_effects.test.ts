@@ -211,12 +211,21 @@ async function sellerReleaseThroughRealMediaStore(transport: IpfsTransport): Pro
     senderPubkeyHex: BUYER,
     ownPubkeyHex: SELLER,
     order: { id: order.id, productId: order.productId, buyerPubkey: order.buyerPubkey, sellerPubkey: order.sellerPubkey, status: order.status },
-    media: { id: MEDIA_ID, productId: PRODUCT_ID, classification: "protected", storageRef, contentType: "application/pdf" },
+    // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C)
+    // added a content-IDENTITY gate (`checksum`/`getStoredCiphertextChecksum`)
+    // that is orthogonal to what THIS file tests (network egress gating /
+    // Effects 1-2) -- neutralized here to a trivially self-consistent literal
+    // so it can never interfere with test 3's negative control (which, by
+    // design, sometimes has an empty/never-stored `storageRef`). Real
+    // content-identity coverage lives in
+    // `commerce_private_media_release_end_to_end.test.ts`.
+    media: { id: MEDIA_ID, productId: PRODUCT_ID, classification: "protected", storageRef, contentType: "application/pdf", checksum: "neutral-checksum-not-under-test-here" },
     candidateGrantEnvelope: candidate,
     latestKnownGrantVersion: latest,
     now: NOW,
     merchantAccountIndex: 0,
     authority: new FakeDirectionalAuthority(SELLER) as unknown as FedosMasterSeedAuthority,
+    getStoredCiphertextChecksum: () => "neutral-checksum-not-under-test-here",
     // THE SEAM: the real store, not a lambda.
     getProtectedContent: async (ref: string) => store.getProtected(ref),
   };
@@ -283,7 +292,7 @@ describe("Coordinator integration effect 2 -- what Agent A's completion invarian
       hasReleasedContent: () => false,
     });
     expect(invariant.satisfied).toBe(false);
-    if (invariant.satisfied) throw new Error("unreachable");
+    if (invariant.satisfied || invariant.reason !== "digital-content-not-delivered") throw new Error("unreachable");
     expect(invariant.missingMediaIds).toEqual([MEDIA_ID]);
   });
 

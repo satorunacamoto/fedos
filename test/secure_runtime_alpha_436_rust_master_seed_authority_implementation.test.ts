@@ -62,9 +62,19 @@ describe("Secure Runtime Alpha 436 -- Rust Master Seed Authority Implementation"
   });
 
   it("zeroizes temporary secret buffers in seal()/restore_sealed()", () => {
-    const sealFn = (lib.match(/pub fn seal\(&self, passphrase: &\[u8\]\)[\s\S]*?\n    \}/) ?? [""])[0];
+    // FedOS Commerce Product-Media Sync + Truthful Completion mega-arc,
+    // Wave A (Agent S) — Task 2: `passphrase` moved from a `&[u8]` borrow
+    // to an owned `Vec<u8>` (wrapped in `Zeroizing`) so this function can
+    // explicitly clear the WASM-boundary copy itself, not just the
+    // pre-existing seed/wrapping-key/AEAD-plaintext buffers this
+    // assertion already covered. The signature below is updated to
+    // match; the assertion's own intent (every temporary secret buffer
+    // in these two functions is zeroized) is unchanged and still holds.
+    const sealFn = (lib.match(/pub fn seal\(&self, passphrase: Vec<u8>\)[\s\S]*?\n    \}/) ?? [""])[0];
     expect(sealFn).toMatch(/\.zeroize\(\)/);
+    expect(sealFn).toMatch(/Zeroizing::new\(passphrase\)/);
     const restoreFn = (lib.match(/pub fn restore_sealed\(&mut self,[\s\S]*?\n    \}/) ?? [""])[0];
     expect(restoreFn).toMatch(/\.zeroize\(\)/);
+    expect(restoreFn).toMatch(/Zeroizing::new\(passphrase\)/);
   });
 });

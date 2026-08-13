@@ -430,3 +430,75 @@ Live regression coverage:
 DOM file picker via the `ui-script` harness's new `attachFile` action (the
 one thing that harness could not previously do, and therefore the reason this
 whole class of failure had no automated coverage).
+
+## Addendum 4 (Commerce Product-Media Sync + Truthful Completion mega-arc, Agent C) — the per-process vacuity is now structurally closable with ONE parameter, and two adjacent truthfulness gaps are closed outright
+
+This arc's mandate was to make the completion/receipt/reputation machinery
+truthful about reality regardless of *why* protected content is missing —
+including Addendum 2's per-process vacuity, without waiting for it to be
+fully closed (that remains cross-process wiring work, still not done by this
+pass). Concretely, this pass:
+
+- Added `productMediaKnowledge: "authoritative" | "unsynced"` (optional,
+  defaults to `"authoritative"` — BYTE-IDENTICAL behavior to before this
+  arc for every existing caller) to
+  `evaluateDigitalContentDeliveryInvariantForOrderCompletion()`
+  (`../../src/os/commerce/media_grant/media_access_grant_release_channel_policy.ts`).
+  A caller that honestly declares `"unsynced"` can no longer receive a
+  vacuous `satisfied: true` from an empty/incomplete `productMedia` view —
+  it instead receives a new, distinct `reason: "product-media-knowledge-unsynced"`.
+  **This does NOT by itself fix the live vacuity** (no call site in
+  `fedos_electron_beta_main.cts` passes this parameter yet — that file is
+  out of this pass's scope, per its own mandate) — it makes the fix a
+  ONE-LINE, Wave-B-only change once a process's `ProductMedia` view is
+  genuinely known to be incomplete (e.g. a buyer process that has not
+  completed a real `ProductMediaSyncReadModel`-backed discovery pass for
+  the Order's own product — see Agent M's parallel
+  `src/os/commerce/catalog/product_media_sync_read_model.ts`, whose
+  `ProductMediaSyncView.classification` is structurally the same
+  `"public" | "protected"` vocabulary this invariant already consumes, so
+  no renaming is needed to compose the two once Wave B wires them
+  together).
+- Closed a REAL, previously-unenforced "wrong content" gap: the seller-side
+  release builder (`buildOutboundPrivateMediaReleaseResponse()`,
+  `../../src/os/commerce/events/commerce_private_media_release_apply.ts`)
+  now independently re-checks that the CIPHERTEXT actually stored under
+  `media.storageRef` still hashes to the product's own declared
+  `ProductMedia.checksum` — fail-closed, before ever decrypting or
+  releasing anything. Previously nothing enforced that the released bytes
+  were the ones the product actually declared; only that the release was
+  internally self-consistent (buyer-side digest re-check against whatever
+  the seller happened to compute).
+- Closed a receipt-truthfulness gap: `issueSignedTradeReceiptProof()`/
+  `issueSignedDeliveryReceiptProof()`
+  (`../../src/os/commerce/receipt/commerce_trust_receipt_adapter.ts`) were,
+  by design, bare signers with no domain-state lookup of their own — a
+  caller could sign a `"delivery_confirmation"` receipt for an order that
+  never reached `"completed"`, or without re-verifying content delivery.
+  New guarded siblings `issueSignedTradeReceiptProofIfTruthful()`/
+  `issueSignedDeliveryReceiptProofIfTruthful()`, built on a new pure gate
+  `evaluateCommerceReceiptTruthfulness()`
+  (`../../src/os/commerce/receipt/commerce_receipt_truthfulness_gate.ts`),
+  independently re-check `orderStatus === "completed"` and (for
+  `"delivery_confirmation"`) the caller's own freshly-computed content
+  invariant before ever signing. **Not yet wired into
+  `handleCommerceReceiptIssue()`** — that handler currently determines
+  `"delivery_confirmation"` vs `"trade_completion"` by checking whether
+  *at least one* protected media item was released
+  (`releasedMediaRefs.length > 0`), not whether *every* protected item was
+  — harmless today only because both real completion call sites already
+  enforce the full invariant before `"completed"` is ever reached, but a
+  latent landmine for any future third path that doesn't. Wave B should
+  swap that check for the new guarded issuance function.
+- Added the product-level classification vocabulary
+  (`ProductDeliveryClassification` — `"no-digital-deliverable" |
+  "public-content-only" | "protected-digital-deliverable"`,
+  `deriveProductDeliveryClassification()`,
+  `../../src/os/commerce/catalog/product_media_types.ts`) and a role-aware
+  buyer/seller display-state module
+  (`deriveDigitalContentDeliveryDisplayState()`/
+  `describeDigitalContentDeliveryDisplayState()`,
+  `../../src/os/commerce/media_grant/digital_content_delivery_display_state.ts`)
+  so Wave B's UI wiring never needs to invent its own copy or re-derive
+  "is this genuinely delivered, genuinely missing, or just not-yet-known"
+  twice for the two roles.

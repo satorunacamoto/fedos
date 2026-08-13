@@ -101,6 +101,47 @@
  * guarantee within one process's own view of a product it lists, but NOT
  * yet a cross-process delivery guarantee — do not represent it as the
  * latter in any user-facing or release-readiness claim.
+ *
+ * *** Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C)
+ * — `productMediaKnowledge`, the structural fix for the vacuity above ***
+ * The root cause of the "buyer process, empty list -> vacuously satisfied"
+ * bug is that this function used to treat "the supplied `productMedia` list
+ * has no protected entries" as PROOF of "this product genuinely has no
+ * protected media" — but an empty list is equally consistent with "this
+ * process simply has not synced this product's media yet" (Agent M's
+ * still-in-progress cross-process `ProductMedia` sync gap, OR the separately
+ * tracked, permanently-out-of-scope grant-signing Blocker 5 — this function
+ * does not need to know or care WHY content is unavailable, only whether it
+ * genuinely is). `productMediaKnowledge` makes the caller state, EXPLICITLY,
+ * which of those two cases it is actually in, rather than letting silence
+ * default to "satisfied":
+ *   - `"authoritative"` (the DEFAULT when omitted, for exact backward
+ *     compatibility with every pre-existing caller/test) — the caller
+ *     asserts its supplied `productMedia` list is a COMPLETE, trustworthy
+ *     view of every `ProductMedia` record for `productId` (true today for a
+ *     seller's own process, which populated its `LocalProductMediaRepository`
+ *     itself via the real attach handlers). Behavior is BYTE-IDENTICAL to
+ *     before this arc when this value is used.
+ *   - `"unsynced"` — the caller admits its `productMedia` list might be
+ *     INCOMPLETE (true today for any buyer process, which has no real
+ *     cross-process `ProductMedia` sync yet). Once ANY protected item the
+ *     caller DOES know about is missing a release, that positive fact is
+ *     still trusted (`"digital-content-not-delivered"`, unchanged) — partial
+ *     knowledge of a real gap is not weakened. But an otherwise-clean result
+ *     (no known-missing protected item) can NEVER be reported as
+ *     `satisfied: true` under `"unsynced"` — it is reported as the new
+ *     `"product-media-knowledge-unsynced"` reason instead, so a caller can
+ *     render an honest "can't confirm yet" state (see
+ *     `./digital_content_delivery_display_state.ts`) rather than either a
+ *     false "Completed" or a false "this product has no protected content."
+ *
+ * This parameter is OPTIONAL and additive specifically so Wave B integration
+ * can close the per-process vacuity with a ONE-LINE change at the call site
+ * (pass `productMediaKnowledge: "unsynced"` once a process's `ProductMedia`
+ * view is not self-populated/authoritative) with ZERO further changes to
+ * this file — "it becomes correct automatically once Agent M's real
+ * cross-process state replaces the vacuous per-process one," per this arc's
+ * own mandate.
  */
 
 // ---------------------------------------------------------------------------
@@ -250,9 +291,14 @@ export interface DigitalContentDeliveryInvariantMediaLike {
   readonly classification: "public" | "protected";
 }
 
+/** See this file's own header ("`productMediaKnowledge`, the structural fix for the vacuity above") for the full account of what each value means and why the default preserves exact pre-existing behavior. */
+export type ProductMediaKnowledgeState = "authoritative" | "unsynced";
+
 export type DigitalContentDeliveryInvariantResult =
   | { readonly satisfied: true }
-  | { readonly satisfied: false; readonly reason: "digital-content-not-delivered"; readonly missingMediaIds: readonly string[] };
+  | { readonly satisfied: false; readonly reason: "digital-content-not-delivered"; readonly missingMediaIds: readonly string[] }
+  /** NEW (Commerce Product-Media Sync + Truthful Completion mega-arc, Agent C) — reported instead of a vacuous `satisfied: true` whenever `productMediaKnowledge: "unsynced"` and no KNOWN protected item is missing a release; see this file's own header. */
+  | { readonly satisfied: false; readonly reason: "product-media-knowledge-unsynced" };
 
 export interface EvaluateDigitalContentDeliveryInvariantForOrderCompletionInput {
   readonly productId: string;
@@ -260,16 +306,19 @@ export interface EvaluateDigitalContentDeliveryInvariantForOrderCompletionInput 
   readonly productMedia: readonly DigitalContentDeliveryInvariantMediaLike[];
   /** Caller-supplied predicate: has a REAL, verified release already been obtained for `mediaId` under this specific order/buyer? Callers get this from `DurableMediaReleaseContentCache.getRelease()` (`./persistence/durable_media_release_content_cache.ts`) — never a bare acknowledgment flag. */
   readonly hasReleasedContent: (mediaId: string) => boolean;
+  /** OPTIONAL — defaults to `"authoritative"`, the exact pre-existing behavior. See this file's own header for the full account. */
+  readonly productMediaKnowledge?: ProductMediaKnowledgeState;
 }
 
 /**
- * `satisfied: true` unconditionally when the product carries no protected
- * media at all (an ordinary physical-goods/no-digital-content Order is
- * never blocked by this invariant). Otherwise `satisfied: true` only when
- * EVERY protected media item for this product has a real release on file;
- * any missing item makes this Order ineligible to reach `"completed"`,
- * naming every missing `mediaId` so the caller can surface a truthful
- * reason rather than a bare rejection.
+ * `satisfied: true` only when EVERY protected media item the caller knows
+ * about for this product has a real release on file for this order's own
+ * buyer, AND (`productMediaKnowledge` — see this file's own header)
+ * the caller's `productMedia` view is itself asserted trustworthy/complete.
+ * Any missing known-protected item always makes this Order ineligible to
+ * reach `"completed"`, naming every missing `mediaId`. A physical-goods
+ * Order (no protected media in a trustworthy view) is never blocked by this
+ * invariant.
  */
 export function evaluateDigitalContentDeliveryInvariantForOrderCompletion(
   input: EvaluateDigitalContentDeliveryInvariantForOrderCompletionInput,
@@ -278,6 +327,10 @@ export function evaluateDigitalContentDeliveryInvariantForOrderCompletion(
   const missingMediaIds = protectedMedia.filter((media) => !input.hasReleasedContent(media.id)).map((media) => media.id);
   if (missingMediaIds.length > 0) {
     return { satisfied: false, reason: "digital-content-not-delivered", missingMediaIds };
+  }
+  const knowledge = input.productMediaKnowledge ?? "authoritative";
+  if (knowledge === "unsynced") {
+    return { satisfied: false, reason: "product-media-knowledge-unsynced" };
   }
   return { satisfied: true };
 }

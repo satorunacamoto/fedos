@@ -205,11 +205,31 @@ const fedosApp: FedosAppBridge = Object.freeze({
     ipcRenderer.invoke("fedos-app:identity-transition-defer", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
   identityTransitionRecordManualVerification: (method: string, noteCode: string) =>
     ipcRenderer.invoke("fedos-app:identity-transition-record-manual-verification", { method: boundedString(method, MAX_LABEL_CHARS), noteCode: boundedString(noteCode, MAX_LABEL_CHARS) }),
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) --
+  // Identity Replacement two-step Ratchet-reset confirmation. Step 1
+  // (assess) is read-only; step 2 (authorize) is the ONE call that
+  // actually resets a Ratchet session -- the renderer must call step 1
+  // first and only offer step 2 when its response says `canAuthorize`.
+  identityTransitionAssessContinuity: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-assess-continuity", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
+  identityTransitionAuthorizeRatchetReset: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) =>
+    ipcRenderer.invoke("fedos-app:identity-transition-authorize-ratchet-reset", { peerAccountRef, peerDeviceRef: boundedString(peerDeviceRef, MAX_ID_CHARS), transitionId: boundedString(transitionId, MAX_ID_CHARS) }),
   deletionRequestListReceived: () => ipcRenderer.invoke("fedos-app:deletion-request-list-received"),
   deletionRequestOpen: (requestId: string) => ipcRenderer.invoke("fedos-app:deletion-request-open", { requestId: boundedString(requestId, MAX_ID_CHARS) }),
   // Secure Runtime Alpha 8121-8200 -- Security Finding 3: exact requestId travels with the decision.
   deletionRequestApprove: (requestId: string) => ipcRenderer.invoke("fedos-app:deletion-request-approve", { requestId: boundedString(requestId, MAX_ID_CHARS) }),
   deletionRequestReject: (requestId: string) => ipcRenderer.invoke("fedos-app:deletion-request-reject", { requestId: boundedString(requestId, MAX_ID_CHARS) }),
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) --
+  // Signed Deletion sender-side. NEVER claims "deleted everywhere" -- a
+  // remote peer/relay accepting delivery is not the same as complying.
+  deletionRequestCreate: (conversationId: string, messageId: string, scope: string, reasonCode: string | null, expiresInSeconds: number | null) =>
+    ipcRenderer.invoke("fedos-app:deletion-request-create", {
+      conversationId: boundedString(conversationId, MAX_ID_CHARS),
+      messageId: boundedString(messageId, MAX_ID_CHARS),
+      scope,
+      reasonCode,
+      expiresInSeconds,
+    }),
   safetyCenterOverview: () => ipcRenderer.invoke("fedos-app:safety-center-overview"),
   settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
   relayStatus: () => ipcRenderer.invoke("fedos-app:relay-status"),

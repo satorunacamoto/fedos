@@ -18,12 +18,33 @@
  *     2. `evaluateMediaAccessGrant()` — the REAL grant decision (signature,
  *        Order-status, expiry/revocation/version, wrong-buyer/wrong-media/
  *        wrong-signer) against the caller-supplied candidate envelope.
- *     3. ONLY on ALLOW does this function ever call `getProtectedContent()`
- *        (the caller's own `IpfsMediaStore.getProtected()`-backed callback)
- *        or touch the Master-Seed-derived key AT ALL, via
- *        `wrapMediaAccessGrantRelease()` (which itself re-runs step 2
- *        before ever calling `authority.encryptNip44Wire()` — belt AND
- *        braces, same as the redeem handler's own design).
+ *     3. Commerce Product-Media Sync + Truthful Completion mega-arc (Agent
+ *        C) — CONTENT-IDENTITY verification, `"content-checksum-mismatch"`:
+ *        before this function ever spends a decrypt on `media.storageRef`,
+ *        it re-checks that the bytes ACTUALLY STORED under that
+ *        `storageRef` still hash to `media.checksum` — the SAME checksum
+ *        this product's own `ProductMedia` record declared at attach time
+ *        (`../catalog/product_media_types.ts`'s `checksumSubject:
+ *        "ciphertext"` rule for protected media, so this compares
+ *        ciphertext-to-ciphertext, never plaintext-to-ciphertext). This is
+ *        THE concrete enforcement of this arc's mandate item 2 ("the content
+ *        identity matches the purchased ProductMedia declaration
+ *        (checksum/commitment match)") — it catches a `storageRef` that
+ *        silently drifted from the declared record (corruption, a
+ *        mis-attributed re-attach, a bug in a future storage adapter),
+ *        something the EXISTING self-consistency check on the buyer side
+ *        (step 4 below) structurally cannot catch, since that check only
+ *        proves the released bytes match whatever digest THIS function
+ *        itself computed — never that the digest matches what the product
+ *        actually declared. A mismatch denies BEFORE ever decrypting or
+ *        wrapping anything.
+ *     4. ONLY on ALLOW at every step above does this function ever call
+ *        `getProtectedContent()` (the caller's own
+ *        `IpfsMediaStore.getProtected()`-backed callback) or touch the
+ *        Master-Seed-derived key AT ALL, via `wrapMediaAccessGrantRelease()`
+ *        (which itself re-runs step 2 before ever calling
+ *        `authority.encryptNip44Wire()` — belt AND braces, same as the
+ *        redeem handler's own design).
  *   A denial at ANY step produces a bounded, reasoned `"denied"` response
  *   payload — never a thrown error, never a bare drop (see
  *   `commerce_private_media_release_sync.ts`'s own header for why a denial
@@ -91,8 +112,8 @@ export interface BuildOutboundPrivateMediaReleaseResponseInput {
   /** This seller process's own real identity for the account the request arrived on. */
   readonly ownPubkeyHex: string;
   readonly order: MediaReleaseRequestOrderWithStatusLike | undefined;
-  /** Must include `storageRef`/`contentType` — fields `MediaReleaseRequestMediaLike` itself does not carry (that policy type only needs id/productId/classification). */
-  readonly media: (MediaReleaseRequestMediaLike & { readonly storageRef: string; readonly contentType: string }) | undefined;
+  /** Must include `storageRef`/`contentType`/`checksum` — fields `MediaReleaseRequestMediaLike` itself does not carry (that policy type only needs id/productId/classification). `checksum` is this product's own declared `ProductMedia.checksum` (`../catalog/product_media_types.ts`) — for `classification: "protected"` media this is a CIPHERTEXT-subject digest (`checksumSubject: "ciphertext"`), the exact quantity `getStoredCiphertextChecksum` below re-derives from the actual store. */
+  readonly media: (MediaReleaseRequestMediaLike & { readonly storageRef: string; readonly contentType: string; readonly checksum: string }) | undefined;
   /** The candidate `MediaAccessGrantEnvelope` for `(mediaId, buyerPubkey, orderId)` at its latest known version, if any — `undefined` means "no grant on file", handled the same as `evaluateMediaAccessGrant()`'s own `envelope: undefined` case. */
   readonly candidateGrantEnvelope: EvaluateMediaAccessGrantInput["envelope"];
   readonly latestKnownGrantVersion: number;
@@ -100,7 +121,19 @@ export interface BuildOutboundPrivateMediaReleaseResponseInput {
   readonly merchantAccountIndex: number;
   /** The SELLER's own, already-unlocked authority — never constructed fresh by this function. */
   readonly authority: FedosMasterSeedAuthority;
-  /** The caller's own `IpfsMediaStore.getProtected()`-backed callback — only ever invoked AFTER the grant independently evaluates ALLOW. */
+  /**
+   * Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) —
+   * synchronous CONTENT-IDENTITY check: the checksum of whatever bytes are
+   * ACTUALLY stored under `storageRef` right now (e.g.
+   * `IpfsMediaStore.metadata(storageRef)?.checksum ?? null`), never a bare
+   * re-statement of `media.checksum` itself — this callback's whole purpose
+   * is to let this function catch the two drifting apart. Sync, since every
+   * real `MediaStorePort.metadata()` implementation in this codebase already
+   * is (`../catalog/media_store_port.ts`). `null` means "unavailable" and is
+   * treated as a mismatch (fail closed).
+   */
+  readonly getStoredCiphertextChecksum: (storageRef: string) => string | null;
+  /** The caller's own `IpfsMediaStore.getProtected()`-backed callback — only ever invoked AFTER the grant independently evaluates ALLOW AND the content-identity check above passes. */
   readonly getProtectedContent: (storageRef: string) => Promise<Uint8Array | null>;
 }
 
@@ -134,7 +167,7 @@ export async function buildOutboundPrivateMediaReleaseResponse(
   if (!authorization.authorized) return denied(authorization.reason);
   // Narrowed non-undefined by the authorization check above.
   const order = input.order as MediaReleaseRequestOrderWithStatusLike;
-  const media = input.media as MediaReleaseRequestMediaLike & { readonly storageRef: string; readonly contentType: string };
+  const media = input.media as MediaReleaseRequestMediaLike & { readonly storageRef: string; readonly contentType: string; readonly checksum: string };
 
   const decision = evaluateMediaAccessGrant({
     envelope: input.candidateGrantEnvelope,
@@ -145,6 +178,16 @@ export async function buildOutboundPrivateMediaReleaseResponse(
     latestKnownGrantVersion: input.latestKnownGrantVersion,
   });
   if (!decision.allowed) return denied(decision.reason);
+
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) —
+  // CONTENT-IDENTITY gate, BEFORE ever touching the decryption key. See this
+  // file's own header, step 3. Fail-closed: `null` (store has no record for
+  // this `storageRef`, or the caller's callback itself is unavailable) is
+  // treated exactly like an explicit mismatch, never like "skip the check".
+  const storedChecksum = input.getStoredCiphertextChecksum(media.storageRef);
+  if (storedChecksum === null || storedChecksum !== media.checksum) {
+    return denied("content-checksum-mismatch");
+  }
 
   const decrypted = await input.getProtectedContent(media.storageRef);
   if (decrypted === null) return denied("content-unavailable");

@@ -72,6 +72,20 @@
  *      catch this, since the attacker's signature is genuinely valid for
  *      the attacker's own key — this is a second, independent check).
  *
+ * STATUS UPDATE (ProductMedia Sync Protocol, Agent M, Commerce
+ * Product-Media Sync + Truthful Completion mega-arc, Wave A) — `ingest()`
+ * now also handles `product-media-declaration`/`product-media-retraction`
+ * (delegating to the pure `ProductMediaSyncReadModel` domain class,
+ * `../catalog/product_media_sync_read_model.js`, fed from this SAME
+ * `#products` map for product/signer binding). See
+ * `docs/commerce/PRODUCTMEDIA-SYNC-PROTOCOL-DESIGN.md` for the full design
+ * — this closes `PROTECTED-MEDIA-CROSS-PROCESS-REACHABILITY.md`'s Blocker
+ * 1 / Addendum 2's "NEW limitation" (a buyer's process previously had no
+ * way to learn a product has protected media at all). Still not wired into
+ * `createCommerce()`'s barrel, same status as the rest of this file; the
+ * Wave B composition-root merge point is documented in the design doc, not
+ * built by this agent.
+ *
  * RESILIENCE (original brief's own explicit requirement)
  * ----------------------------------------------------------------------
  * `ingest()` is synchronous, total, and NEVER throws — a malformed
@@ -129,6 +143,10 @@ import {
   type CommerceNostrProductKindMirror,
   type CommercePublicProductStatus,
 } from "./commerce_nostr_event_drafts.js";
+import {
+  ProductMediaSyncReadModel,
+  type ProductMediaSyncView,
+} from "../catalog/product_media_sync_read_model.js";
 
 // ---------------------------------------------------------------------------
 // Inbound envelope — the ONE shape this file accepts from any transport.
@@ -193,7 +211,9 @@ export type CommerceNostrIngestOutcome =
   | "rejected-unknown-shape"
   | "rejected-signer-mismatch"
   | "rejected-stale-version"
-  | "rejected-unknown-product";
+  | "rejected-unknown-product"
+  | "rejected-malformed"
+  | "rejected-product-mismatch";
 
 export interface CommerceNostrIngestResult {
   readonly outcome: CommerceNostrIngestOutcome;
@@ -217,6 +237,22 @@ export class CommerceNostrProductReadModel {
    * this wave gives them dedup-only bookkeeping (no versioning/signer
    * semantics defined yet for those categories; see this file's header). */
   readonly #otherRecords = new Map<string, { readonly category: string; readonly eventId: string }>();
+  /**
+   * ProductMedia Sync Protocol (Agent M, Commerce Product-Media Sync +
+   * Truthful Completion mega-arc, Wave A) — composed, not duplicated: this
+   * class delegates ALL `product-media-declaration`/`product-media-
+   * retraction` ordering/replay/product-binding logic to the pure domain
+   * `ProductMediaSyncReadModel` (`../catalog/product_media_sync_read_model.js`),
+   * fed with this SAME `#products` map for the "is the claimed seller the
+   * product's real creator" check — see `docs/commerce/
+   * PRODUCTMEDIA-SYNC-PROTOCOL-DESIGN.md`'s "Coordinator integration
+   * point" section. This is the concrete mechanism behind "the buyer's
+   * declaration materializes through the SAME real sync/read-model
+   * mechanism Product publication itself uses" — one process, one
+   * `CommerceNostrProductReadModel` instance, one `ingest()` entry point,
+   * for both product and product-media events.
+   */
+  readonly #productMedia = new ProductMediaSyncReadModel();
 
   ingest(envelope: InboundCommerceNostrEnvelope): CommerceNostrIngestResult {
     if (this.#appliedEventIds.has(envelope.eventId)) {
@@ -320,6 +356,34 @@ export class CommerceNostrProductReadModel {
         return { outcome: "applied", reason: "product-update applied", productId: draft.productId };
       }
 
+      case "product-media-declaration": {
+        const knownCreator = this.#products.get(draft.productId)?.creatorPubkeyHex;
+        const result = this.#productMedia.ingestDeclaration(
+          { eventId: envelope.eventId, authorPubkeyHex: envelope.authorPubkeyHex, signatureVerified: envelope.signatureVerified, receivedAt: envelope.receivedAt },
+          draft,
+          knownCreator,
+        );
+        // The domain read model owns its own duplicate-eventId bookkeeping
+        // independently — mirror that into this class's own
+        // `#appliedEventIds` too, so `appliedEventCount`/future categories
+        // sharing an event-id namespace stay consistent (an event id is
+        // globally unique per real Nostr event, never reused across
+        // categories in practice, but this keeps the invariant explicit).
+        if (result.outcome === "applied") this.#appliedEventIds.add(envelope.eventId);
+        return { outcome: result.outcome, reason: result.reason, productId: draft.productId };
+      }
+
+      case "product-media-retraction": {
+        const knownCreator = this.#products.get(draft.productId)?.creatorPubkeyHex;
+        const result = this.#productMedia.ingestRetraction(
+          { eventId: envelope.eventId, authorPubkeyHex: envelope.authorPubkeyHex, signatureVerified: envelope.signatureVerified, receivedAt: envelope.receivedAt },
+          draft,
+          knownCreator,
+        );
+        if (result.outcome === "applied") this.#appliedEventIds.add(envelope.eventId);
+        return { outcome: result.outcome, reason: result.reason, productId: draft.productId };
+      }
+
       default: {
         // order-commitment / trade-completion-attestation /
         // reputation-attestation / media-manifest-reference: dedup-only
@@ -348,6 +412,30 @@ export class CommerceNostrProductReadModel {
    */
   listProducts(): readonly CommerceReadModelProductView[] {
     return [...this.#products.values()];
+  }
+
+  /**
+   * ProductMedia Sync Protocol (Agent M, Wave A) — every currently-applied
+   * `ProductMedia` declaration for `productId`, on THIS process, learned
+   * purely from verified Nostr events (never bytes, never a decryption
+   * key). This is the exact seam a Coordinator's buyer-side composition
+   * root should merge into `commerceProductMediaState()`'s own
+   * `listForProduct()` result — see the design doc's "Coordinator
+   * integration point" section for why no shape translation is needed to
+   * feed `evaluateDigitalContentDeliveryInvariantForOrderCompletion()`.
+   */
+  listProductMedia(productId: string): readonly ProductMediaSyncView[] {
+    return this.#productMedia.listForProduct(productId);
+  }
+
+  /** One media declaration by id, or `undefined` if never (yet) applied. */
+  getProductMedia(mediaId: string): ProductMediaSyncView | undefined {
+    return this.#productMedia.getView(mediaId);
+  }
+
+  /** `true` iff a real, verified retraction has been applied for `mediaId` — see design doc §7/§10 for the buyer-facing "unavailable" state this backs. */
+  isProductMediaRetracted(mediaId: string): boolean {
+    return this.#productMedia.isRetracted(mediaId);
   }
 
   /** Test/introspection helper — total count of distinct event ids ever

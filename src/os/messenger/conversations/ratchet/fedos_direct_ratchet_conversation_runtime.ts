@@ -17,6 +17,7 @@
  * migration, no automatic session creation, no silent route change.
  */
 import type { FedosDeviceRegistryPersistence } from "../../device/persistence/fedos_device_registry_persistence.js";
+import type { FedosDirectRatchetSessionRecordV1 } from "./fedos_direct_ratchet_session_record.js";
 import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
 import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import type { FedosConversationId } from "../fedos_conversation_id.js";
@@ -281,6 +282,21 @@ export class FedosDirectRatchetConversationRuntime {
   /** Alias mirroring Phase M's own named `assessDirectRatchetReadiness()` operation — identical to `getDirectRatchetStatus()`. */
   assessDirectRatchetReadiness(conversationId: string, remoteDeviceRef: string): FedosDirectRatchetSafeStatus {
     return this.getDirectRatchetStatus(conversationId, remoteDeviceRef);
+  }
+
+  /**
+   * Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+   * a narrow, additive, read-only delegation to the already-existing
+   * session-persistence listing, needed by
+   * `FedosIdentityTransitionPeerRuntime.assessIdentityTransitionRatchetImpact()`
+   * to plan which real sessions an Identity Replacement's Ratchet reset
+   * would affect. Mirrors `getDirectRatchetStatus()`'s own "delegate to an
+   * already-public persistence method, no new business logic" shape —
+   * never exposes session secrets, only the same record shape the
+   * persistence layer already returns.
+   */
+  listLiveSessions(): readonly FedosDirectRatchetSessionRecordV1[] {
+    return this.#deps.sessionPersistence.listSessions();
   }
 
   /** Phase E — real ratchet message send. Requires an already-persisted local Envelope for `envelopeId` (the SAME requirement `FedosPrivateTransport.sendMailboxNip17()` itself enforces). */

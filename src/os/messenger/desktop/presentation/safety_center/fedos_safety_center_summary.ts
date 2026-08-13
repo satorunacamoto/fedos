@@ -30,6 +30,19 @@ export interface FedosSafetyCenterRawFacts {
   readonly peerCapabilityStatuses: readonly FedosRatchetPeerCapabilityPeerDeviceStatus[];
   readonly peerCapabilityRuntimeConfigured: boolean;
   readonly pendingIdentityReplacementCount: number;
+  /**
+   * FedOS Commerce Product-Media Sync + Truthful Completion mega-arc, Wave
+   * A (Agent S) — Task 1: old-key continuity auto-accept visibility
+   * recovery. Replacements that FedOS's own default local policy already
+   * accepted WITHOUT ever asking the user (old-key-only continuity
+   * evidence under `autoAcceptOldKeyContinuity: true`) — counted
+   * separately from `pendingIdentityReplacementCount` because these never
+   * appear in any pending/review queue at all, so without this count
+   * nobody would ever see that they happened. See
+   * `fedos_identity_transition_silent_acceptance_detection.ts`. This is a
+   * visibility fact only — it does not imply the policy itself changed.
+   */
+  readonly accountSilentlyAcceptedIdentityReplacementCount: number;
   readonly identityReplacementRuntimeConfigured: boolean;
   readonly pendingDeletionConsentCount: number;
   readonly mixedOrUnknownDeletionOutcomeCount: number;
@@ -51,6 +64,8 @@ export interface FedosSafetyCenterSummaryV1 {
   readonly resetRequiredRatchetSessionCount: number;
   readonly peerCapabilityConflictCount: number;
   readonly pendingIdentityReplacementCount: number;
+  /** Wave A (Agent S) Task 1 — see `FedosSafetyCenterRawFacts`'s own field of the same name. */
+  readonly accountSilentlyAcceptedIdentityReplacementCount: number;
   readonly pendingDeletionConsentCount: number;
   readonly mixedOrUnknownDeletionOutcomeCount: number;
   readonly notificationsEnabled: boolean | null;
@@ -125,11 +140,23 @@ export function fedosSafetyCenterBuildSummary(facts: FedosSafetyCenterRawFacts):
         ? sectionState("peer-capabilities", "attention", `${peerAttentionCount} peer capability observation(s) need review`)
         : sectionState("peer-capabilities", "ready");
 
+  // Wave A (Agent S) Task 1 — an already-silently-accepted replacement is
+  // reported first and at a HIGHER severity ("warning", not "attention")
+  // than a merely-pending one: it is the more dangerous of the two,
+  // because nobody will ever be prompted to look at it (it is not in any
+  // review queue). Ranking it above "pending" mirrors the reference fix
+  // this Task ports (`docs`/`git log` reference only, not merged).
   const identitySection: FedosSafetyCenterSectionSummary = !facts.identityReplacementRuntimeConfigured
     ? sectionState("identity-replacement", "unavailable", "Identity Transition Runtime is not configured")
-    : facts.pendingIdentityReplacementCount > 0
-      ? sectionState("identity-replacement", "attention", `${facts.pendingIdentityReplacementCount} pending review(s)`)
-      : sectionState("identity-replacement", "ready");
+    : facts.accountSilentlyAcceptedIdentityReplacementCount > 0
+      ? sectionState(
+          "identity-replacement",
+          "warning",
+          `${facts.accountSilentlyAcceptedIdentityReplacementCount} replacement(s) were accepted automatically without asking you`,
+        )
+      : facts.pendingIdentityReplacementCount > 0
+        ? sectionState("identity-replacement", "attention", `${facts.pendingIdentityReplacementCount} pending review(s)`)
+        : sectionState("identity-replacement", "ready");
 
   const deletionSection: FedosSafetyCenterSectionSummary = !facts.deletionRequestRuntimeConfigured
     ? sectionState("deletion-requests", "unavailable", "Deletion Request Runtime is not configured")
@@ -168,6 +195,7 @@ export function fedosSafetyCenterBuildSummary(facts: FedosSafetyCenterRawFacts):
     facts.ratchetSessionStatuses.filter((s) => s === "reset-required").length +
     peerConflictCount +
     facts.pendingIdentityReplacementCount +
+    facts.accountSilentlyAcceptedIdentityReplacementCount +
     facts.pendingDeletionConsentCount +
     facts.mixedOrUnknownDeletionOutcomeCount;
 
@@ -183,6 +211,7 @@ export function fedosSafetyCenterBuildSummary(facts: FedosSafetyCenterRawFacts):
     resetRequiredRatchetSessionCount: facts.ratchetSessionStatuses.filter((s) => s === "reset-required").length,
     peerCapabilityConflictCount: peerConflictCount,
     pendingIdentityReplacementCount: facts.pendingIdentityReplacementCount,
+    accountSilentlyAcceptedIdentityReplacementCount: facts.accountSilentlyAcceptedIdentityReplacementCount,
     pendingDeletionConsentCount: facts.pendingDeletionConsentCount,
     mixedOrUnknownDeletionOutcomeCount: facts.mixedOrUnknownDeletionOutcomeCount,
     notificationsEnabled: facts.notificationsEnabled,

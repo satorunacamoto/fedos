@@ -105,7 +105,8 @@ function toPaid(o: Order): Order {
   return paid.order;
 }
 
-const MEDIA = { id: MEDIA_ID, productId: PRODUCT_ID, classification: "protected" as const, storageRef: "storage-ref-1", contentType: "application/pdf" };
+const REAL_STORED_CIPHERTEXT_CHECKSUM = "a".repeat(64);
+const MEDIA = { id: MEDIA_ID, productId: PRODUCT_ID, classification: "protected" as const, storageRef: "storage-ref-1", contentType: "application/pdf", checksum: REAL_STORED_CIPHERTEXT_CHECKSUM };
 
 function issueRealGrant(order: Order, persistence: AppendOnlyMediaAccessGrantPersistence): void {
   const existingGrants = persistence.listGrants();
@@ -135,7 +136,7 @@ async function sellerBuildResponse(
   persistence: AppendOnlyMediaAccessGrantPersistence,
   requestBuyer: string,
   senderPubkeyHex: string,
-  opts: { readonly storeReturnsNull?: boolean } = {},
+  opts: { readonly storeReturnsNull?: boolean; readonly storedChecksum?: string | null } = {},
 ) {
   const { latest, candidate } = candidateGrantFor(persistence, order, requestBuyer);
   const input: BuildOutboundPrivateMediaReleaseResponseInput = {
@@ -149,6 +150,12 @@ async function sellerBuildResponse(
     now: NOW,
     merchantAccountIndex: 0,
     authority: new FakeDirectionalAuthority(SELLER) as unknown as FedosMasterSeedAuthority,
+    // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) --
+    // defaults to a genuine match (`MEDIA.checksum`) so every pre-existing
+    // scenario in this file is unaffected; `opts.storedChecksum` lets a test
+    // simulate the store actually holding DIFFERENT (or unavailable) bytes
+    // than the product's own declared checksum.
+    getStoredCiphertextChecksum: () => (opts.storedChecksum !== undefined ? opts.storedChecksum : MEDIA.checksum),
     getProtectedContent: async () => (opts.storeReturnsNull ? null : REAL_CONTENT),
   };
   return buildOutboundPrivateMediaReleaseResponse(input);
@@ -327,6 +334,26 @@ describe("Private media-release channel -- assembled end-to-end", () => {
     expect(response.outcome).toBe("denied");
     if (response.outcome !== "denied") throw new Error("unreachable");
     expect(response.reason).toBe("revoked");
+  });
+
+  it("REJECT (Agent C): stored ciphertext checksum does not match the product's declared ProductMedia checksum -- denied before any decrypt is ever attempted", async () => {
+    const order = toPaid(buildOrder());
+    const persistence = new AppendOnlyMediaAccessGrantPersistence(join(freshDir(), "grants.ndjson"));
+    issueRealGrant(order, persistence);
+    const response = await sellerBuildResponse(order, persistence, order.buyerPubkey, order.buyerPubkey, { storedChecksum: "b".repeat(64) /* differs from MEDIA.checksum */ });
+    expect(response.outcome).toBe("denied");
+    if (response.outcome !== "denied") throw new Error("unreachable");
+    expect(response.reason).toBe("content-checksum-mismatch");
+  });
+
+  it("REJECT (Agent C): store has no record at all for this storageRef -- fail-closed as a mismatch, not silently skipped", async () => {
+    const order = toPaid(buildOrder());
+    const persistence = new AppendOnlyMediaAccessGrantPersistence(join(freshDir(), "grants.ndjson"));
+    issueRealGrant(order, persistence);
+    const response = await sellerBuildResponse(order, persistence, order.buyerPubkey, order.buyerPubkey, { storedChecksum: null });
+    expect(response.outcome).toBe("denied");
+    if (response.outcome !== "denied") throw new Error("unreachable");
+    expect(response.reason).toBe("content-checksum-mismatch");
   });
 
   it("order-completion invariant: a digital order with an UNRELEASED protected media item is never satisfied", () => {

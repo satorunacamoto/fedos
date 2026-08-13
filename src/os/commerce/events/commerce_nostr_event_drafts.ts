@@ -12,10 +12,16 @@
  * call (`commerce_nostr_event_port.ts` enforces this at the Port boundary;
  * this file only defines what "valid" means).
  *
- * WHY SIX CATEGORIES, NO MORE
+ * WHY SIX CATEGORIES, NO MORE (updated: now EIGHT — see below)
  * ----------------------------------------------------------------------
  * Each category below is the coarsest, smallest public artifact that still
- * lets Commerce accomplish one real thing on a public relay:
+ * lets Commerce accomplish one real thing on a public relay. ProductMedia
+ * Sync Protocol (Agent M, Commerce Product-Media Sync + Truthful
+ * Completion mega-arc, Wave A) added two more, `product-media-declaration`
+ * / `product-media-retraction` — see their own section below and
+ * `docs/commerce/PRODUCTMEDIA-SYNC-PROTOCOL-DESIGN.md` for the full design
+ * (why `media-manifest-reference` below was NOT reused/repurposed for
+ * this — checked directly against the requirements, does not fit).
  *   - `product-publication` / `product-update` — list/update a PUBLIC
  *     product (mirrors `../catalog/types.ts`'s `Product`, `visibility:
  *     "public"` only — see that file's own doc comment: price/description
@@ -70,6 +76,10 @@ import {
   isWellFormedReputationAttestationPayload,
   isWellFormedTradeCompletionAttestationPayload,
 } from "../reputation/attestation_types.js";
+import {
+  validateProductMediaDeclaration,
+  validateProductMediaRetraction,
+} from "../catalog/product_media_declaration_types.js";
 
 // ---------------------------------------------------------------------------
 // Shared primitives
@@ -151,6 +161,8 @@ export const COMMERCE_NOSTR_EVENT_CATEGORIES = [
   "trade-completion-attestation",
   "reputation-attestation",
   "media-manifest-reference",
+  "product-media-declaration",
+  "product-media-retraction",
 ] as const;
 
 export type CommerceNostrEventCategory = (typeof COMMERCE_NOSTR_EVENT_CATEGORIES)[number];
@@ -513,6 +525,147 @@ export function isWellFormedMediaManifestReferenceEventDraft(
 }
 
 // ---------------------------------------------------------------------------
+// 7/8. product-media-declaration / product-media-retraction
+//
+// ProductMedia Sync Protocol (Agent M, Commerce Product-Media Sync +
+// Truthful Completion mega-arc, Wave A) — see
+// `docs/commerce/PRODUCTMEDIA-SYNC-PROTOCOL-DESIGN.md` for the full design
+// (why these two categories exist rather than reusing
+// `media-manifest-reference` above — checked directly, does not fit: no
+// `classification`, no `checksumSubject`, no ordering field, no
+// seller-binding field), the complete field-by-field privacy
+// classification, and the ordering/replay-rejection worked example.
+//
+// PUBLIC-SAFE FIELD ALLOWLIST, same discipline as every category above —
+// every field is already as public as the `product-publication` event this
+// media is attached to (see the design doc's privacy table for exactly
+// why each field is safe). Deliberately EXCLUDES `storageRef` (an opaque,
+// backend-specific pointer that could leak internal storage layout — same
+// reasoning `media-manifest-reference` above already documents for never
+// carrying a raw pointer/URL) and exact `sizeBytes` (a coarse `sizeClass`
+// bucket is carried instead — design doc "resolved ambiguities" #2).
+// Structural validation (including the "protected implies checksumSubject
+// ciphertext" invariant) is delegated to the pure domain validators in
+// `../catalog/product_media_declaration_types.ts` — this file does not
+// duplicate that logic, only adds the category/formatVersion/allowlist
+// checks every sibling draft already performs.
+// ---------------------------------------------------------------------------
+
+/** Local mirror of `ProductMediaRole` (`../catalog/product_media_types.ts`) — imported directly rather than re-declared, since (unlike `CommerceNostrProductKindMirror`'s own stated reason for mirroring `ProductKind`) `product_media_types.ts` is this SAME wave's own, already-stable territory, not another agent's active work. */
+export type { ProductMediaRole, ProductMediaClassification, ProductMediaChecksumSubject } from "../catalog/product_media_types.js";
+export type { ProductMediaSizeClass } from "../catalog/product_media_declaration_types.js";
+
+import type {
+  ProductMediaChecksumSubject as _PMChecksumSubject,
+  ProductMediaClassification as _PMClassification,
+  ProductMediaRole as _PMRole,
+} from "../catalog/product_media_types.js";
+import type { ProductMediaSizeClass as _PMSizeClass } from "../catalog/product_media_declaration_types.js";
+
+export interface ProductMediaDeclarationEventDraft {
+  readonly category: "product-media-declaration";
+  readonly formatVersion: 1;
+  readonly mediaId: string;
+  readonly productId: string;
+  /** The product's real, already-public creator pubkey — see design doc §5/§9. */
+  readonly sellerPubkey: string;
+  readonly role: _PMRole;
+  readonly classification: _PMClassification;
+  readonly contentType: string;
+  readonly sizeClass: _PMSizeClass;
+  readonly checksum: string;
+  readonly checksumSubject: _PMChecksumSubject;
+  readonly altText?: string;
+  /** Monotonic per-mediaId ordering authority — never a timestamp. See design doc §6. */
+  readonly version: number;
+  readonly declaredAt: number;
+}
+
+export const PRODUCT_MEDIA_DECLARATION_EVENT_ALLOWED_KEYS: ReadonlySet<string> = new Set([
+  "category",
+  "formatVersion",
+  "mediaId",
+  "productId",
+  "sellerPubkey",
+  "role",
+  "classification",
+  "contentType",
+  "sizeClass",
+  "checksum",
+  "checksumSubject",
+  "altText",
+  "version",
+  "declaredAt",
+]);
+
+export function isWellFormedProductMediaDeclarationEventDraft(
+  value: unknown,
+): value is ProductMediaDeclarationEventDraft {
+  if (typeof value !== "object" || value === null) return false;
+  const c = value as Record<string, unknown>;
+  if (!hasOnlyAllowedKeys(c, PRODUCT_MEDIA_DECLARATION_EVENT_ALLOWED_KEYS)) return false;
+  if (c.category !== "product-media-declaration") return false;
+  if (c.formatVersion !== 1) return false;
+  return validateProductMediaDeclaration({
+    mediaId: c.mediaId,
+    productId: c.productId,
+    sellerPubkey: c.sellerPubkey,
+    role: c.role,
+    classification: c.classification,
+    contentType: c.contentType,
+    sizeClass: c.sizeClass,
+    checksum: c.checksum,
+    checksumSubject: c.checksumSubject,
+    altText: c.altText,
+    version: c.version,
+    declaredAt: c.declaredAt,
+  }).valid;
+}
+
+/**
+ * The unpublish/removal signal — a sibling category, not a status field on
+ * the declaration itself (design doc §7: `ProductMedia` has no per-item
+ * lifecycle field to mirror the way a whole `Product` does).
+ */
+export interface ProductMediaRetractionEventDraft {
+  readonly category: "product-media-retraction";
+  readonly formatVersion: 1;
+  readonly mediaId: string;
+  readonly productId: string;
+  readonly sellerPubkey: string;
+  /** MUST exceed every previously-applied version for this mediaId — see design doc §7/§8 for why retraction also advances the ordering watermark. */
+  readonly version: number;
+  readonly retractedAt: number;
+}
+
+export const PRODUCT_MEDIA_RETRACTION_EVENT_ALLOWED_KEYS: ReadonlySet<string> = new Set([
+  "category",
+  "formatVersion",
+  "mediaId",
+  "productId",
+  "sellerPubkey",
+  "version",
+  "retractedAt",
+]);
+
+export function isWellFormedProductMediaRetractionEventDraft(
+  value: unknown,
+): value is ProductMediaRetractionEventDraft {
+  if (typeof value !== "object" || value === null) return false;
+  const c = value as Record<string, unknown>;
+  if (!hasOnlyAllowedKeys(c, PRODUCT_MEDIA_RETRACTION_EVENT_ALLOWED_KEYS)) return false;
+  if (c.category !== "product-media-retraction") return false;
+  if (c.formatVersion !== 1) return false;
+  return validateProductMediaRetraction({
+    mediaId: c.mediaId,
+    productId: c.productId,
+    sellerPubkey: c.sellerPubkey,
+    version: c.version,
+    retractedAt: c.retractedAt,
+  }).valid;
+}
+
+// ---------------------------------------------------------------------------
 // Union + dispatcher
 // ---------------------------------------------------------------------------
 
@@ -522,7 +675,9 @@ export type CommerceNostrEventDraft =
   | OrderCommitmentEventDraft
   | TradeCompletionAttestationEventDraft
   | ReputationAttestationEventDraft
-  | MediaManifestReferenceEventDraft;
+  | MediaManifestReferenceEventDraft
+  | ProductMediaDeclarationEventDraft
+  | ProductMediaRetractionEventDraft;
 
 /**
  * The single entry point every `CommerceNostrEventPort` implementation MUST
@@ -546,6 +701,10 @@ export function isWellFormedCommerceNostrEventDraft(value: unknown): value is Co
       return isWellFormedReputationAttestationEventDraft(value);
     case "media-manifest-reference":
       return isWellFormedMediaManifestReferenceEventDraft(value);
+    case "product-media-declaration":
+      return isWellFormedProductMediaDeclarationEventDraft(value);
+    case "product-media-retraction":
+      return isWellFormedProductMediaRetractionEventDraft(value);
     default:
       return false;
   }
@@ -563,4 +722,6 @@ export const COMMERCE_NOSTR_EVENT_DRAFT_ALLOWED_KEYS: Readonly<
   "trade-completion-attestation": TRADE_COMPLETION_ATTESTATION_EVENT_ALLOWED_KEYS,
   "reputation-attestation": REPUTATION_ATTESTATION_EVENT_ALLOWED_KEYS,
   "media-manifest-reference": MEDIA_MANIFEST_REFERENCE_EVENT_ALLOWED_KEYS,
+  "product-media-declaration": PRODUCT_MEDIA_DECLARATION_EVENT_ALLOWED_KEYS,
+  "product-media-retraction": PRODUCT_MEDIA_RETRACTION_EVENT_ALLOWED_KEYS,
 };

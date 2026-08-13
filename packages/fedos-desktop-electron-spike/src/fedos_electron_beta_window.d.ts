@@ -191,6 +191,8 @@ interface FedosCommerceProductDetail {
   readonly creatorPubkey: string;
   /** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- true only when this response came from the creator-only draft/unpublished preview path (friction ledger row #24), never for an ordinary published buyer view. */
   readonly isPreview: boolean;
+  /** Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) -- the pre-purchase truthful declaration (§16/§67). `"unknown"` (never a false `"absent"`) whenever this process's own knowledge of the seller's real declarations is not authoritative (a buyer's process) and it has not itself seen a protected declaration yet. */
+  readonly protectedContent: "present" | "absent" | "unknown";
 }
 
 interface FedosCommerceProductDetailResult {
@@ -531,10 +533,13 @@ interface FedosAppBridge {
   readonly identityTransitionReject: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
   readonly identityTransitionDefer: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
   readonly identityTransitionRecordManualVerification: (method: string, noteCode: string) => Promise<FedosAppCommandResult>;
+  readonly identityTransitionAssessContinuity: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
+  readonly identityTransitionAuthorizeRatchetReset: (peerAccountRef: unknown, peerDeviceRef: string, transitionId: string) => Promise<FedosAppCommandResult>;
   readonly deletionRequestListReceived: () => Promise<FedosAppCommandResult>;
   readonly deletionRequestOpen: (requestId: string) => Promise<FedosAppCommandResult>;
   readonly deletionRequestApprove: (requestId: string) => Promise<FedosAppCommandResult>;
   readonly deletionRequestReject: (requestId: string) => Promise<FedosAppCommandResult>;
+  readonly deletionRequestCreate: (conversationId: string, messageId: string, scope: string, reasonCode: string | null, expiresInSeconds: number | null) => Promise<FedosAppCommandResult>;
   readonly safetyCenterOverview: () => Promise<FedosAppCommandResult>;
   readonly settingsLoad: () => Promise<FedosAppCommandResult>;
   readonly relayStatus: () => Promise<FedosAppCommandResult>;

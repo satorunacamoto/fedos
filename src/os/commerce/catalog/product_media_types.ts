@@ -120,3 +120,53 @@ export function validateProductMedia(media: {
   }
   return { valid: true, reason: "valid" };
 }
+
+/**
+ * Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) —
+ * coarse, PRODUCT-level delivery classification derived PURELY from a
+ * Product's own declared `ProductMedia` records' `classification` field
+ * above — never inferred from "does some local file happen to exist" (the
+ * exact vacuity `docs/commerce/PROTECTED-MEDIA-CROSS-PROCESS-REACHABILITY.md`'s
+ * Addendum 2 documents for the per-process `ProductMedia` view). This is the
+ * shared vocabulary `../media_grant/media_access_grant_release_channel_policy.ts`'s
+ * `evaluateDigitalContentDeliveryInvariantForOrderCompletion()` and
+ * `../media_grant/digital_content_delivery_display_state.ts` both key off of
+ * to answer "does this Product require a protected digital release before it
+ * can honestly be called delivered?"
+ *
+ *   - "no-digital-deliverable" — the caller-supplied `productMedia` list is
+ *     empty. PRE-FEATURE, backward-compatible semantics (requirement 5 of
+ *     this arc): a physical-goods/service Order for such a Product completes
+ *     exactly as it always has — this classification never NEWLY blocks it.
+ *     NOTE: an empty list can ALSO mean "this process has not synced this
+ *     Product's media yet" (the cross-process gap) rather than "genuinely no
+ *     media exists" — this function has no way to tell those apart from the
+ *     list alone (deliberately: it is a one-shot, knowledge-provenance-
+ *     unaware helper). A caller that needs that distinction — most
+ *     importantly `evaluateDigitalContentDeliveryInvariantForOrderCompletion()`
+ *     at order-completion time — MUST additionally supply its own
+ *     `productMediaKnowledge` signal; see that function's own header.
+ *   - "public-content-only" — at least one `ProductMedia` record exists, and
+ *     every one is `classification: "public"`. Nothing to gate — public
+ *     media needs no grant/release.
+ *   - "protected-digital-deliverable" — at least one `ProductMedia` record is
+ *     `classification: "protected"`. THIS is the bucket the digital-content
+ *     delivery invariant enforces: completion for a Product in this bucket
+ *     must never be representable as successful unless every protected item
+ *     has a REAL, verified release on file for this Order's own buyer.
+ */
+export type ProductDeliveryClassification = "no-digital-deliverable" | "public-content-only" | "protected-digital-deliverable";
+
+/**
+ * Pure derivation — see `ProductDeliveryClassification`'s own doc for the
+ * exact rule. `productMedia` should already be scoped to one `productId` by
+ * the caller (mirrors this codebase's pervasive "caller resolves references"
+ * discipline); this function does not itself filter by `productId`. Never
+ * throws.
+ */
+export function deriveProductDeliveryClassification(
+  productMedia: readonly Pick<ProductMedia, "classification">[],
+): ProductDeliveryClassification {
+  if (productMedia.length === 0) return "no-digital-deliverable";
+  return productMedia.some((media) => media.classification === "protected") ? "protected-digital-deliverable" : "public-content-only";
+}

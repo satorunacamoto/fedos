@@ -1384,17 +1384,28 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
   const unavailableNote = byId("commerce-detail-order-unavailable-note");
   unavailableNote.textContent = availability.blockedReason;
   unavailableNote.toggleAttribute("hidden", availability.blockedReason.length === 0);
+  // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) --
+  // THE truthful pre-purchase declaration (§16/§67) this build previously
+  // had no per-product signal for (see the superseded comment this
+  // replaces, still visible in git history). Never claims content exists
+  // when this process genuinely cannot know yet -- "unknown" renders as an
+  // honest "not confirmed yet", never a false "no protected content".
+  const declarationEl = byId("commerce-detail-media-declaration");
+  if (product.protectedContent === "present") {
+    declarationEl.textContent = "Includes protected digital content — available to you after your order is confirmed and the seller fulfills it.";
+  } else if (product.protectedContent === "unknown") {
+    declarationEl.textContent = "Whether this listing includes protected digital content hasn't synced to this device yet — check back, or view again after reconnecting.";
+  } else {
+    declarationEl.textContent = "";
+  }
   // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
   // item 5: a clear delivery expectation shown BEFORE checkout, never only
-  // discovered after paying. Deliberately mirrors this app's own existing,
-  // already-honest post-purchase copy ("Digital content from this
-  // purchase, if the seller attached any.", `#commerce-order-purchased-content-actions`)
-  // rather than inventing a second, differently-worded promise -- this
-  // build has no per-product signal for "does this listing actually have
-  // protected content attached" (see `FedosCommerceProductDetail`'s own
-  // shape), so this never claims content exists; it explains the REAL
-  // mechanics (pay -> seller fulfills -> you confirm receipt yourself)
-  // that apply to every order regardless.
+  // discovered after paying. Mirrors this app's own existing, already-honest
+  // post-purchase copy ("Digital content from this purchase, if the seller
+  // attached any.", `#commerce-order-purchased-content-actions`) rather than
+  // inventing a second, differently-worded promise; explains the REAL
+  // mechanics (pay -> seller fulfills -> you confirm receipt yourself) that
+  // apply to every order regardless of the declaration above.
   // Deliberately avoids the words "pay"/"paid": this screen's own structural
   // guard (`commerce_reachable_catalog_phase1_structural_guards.test.ts`,
   // "no 'Buy Now'/instant-purchase button, and PAID is never one click away
@@ -3572,7 +3583,18 @@ async function refreshIdentityTransitionList(): Promise<void> {
   list.textContent = "";
   byId("identity-transition-detail").textContent = "";
   if (result.outcome !== "ok") return;
-  const items = (result.value as readonly { readonly transitionId: string; readonly acceptanceState: string; readonly openable: boolean; readonly peerAccountRef: unknown; readonly peerDeviceRef: string | null }[]) ?? [];
+  const items =
+    (result.value as readonly {
+      readonly transitionId: string;
+      readonly acceptanceState: string;
+      readonly openable: boolean;
+      readonly peerAccountRef: unknown;
+      readonly peerDeviceRef: string | null;
+      // FedOS Commerce Product-Media Sync + Truthful Completion mega-arc,
+      // Wave A (Agent S) — Task 1: old-key continuity auto-accept
+      // visibility recovery. Visibility only -- no policy change.
+      readonly silentlyAutoAcceptedWithoutAsking?: boolean;
+    }[]) ?? [];
   if (items.length === 0) {
     const li = document.createElement("li");
     li.textContent = "No pending Identity Replacement items.";
@@ -3581,8 +3603,14 @@ async function refreshIdentityTransitionList(): Promise<void> {
   }
   for (const item of items) {
     const li = document.createElement("li");
-    const glyph = IDENTITY_ACCEPTANCE_GLYPH[item.acceptanceState] ?? "–";
+    const glyph = item.silentlyAutoAcceptedWithoutAsking === true ? "⚠✓" : (IDENTITY_ACCEPTANCE_GLYPH[item.acceptanceState] ?? "–");
     li.textContent = `${glyph} Transition ${item.transitionId} – ${item.acceptanceState}`;
+    if (item.silentlyAutoAcceptedWithoutAsking === true) {
+      const autoAcceptNote = document.createElement("span");
+      autoAcceptNote.className = "warn";
+      autoAcceptNote.textContent = " — accepted automatically, you were not asked";
+      li.appendChild(autoAcceptNote);
+    }
     if (item.openable && item.peerDeviceRef !== null) {
       const openBtn = document.createElement("button");
       openBtn.type = "button";
@@ -3632,6 +3660,10 @@ function renderIdentityTransitionDetail(
     readonly evidenceOutcome: string;
     readonly acceptanceState: string;
     readonly oldKeyOnlyInsufficientWarning: boolean;
+    // FedOS Commerce Product-Media Sync + Truthful Completion mega-arc,
+    // Wave A (Agent S) — Task 1: old-key continuity auto-accept
+    // visibility recovery. Visibility only -- no policy change.
+    readonly silentlyAutoAcceptedWithoutAsking: boolean;
     readonly warningText: readonly string[];
   };
   const summary = document.createElement("p");
@@ -3649,6 +3681,14 @@ function renderIdentityTransitionDetail(
     warn.className = "warn";
     warn.textContent = "The old identity's signature alone is not treated as sufficient here — manual verification is recommended before accepting.";
     container.appendChild(warn);
+  }
+  if (detail.silentlyAutoAcceptedWithoutAsking) {
+    const autoAcceptWarn = document.createElement("p");
+    autoAcceptWarn.className = "warn";
+    autoAcceptWarn.id = "identity-transition-auto-accepted-warning";
+    autoAcceptWarn.textContent =
+      "FedOS accepted this identity replacement automatically because it was signed with your contact's previous key — nobody was asked to confirm it first. Consider confirming with this contact through another channel that they really did replace their identity.";
+    container.appendChild(autoAcceptWarn);
   }
   for (const text of detail.warningText) {
     const p = document.createElement("p");

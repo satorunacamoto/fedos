@@ -19,6 +19,8 @@ export interface FedosIdentityTransitionInboxItem {
   readonly evidenceOutcome: FedosIdentityTransitionPeerStatusView["evidenceOutcome"];
   readonly acceptanceState: FedosIdentityTransitionPeerStatusView["acceptanceState"];
   readonly superseded: boolean;
+  /** Wave A (Agent S) Task 1 — visibility only. See `fedos_identity_transition_silent_acceptance_detection.ts`. */
+  readonly silentlyAutoAcceptedWithoutAsking: boolean;
 }
 
 /** Deterministic ordering: highest revision first, then transitionId — stable across a restart since it never depends on insertion order alone. */
@@ -38,6 +40,7 @@ export function fedosIdentityTransitionBuildInboxItem(view: FedosIdentityTransit
     evidenceOutcome: view.evidenceOutcome,
     acceptanceState: view.acceptanceState,
     superseded: view.superseded,
+    silentlyAutoAcceptedWithoutAsking: view.silentlyAutoAcceptedWithoutAsking,
   });
 }
 

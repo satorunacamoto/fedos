@@ -52,7 +52,18 @@ export type FedosSafetyCenterWarningCode =
    * the first time — restoring history was always separate from
    * restoring a live session (Phase F), but no warning ever said so.
    */
-  | "archive-restore-does-not-imply-live-session-continuity";
+  | "archive-restore-does-not-imply-live-session-continuity"
+  /**
+   * FedOS Commerce Product-Media Sync + Truthful Completion mega-arc, Wave
+   * A (Agent S) — Task 1: old-key continuity auto-accept visibility
+   * recovery. ONE new, standing (always-shown, not conditional on any
+   * transition existing) code disclosing FedOS's own current default
+   * policy, mirroring this codebase's own existing
+   * `"identity-replacement-evidence-is-not-automatic-trust"` /
+   * `"old-key-signature-insufficient-under-compromise"` precedent of
+   * naming a real policy fact plainly. Does not itself change the policy.
+   */
+  | "identity-replacement-old-key-continuity-is-auto-accepted-by-default";
 
 export const FEDOS_SAFETY_CENTER_KNOWN_WARNING_CODES: readonly FedosSafetyCenterWarningCode[] = [
   "device-revocation-does-not-erase-copies",
@@ -74,6 +85,7 @@ export const FEDOS_SAFETY_CENTER_KNOWN_WARNING_CODES: readonly FedosSafetyCenter
   "archive-suppression-sync-is-not-recipient-deletion-acknowledgement",
   "archive-suppression-requires-local-receipt-to-take-effect",
   "archive-restore-does-not-imply-live-session-continuity",
+  "identity-replacement-old-key-continuity-is-auto-accepted-by-default",
 ];
 
 export function isFedosSafetyCenterWarningCode(candidate: unknown): candidate is FedosSafetyCenterWarningCode {
@@ -100,6 +112,7 @@ const TEXT: Readonly<Record<FedosSafetyCenterWarningCode, string>> = {
   "archive-suppression-sync-is-not-recipient-deletion-acknowledgement": "Suppression facts synchronize your own restore policy between your own Devices only — they are separate from, and never automatically created by, a deletion request acknowledgement from someone else's Device.",
   "archive-suppression-requires-local-receipt-to-take-effect": "A Device only refuses to restore a deleted item once it has actually received and recorded that deletion — restoring an old Archive before that point may still show the deleted content.",
   "archive-restore-does-not-imply-live-session-continuity": "Restoring an Archive brings back your message history. It does not reconnect a live conversation by itself — sending a new message may require re-establishing the conversation first, exactly like starting a new one.",
+  "identity-replacement-old-key-continuity-is-auto-accepted-by-default": "By default, FedOS accepts an identity replacement signed with a contact's previous key without asking you first. Anyone who obtains that old key could become that contact this way. See the Identity Replacement section above for whether this has actually happened for any contact.",
 };
 
 /** The ONE place any Safety Center screen resolves warning text — never an inline string in a screen-model builder or Renderer. */

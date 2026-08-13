@@ -1006,6 +1006,25 @@ export class FedosDesktopApplicationShell {
     return fedosDesktopShellFailure("failed", outcome);
   }
 
+  /**
+   * Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) —
+   * the one additive read exposing the REAL `sessionId`/`remoteAccountRef`
+   * shape `authorizeIdentityTransitionRatchetReset()` needs, which
+   * `identityTransitionAssessContinuity()` below deliberately does not
+   * (it wraps a different, narrower Runtime call). Delegates entirely to
+   * already-public Runtime reads — no new business logic.
+   */
+  identityTransitionRatchetImpact(
+    oldAccountIdentity: FedosDeviceBindingAccountRef,
+  ): FedosDesktopShellResult<readonly FedosIdentityTransitionAffectedSession[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "Runtime is not started");
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    const dr = this.#runtime.conversationRuntime().directRatchet();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
+    return fedosDesktopShellOk(it.assessIdentityTransitionRatchetImpact(oldAccountIdentity, dr.listLiveSessions()));
+  }
+
   /** Phase H/I — read-only. Reports each named `(conversationId, remoteDeviceRef)` pair's ALREADY-PUBLIC Ratchet safe status; never mutates anything. */
   identityTransitionAssessContinuity(
     pairs: readonly FedosIdentityTransitionSessionPairToAssess[],

@@ -15,7 +15,19 @@ export type FedosIdentityTransitionWarningCode =
   | "new-secure-session-required"
   | "other-devices-may-decide-independently"
   | "conflicting-claims-require-manual-review"
-  | "archive-restore-does-not-establish-trust";
+  | "archive-restore-does-not-establish-trust"
+  /**
+   * FedOS Commerce Product-Media Sync + Truthful Completion mega-arc, Wave
+   * A (Agent S) — Task 1: old-key continuity auto-accept visibility
+   * recovery. ONE new, narrow, additive code: FedOS's default policy
+   * (`autoAcceptOldKeyContinuity: true`, unchanged by this Task) accepts an
+   * old-key-signed, non-compromise-reason replacement with zero user
+   * interaction. That was previously undetectable from this domain's own
+   * warning set — this code closes that gap without changing the policy
+   * itself. See `fedos_identity_transition_silent_acceptance_detection.ts`
+   * for exactly which transitions this applies to.
+   */
+  | "identity-replacement-auto-accepted-without-asking";
 
 export const FEDOS_IDENTITY_TRANSITION_KNOWN_WARNING_CODES: readonly FedosIdentityTransitionWarningCode[] = Object.freeze([
   "replacement-not-rotation",
@@ -28,6 +40,7 @@ export const FEDOS_IDENTITY_TRANSITION_KNOWN_WARNING_CODES: readonly FedosIdenti
   "other-devices-may-decide-independently",
   "conflicting-claims-require-manual-review",
   "archive-restore-does-not-establish-trust",
+  "identity-replacement-auto-accepted-without-asking",
 ]);
 
 export function isKnownFedosIdentityTransitionWarningCode(value: unknown): value is FedosIdentityTransitionWarningCode {
@@ -45,6 +58,8 @@ const WARNING_TEXT: Readonly<Record<FedosIdentityTransitionWarningCode, string>>
   "other-devices-may-decide-independently": "Other Devices belonging to either party may reach a different decision about this claim than this Device does.",
   "conflicting-claims-require-manual-review": "More than one competing replacement claim was seen for this identity. It cannot be accepted until this is manually reviewed.",
   "archive-restore-does-not-establish-trust": "Restoring an Archive does not, by itself, establish trust in any identity referenced inside it.",
+  "identity-replacement-auto-accepted-without-asking":
+    "FedOS accepted this identity replacement automatically because it was signed with your contact's previous key — nobody was asked to confirm it first. This is expected behavior under FedOS's current default setting, not an error. If you want extra confidence, confirm with this contact through another channel that they really did replace their identity.",
 });
 
 /** Total function — returns the exact registered text for a known code. Unknown codes fail closed to a generic, still-honest fallback rather than throwing. */
