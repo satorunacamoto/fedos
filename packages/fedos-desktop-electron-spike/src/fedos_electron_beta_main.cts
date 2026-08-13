@@ -6881,6 +6881,31 @@ async function handleCommerceShareOpen(payload: unknown) {
  * the raw `resolveCommerceMediaKey()` primitive (it never even imports
  * anything that could) -- this arc's own mandate item 2.
  */
+/**
+ * Coordinator security review (BUYER DISCOVERY + DIGITAL CONTENT DELIVERY
+ * mega-arc) -- `PrivateMediaReleaseReleasedPayload.contentType` is REMOTE,
+ * SELLER-SUPPLIED input. `isWellFormedPrivateMediaReleasePayload()`
+ * (`src/os/commerce/events/commerce_private_media_release_sync.ts`) bounds it
+ * to 128 chars but deliberately does NOT allowlist it ("generous, never
+ * trusted as a real sniffed type", that file's own comment), and the buyer's
+ * renderer interpolates whatever arrives straight into a `data:` URL media
+ * type AND into the download filename's extension
+ * (`onCommerceOpenPurchasedContentClick()`,
+ * `fedos_electron_beta_renderer.ts`). A hostile or modified seller process
+ * could therefore claim `text/html`/`image/svg+xml`/anything for bytes it
+ * controls and turn a "purchased file" into active content (or steer the
+ * suggested filename with `/`-bearing junk). This handler is the ONE place
+ * that value crosses back to the renderer, so it is normalized here against
+ * the SAME closed, non-scriptable allowlist the seller-side attach path
+ * itself enforces (`COMMERCE_PROTECTED_CONTENT_TYPES`). Anything else becomes
+ * the inert `application/octet-stream` -- never a rejection (the bytes are
+ * genuinely this buyer's and were digest-verified before ever being cached;
+ * only the seller's unverifiable CLAIM about their type is dropped).
+ */
+function commerceSafePurchasedContentType(claimed: unknown): string {
+  return typeof claimed === "string" && COMMERCE_PROTECTED_CONTENT_TYPES.has(claimed) ? claimed : "application/octet-stream";
+}
+
 async function handleCommerceMediaGrantRedeem(payload: unknown) {
   const body = payload as { orderId?: unknown; actorPubkey?: unknown } | null;
   if (!isBoundedString(body?.orderId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed orderId" };
@@ -6889,6 +6914,24 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
   }
   const order = commerceState().orders.findById(body.orderId);
   if (order === undefined) return { outcome: "not-found", reason: "no such order" };
+  // Coordinator security review (this arc): `actorPubkey` is a RENDERER-ASSERTED
+  // claim ("Acting as"), never a verified identity -- every other order-scoped
+  // handler in this file that acts on the buyer's behalf already re-checks it
+  // against the real, locally-stored Order (see
+  // `handleCommerceDeliveryAcknowledgeReceipt()`'s own identical gate), and this
+  // one did not. Without this check the main process would sign and publish a
+  // `private-media-release-request` whose `buyerPubkey` field claims an identity
+  // this device does not control (the seller's own
+  // `evaluateInboundMediaReleaseRequestAuthorization()` correctly refuses it as
+  // `sender-mismatch`, so this was never a content-disclosure hole -- but a
+  // signed, published false claim attributable to this user is not something a
+  // renderer bug should be able to mint). `"buyer-mismatch"` reuses the
+  // renderer's own existing closed denial vocabulary
+  // (`COMMERCE_PURCHASED_CONTENT_DENIAL_TEXT`), which already tells the user to
+  // switch "Acting as" to the identity that placed the order.
+  if (order.buyerPubkey !== body.actorPubkey) {
+    return { outcome: "rejected", reason: "buyer-mismatch" };
+  }
 
   const protectedMedia = commerceProductMediaState()
     .listForProduct(order.productId)
@@ -6901,7 +6944,7 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
   const cache = commerceMediaReleaseContentCacheState();
   const cached = cache.getRelease(order.id, media.id, actorPubkey);
   if (cached !== undefined) {
-    return { outcome: "ok", contentBase64: cached.contentBase64, contentType: cached.contentType, source: "cache" };
+    return { outcome: "ok", contentBase64: cached.contentBase64, contentType: commerceSafePurchasedContentType(cached.contentType), source: "cache" };
   }
 
   // Bounded reliable-refresh, same posture as every other cross-process
@@ -6913,7 +6956,7 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
 
   const cachedAfterRefresh = cache.getRelease(order.id, media.id, actorPubkey);
   if (cachedAfterRefresh !== undefined) {
-    return { outcome: "ok", contentBase64: cachedAfterRefresh.contentBase64, contentType: cachedAfterRefresh.contentType, source: "cache" };
+    return { outcome: "ok", contentBase64: cachedAfterRefresh.contentBase64, contentType: commerceSafePurchasedContentType(cachedAfterRefresh.contentType), source: "cache" };
   }
 
   const denialKey = mediaReleaseDenialKey(order.id, media.id, actorPubkey);
@@ -6933,7 +6976,7 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
   await commercePrivateMediaReleaseDiscoverAndApplyNonFatal();
   const cachedAfterRequest = cache.getRelease(order.id, media.id, actorPubkey);
   if (cachedAfterRequest !== undefined) {
-    return { outcome: "ok", contentBase64: cachedAfterRequest.contentBase64, contentType: cachedAfterRequest.contentType, source: "cache" };
+    return { outcome: "ok", contentBase64: cachedAfterRequest.contentBase64, contentType: commerceSafePurchasedContentType(cachedAfterRequest.contentType), source: "cache" };
   }
   const denialAfterRequest = commerceMediaReleaseLastKnownDenial.get(denialKey);
   if (denialAfterRequest !== undefined) {

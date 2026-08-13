@@ -250,3 +250,65 @@ transport/protocol half of the gap is closed and tested, while the
 store-availability and seller-signing-capability halves remain the two
 concrete blockers a future arc (or Agent M's sibling work landing first)
 would need to close before a buyer can ever see real released bytes.
+
+---
+
+## Addendum 2 (Coordinator security review, post-integration) — corrections to Addendum 1, and one NEW limitation
+
+Addendum 1 was written on Agent A's own branch, before Agent M's merged into
+the same integration. Three of its closing statements are **no longer true of
+the integrated branch** and are corrected here rather than left to mislead:
+
+- **"Blocker 4 … is still live"** — CORRECTED. Agent M fixed it:
+  `IpfsTransport` now declares a `requiresNetwork` self-report and
+  `IpfsMediaStore.put()`/`get()` consult it instead of a hard-coded `true`
+  (`src/os/commerce/catalog/ipfs_media_store.ts`). Independently re-verified:
+  `InMemoryIpfsTransport` is still the ONLY implementation in the repository
+  and honestly declares `false`; a transport declaring `true` is still refused
+  under `"local-only"` (`test/commerce_ipfs_media_store.test.ts` 16/16b), and
+  nothing in this store performs a real network call either way, so no genuine
+  egress gate was relaxed. The read is now additionally FAIL-CLOSED (anything
+  not literally `false` counts as network-requiring) because the store is
+  constructed across an untyped composition-root boundary.
+- **"protected media can never actually be attached in the shipped app"** —
+  CORRECTED. `handleCommerceProductContentAttach()` /
+  `fedos-app:commerce-product-content-attach` (Agent M) is a real, registered
+  IPC path that writes `classification: "protected"` `ProductMedia` records.
+- **Blocker 5 (`"seller-not-grant-capable"`)** — still live, unchanged, and its
+  practical impact is now WORSE than when this doc was written, precisely
+  because attach works: a real seller can now attach a purchased file, but
+  `issueCommerceMediaAccessGrantsNonFatal()` still cannot mint a grant for a
+  real seller identity, so the release channel answers every request with a
+  denial and the buyer never receives bytes.
+
+**NEW limitation this review found — the order-completion "digital content
+delivery invariant" is PER-PROCESS, and therefore vacuous on the buyer's own
+process.** `evaluateDigitalContentDeliveryInvariantForOrderCompletion()`
+(`src/os/commerce/media_grant/media_access_grant_release_channel_policy.ts`) is
+fed from `commerceProductMediaState()` — a per-process, in-memory
+`LocalProductMediaRepository` that is populated ONLY by the two seller-side
+attach handlers. No code path anywhere ingests `ProductMedia` from the network
+(this doc's own Blocker 1 already established that `storageRef`/`ProductMedia`
+appear in no event shape). Consequences on a genuinely two-process trade:
+
+- On the **buyer's** process `listForProduct(order.productId)` is `[]`, so the
+  invariant reports `satisfied: true` unconditionally and the buyer can
+  complete an order whose protected content was never delivered. The same is
+  true on any process after a restart (the media repository is in-memory).
+- On the **seller's** process the invariant can never be satisfied at all — the
+  release cache is only ever written by the BUYER-side apply path — so a seller
+  can never complete a digital order locally.
+
+That policy module's own header claim that `"completed"` "can no longer be
+reached for an under-delivered digital Order", and the transitive reputation
+claim built on it, therefore hold only in a single-process/tabletop topology.
+A second, independent bypass exists even there: an inbound
+`private-order-sync` payload with `status: "completed"`
+(`PRIVATE_ORDER_SYNC_STATUS_ACTION.completed`, `actorKind: "either"`) reaches
+`applyOrderAction(order, { type: "complete" })` through
+`applyInboundPrivateOrderSyncPayload()` without consulting the invariant at
+all — so `handleCommerceOrderComplete()` is not the "ONE call site" that
+header describes. Both are recorded here as disclosed limitations rather than
+patched: making the invariant real needs cross-process `ProductMedia`
+knowledge and a decision about which process owns completion authority, which
+is protocol design, not wiring.

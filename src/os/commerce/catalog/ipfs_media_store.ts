@@ -300,6 +300,24 @@ export class IpfsMediaStore implements MediaStorePort {
   }
 
   /**
+   * BLOCKER 4 FIX hardening (Coordinator security review of this arc) — the
+   * transport's own honest `requiresNetwork` self-report, read FAIL-CLOSED:
+   * anything that is not literally `false` is treated as "this transport
+   * does reach a network". `IpfsTransport` declares the field as a required
+   * `boolean`, so no in-repo implementation can omit it — but this store is
+   * constructed across an UNTYPED composition-root boundary
+   * (`fedos_electron_beta_main.cts` holds the transport class as `unknown`),
+   * where a missing/renamed field would arrive as `undefined`, and
+   * `evaluateNetworkAccess(profile, undefined)` would have silently taken
+   * the "does not require network — always allowed" branch. That is the one
+   * direction this gate must never fail in, so the default is inverted here
+   * rather than inherited from JavaScript falsiness.
+   */
+  #transportRequiresNetwork(): boolean {
+    return this.#transport.requiresNetwork !== false;
+  }
+
+  /**
    * `MediaStorePort.put()` — stores whatever bytes it is given (already
    * ciphertext for protected media, already plaintext for public media;
    * see this file's own header). Content-addresses via the transport's
@@ -316,7 +334,7 @@ export class IpfsMediaStore implements MediaStorePort {
     }
     // BLOCKER 4 FIX (this file's own header) — the TRANSPORT's own honest
     // self-report, never a hard-coded `true`.
-    if (!evaluateNetworkAccess(this.#networkProfile, this.#transport.requiresNetwork).allowed) {
+    if (!evaluateNetworkAccess(this.#networkProfile, this.#transportRequiresNetwork()).allowed) {
       return { outcome: "failed" };
     }
 
@@ -373,7 +391,7 @@ export class IpfsMediaStore implements MediaStorePort {
     if (entry === undefined) return null;
     // BLOCKER 4 FIX (this file's own header) — the TRANSPORT's own honest
     // self-report, never a hard-coded `true`.
-    if (!evaluateNetworkAccess(this.#networkProfile, this.#transport.requiresNetwork).allowed) return null;
+    if (!evaluateNetworkAccess(this.#networkProfile, this.#transportRequiresNetwork()).allowed) return null;
 
     let bytes: Uint8Array | null;
     try {
