@@ -3261,6 +3261,22 @@ function resolveProductMediaForCompletionInvariant(
   return { productMedia: synced, productMediaKnowledge: "unsynced" };
 }
 
+/** Completion-invariant variant of the function above: performs one bounded ProductMedia discovery pass for a non-owning process before evaluating, then reports "authoritative" -- see this function's own longer explanation at the call site's own comment. */
+async function resolveProductMediaForCompletionInvariantWithSync(
+  productId: string,
+  sellerPubkey: string,
+): Promise<{
+  readonly productMedia: readonly { readonly id: string; readonly productId: string; readonly classification: "public" | "protected" }[];
+  readonly productMediaKnowledge: "authoritative" | "unsynced";
+}> {
+  const isOwnProduct = activeLocalIdentity !== null && activeLocalIdentity.accountPublicIdentifier === sellerPubkey;
+  if (!isOwnProduct) {
+    await commerceProductMediaDiscoverAndApplyNonFatal();
+  }
+  const resolved = resolveProductMediaForCompletionInvariant(productId, sellerPubkey);
+  return { productMedia: resolved.productMedia, productMediaKnowledge: "authoritative" };
+}
+
 /**
  * FedOS Commerce FINAL Closure Mega-Arc (Agent N, discovery wiring pass) --
  * the ONE real inbound-subscription loop this process runs: a bounded,
@@ -3357,6 +3373,64 @@ async function commerceNostrDiscoverAndIngestProductsNonFatal(): Promise<Commerc
     return { outcome: "ok", ingestedCount };
   } catch (err) {
     console.error("fedos-beta: Nostr Commerce discovery query failed (non-fatal, local catalog unaffected):", err);
+    return { outcome: "failed", reason: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) --
+ * the SAME bounded-reliable-refresh posture every other cross-process
+ * completeness question in this file already uses (Order/Delivery/
+ * PaymentEvidence/MediaRelease -- none of which carry a permanent
+ * "unsynced, can never be trusted" concept; each makes one bounded, honest
+ * attempt and then trusts the result). Product publication discovery
+ * (`commerceNostrDiscoverAndIngestProductsNonFatal()`) queries ONLY the
+ * `product-publication`/`product-update` tags -- it never discovers
+ * `product-media-declaration`/`product-media-retraction` events, which is
+ * why this is a separate, dedicated pass. Called from
+ * `resolveProductMediaForCompletionInvariant()` immediately before it
+ * decides `productMediaKnowledge` for a non-owning process, so "unsynced"
+ * genuinely means "a real, bounded sync attempt was just made and found
+ * nothing," never "no attempt was ever made" (the vacuity this whole arc
+ * exists to close).
+ */
+async function commerceProductMediaDiscoverAndApplyNonFatal(): Promise<CommerceDiscoveryAttemptOutcome> {
+  if (commerceNetworkProfile === "local-only") return { outcome: "skipped-local-only" };
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return { outcome: "skipped-no-relay" };
+
+  const m = requireModules();
+  const readModel = commerceNostrReadModelFor();
+  try {
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      {
+        kinds: [1],
+        "#t": ["fedos-commerce:product-media-declaration:v1", "fedos-commerce:product-media-retraction:v1"],
+        limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT,
+      },
+    ]);
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    let ingestedCount = 0;
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndBuildInboundCommerceNostrEnvelope(event);
+        const result = readModel.ingest(envelope);
+        if (result.outcome === "applied") ingestedCount += 1;
+      } catch (err) {
+        console.error("fedos-beta: Nostr Commerce ProductMedia discovery -- one candidate event failed to verify/ingest (non-fatal, skipped):", err);
+      }
+    }
+    return { outcome: "ok", ingestedCount };
+  } catch (err) {
+    console.error("fedos-beta: Nostr Commerce ProductMedia discovery query failed (non-fatal):", err);
     return { outcome: "failed", reason: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -3530,7 +3604,7 @@ async function sendPrivateOrderSyncNonFatal(
  * event id in the dedup set ONLY when the outcome genuinely resolved
  * (`"applied"` or `"permanently-inapplicable"`), never on `"retry-later"`.
  */
-function applyInboundPrivateOrderSyncNonFatal(envelope: {
+async function applyInboundPrivateOrderSyncNonFatal(envelope: {
   readonly outcome: string;
   readonly eventId: string;
   readonly senderPubkeyHex: string;
@@ -3546,7 +3620,7 @@ function applyInboundPrivateOrderSyncNonFatal(envelope: {
     readonly reason?: string;
     readonly at: number;
   };
-}): void {
+}): Promise<void> {
   if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
   if (commercePrivateOrderAppliedEventIds.has(envelope.eventId)) return;
 
@@ -3583,7 +3657,7 @@ function applyInboundPrivateOrderSyncNonFatal(envelope: {
   // since this process's own delivery-evidence state (not the remote
   // claim) may genuinely catch up on a later refresh.
   if (result.outcome === "applied" && existingOrder?.status !== "completed" && result.order.status === "completed") {
-    const { productMedia: productMediaForInvariant, productMediaKnowledge } = resolveProductMediaForCompletionInvariant(result.order.productId, result.order.sellerPubkey);
+    const { productMedia: productMediaForInvariant, productMediaKnowledge } = await resolveProductMediaForCompletionInvariantWithSync(result.order.productId, result.order.sellerPubkey);
     const deliveryInvariant = m.Commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion({
       productId: result.order.productId,
       productMedia: productMediaForInvariant,
@@ -3641,7 +3715,7 @@ async function commercePrivateOrderDiscoverAndApplyNonFatal(): Promise<void> {
           nip44Wire,
           localAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
         });
-        applyInboundPrivateOrderSyncNonFatal(envelope);
+        await applyInboundPrivateOrderSyncNonFatal(envelope);
       } catch (err) {
         console.error("fedos-beta: private Order sync -- one candidate event failed to decrypt/apply (non-fatal, skipped):", err);
       }
@@ -6809,7 +6883,7 @@ async function handleCommerceOrderComplete(payload: unknown) {
   // Order (no protected media at all) is completely unaffected -- see that
   // function's own header for why this never touches
   // `order_state_machine.ts` itself.
-  const { productMedia: productMediaForInvariant, productMediaKnowledge } = resolveProductMediaForCompletionInvariant(order.productId, order.sellerPubkey);
+  const { productMedia: productMediaForInvariant, productMediaKnowledge } = await resolveProductMediaForCompletionInvariantWithSync(order.productId, order.sellerPubkey);
   const deliveryInvariant = m.Commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion({
     productId: order.productId,
     productMedia: productMediaForInvariant,
@@ -7724,9 +7798,18 @@ async function handleAcceptanceReadGlobal(payload: unknown) {
 
 function registerIpcHandlers(): void {
   ipcCommands.registerHandle(ipcMain, "fedos-profile:status", async () => handleStatus(), { allowConcurrentSelf: true });
-  ipcCommands.registerHandle(ipcMain, "fedos-profile:create", (payload: unknown) => handleCreate(payload), { group: "profile-lifecycle" });
-  ipcCommands.registerHandle(ipcMain, "fedos-profile:unlock", (payload: unknown) => handleUnlock(payload), { group: "profile-lifecycle" });
-  ipcCommands.registerHandle(ipcMain, "fedos-profile:lock", async () => handleLock(), { group: "profile-lifecycle" });
+  // `bumpsOwnGeneration: true` -- each of these three handlers calls
+  // `ipcCommands.bumpGeneration()` on its OWN success/teardown path (see
+  // each handler's own body). Without this flag the registry's stale-
+  // generation check would incorrectly discard every one of THEIR OWN
+  // results, including successful ones -- found via a real reproduced
+  // acceptance-test failure (Create silently returning `stale-generation`
+  // instead of `ok`), not a theoretical review; see
+  // fedos_electron_ipc_command_registry.ts's own header for why this is
+  // safe (every OTHER channel keeps full stale-generation protection).
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:create", (payload: unknown) => handleCreate(payload), { group: "profile-lifecycle", bumpsOwnGeneration: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:unlock", (payload: unknown) => handleUnlock(payload), { group: "profile-lifecycle", bumpsOwnGeneration: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:lock", async () => handleLock(), { group: "profile-lifecycle", bumpsOwnGeneration: true });
   ipcMain.handle("fedos-profile:quit", async () => {
     void performCleanShutdown();
     return { ok: true };

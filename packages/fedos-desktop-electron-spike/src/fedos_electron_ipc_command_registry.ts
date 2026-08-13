@@ -174,6 +174,27 @@ export interface FedosIpcCommandRegistrationOptions {
    * `.send()` double-submit race described in this module's header.
    */
   readonly allowConcurrentSelf?: boolean;
+  /**
+   * Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B
+   * fix, found via a real reproduced acceptance-test failure, not a
+   * theoretical review). Set `true` ONLY for a channel whose own handler
+   * calls `bumpGeneration()` on ITS OWN success path (`fedos-profile:
+   * create`/`unlock`/`lock` — the bump happens partway through the SAME
+   * call this option applies to, marking a NEW assembly generation the
+   * handler itself just installed or a teardown it itself just began).
+   * Without this flag, the generation captured at entry would no longer
+   * match the generation read after `run()` resolves — not because some
+   * OTHER concurrent command raced this one (impossible for these three:
+   * they share the `"profile-lifecycle"` group, which is exclusive with
+   * itself), but because THIS call's own bump moved it — and the result
+   * would be incorrectly discarded as `stale-generation` every single
+   * time, including on success. Every OTHER channel (none of which ever
+   * calls `bumpGeneration()` itself) keeps the full protection this
+   * option skips: a `fedos-app:*`/`fedos-acceptance:*` command captured
+   * against a since-replaced-or-destroyed assembly is still correctly
+   * discarded, because ITS generation check is never bypassed.
+   */
+  readonly bumpsOwnGeneration?: boolean;
 }
 
 /** Structural-only — mirrors this package's own established "never import a root `electron` type into an isolated, unit-testable module" discipline (see `fedos_electron_host_adapter_dispatch_translation.ts`'s header). Satisfied by the real `ipcMain` without any cast. */
@@ -273,6 +294,7 @@ export class FedosIpcCommandRegistry {
     this.#registeredChannels.add(channel);
     const group = options.group;
     const allowConcurrentSelf = options.allowConcurrentSelf ?? false;
+    const bumpsOwnGeneration = options.bumpsOwnGeneration ?? false;
 
     return async (payload: TPayload): Promise<FedosIpcCommandResult<TResult>> => {
       if (this.#closed) return fedosIpcClosedOutcome();
@@ -286,7 +308,7 @@ export class FedosIpcCommandRegistry {
       this.#enter(channel, group);
       try {
         const result = await run(payload);
-        if (this.#generation !== enteredGeneration) return fedosIpcStaleGenerationOutcome();
+        if (!bumpsOwnGeneration && this.#generation !== enteredGeneration) return fedosIpcStaleGenerationOutcome();
         return result;
       } finally {
         this.#exit(channel, group);

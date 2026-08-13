@@ -302,3 +302,47 @@ describe("FedosIpcCommandRegistry — registration hygiene / registerHandle() wi
     expect(await first).toEqual({ outcome: "ok" });
   });
 });
+
+describe("FedosIpcCommandRegistry — bumpsOwnGeneration (Wave B fix: real reproduced Create failure, not a theoretical review)", () => {
+  it("WITHOUT bumpsOwnGeneration, a handler that bumps its own generation on success has that same success incorrectly discarded as stale-generation -- reproduces the exact bug a live acceptance-test run hit (Create returning stale-generation instead of ok)", async () => {
+    const registry = new FedosIpcCommandRegistry();
+    const run = registry.register("fedos-profile:create", async () => {
+      registry.bumpGeneration();
+      return { outcome: "ok" as const };
+    });
+    expect(await run(undefined)).toEqual(fedosIpcStaleGenerationOutcome());
+  });
+
+  it("WITH bumpsOwnGeneration: true, that same handler's own success is preserved", async () => {
+    const registry = new FedosIpcCommandRegistry();
+    const run = registry.register(
+      "fedos-profile:create",
+      async () => {
+        registry.bumpGeneration();
+        return { outcome: "ok" as const };
+      },
+      { bumpsOwnGeneration: true },
+    );
+    expect(await run(undefined)).toEqual({ outcome: "ok" });
+  });
+
+  it("bumpsOwnGeneration does NOT weaken protection for every OTHER channel -- a fedos-app:* command still correctly discards its result when a DIFFERENT lifecycle command bumps the generation out from under it mid-flight", async () => {
+    const registry = new FedosIpcCommandRegistry();
+    const create = registry.register(
+      "fedos-profile:create",
+      async () => {
+        registry.bumpGeneration();
+        return { outcome: "ok" as const };
+      },
+      { group: "profile-lifecycle", bumpsOwnGeneration: true },
+    );
+    const d = deferred<{ readonly outcome: "ok"; readonly value: string }>();
+    const appRead = registry.register("fedos-app:conversations-list", async () => d.promise, { allowConcurrentSelf: true });
+
+    const appReadPromise = appRead(undefined);
+    await flushMicrotasks();
+    await create(undefined); // bumps the generation while appRead is still in flight
+    d.resolve({ outcome: "ok", value: "stale content" });
+    expect(await appReadPromise).toEqual(fedosIpcStaleGenerationOutcome());
+  });
+});
