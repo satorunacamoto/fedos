@@ -37,7 +37,24 @@ const WINDOW_DTS_PATH = "packages/fedos-desktop-electron-spike/src/fedos_electro
 describe("arc mandate item 1 -- Commerce inherits the user's own Relay config", () => {
   it("1. initializeCommerceNetworkProfileFromRelayConfig() derives the default from activeRelays.length, never a hardcoded local-only reset", () => {
     const source = stripComments(read(MAIN_PATH));
-    expect(source).toMatch(/function initializeCommerceNetworkProfileFromRelayConfig\(\): void \{\s*\n\s*commerceNetworkProfile = activeRelays\.length > 0 \? "direct" : "local-only";/);
+    // Coordinator integration pass: this assertion used to also pin the
+    // derivation as the function's FIRST statement. Agent U's durable
+    // explicit-choice persistence (a different branch, invisible to Agent D)
+    // required an override guard to run before it, or a user's deliberate
+    // "local-only" was silently re-enabled to "direct" on every relaunch --
+    // which D's own doc comment already forbade ("never removes the
+    // override"). The guard's position is now asserted separately, and more
+    // strictly, in `commerce_coordinator_integration_structural_guards.test.ts`
+    // tests 1-3. What THIS test exists to protect -- the default is derived
+    // from the real relay config and is never a hardcoded local-only reset --
+    // is asserted below unchanged, on the function's own body.
+    const start = source.indexOf("function initializeCommerceNetworkProfileFromRelayConfig(): void {");
+    expect(start, source).toBeGreaterThanOrEqual(0);
+    const body = source.slice(start, source.indexOf("\n}", start) + 2);
+    expect(body).toMatch(/commerceNetworkProfile = activeRelays\.length > 0 \? "direct" : "local-only";/);
+    // The ONLY thing allowed to pre-empt that derivation is a genuine,
+    // durable, explicit user choice -- never an unconditional reset.
+    expect(body).not.toMatch(/commerceNetworkProfile = "local-only";/);
   });
 
   it("2. is called on BOTH the create and unlock success paths, before commerceNostrOutboundPortFor() -- so the very first outbound port construction already reflects the real Relay config", () => {

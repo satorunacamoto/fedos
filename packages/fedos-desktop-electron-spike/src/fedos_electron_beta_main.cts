@@ -2764,6 +2764,46 @@ function loadPersistedCommerceNetworkProfile(): CommerceNetworkProfileValue {
   return "local-only";
 }
 
+/**
+ * Buyer Discovery + Digital Content Delivery mega-arc (COORDINATOR
+ * INTEGRATION PASS) -- `true` iff the user has genuinely made an EXPLICIT
+ * Commerce Network Profile choice that was durably recorded.
+ *
+ * `persistCommerceNetworkProfile()` below has exactly ONE call site --
+ * `handleCommerceNetworkProfileSet()`, the `fedos-app:commerce-network-
+ * profile-set` IPC handler -- so the presence of a valid profile file means
+ * "a human explicitly chose this in Settings", never "some default was
+ * written out". That is what makes this a sound override signal.
+ *
+ * Needed because Agent D and Agent U independently changed how this value
+ * is established and could not see each other's branch: U made an explicit
+ * choice durable (loaded in `app.whenReady()`), while D re-derived the
+ * profile from relay config on every create/unlock. Merged naively those
+ * run in that order, so D's re-derivation silently overwrote U's restored
+ * choice on every launch -- meaning a privacy-conscious user who had
+ * deliberately set Commerce to `"local-only"` while still using messaging
+ * relays would be flipped back to `"direct"` (Commerce discovery/publish
+ * ON) after every restart, against an explicit instruction. Neither agent's
+ * branch had that defect alone; it is purely an artifact of combining them.
+ *
+ * This is NOT the Coordinator picking a side: D's own doc comment on
+ * `initializeCommerceNetworkProfileFromRelayConfig()` already states it
+ * "only sets the DEFAULT for the session, never removes the override", and
+ * U's whole point was to make that override durable. Honouring a persisted
+ * explicit choice is what BOTH agents specified; it simply could not be
+ * implemented until their two halves existed in the same tree.
+ */
+function hasPersistedCommerceNetworkProfileChoice(): boolean {
+  try {
+    const raw = fs.readFileSync(commerceNetworkProfileFilePath(), "utf8");
+    const parsed: unknown = JSON.parse(raw);
+    const candidate = (parsed as { profile?: unknown } | null)?.profile;
+    return typeof candidate === "string" && (COMMERCE_NETWORK_PROFILE_VALUES as readonly string[]).includes(candidate);
+  } catch {
+    return false;
+  }
+}
+
 /** Best-effort persistence -- a write failure never throws into the IPC handler; the in-memory value the caller already set is still correct for THIS session even if it won't survive a restart. */
 function persistCommerceNetworkProfile(profile: CommerceNetworkProfileValue): void {
   try {
@@ -2822,6 +2862,15 @@ let commerceNetworkProfile: CommerceNetworkProfileValue = "local-only";
  * instead of a wrong-by-default one) -- see this arc's own final report.
  */
 function initializeCommerceNetworkProfileFromRelayConfig(): void {
+  // COORDINATOR INTEGRATION PASS -- honour a durable EXPLICIT user choice
+  // over this relay-derived default, exactly as this function's own doc
+  // comment above already promised ("never removes the override"). Before
+  // Agent U's persistence existed there was no override to detect here, so
+  // the unconditional assignment below was correct on D's own branch; with
+  // both halves present it would silently re-enable Commerce networking
+  // against an explicit "local-only" instruction on every relaunch. See
+  // `hasPersistedCommerceNetworkProfileChoice()`'s own header.
+  if (hasPersistedCommerceNetworkProfileChoice()) return;
   commerceNetworkProfile = activeRelays.length > 0 ? "direct" : "local-only";
 }
 const COMMERCE_NOSTR_ACCOUNT_INDEX = 0;
