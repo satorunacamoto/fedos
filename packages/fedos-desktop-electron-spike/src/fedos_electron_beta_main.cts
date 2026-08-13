@@ -3230,8 +3230,9 @@ function applyInboundPrivateOrderSyncNonFatal(envelope: {
 
   const m = requireModules();
   const state = commerceState();
+  const existingOrder = state.orders.findById(envelope.payload.orderId);
   const result = m.CommerceNostr.applyInboundPrivateOrderSyncPayload({
-    existingOrder: state.orders.findById(envelope.payload.orderId),
+    existingOrder,
     senderPubkeyHex: envelope.senderPubkeyHex,
     payload: envelope.payload,
   });
@@ -3241,6 +3242,41 @@ function applyInboundPrivateOrderSyncNonFatal(envelope: {
     // against a local state that may by then legitimately accept it.
     return;
   }
+
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+  // security-review follow-up) -- `handleCommerceOrderComplete()`'s own
+  // header claims the digital-content delivery invariant is checked "HERE,
+  // BEFORE `applyOrderAction(..., {type: "complete"})` is ever called" and
+  // implies that is the ONE call site. It was not: a counterparty's own
+  // `"completed"` private-order-sync event reaches `applyOrderAction()`
+  // via `applyInboundPrivateOrderSyncPayload()` above with NO invariant
+  // check at all, so a remote party (malicious or merely out of sync with
+  // its own release state) could force this process's local Order to
+  // `"completed"` for a digital product with undelivered protected media --
+  // fully bypassing the guard added above. Re-run the SAME check here,
+  // symmetrically, before this inbound transition is ever saved. A
+  // physical-goods Order (no protected media) is unaffected, exactly as in
+  // the local path. On failure: do NOT save the transition and do NOT add
+  // this event to the dedup set -- treated the same as `"retry-later"`,
+  // since this process's own delivery-evidence state (not the remote
+  // claim) may genuinely catch up on a later refresh.
+  if (result.outcome === "applied" && existingOrder?.status !== "completed" && result.order.status === "completed") {
+    const productMediaForInvariant = commerceProductMediaState()
+      .listForProduct(result.order.productId)
+      .map((item) => ({ id: item.id, productId: item.productId, classification: item.classification }));
+    const deliveryInvariant = m.Commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion({
+      productId: result.order.productId,
+      productMedia: productMediaForInvariant,
+      hasReleasedContent: (mediaId) => commerceMediaReleaseContentCacheState().hasRelease(result.order.id, mediaId, result.order.buyerPubkey),
+    });
+    if (!deliveryInvariant.satisfied) {
+      console.warn(
+        `fedos-beta: inbound private-order-sync "completed" for order ${result.order.id} rejected -- digital content delivery invariant not satisfied (${deliveryInvariant.reason}); transition dropped, not saved, eligible for retry`,
+      );
+      return;
+    }
+  }
+
   commercePrivateOrderAppliedEventIds.add(envelope.eventId);
   if (result.outcome === "applied") state.orders.save(result.order);
 }

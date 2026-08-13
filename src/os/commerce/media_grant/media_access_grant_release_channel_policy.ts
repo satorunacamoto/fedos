@@ -38,9 +38,9 @@
  *    release on file for this order's own buyer (never a bare "I received
  *    it" attestation — see
  *    `../../../../packages/fedos-desktop-electron-spike/src/fedos_electron_beta_main.cts`'s
- *    `handleCommerceOrderComplete()`, the ONE call site that consults this
+ *    `handleCommerceOrderComplete()`, the LOCAL call site that consults this
  *    function, immediately before it ever calls
- *    `applyOrderAction(order, { type: "complete" }, ...)`). This is
+ *    `applyOrderAction(order, { type: "complete" }, ...)`. This is
  *    deliberately NOT implemented inside `../order/order_state_machine.ts`
  *    itself: that file has no knowledge of `ProductMedia`/protected
  *    classification at all (a different arc's own territory, and its own
@@ -68,6 +68,39 @@
  *    genuinely successful one — closing this arc's own mandate item 8
  *    without touching the reputation module's own, already-correct gate
  *    ordering.
+ *
+ * *** CONFIRMED REMAINING GAP (Coordinator security review, same arc) ***
+ * "the one real transition site" above was originally only true for a
+ * LOCAL completion. A second, independent path reaches
+ * `applyOrderAction(order, { type: "complete" })` with NO invariant
+ * check at all: an inbound `"completed"` private-order-sync event, via
+ * `applyInboundPrivateOrderSyncPayload()`
+ * (`../events/commerce_private_order_apply.ts`) →
+ * `applyInboundPrivateOrderSyncNonFatal()` in `fedos_electron_beta_main.cts`.
+ * A counterparty publishing that sync status could force this process's
+ * local Order to `"completed"` for a digital product with undelivered
+ * protected media, fully bypassing this invariant. FIXED as part of the
+ * same review: `applyInboundPrivateOrderSyncNonFatal()` now re-runs this
+ * exact function, symmetrically, before saving any inbound transition
+ * that reaches `"completed"` — see that function's own comment.
+ *
+ * A DEEPER, NOT-YET-FIXED gap remains even with both call sites gated:
+ * `productMediaForInvariant` is read from THIS process's own
+ * `LocalProductMediaRepository` (`../catalog/product_media_types.ts`),
+ * which is populated ONLY by the seller-side attach handlers
+ * (`handleCommerceProductContentAttach`/`...ImageAttach`) and is never
+ * synced to any other process. On a BUYER's process, `listForProduct()`
+ * therefore returns `[]` for a product it did not itself list — so
+ * `protectedMedia.length === 0` and this invariant is satisfied
+ * VACUOUSLY, not genuinely, on exactly the process where the completion
+ * actually matters. Nothing in this codebase today synchronizes
+ * `ProductMedia` metadata (id + classification, never bytes) to a buyer's
+ * process — the reachability doc's own drafted-but-unwired
+ * `MediaManifestReferenceEventDraft` is the closest existing scaffold for
+ * that future fix. Until that exists, this invariant is a REAL, tested
+ * guarantee within one process's own view of a product it lists, but NOT
+ * yet a cross-process delivery guarantee — do not represent it as the
+ * latter in any user-facing or release-readiness claim.
  */
 
 // ---------------------------------------------------------------------------

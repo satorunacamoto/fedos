@@ -100,3 +100,27 @@ describe("Coordinator integration -- Agent M's real protected-content control ma
     expect(source).toMatch(/function commerceMerchantProductContentAttachControls\(/);
   });
 });
+
+describe("Coordinator security review follow-up -- the digital content delivery invariant is checked on BOTH completion paths, not just the local one", () => {
+  it("7. applyInboundPrivateOrderSyncNonFatal() re-runs evaluateDigitalContentDeliveryInvariantForOrderCompletion() before saving an inbound transition into \"completed\"", () => {
+    const source = stripComments(read(MAIN_PATH));
+    const start = source.indexOf("function applyInboundPrivateOrderSyncNonFatal(envelope: {");
+    expect(start, "expected the inbound private-order-sync apply shell to still exist").toBeGreaterThanOrEqual(0);
+    const body = source.slice(start, source.indexOf("\napplyInboundPrivateOrderSyncNonFatal", start + 1) || source.indexOf("\n}\n\n", start) + 4);
+    expect(body).toMatch(/evaluateDigitalContentDeliveryInvariantForOrderCompletion/);
+    // Order matters: the invariant check must run, and on failure return, BEFORE `state.orders.save(result.order)`.
+    const invariantIdx = body.indexOf("evaluateDigitalContentDeliveryInvariantForOrderCompletion");
+    const saveIdx = body.lastIndexOf("state.orders.save(result.order)");
+    expect(invariantIdx).toBeGreaterThan(0);
+    expect(saveIdx).toBeGreaterThan(invariantIdx);
+    // Only gates a genuine NEW transition into "completed", never re-evaluates an
+    // already-completed order or a transition to any other status.
+    expect(body).toMatch(/existingOrder\?\.status !== "completed" && result\.order\.status === "completed"/);
+    // On failure, the event id is deliberately NOT added to the dedup set (mirrors the
+    // pre-existing "retry-later" contract) -- re-verify by checking the early `return`
+    // sits before `commercePrivateOrderAppliedEventIds.add(envelope.eventId)`.
+    const dedupAddIdx = body.indexOf("commercePrivateOrderAppliedEventIds.add(envelope.eventId)");
+    const invariantBlockEnd = body.indexOf("}", body.indexOf("if (!deliveryInvariant.satisfied)", invariantIdx));
+    expect(dedupAddIdx).toBeGreaterThan(invariantBlockEnd);
+  });
+});
