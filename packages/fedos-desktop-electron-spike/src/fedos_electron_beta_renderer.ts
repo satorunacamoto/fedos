@@ -147,6 +147,43 @@ function showCommerceError(elementId: string, result: { readonly outcome: string
   byId(elementId).textContent = result.reason !== undefined && result.reason.length > 0 ? result.reason : describeOutcome(result.outcome);
 }
 
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item 7
+ * (grant denied / content missing / content corrupted error-recovery copy).
+ * `commerceMediaGrantRedeem()`'s closed-vocabulary denial `reason` (see
+ * `handleCommerceMediaGrantRedeem()`/`evaluateMediaAccessGrant()` in
+ * `fedos_electron_beta_main.cts`/`src/os/commerce/media_grant/media_access_grant_policy.ts`)
+ * was previously shown to a buyer verbatim for every case except two —
+ * technically accurate, but jargon (`"wrong-signer"`, `"media-id-mismatch"`,
+ * `"superseded"`) a non-technical buyer cannot act on. Every branch here
+ * maps to a real, user-actionable next step; the final fallback still never
+ * fabricates a reason it wasn't given.
+ */
+const COMMERCE_PURCHASED_CONTENT_DENIAL_TEXT: Readonly<Record<string, string>> = {
+  "no-grant-on-file": "No protected digital content is available for this order yet.",
+  "order-not-qualifying": "No protected digital content is available for this order yet.",
+  "content-unavailable": "The seller's stored content for this order appears to be missing or corrupted, and could not be retrieved. This is not something you can fix from here — contact the seller.",
+  "wrap-unavailable": "Couldn't unlock this content right now (a required security key isn't available in this session). Try again after unlocking your profile fresh; if it keeps happening, this content may not be retrievable from this device.",
+  "buyer-mismatch": "This content grant was issued to a different buyer identity than the one you're currently acting as. Switch \"Acting as\" to the identity that placed this order.",
+  "order-id-mismatch": "This content grant doesn't match this order. Contact the seller — this looks like a data inconsistency on their side.",
+  "media-id-mismatch": "This content grant doesn't match this product's content. Contact the seller — this looks like a data inconsistency on their side.",
+  "product-id-mismatch": "This content grant doesn't match this product. Contact the seller — this looks like a data inconsistency on their side.",
+  "order-not-found": "The order behind this content grant could not be found. Contact the seller.",
+  "wrong-signer": "This content grant wasn't signed by this product's seller and was rejected. Contact the seller — this looks like a data inconsistency or tampering, not something you did wrong.",
+  "not-yet-valid": "This content grant isn't active yet. Try again in a moment; if it persists, contact the seller.",
+  expired: "This content grant has expired. Contact the seller to ask them to reissue access.",
+  revoked: "The seller has revoked access to this content for this order. Contact the seller if you believe this is a mistake.",
+  superseded: "This content grant was replaced by a newer one. Reopen this order and try again.",
+};
+
+/** Friendly text for a `commerceMediaGrantRedeem()` denial `reason` — see `COMMERCE_PURCHASED_CONTENT_DENIAL_TEXT`'s own header. Falls back to the raw reason (or `describeOutcome()`) for anything outside the closed vocabulary above, exactly like `showCommerceError()`'s own established fallback discipline — never invents a reason it wasn't given. */
+function commercePurchasedContentDenialText(outcome: string, reason: string | undefined): string {
+  if (reason !== undefined && reason in COMMERCE_PURCHASED_CONTENT_DENIAL_TEXT) {
+    return COMMERCE_PURCHASED_CONTENT_DENIAL_TEXT[reason] as string;
+  }
+  return reason !== undefined && reason.length > 0 ? reason : describeOutcome(outcome);
+}
+
 // ---------------------------------------------------------------------
 // FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- honest
 // cross-process sync-outcome copy + sync-state derivation for any bounded
@@ -895,13 +932,21 @@ function pluralizeCommerceLandingCount(count: number, noun: string): string {
 
 async function refreshCommerceLandingPointer(): Promise<void> {
   const el = byId("commerce-landing-pointer");
+  // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+  // item 6: the "Go to Shop"/"Go to My Store" action buttons alongside the
+  // text -- see their own HTML comment for why text-only wasn't enough.
+  const shopBtn = byId<HTMLButtonElement>("commerce-landing-pointer-shop-btn");
+  const storeBtn = byId<HTMLButtonElement>("commerce-landing-pointer-store-btn");
   const result = await window.fedosApp.commerceActivitySummary(commerceActingAsPubkey);
   if (result.outcome !== "ok") {
     el.setAttribute("hidden", "");
     el.textContent = "";
+    shopBtn.setAttribute("hidden", "");
+    storeBtn.setAttribute("hidden", "");
     return;
   }
   const lines: string[] = [];
+  let hasBuyerActivity = false;
   const b = result.asBuyer;
   if (b !== undefined) {
     const parts: string[] = [];
@@ -912,8 +957,12 @@ async function refreshCommerceLandingPointer(): Promise<void> {
     if (parts.length === 0 && b.awaitingSellerAcceptance > 0) {
       parts.push(`${pluralizeCommerceLandingCount(b.awaitingSellerAcceptance, "order")} awaiting seller acceptance`);
     }
-    if (parts.length > 0) lines.push(`Shop: ${parts.join(", ")}.`);
+    if (parts.length > 0) {
+      lines.push(`Shop: ${parts.join(", ")}.`);
+      hasBuyerActivity = true;
+    }
   }
+  let hasSellerActivity = false;
   const s = result.asSeller;
   if (s !== undefined) {
     const parts: string[] = [];
@@ -921,8 +970,13 @@ async function refreshCommerceLandingPointer(): Promise<void> {
     if (s.unpaid > 0) parts.push(`${pluralizeCommerceLandingCount(s.unpaid, "order")} awaiting buyer payment`);
     if (s.paidReadyToFulfill > 0) parts.push(`${pluralizeCommerceLandingCount(s.paidReadyToFulfill, "order")} paid, ready to fulfill`);
     if (s.fulfillingInProgress > 0) parts.push(`${pluralizeCommerceLandingCount(s.fulfillingInProgress, "order")} awaiting buyer confirmation`);
-    if (parts.length > 0) lines.push(`My Store: ${parts.join(", ")}.`);
+    if (parts.length > 0) {
+      lines.push(`My Store: ${parts.join(", ")}.`);
+      hasSellerActivity = true;
+    }
   }
+  shopBtn.toggleAttribute("hidden", !hasBuyerActivity);
+  storeBtn.toggleAttribute("hidden", !hasSellerActivity);
   if (lines.length === 0) {
     el.setAttribute("hidden", "");
     el.textContent = "";
@@ -967,10 +1021,29 @@ async function openCommerceProductDetailScreen(productId: string, previewActorPu
   }
   if (result.outcome !== "ok" || result.product === undefined) {
     byId("commerce-detail-title").textContent = "Product";
-    showError("commerce-detail-error", result);
+    showCommerceProductDetailNotFoundError(result);
     return;
   }
   renderCommerceProductDetail(result.product);
+}
+
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item 7
+ * ("seller not found"/"listing unavailable" error-recovery copy), split out
+ * of `openCommerceProductDetailScreen()` to keep that function's own body
+ * short (a real structural test bounds its length). `handleCommerceProductDetail()`
+ * reports every not-found case (a genuinely nonexistent id, an unpublished/
+ * archived listing, or a Nostr-discovery miss for a seller this process
+ * couldn't reach) as one `"not-found"` outcome -- this build has no signal
+ * to tell those apart, so this honestly covers all of them rather than
+ * guessing which one happened.
+ */
+function showCommerceProductDetailNotFoundError(result: { readonly outcome: string; readonly reason?: string }): void {
+  const reason =
+    result.outcome === "not-found"
+      ? "This listing isn't available. It may have been removed or unpublished by the seller, or the seller may not be reachable from this device right now — try again later, or ask the seller to re-share it."
+      : result.reason;
+  showCommerceError("commerce-detail-error", { outcome: result.outcome, reason });
 }
 
 async function openCommerceProduct(productId: string): Promise<void> {
@@ -1004,6 +1077,28 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
   const isCustomer = commerceActorRole(commerceActingAsPubkey) === "customer";
   byId("commerce-detail-order-form").toggleAttribute("hidden", !isCustomer || product.isPreview);
   byId("commerce-detail-order-unavailable-note").toggleAttribute("hidden", isCustomer || product.isPreview);
+  // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+  // item 5: a clear delivery expectation shown BEFORE checkout, never only
+  // discovered after paying. Deliberately mirrors this app's own existing,
+  // already-honest post-purchase copy ("Digital content from this
+  // purchase, if the seller attached any.", `#commerce-order-purchased-content-actions`)
+  // rather than inventing a second, differently-worded promise -- this
+  // build has no per-product signal for "does this listing actually have
+  // protected content attached" (see `FedosCommerceProductDetail`'s own
+  // shape), so this never claims content exists; it explains the REAL
+  // mechanics (pay -> seller fulfills -> you confirm receipt yourself)
+  // that apply to every order regardless.
+  // Deliberately avoids the words "pay"/"paid": this screen's own structural
+  // guard (`commerce_reachable_catalog_phase1_structural_guards.test.ts`,
+  // "no 'Buy Now'/instant-purchase button, and PAID is never one click away
+  // from Product Detail") asserts the WHOLE Product Detail screen never
+  // mentions payment at all -- Create Order is the only action here, and
+  // the actual pay/confirm step correctly lives one screen later, on the
+  // Order screen.
+  const deliveryExpectationText =
+    "Digital item — any protected content the seller has attached becomes available to you (Order screen → \"Open Purchased Content\") once your order is confirmed and the seller marks this fulfilled. You confirm receipt yourself; nothing is marked delivered on the seller's say-so alone.";
+  byId("commerce-detail-delivery-expectation").textContent = deliveryExpectationText;
+  byId("commerce-detail-order-form-delivery-note").textContent = deliveryExpectationText;
   void renderCommerceSellerReputation(product.creatorPubkey);
 }
 
@@ -1117,10 +1212,30 @@ function commerceRealActor(): CommerceActingAsActor | null {
   return { pubkey: localAccountPublicIdentifier, label: `My Store — ${label} (real profile)`, role: "merchant", isDemo: false };
 }
 
-/** Every selectable "Acting as" actor: the real local Persona first (when available), then the demo fixtures — so the real production identity is never buried below fictional ones. */
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item 1
+ * ("Remove demo-persona dependence from the normal flow... A demo selector
+ * may remain, but gated to an explicit test/demo mode only"). Reuses the
+ * SAME `window.fedosBeta.debugInstrumentationEnabled` flag every other
+ * test-only affordance in this file already gates on (a plain synchronous
+ * property backed by `FEDOS_ELECTRON_BETA_AUTOTEST`, see that property's own
+ * doc comment in `fedos_electron_beta_window.d.ts`) -- unset on every real
+ * production launch, so an ordinary user's "Acting as" selector NEVER offers
+ * "Alice"/"Northlight Studio"/"Riverbend Makerspace". Every existing
+ * automated test/E2E harness in this package already sets
+ * `FEDOS_ELECTRON_BETA_AUTOTEST` to launch Electron at all, so this is a
+ * pure production-vs-test gate, not a behavior change for any existing
+ * test.
+ */
+function commerceDemoActorsVisible(): boolean {
+  return window.fedosBeta.debugInstrumentationEnabled;
+}
+
+/** Every selectable "Acting as" actor: the real local Persona first (when available), then the demo fixtures -- ONLY when demo mode is explicitly active (`commerceDemoActorsVisible()`) -- so the real production identity is never buried below fictional ones, and a real production build never offers a fictional one at all. */
 function commerceActingAsOptions(): readonly CommerceActingAsActor[] {
   const real = commerceRealActor();
-  return real === null ? COMMERCE_DEMO_ACTORS : [real, ...COMMERCE_DEMO_ACTORS];
+  const demoActors = commerceDemoActorsVisible() ? COMMERCE_DEMO_ACTORS : [];
+  return real === null ? demoActors : [real, ...demoActors];
 }
 
 /** The asserted role for a given "Acting as" pubkey, across BOTH the real identity and the demo fixtures — `undefined` for an unrecognized pubkey (never defaults to a privileged role). */
@@ -1128,7 +1243,101 @@ function commerceActorRole(pubkey: string): "customer" | "merchant" | undefined 
   return commerceActingAsOptions().find((a) => a.pubkey === pubkey)?.role;
 }
 
-let commerceActingAsPubkey: string = COMMERCE_DEMO_ACTORS[0]?.pubkey ?? "";
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item 1
+ * / item 6 (order recovery): starts EMPTY (never defaulted to the demo
+ * customer fixture). `refreshCommerceActorOptionsForRealIdentity()` below
+ * fills this in with the real local Persona the moment one is available,
+ * UNLESS the user has explicitly picked something themselves this session
+ * (`commerceActingAsUserExplicitlyChosen`) -- see that flag's own doc
+ * comment. This was the actual root cause of two separately-reported
+ * tabletop bugs that read as unrelated: SELLER-TABLETOP-AFTER.md's "Does
+ * 'Acting as' remember your last selection across a reload? NO... the same
+ * disorienting default a brand-new seller hits on their very first visit"
+ * AND the final report's own named P1 "restart doesn't land on/point back
+ * to the in-progress order" -- `refreshCommerceLandingPointer()`/
+ * `refreshCommerceMyOrdersList()`/`refreshCommerceMerchantOrdersList()` all
+ * key off `commerceActingAsPubkey`, so silently re-defaulting to the demo
+ * Alice fixture on every restart meant every one of those views queried the
+ * WRONG identity for a real user, every single time.
+ */
+let commerceActingAsPubkey = "";
+
+/**
+ * True only once a user has ACTUALLY interacted with an "Acting as"
+ * selector this session (`setCommerceActingAs()` below is called ONLY from
+ * the two selects' own "change"/"input" listeners -- never programmatically
+ * elsewhere in this file). While `false`, `refreshCommerceActorOptionsForRealIdentity()`
+ * is free to keep re-defaulting `commerceActingAsPubkey` to the real local
+ * Persona as it becomes available; once `true`, a user's own explicit
+ * choice (including deliberately switching to a demo fixture, when demo
+ * mode is active) is never silently overridden.
+ */
+let commerceActingAsUserExplicitlyChosen = false;
+
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item
+ * 2/3: the last-known `commerceNetworkProfile` (Local Only / Nostr
+ * Optional / Serverless Privacy), fetched once at Ready
+ * (`refreshCommerceNetworkProfileCache()` below) and refreshed whenever the
+ * Settings screen's own Network Profile panel loads/saves — cached rather
+ * than re-fetched synchronously inside `renderCommerceCatalogModeBanner()`
+ * (that function must stay synchronous: it runs inline inside
+ * `populateCommerceActorSelect()`, which many synchronous call sites
+ * depend on). `null` only before the very first fetch resolves — the
+ * banner renders an honest "checking…" state for that brief window, never
+ * a guessed value.
+ */
+let commerceNetworkProfileCache: FedosCommerceNetworkProfile | null = null;
+
+const COMMERCE_DEMO_MODE_BANNER_HTML =
+  'Fictional/local demo data only — nothing here is a real product, merchant, or payment. <span class="commerce-sim-pill">LOCAL DEMO</span>';
+
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item
+ * 3 ("never let an apparently-working empty/demo catalog silently
+ * substitute for real discovery... you own the copy/visual truthfulness").
+ * Renders `#commerce-mode-banner` (Shop) and `#commerce-merchant-mode-banner`
+ * (My Store) truthfully based on the CURRENTLY selected "Acting as"
+ * identity, instead of the old unconditional static "LOCAL DEMO" claim
+ * that used to render even directly over a seller's own real, just-created
+ * listing (SELLER-TABLETOP-AFTER.md: "I had just clicked into my own store
+ * and was immediately looking at it as a fake customer"). Never claims
+ * network reachability it hasn't actually checked -- the real-mode copy
+ * distinguishes "stored only on this device" (Local Only) from "shared to
+ * your configured Relay" (Nostr Optional/Serverless Privacy) using the
+ * SAME `commerceNetworkProfile` Settings already exposes, never a second,
+ * separately-derived sync claim.
+ */
+function renderCommerceCatalogModeBanner(): void {
+  const active = commerceActingAsOptions().find((a) => a.pubkey === commerceActingAsPubkey);
+  let html: string;
+  if (active === undefined) {
+    html = "Loading your store…";
+  } else if (active.isDemo) {
+    html = COMMERCE_DEMO_MODE_BANNER_HTML;
+  } else if (commerceNetworkProfileCache === null) {
+    html = "Your real listings and orders, stored on this device. Checking network publish status…";
+  } else if (commerceNetworkProfileCache === "local-only") {
+    html =
+      'Your real listings and orders, stored only on this device. <strong>Not</strong> published to the network yet — other people cannot discover them until you enable Nostr publication (Settings → Commerce Nostr Publication). <span class="commerce-sim-pill">LOCAL ONLY</span>';
+  } else {
+    html = "Your real listings and orders. Nostr publication is on (Settings → Commerce Nostr Publication) — new or updated listings are sent to your configured Relay.";
+  }
+  for (const id of ["commerce-mode-banner", "commerce-merchant-mode-banner"]) {
+    const el = document.getElementById(id);
+    if (el !== null) el.innerHTML = html;
+  }
+}
+
+/** Fetches the real Commerce Network Profile once (Ready / Settings load/save) and re-renders the Shop/My Store mode banners against it — see `commerceNetworkProfileCache`'s own doc comment. Never blocks/guesses in the meantime. */
+async function refreshCommerceNetworkProfileCache(): Promise<void> {
+  const result = await window.fedosApp.commerceNetworkProfileGet();
+  if (result.outcome === "ok" && result.profile !== undefined) {
+    commerceNetworkProfileCache = result.profile;
+    renderCommerceCatalogModeBanner();
+  }
+}
 
 function populateCommerceActorSelect(selectId: string): void {
   const select = byId<HTMLSelectElement>(selectId);
@@ -1151,17 +1360,38 @@ function populateCommerceActorSelect(selectId: string): void {
           ? "Demo fixture identity — not your real profile, not a real merchant/customer."
           : "Your real local profile, acting as this store's merchant.";
   }
+  renderCommerceCatalogModeBanner();
 }
 
-/** Keeps the Commerce screen's and Merchant screen's selectors mirrored to ONE shared identity — see this section's own header for why two selectors exist at all (both screens need the control visible without cross-navigating). */
+/** Keeps the Commerce screen's and Merchant screen's selectors mirrored to ONE shared identity — see this section's own header for why two selectors exist at all (both screens need the control visible without cross-navigating). Called ONLY from a real user "change"/"input" event (see `commerceActingAsUserExplicitlyChosen`'s own doc comment) -- marks the choice as explicit so it is never silently overridden by the real-identity auto-default below. */
 function setCommerceActingAs(pubkey: string): void {
   commerceActingAsPubkey = pubkey;
+  commerceActingAsUserExplicitlyChosen = true;
   byId<HTMLSelectElement>("commerce-acting-as").value = pubkey;
   byId<HTMLSelectElement>("commerce-merchant-acting-as").value = pubkey;
 }
 
-/** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — re-populates BOTH "Acting as" selectors so the real local-identity option appears the moment a profile becomes ready, mirroring the startup call's own "populate both, unconditionally" discipline (see that call's own comment further below) rather than only lazily on next screen visit. */
+/**
+ * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — re-populates
+ * BOTH "Acting as" selectors so the real local-identity option appears the
+ * moment a profile becomes ready, mirroring the startup call's own
+ * "populate both, unconditionally" discipline (see that call's own comment
+ * further below) rather than only lazily on next screen visit.
+ *
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+ * additionally DEFAULTS `commerceActingAsPubkey` to the real local Persona
+ * the instant one is available, as long as the user hasn't explicitly
+ * picked something themselves yet this session -- see
+ * `commerceActingAsUserExplicitlyChosen`'s own doc comment for why this is
+ * the real fix for both the "Acting as doesn't remember your selection"
+ * seller-tabletop complaint AND the "restart doesn't land on the
+ * in-progress order" P1.
+ */
 function refreshCommerceActorOptionsForRealIdentity(): void {
+  const real = commerceRealActor();
+  if (real !== null && !commerceActingAsUserExplicitlyChosen) {
+    commerceActingAsPubkey = real.pubkey;
+  }
   populateCommerceActorSelect("commerce-acting-as");
   populateCommerceActorSelect("commerce-merchant-acting-as");
 }
@@ -1180,6 +1410,7 @@ function refreshCommerceActorOptionsForRealIdentity(): void {
  * from primary label to secondary/advanced.
  */
 function commerceActorLabel(pubkey: string): string {
+  if (pubkey.length > 0 && pubkey === localAccountPublicIdentifier) return localDisplayLabel.length > 0 ? localDisplayLabel : "You";
   const actor = COMMERCE_DEMO_ACTORS.find((a) => a.pubkey === pubkey);
   if (actor !== undefined) return actor.label;
   return pubkey.length > 12 ? `${pubkey.slice(0, 12)}…` : pubkey;
@@ -1208,19 +1439,19 @@ function commerceOrderSummaryText(order: FedosCommerceOrder): string {
  */
 function commerceOrderWaitingText(status: string, isBuyer: boolean, isSeller: boolean): string {
   if (status === "created" && isSeller && !isBuyer) {
-    return "Waiting on the buyer to review and submit this order. You can safely close this and come back later — nothing is lost. Reopen this order to see whether they've submitted it.";
+    return "Waiting on the buyer to review and submit this order. You can safely close this and come back later — nothing is lost or expires if they're offline. Reopen this order to see whether they've submitted it.";
   }
   if (status === "submitted" && isBuyer && !isSeller) {
-    return "Submitted — waiting on the seller to accept or reject. You can safely close this and come back later; reopen this order to see their decision.";
+    return "Submitted — waiting on the seller to accept or reject. If they're offline, this simply waits for them; reopen this order later to see their decision.";
   }
   if (status === "accepted" && isSeller && !isBuyer) {
-    return "Accepted — waiting on the buyer to pay. Reopen this order later to see whether payment has arrived.";
+    return "Accepted — waiting on the buyer to pay. If they're offline, this simply waits; reopen this order later to see whether payment has arrived.";
   }
   if (status === "paid" && isBuyer && !isSeller) {
-    return "Payment confirmed — waiting on the seller to fulfill your order. Reopen this order later to check progress.";
+    return "Payment confirmed — waiting on the seller to fulfill your order. If they're offline, this simply waits; reopen this order later to check progress.";
   }
   if (status === "fulfilling" && isSeller && !isBuyer) {
-    return "Marked fulfilling — waiting on the buyer to confirm they received it. Reopen this order later to see whether they have.";
+    return "Marked fulfilling — waiting on the buyer to confirm they received it. If they're offline, this simply waits; reopen this order later to see whether they have.";
   }
   if (!isBuyer && !isSeller) {
     return "You're viewing this order under an identity that is neither its buyer nor its seller — no action is available to you here.";
@@ -1309,9 +1540,7 @@ async function onCommerceOpenPurchasedContentClick(): Promise<void> {
   try {
     const result = await window.fedosApp.commerceMediaGrantRedeem(currentCommerceOrder.id, commerceActingAsPubkey);
     if (result.outcome !== "ok" || result.contentBase64 === undefined) {
-      const reason = result.reason === "no-grant-on-file" || result.reason === "order-not-qualifying"
-        ? "No protected digital content is available for this order yet."
-        : (result.reason ?? result.outcome);
+      const reason = commercePurchasedContentDenialText(result.outcome, result.reason);
       showCommerceError("commerce-order-purchased-content-error", { outcome: result.outcome, reason });
       return;
     }
@@ -1785,7 +2014,47 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
   // (Agent D) -- friction-ledger row #17 / arc §38: per-product image
   // attach control, independent of publish state.
   li.appendChild(commerceMerchantProductImageAttachControls(product.id));
+  li.appendChild(commerceMerchantProductShareControls(product));
   return li;
+}
+
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item
+ * 2 ("how do I share my store/product?"). This is deliberately the UI
+ * SURFACE and honest copy only -- the underlying signed-artifact/QR
+ * plumbing (a verifiable "here's my real listing" object a buyer could
+ * scan/import) is Agent D's territory in a sibling worktree; the
+ * Coordinator wires the two together. Until that lands, this copies the
+ * plain product id + seller pubkey a buyer can be given out-of-band, WITH
+ * an explicit, honest caveat about what that recipient still needs (a
+ * working relay connection to actually discover it) -- never implies this
+ * is already a one-tap "share" that Just Works end-to-end.
+ */
+function commerceMerchantProductShareControls(product: FedosCommerceMerchantProduct): HTMLDivElement {
+  const wrap = document.createElement("div");
+  wrap.className = "commerce-product-share";
+  const shareBtn = document.createElement("button");
+  shareBtn.type = "button";
+  shareBtn.textContent = "Copy Share Info";
+  shareBtn.setAttribute("aria-label", `Copy share info for ${product.title}`);
+  const feedbackEl = document.createElement("span");
+  feedbackEl.className = "muted";
+  feedbackEl.setAttribute("role", "status");
+  feedbackEl.setAttribute("aria-live", "polite");
+  shareBtn.addEventListener("click", () => {
+    void (async () => {
+      const shareText = `FedOS product: "${product.title}" (id ${product.id}) — seller ${product.creatorPubkey}. The recipient needs a working Relay connection to find this listing; this is not yet a verified/signed proof of the listing.`;
+      try {
+        await navigator.clipboard.writeText(shareText);
+        feedbackEl.textContent = "Copied. Note: the recipient still needs a working Relay connection to actually find this listing.";
+      } catch {
+        feedbackEl.textContent = "Couldn't copy to clipboard.";
+      }
+    })();
+  });
+  wrap.appendChild(shareBtn);
+  wrap.appendChild(feedbackEl);
+  return wrap;
 }
 
 // Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge note):
@@ -1844,13 +2113,26 @@ async function onCommercePublishAction(productId: string, action: "publish" | "u
 function commerceMerchantProductImageAttachControls(productId: string): HTMLDivElement {
   const wrap = document.createElement("div");
   wrap.className = "commerce-product-image-attach";
+  // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+  // SELLER-TABLETOP-AFTER.md: "'Attach Image' is a red herring for
+  // delivery... it is a product-photo uploader, not a deliverable-content
+  // uploader. I never found any control... that lets a seller attach the
+  // actual thing a buyer is paying for." This build genuinely has no
+  // deliverable-content upload path anywhere (see the final report's own
+  // "Purchased Content: FAIL" -- a plumbing gap outside this fix's scope),
+  // so the honest fix available here is to stop this control from reading
+  // as that missing feature -- a plain caption, not a new capability.
+  const captionEl = document.createElement("div");
+  captionEl.className = "muted";
+  captionEl.textContent = "Product photo only — this is not where you attach the digital content buyers will receive (this build has no control for that yet).";
+  wrap.appendChild(captionEl);
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = "image/png,image/jpeg";
   wrap.appendChild(fileInput);
   const attachBtn = document.createElement("button");
   attachBtn.type = "button";
-  attachBtn.textContent = "Attach Image";
+  attachBtn.textContent = "Attach Photo";
   wrap.appendChild(attachBtn);
   const errorEl = document.createElement("div");
   errorEl.className = "error";
@@ -1876,7 +2158,17 @@ function commerceMerchantProductImageAttachControls(productId: string): HTMLDivE
         const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
         const result = await window.fedosApp.commerceProductImageAttach(commerceActingAsPubkey, productId, base64, file.type);
         if (result.outcome !== "ok") {
-          errorEl.textContent = result.reason ?? `attach failed: ${result.outcome}`;
+          // Commerce Discovery + Digital Content Delivery mega-arc (Agent U)
+          // -- item 7 (content upload rejected). The two most common real
+          // rejections get a plain-language translation; anything else
+          // still shows the real reason `handleCommerceProductImageAttach()`
+          // gave (never fabricated, never a bare outcome code).
+          errorEl.textContent =
+            result.reason !== undefined && result.reason.startsWith("contentType must be one of")
+              ? "This file type isn't supported. Only PNG or JPEG images can be attached."
+              : result.reason === "malformed or missing image data" || result.reason === "image data is not valid base64" || result.reason === "image data decoded to zero bytes"
+                ? "Couldn't read that image file — it may be corrupted or empty. Try a different file."
+                : (result.reason ?? describeOutcome(result.outcome));
           return;
         }
         fileInput.value = "";
@@ -3008,6 +3300,11 @@ async function refreshCommerceNetworkProfile(): Promise<void> {
     return;
   }
   byId<HTMLSelectElement>("commerce-network-profile-select").value = result.profile;
+  // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+  // keep the Shop/My Store mode banners' cached value current whenever
+  // this screen re-fetches it too, rather than only at Ready.
+  commerceNetworkProfileCache = result.profile;
+  renderCommerceCatalogModeBanner();
 }
 
 async function onCommerceNetworkProfileSave(): Promise<void> {
@@ -3019,7 +3316,14 @@ async function onCommerceNetworkProfileSave(): Promise<void> {
     showError("commerce-network-profile-error", result);
     return;
   }
-  byId("commerce-network-profile-report").textContent = "Saved for this session. Resets to Local Only on the next launch.";
+  // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+  // durability fix: this now actually persists (`persistCommerceNetworkProfile()`,
+  // `fedos_electron_beta_main.cts`) -- the previous "resets to Local Only
+  // on the next launch" copy here was accurate for the OLD in-memory-only
+  // behavior and would now be a false claim.
+  byId("commerce-network-profile-report").textContent = "Saved — this choice will still be in effect the next time you launch FedOS.";
+  if (result.profile !== undefined) commerceNetworkProfileCache = result.profile;
+  renderCommerceCatalogModeBanner();
 }
 
 function onSettingsRelayAdd(): void {
@@ -3122,6 +3426,11 @@ function renderReady(ready: FedosProfileCommandResult["ready"]): void {
   // `#commerce-landing-pointer`'s own HTML comment / `refreshCommerceLandingPointer()`'s
   // own header.
   void refreshCommerceLandingPointer();
+  // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+  // same one-shot-at-Ready pattern, so the Shop/My Store mode banner's
+  // real/local-only-vs-published wording is already correct the moment a
+  // returning user reaches either screen, not only after a Settings visit.
+  void refreshCommerceNetworkProfileCache();
 }
 
 function routeByStatus(status: FedosProfileStatusResult): void {
@@ -3142,6 +3451,7 @@ function routeByStatus(status: FedosProfileStatusResult): void {
     void refreshCommerceMyOrdersList();
     void refreshCommerceMerchantOrdersList();
     void refreshCommerceLandingPointer();
+    void refreshCommerceNetworkProfileCache();
     return;
   }
   if (status.presence === "absent") {
@@ -3338,6 +3648,13 @@ function clearAllRendererContentState(): void {
   localAccountPublicIdentifier = "";
   localDisplayLabel = "";
   pendingDevicePairingId = null;
+  // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+  // same defense-in-depth reset as `localAccountPublicIdentifier`/
+  // `localDisplayLabel` immediately above: a locked/relocked session must
+  // never carry a PRIOR profile's "Acting as" selection (or its "user
+  // explicitly chose" flag) into a newly-unlocked one.
+  commerceActingAsPubkey = "";
+  commerceActingAsUserExplicitlyChosen = false;
 
   // Content-bearing DOM containers (list/detail views, error text, status/feedback text).
   const textContentOnlyIds = [
@@ -3514,6 +3831,19 @@ byId<HTMLButtonElement>("nav-commerce-merchant").addEventListener("click", () =>
   showAppScreen("commerce-merchant");
   void refreshCommerceMerchantScreen();
 });
+// Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item 6
+// (order recovery): the landing-pointer action buttons navigate exactly the
+// same way their corresponding nav button does (SAME screen/refresh calls
+// as `nav-commerce`/`nav-commerce-merchant` immediately above), never a
+// second, divergent navigation path.
+byId<HTMLButtonElement>("commerce-landing-pointer-shop-btn").addEventListener("click", () => {
+  showAppScreen("commerce");
+  void refreshCommerceCatalogList();
+});
+byId<HTMLButtonElement>("commerce-landing-pointer-store-btn").addEventListener("click", () => {
+  showAppScreen("commerce-merchant");
+  void refreshCommerceMerchantScreen();
+});
 byId<HTMLButtonElement>("nav-search").addEventListener("click", () => showAppScreen("search"));
 byId<HTMLButtonElement>("nav-archive").addEventListener("click", () => {
   showAppScreen("archive");
@@ -3626,6 +3956,21 @@ byId<HTMLButtonElement>("commerce-order-complete-btn").addEventListener("click",
 byId<HTMLButtonElement>("commerce-order-receipt-issue-btn").addEventListener("click", () => void onCommerceReceiptIssueClick());
 byId<HTMLButtonElement>("commerce-order-purchased-content-btn").addEventListener("click", () => void onCommerceOpenPurchasedContentClick());
 byId<HTMLButtonElement>("commerce-merchant-create-submit").addEventListener("click", () => void onCommerceMerchantCreateSubmit());
+// Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- item 2
+// ("how do I share my store?"); see `commerceMerchantProductShareControls()`'s
+// own header for the honest scope of what this can promise today.
+byId<HTMLButtonElement>("commerce-merchant-share-store").addEventListener("click", () => {
+  void (async () => {
+    const feedbackEl = byId("commerce-merchant-share-store-feedback");
+    const shareText = `FedOS store: ${commerceActorLabel(commerceActingAsPubkey)} — pubkey ${commerceActingAsPubkey}. The recipient needs a working Relay connection on their own device to actually find your listings; this is not yet a scannable/verified proof.`;
+    try {
+      await navigator.clipboard.writeText(shareText);
+      feedbackEl.textContent = "Copied. Note: the recipient still needs a working Relay connection to find your listings.";
+    } catch {
+      feedbackEl.textContent = "Couldn't copy to clipboard.";
+    }
+  })();
+});
 // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
 // ledger row #18: live formatted price preview as Bob types/changes
 // currency, on both the Create and Edit forms. "input" + "change" both
