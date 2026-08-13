@@ -53,25 +53,46 @@
  * they are additional, explicitly-asserted restarts layered on top of a
  * flow that was already restart-per-turn end to end.
  *
- * KNOWN, LIVE-CONFIRMED RENDERER GAP THIS SUITE WORKS AROUND (never a
- * shortcut around any IPC/domain validation -- see the long comment above
- * `ALICE_2_DISCOVER_AND_ORDER` below): `commerceRealActor()`
- * (`fedos_electron_beta_renderer.ts`) hard-codes the real local Persona's
- * "Acting as" role to `"merchant"` -- there is, today, no real "become a
- * customer" identity concept in this build (the file's own header says so
- * explicitly). This CSS-hides Product Detail's buyer Order form
- * (`#commerce-detail-order-form`) for a real (non-demo) identity. The
- * underlying `#commerce-order-create-submit` button, its click listener,
- * and the `fedos-app:commerce-order-create` IPC handler apply NO
- * independent role check of their own (confirmed by direct source read) --
- * they act on whatever `commerceActingAsPubkey` is currently selected,
- * structurally identical for a real identity and a demo one. This suite
- * drives that real button via the SAME raw `document.querySelector(...).click()`
- * primitive every OTHER step in the pre-existing `ui-script` harness
- * already uses (visibility is never checked by that primitive, by design --
- * see `fedos_electron_beta_main.cts`'s own `click` step implementation) --
- * never a new automation surface, never a change to any IPC handler or
- * domain rule, never a fabricated success.
+ * A RENDERER GAP THIS SUITE USED TO WORK AROUND -- NOW FIXED, AND THE
+ * WORKAROUND IS WHY THIS SUITE NEVER CAUGHT IT (kept on the record
+ * deliberately, because the lesson matters more than the fix):
+ *
+ *   This header used to describe, and accept, a "cosmetic" gap:
+ *   `commerceRealActor()` hard-codes every real local Persona's "Acting
+ *   as" role to `"merchant"`, and Product Detail's order-form gate read
+ *   `commerceActorRole(commerceActingAsPubkey) === "customer"` -- so the
+ *   buyer Order form (`#commerce-detail-order-form`) was hidden for any
+ *   real identity. This suite drove `#commerce-order-create-submit`
+ *   anyway, via the `ui-script` harness's raw
+ *   `document.querySelector(...).click()` primitive, which by design never
+ *   checks visibility.
+ *
+ *   That was NOT cosmetic. Once this same mega-arc's item 1 correctly
+ *   gated the demo personas behind `commerceDemoActorsVisible()`, the
+ *   demo CUSTOMER fixture -- the only actor in the entire build ever
+ *   labelled `role: "customer"` -- vanished from every production launch,
+ *   and the gate became unconditionally false. A real user could not
+ *   order ANY product, including the built-in demo listings. An
+ *   independent fresh-buyer usability tester found it live on the real
+ *   packaged app; a Coordinator-driven CDP repro reproduced it on a real
+ *   PRODUCTION launch (no `FEDOS_ELECTRON_BETA_AUTOTEST`, so
+ *   `debugInstrumentationEnabled === false`) with real synthesized mouse
+ *   input, which -- unlike this suite's `.click()` -- physically cannot
+ *   actuate a hidden control.
+ *
+ *   THE LESSON FOR THIS SUITE: an automation primitive that ignores
+ *   visibility can only ever prove the IPC/domain layer works. It cannot
+ *   prove a real user can reach it. When a step here needs a documented
+ *   "the control is hidden but we click it anyway" note, that note is a
+ *   BUG REPORT, not a workaround -- treat it as one.
+ *
+ *   The gate now reads the real condition
+ *   (`commerceProductOrderAvailability()`: any real local identity may
+ *   order any product it does not itself own; self-dealing is refused on
+ *   `commerceActingAsPubkey === product.creatorPubkey`, mirroring
+ *   `createOrder()`'s own unbypassable `"self_dealing"` rejection), so
+ *   the order form is genuinely visible to Alice below and the click
+ *   these steps perform is now the same click a real user performs.
  *
  * REVISION HISTORY OF THIS SUITE'S OWN FINDINGS (read this before trusting
  * any comment below in isolation):
@@ -706,12 +727,13 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
       // `verifyAndBuildInboundCommerceNostrEnvelope` Schnorr-signature-
       // checking bridge, never a fixture/shortcut. Then open the real
       // Product Detail (verifies seller identity is shown), and submit a
-      // real Order using Alice's own real pubkey as buyer -- see this
-      // file's own top-of-file comment for why `#commerce-order-create-submit`
-      // is clicked via the same visibility-blind `.click()` primitive every
-      // other step already uses, working around a renderer-only cosmetic
-      // gap (`commerceRealActor()` always labels a real identity
-      // `"merchant"`), never a change to any IPC handler or domain rule.
+      // real Order using Alice's own real pubkey as buyer. NOTE (Coordinator
+      // validation-gate fix): `#commerce-order-create-submit` is now a
+      // genuinely VISIBLE control here -- Product Detail's order form is
+      // offered to any real local identity viewing a product it does not
+      // own. This step used to be documented as clicking a hidden button;
+      // see this file's own top-of-file comment for the full history and
+      // why that note was really a bug report.
       // =====================================================================
       const alice2 = await runBetaUiScript("ALICE_2_DISCOVER_AND_ORDER", aliceDataDir, [
         ...returningLaunchPreamble(ALICE_PASSPHRASE, "direct", "#commerce-acting-as", alicePubkey), // 0..13

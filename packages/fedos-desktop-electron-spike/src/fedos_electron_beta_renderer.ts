@@ -1251,6 +1251,69 @@ async function openCommerceProductPreview(productId: string): Promise<void> {
   await openCommerceProductDetailScreen(productId, commerceActingAsPubkey);
 }
 
+/**
+ * Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+ * validation-gate fix) -- decides whether Product Detail offers its
+ * "Create Order" form, and if not, the ONE honest reason why.
+ *
+ * THE BUG THIS REPLACES (live-reproduced on a real production launch,
+ * fresh profile, real relay-discovered listing): the gate used to read
+ *
+ *     const isCustomer = commerceActorRole(commerceActingAsPubkey) === "customer";
+ *
+ * i.e. it asked "is the selected 'Acting as' identity one of the actors
+ * this build labels `role: "customer"`?". The ONLY actor that has ever
+ * carried `role: "customer"` is the synthetic demo fixture
+ * `COMMERCE_DEMO_ACTORS[0]` (`"c".repeat(64)`, "Customer -- Alice (demo)") --
+ * `commerceRealActor()` hard-codes EVERY real local Persona to
+ * `role: "merchant"` (it is that identity's *store* capacity). So the
+ * moment this arc's own item 1 correctly gated the demo fixtures behind
+ * `commerceDemoActorsVisible()` (production launches never set
+ * `FEDOS_ELECTRON_BETA_AUTOTEST`), `commerceActingAsOptions()` on a real
+ * launch became `[realActor]` alone -- every option `role: "merchant"`,
+ * so `isCustomer` was UNCONDITIONALLY false and the order form was
+ * UNCONDITIONALLY hidden. No real user could order ANY product, including
+ * the built-in demo listings. The demo-persona gate was right; this gate
+ * was the one still depending on the removed demo-customer concept.
+ *
+ * THE CORRECT CONDITION, and the one implemented here: buying is not a
+ * separate identity concept at all. A person's real local Persona is the
+ * same pubkey whether they are selling their own listings or buying
+ * someone else's; "customer" vs "merchant" is a per-ORDER capacity, not a
+ * property of an identity. So any real local identity may order any
+ * product it does NOT itself own.
+ *
+ * SELF-DEALING is still blocked, and now on the REAL property rather than
+ * demo-fixture-list membership: `commerceActingAsPubkey === product.creatorPubkey`.
+ * That mirrors exactly what the domain layer independently and
+ * unbypassably enforces -- `createOrder()`'s own
+ * `actor.pubkey === input.sellerPubkey` -> `"self_dealing"` rejection in
+ * `src/os/commerce/order/order_state_machine.ts`, reached through
+ * `handleCommerceOrderCreate()`, which sets `sellerPubkey` from the
+ * product's own `creatorPubkey` on BOTH its local and its
+ * Nostr-discovered branch. This UI gate is therefore a truthful mirror of
+ * the real rule, never the enforcement boundary itself.
+ *
+ * `product.isPreview` (a seller previewing their own draft through the
+ * buyer renderer, Agent S's friction-ledger row #24) is deliberately kept
+ * silent: the screen already carries `#commerce-detail-preview-banner`
+ * explaining the state, so a second "you can't order this" line would be
+ * noise. It is also always a self-owned draft, so it is redundant.
+ */
+function commerceProductOrderAvailability(product: FedosCommerceProductDetail): { readonly canOrder: boolean; readonly blockedReason: string } {
+  if (product.isPreview) return { canOrder: false, blockedReason: "" };
+  if (commerceActingAsPubkey.length === 0) {
+    return { canOrder: false, blockedReason: "FedOS is still loading your local identity — an order is always placed as a real identity of yours, so this will become available in a moment." };
+  }
+  if (commerceActingAsPubkey === product.creatorPubkey) {
+    return {
+      canOrder: false,
+      blockedReason: 'This is your own listing — you cannot place an order with yourself. Manage it from "My Store" instead. (If you meant to order as a different identity of yours, change "Acting as".)',
+    };
+  }
+  return { canOrder: true, blockedReason: "" };
+}
+
 function renderCommerceProductDetail(product: FedosCommerceProductDetail): void {
   byId("commerce-detail-title").textContent = product.title;
   byId("commerce-detail-preview-banner").toggleAttribute("hidden", !product.isPreview);
@@ -1261,9 +1324,11 @@ function renderCommerceProductDetail(product: FedosCommerceProductDetail): void 
   byId("commerce-detail-merchant").textContent = `Sold by ${product.merchantLabel}`;
   byId("commerce-detail-status").textContent = `Status: ${product.status}`;
   byId("commerce-detail-description").textContent = product.description;
-  const isCustomer = commerceActorRole(commerceActingAsPubkey) === "customer";
-  byId("commerce-detail-order-form").toggleAttribute("hidden", !isCustomer || product.isPreview);
-  byId("commerce-detail-order-unavailable-note").toggleAttribute("hidden", isCustomer || product.isPreview);
+  const availability = commerceProductOrderAvailability(product);
+  byId("commerce-detail-order-form").toggleAttribute("hidden", !availability.canOrder);
+  const unavailableNote = byId("commerce-detail-order-unavailable-note");
+  unavailableNote.textContent = availability.blockedReason;
+  unavailableNote.toggleAttribute("hidden", availability.blockedReason.length === 0);
   // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
   // item 5: a clear delivery expectation shown BEFORE checkout, never only
   // discovered after paying. Deliberately mirrors this app's own existing,
@@ -1371,12 +1436,24 @@ async function renderCommerceMerchantReputation(): Promise<void> {
 // non-demo "My Store" option whenever a profile is unlocked — this is
 // the real production merchant identity the brief asks for, structurally
 // separated (own array, own `isDemo: false` flag, own label prefix) from
-// the fictional fixtures rather than merged/renamed into them. Acting as
-// your real identity always asserts a MERCHANT capacity (creating/
-// managing your OWN store's listings) — this build has no separate real
-// "become a customer" identity concept yet, so real-identity purchases
-// are not offered here; the demo customer persona remains the only way
-// to exercise a buyer flow in this single-process build.
+// the fictional fixtures rather than merged/renamed into them.
+//
+// Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+// validation-gate fix) — CORRECTING what this header used to claim. It
+// used to say "Acting as your real identity always asserts a MERCHANT
+// capacity... so real-identity purchases are not offered here; the demo
+// customer persona remains the only way to exercise a buyer flow". That
+// was only ever true of the single-process demo-persona era, and once
+// this arc's item 1 correctly hid the demo fixtures from production it
+// became a live, total blocker: NO real user could order ANYTHING. The
+// real model is: `role` is a per-ORDER capacity, never a property of an
+// identity. One real Persona is simultaneously the merchant of its own
+// listings and a perfectly ordinary buyer of everyone else's, on the same
+// pubkey. `role` below is therefore only consulted where a MERCHANT
+// capacity is genuinely being asserted (creating a product, see
+// `onCommerceMerchantCreateSubmit()` + `canCreateProduct()`); the buyer
+// side asks the real question instead — "is this product one I do not
+// own?" — in `commerceProductOrderAvailability()`.
 // ---------------------------------------------------------------------
 
 interface CommerceActingAsActor {
@@ -1536,16 +1613,29 @@ function populateCommerceActorSelect(selectId: string): void {
     select.appendChild(option);
   }
   select.value = commerceActingAsPubkey;
-  const noteId = selectId === "commerce-acting-as" ? "commerce-acting-as-note" : "commerce-merchant-acting-as-note";
+  const isShopScreen = selectId === "commerce-acting-as";
+  const noteId = isShopScreen ? "commerce-acting-as-note" : "commerce-merchant-acting-as-note";
   const noteEl = document.getElementById(noteId);
   if (noteEl !== null) {
     const active = commerceActingAsOptions().find((a) => a.pubkey === select.value);
+    // Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+    // validation-gate fix): the real-identity caption used to read
+    // "Your real local profile, acting as this store's merchant." on BOTH
+    // screens. On Shop that was actively misleading -- it is the screen
+    // where you BUY other people's listings, and reading a merchant-only
+    // caption next to a merchant-labelled single option is exactly what
+    // told the fresh-buyer tester there must be some other "customer
+    // identity" they were missing. There is not: the same real pubkey
+    // buys and sells. Each screen now describes the capacity that screen
+    // actually exercises.
     noteEl.textContent =
       active === undefined
         ? ""
         : active.isDemo
           ? "Demo fixture identity — not your real profile, not a real merchant/customer."
-          : "Your real local profile, acting as this store's merchant.";
+          : isShopScreen
+            ? "Your real local profile. Orders you place here are placed as this identity."
+            : "Your real local profile, acting as this store's merchant.";
   }
   renderCommerceCatalogModeBanner();
 }

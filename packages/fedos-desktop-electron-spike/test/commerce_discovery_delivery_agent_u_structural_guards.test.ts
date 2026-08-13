@@ -390,3 +390,73 @@ describe("Agent U -- commerceActorLabel() also resolves the current user's own r
     expect(localIdx).toBeLessThan(demoIdx);
   });
 });
+
+/**
+ * REGRESSION GUARDS for the live, severe blocker this arc's own item-1
+ * demo-persona gating exposed and that a fresh-buyer usability tester
+ * found on the real packaged app: with the demo fixtures correctly hidden
+ * from production, Product Detail's order-form gate
+ * (`commerceActorRole(commerceActingAsPubkey) === "customer"`) became
+ * UNCONDITIONALLY false -- the only actor ever labelled `role: "customer"`
+ * was the demo customer fixture, and `commerceRealActor()` hard-codes
+ * every real Persona to `"merchant"`. No real user could order anything.
+ *
+ * These guards pin the CORRECT condition so the two changes can never
+ * drift apart again: ordering is gated on OWNERSHIP (a real identity may
+ * order any product it does not itself own), never on demo-fixture role
+ * membership.
+ */
+describe("Agent U -- item 1 REGRESSION: hiding the demo personas must never also hide the buyer order form", () => {
+  it("35. the Product Detail order-form gate is ownership-based (actingAs vs product.creatorPubkey) and never asks whether the acting identity has the demo-only \"customer\" role", () => {
+    const source = stripComments(read(RENDERER_PATH));
+    const start = source.indexOf("function commerceProductOrderAvailability(product: FedosCommerceProductDetail):");
+    expect(start, source).toBeGreaterThanOrEqual(0);
+    const body = source.slice(start, source.indexOf("\n}", start) + 2);
+    expect(body).toMatch(/commerceActingAsPubkey === product\.creatorPubkey/);
+    expect(body).not.toMatch(/commerceActorRole/);
+    expect(body).not.toMatch(/"customer"/);
+  });
+
+  it("36. renderCommerceProductDetail() drives BOTH the order form and the unavailable note from that one ownership decision -- no surviving isCustomer/role check", () => {
+    const source = stripComments(read(RENDERER_PATH));
+    const start = source.indexOf("function renderCommerceProductDetail(product: FedosCommerceProductDetail): void {");
+    expect(start, source).toBeGreaterThanOrEqual(0);
+    const body = source.slice(start, source.indexOf("\n}", start) + 2);
+    expect(body).toMatch(/commerceProductOrderAvailability\(product\)/);
+    expect(body).toMatch(/commerce-detail-order-form/);
+    expect(body).toMatch(/commerce-detail-order-unavailable-note/);
+    expect(body).not.toMatch(/isCustomer/);
+    expect(body).not.toMatch(/commerceActorRole/);
+  });
+
+  it("37. commerceActorRole() survives ONLY where a genuine MERCHANT capacity is asserted (product creation) -- never on the buyer path", () => {
+    const source = stripComments(read(RENDERER_PATH));
+    const callSites = source.split("commerceActorRole(").length - 1;
+    // one definition + exactly one call site (onCommerceMerchantCreateSubmit)
+    expect(callSites).toBe(2);
+    const createStart = source.indexOf("async function onCommerceMerchantCreateSubmit(): Promise<void> {");
+    const createBody = source.slice(createStart, source.indexOf("\n}", createStart) + 2);
+    expect(createBody).toMatch(/const actorRole = commerceActorRole\(commerceActingAsPubkey\);/);
+  });
+
+  it("38. self-dealing is still refused, and the UI gate mirrors the domain rule createOrder() independently enforces", () => {
+    const domain = stripComments(read("src/os/commerce/order/order_state_machine.ts"));
+    expect(domain).toMatch(/actor\.pubkey === input\.sellerPubkey/);
+    expect(domain).toMatch(/"self_dealing"/);
+    const source = stripComments(read(RENDERER_PATH));
+    expect(source).toMatch(/commerceActingAsPubkey === product\.creatorPubkey/);
+  });
+
+  it("39. the order-unavailable note no longer tells the user to switch to a \"customer identity\" -- an instruction no real build could satisfy (no such option exists anywhere)", () => {
+    // Comments are stripped first: the replacement markup deliberately
+    // KEEPS a comment naming the removed instruction, so a future reader
+    // knows why the element is empty. Only real, user-visible copy is
+    // asserted against.
+    const html = stripHtmlComments(read(HTML_PATH));
+    expect(html).not.toMatch(/customer identity/i);
+    const source = stripComments(read(RENDERER_PATH));
+    expect(source).not.toMatch(/Switch "Acting as" to a customer identity/);
+    // the static markup is deliberately empty; the renderer owns this text
+    expect(html).toMatch(/<p class="muted" id="commerce-detail-order-unavailable-note" hidden><\/p>/);
+  });
+});

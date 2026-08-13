@@ -347,7 +347,12 @@
           <button id="commerce-share-open-btn" type="button">Open</button>
 
           <h3>My Orders</h3>
-          <p class="muted">Orders you created as the currently selected "Acting as" customer identity.</p>
+          <!-- Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+               validation-gate fix): was "...the currently selected \"Acting as\"
+               customer identity", another holdover implying a separate buyer
+               identity concept that does not exist. Buying and selling are
+               per-order capacities of ONE real identity, not two identities. -->
+          <p class="muted">Orders you placed as a buyer using the identity currently selected in "Acting as".</p>
           <p class="muted" id="commerce-my-orders-activity-summary" role="status" aria-live="polite"></p>
           <!-- FedOS Commerce "Purchase Completion" mega-arc (Agent U) -- honest
                sync-state text (no push/poll exists for this list -- see
@@ -387,7 +392,18 @@
             <div id="commerce-order-create-error" class="error" role="alert"></div>
             <button id="commerce-order-create-submit" type="button" class="commerce-btn-primary">Create Order</button>
           </div>
-          <p class="muted" id="commerce-detail-order-unavailable-note" hidden>Switch "Acting as" to a customer identity on the Commerce screen to create an order for this product.</p>
+          <!-- Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+               validation-gate fix): deliberately EMPTY in static markup. The old
+               static copy here ("Switch \"Acting as\" to a customer identity on the
+               Commerce screen...") was a holdover from the removed single-process
+               demo-persona era -- there is no separate "customer identity" concept
+               in this product, and following that instruction was impossible: no
+               such option exists in a real build's "Acting as" selector, and none
+               is needed. `commerceProductOrderAvailability()` (renderer) now owns
+               this text and writes the ONE real reason ordering is unavailable
+               (currently: your own listing / identity still loading), or clears it
+               and shows the order form. See that function's own header. -->
+          <p class="muted" id="commerce-detail-order-unavailable-note" hidden></p>
         </div>
 
         <div class="app-screen" id="app-screen-commerce-order">
