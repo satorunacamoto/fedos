@@ -78,7 +78,12 @@ describe("Commerce Reachable Catalog Phase 1 -- composition root wiring", () => 
     // chars; this test still only positively asserts the ORIGINAL name
     // set is present and the forbidden names absent, so widening the
     // capture window doesn't weaken it.
-    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,3200}?)\};/);
+    // Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+    // integration pass): widened 3200 -> 4600. Measured 3094 chars after
+    // Agent D + Agent A -- passing, but with only ~100 chars of headroom
+    // left, so it is raised here deliberately rather than left to fail on
+    // the next addition. Same non-weakening rationale as the note above.
+    const importBlockMatch = source.match(/const commerce = \(await import\(distUrl\("os", "commerce", "index\.js"\)\)\) as \{([\s\S]{0,4600}?)\};/);
     expect(importBlockMatch, source).not.toBeNull();
     const importBlock = importBlockMatch![1];
     for (const name of [
@@ -98,8 +103,16 @@ describe("Commerce Reachable Catalog Phase 1 -- composition root wiring", () => 
   it("3. RootModules.Commerce exposes exactly the Commerce E2E Completion arc's own reviewed name set -- no PlaceholderPaymentProvider/marketplace field, never the raw createCommerce() factory", () => {
     const source = stripComments(read(MAIN_PATH));
     // Coordinator merge note: window widened from 1900 -- same growth
-    // reason as test 2 above; real length is now ~5500 chars.
-    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,6200}?)\n  \};/);
+    // reason as test 2 above; real length was ~5500 chars.
+    // Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+    // integration pass): widened again 6200 -> 9600. Agent D's share
+    // exports and Agent A's five media-release entries both land in this
+    // same `RootModules.Commerce` declaration, taking it to 8112 chars
+    // measured. Per the note on test 2 above, this window is only a
+    // capture bound -- the positive assertions below are still the
+    // ORIGINAL name set and the negatives are still absence checks, so
+    // widening it does not weaken the guard.
+    const fieldMatch = source.match(/readonly Commerce: \{([\s\S]{0,9600}?)\n  \};/);
     expect(fieldMatch, source).not.toBeNull();
     const field = fieldMatch![1];
     for (const name of [
