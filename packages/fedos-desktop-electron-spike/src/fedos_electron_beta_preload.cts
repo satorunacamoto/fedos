@@ -61,6 +61,10 @@ const MAX_ORDER_REJECTION_REASON_CHARS = 500;
 const MAX_PRODUCT_IMAGE_BASE64_CHARS = 12_000_000;
 const MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS = 300;
 const MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS = 64;
+/** Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- mirrors `fedos_electron_beta_main.cts`'s own identical constants exactly (bounds are enforced independently on both sides of the IPC boundary, same discipline as every other bound in this file). */
+const MAX_PRODUCT_CONTENT_BASE64_CHARS = 4_000_000;
+const MAX_PRODUCT_CONTENT_LABEL_CHARS = 300;
+const MAX_PRODUCT_CONTENT_TYPE_CHARS = 64;
 
 function boundedString(value: unknown, max: number): string {
   return typeof value === "string" ? value.slice(0, max) : "";
@@ -319,6 +323,24 @@ const fedosApp: FedosAppBridge = Object.freeze({
       contentType: boundedString(contentType, MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS),
       altText: altText === undefined ? undefined : boundedString(altText, MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS),
     }),
+  // Buyer Discovery + Digital Content Delivery mega-arc (Agent M) --
+  // protected ("buyers only") content attach, mirroring
+  // `commerceProductImageAttach`'s own bounded-string discipline exactly
+  // (a SEPARATE method/channel, never a `classification` field the
+  // renderer could flip -- see `handleCommerceProductContentAttach()`'s
+  // own header for why), and a plain-language, creator-only listing of a
+  // product's attached media so the seller UI can show what's public vs.
+  // buyers-only before publish.
+  commerceProductContentAttach: (actorPubkey: string, productId: string, contentBase64: string, contentType: string, label: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-product-content-attach", {
+      actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS),
+      productId: boundedString(productId, MAX_ID_CHARS),
+      contentBase64: boundedString(contentBase64, MAX_PRODUCT_CONTENT_BASE64_CHARS),
+      contentType: boundedString(contentType, MAX_PRODUCT_CONTENT_TYPE_CHARS),
+      label: boundedString(label, MAX_PRODUCT_CONTENT_LABEL_CHARS),
+    }),
+  commerceMerchantProductMediaList: (actorPubkey: string, productId: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-merchant-product-media-list", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS), productId: boundedString(productId, MAX_ID_CHARS) }),
   commerceMediaGrantRedeem: (orderId: string, actorPubkey: string) =>
     ipcRenderer.invoke("fedos-app:commerce-media-grant-redeem", { orderId: boundedString(orderId, MAX_ID_CHARS), actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),
   commerceActivitySummary: (actorPubkey: string) => ipcRenderer.invoke("fedos-app:commerce-activity-summary", { actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS) }),

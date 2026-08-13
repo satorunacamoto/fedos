@@ -1785,7 +1785,66 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
   // (Agent D) -- friction-ledger row #17 / arc §38: per-product image
   // attach control, independent of publish state.
   li.appendChild(commerceMerchantProductImageAttachControls(product.id));
+  // Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- P0-2
+  // content-creation half: per-product PROTECTED content attach control
+  // (a purchased file / buyers-only sample), plus a plain-language summary
+  // of what's currently attached and who can see it -- both additive,
+  // independent of publish state, same posture as the image control above.
+  li.appendChild(commerceMerchantProductContentAttachControls(product.id));
+  const summaryContainer = document.createElement("div");
+  summaryContainer.className = "commerce-product-media-summary";
+  summaryContainer.id = `commerce-product-media-summary-${product.id}`;
+  li.appendChild(summaryContainer);
+  void refreshCommerceMerchantProductMediaSummary(product.id);
   return li;
+}
+
+/**
+ * Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- plain,
+ * non-technical, seller-facing summary of a product's attached media,
+ * clearly separating what EVERYONE sees (public preview) from what ONLY a
+ * paying buyer unlocks (protected/buyers-only) -- mandate requirement:
+ * "make sure the seller's create-product UI clearly, non-technically
+ * communicates which is which before they publish." Never renders a CID,
+ * checksum, or any other internal detail -- `FedosCommerceProductMediaListItem`
+ * itself never carries one (see `fedos_electron_beta_window.d.ts`).
+ */
+async function refreshCommerceMerchantProductMediaSummary(productId: string): Promise<void> {
+  const container = document.getElementById(`commerce-product-media-summary-${productId}`);
+  if (container === null) return; // row no longer mounted (list re-rendered/removed) -- nothing to update.
+  try {
+    const result = await window.fedosApp.commerceMerchantProductMediaList(commerceActingAsPubkey, productId);
+    if (result.outcome !== "ok" || result.media === undefined) {
+      container.textContent = "";
+      return;
+    }
+    container.textContent = "";
+    if (result.media.length === 0) {
+      const none = document.createElement("div");
+      none.className = "commerce-product-media-summary-empty";
+      none.textContent = "No content attached yet.";
+      container.appendChild(none);
+      return;
+    }
+    const list = document.createElement("ul");
+    list.className = "commerce-product-media-summary-list";
+    for (const item of result.media) {
+      const row = document.createElement("li");
+      const badge = document.createElement("span");
+      badge.className = item.classification === "protected" ? "commerce-media-badge-protected" : "commerce-media-badge-public";
+      // Plain seller language only -- never "classification"/"AEAD"/"CID"/"content key" (mandate: ordinary seller language, never internals in the normal UI).
+      badge.textContent = item.classification === "protected" ? "Buyers only (unlocked after purchase)" : "Shown to everyone (public preview)";
+      row.appendChild(badge);
+      const label = document.createElement("span");
+      label.className = "commerce-product-media-summary-label";
+      label.textContent = ` ${item.label.length > 0 ? item.label : "(untitled)"}`;
+      row.appendChild(label);
+      list.appendChild(row);
+    }
+    container.appendChild(list);
+  } catch {
+    container.textContent = "";
+  }
 }
 
 // Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge note):
@@ -1844,6 +1903,14 @@ async function onCommercePublishAction(productId: string, action: "publish" | "u
 function commerceMerchantProductImageAttachControls(productId: string): HTMLDivElement {
   const wrap = document.createElement("div");
   wrap.className = "commerce-product-image-attach";
+  // Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- plain
+  // seller-facing label, clarifying this control is the PUBLIC side
+  // (mandate: the create-product UI must clearly, non-technically say
+  // which control is which BEFORE publish).
+  const label = document.createElement("div");
+  label.className = "commerce-product-image-attach-label";
+  label.textContent = "Product image — shown to everyone browsing the Shop.";
+  wrap.appendChild(label);
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.accept = "image/png,image/jpeg";
@@ -1880,10 +1947,105 @@ function commerceMerchantProductImageAttachControls(productId: string): HTMLDivE
           return;
         }
         fileInput.value = "";
+        // `refreshCommerceMerchantProductsList()` rebuilds this product's
+        // whole row (`commerceMerchantProductRow()`), which itself already
+        // kicks off a fresh `refreshCommerceMerchantProductMediaSummary()`
+        // call -- no separate explicit refresh needed here.
         void refreshCommerceMerchantProductsList();
         void refreshCommerceCatalogList();
       } catch (err) {
         errorEl.textContent = err instanceof Error ? err.message : "image attach failed unexpectedly";
+      } finally {
+        attachBtn.disabled = false;
+      }
+    })();
+  });
+
+  return wrap;
+}
+
+/**
+ * Buyer Discovery + Digital Content Delivery mega-arc (Agent M) — P0-2's
+ * content-creation half: mirrors `commerceMerchantProductImageAttachControls()`
+ * exactly (file picker + label input + button + error area, `File`/
+ * `FileReader` read, bounded-string IPC), but attaches PROTECTED
+ * ("buyers only") content via the SEPARATE `commerceProductContentAttach`
+ * channel/method — never a `classification` toggle on the same control,
+ * so a UI bug can never silently downgrade a purchased file to public or
+ * vice versa (see `handleCommerceProductContentAttach()`'s own header,
+ * main process). `accept=".pdf,.zip,application/pdf,application/zip"`
+ * matches `COMMERCE_PROTECTED_CONTENT_TYPES` exactly (main process) — the
+ * file picker itself is the first, advisory line of defense; the real
+ * enforcement is server-side (main process contentType allowlist).
+ *
+ * Plain seller language throughout, per this arc's own mandate: "Purchased
+ * file" / "Buyers only" — never "protected media" / "classification" /
+ * "ciphertext" anywhere in this control's own copy.
+ */
+function commerceMerchantProductContentAttachControls(productId: string): HTMLDivElement {
+  const wrap = document.createElement("div");
+  wrap.className = "commerce-product-content-attach";
+  const labelHint = document.createElement("div");
+  labelHint.className = "commerce-product-content-attach-label";
+  labelHint.textContent = "Purchased file — only buyers who complete payment for this product can open it.";
+  wrap.appendChild(labelHint);
+
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.placeholder = "What should buyers see this called? e.g. \"Full guide (PDF)\"";
+  nameInput.maxLength = 300;
+  wrap.appendChild(nameInput);
+
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = ".pdf,.zip,application/pdf,application/zip";
+  wrap.appendChild(fileInput);
+
+  const attachBtn = document.createElement("button");
+  attachBtn.type = "button";
+  attachBtn.textContent = "Attach Purchased File";
+  wrap.appendChild(attachBtn);
+
+  const errorEl = document.createElement("div");
+  errorEl.className = "error";
+  errorEl.setAttribute("role", "alert");
+  wrap.appendChild(errorEl);
+
+  attachBtn.addEventListener("click", () => {
+    void (async () => {
+      errorEl.textContent = "";
+      const file = fileInput.files?.[0];
+      if (file === undefined) {
+        errorEl.textContent = "Choose a PDF or ZIP file first.";
+        return;
+      }
+      const label = nameInput.value.trim();
+      if (label.length === 0) {
+        errorEl.textContent = "Give buyers a short name for this file first.";
+        return;
+      }
+      attachBtn.disabled = true;
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("failed to read the selected file"));
+          reader.readAsDataURL(file);
+        });
+        const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+        const result = await window.fedosApp.commerceProductContentAttach(commerceActingAsPubkey, productId, base64, file.type, label);
+        if (result.outcome !== "ok") {
+          errorEl.textContent = result.reason ?? `attach failed: ${result.outcome}`;
+          return;
+        }
+        fileInput.value = "";
+        nameInput.value = "";
+        // Same reasoning as the image control's own identical comment: the
+        // full list rebuild already re-triggers the media summary refresh
+        // for this product's row.
+        void refreshCommerceMerchantProductsList();
+      } catch (err) {
+        errorEl.textContent = err instanceof Error ? err.message : "content attach failed unexpectedly";
       } finally {
         attachBtn.disabled = false;
       }

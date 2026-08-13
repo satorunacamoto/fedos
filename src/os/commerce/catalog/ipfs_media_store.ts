@@ -66,6 +66,45 @@
  * from the ordinary, un-overridden constructor default, with no need to
  * separately know about or import either Wasm adapter class themselves.
  *
+ * BLOCKER 4 FIX (Buyer Discovery + Digital Content Delivery mega-arc,
+ * Agent M) — `docs/commerce/PROTECTED-MEDIA-CROSS-PROCESS-REACHABILITY.md`'s
+ * own "Blocker 4" section documented (and
+ * `docs/commerce/usability-v2/SELLER-TABLETOP-AFTER.md`'s live-reproduced
+ * P1 "image storage failed: failed" independently confirmed) that `put()`/
+ * `get()` used to call `evaluateNetworkAccess(this.#networkProfile, true)`
+ * — a HARD-CODED `requiresNetwork: true` — regardless of what the actual
+ * injected `IpfsTransport` does. Every real caller in this codebase
+ * (`commerceMediaStoreFor()`, `fedos_electron_beta_main.cts`) constructs
+ * this store with the ONLY `IpfsTransport` implementation that exists,
+ * `InMemoryIpfsTransport` (a `Map`, this file's own header — no real
+ * network reach anywhere), against `networkProfile: "local-only"`. Since
+ * `"local-only"` refuses any `requiresNetwork: true` call
+ * (`./network_profile.ts`'s own `evaluateNetworkAccess()`), EVERY put/get
+ * against a store that has ZERO actual network dependency failed
+ * unconditionally — a policy bug, not a genuine security boundary: nothing
+ * about writing to a `Map` "requires network access" in the sense
+ * `NetworkProfile` exists to gate.
+ *
+ * The fix: `IpfsTransport` itself now declares `readonly requiresNetwork:
+ * boolean` — an honest, transport-specific self-report of whether ITS OWN
+ * `add()`/`cat()` calls actually reach a network, mirroring `pin()`'s own
+ * "best-effort, transport tells the truth about itself" contract just
+ * above. `put()`/`get()` below now call `evaluateNetworkAccess(profile,
+ * this.#transport.requiresNetwork)` — the transport's own honest claim,
+ * never a blanket `true`. `InMemoryIpfsTransport.requiresNetwork` is
+ * `false` (it is, honestly, always local), so a seller's own local
+ * protected-media store now genuinely durably stores and retrieves their
+ * own content under the default `"local-only"` profile — while a FUTURE
+ * real network-backed `IpfsTransport` (not built by this arc) that
+ * honestly declares `requiresNetwork: true` is STILL correctly refused
+ * under `"local-only"`, exactly as `NetworkProfile`'s own contract
+ * promises. No network-egress gating that exists for a real reason is
+ * weakened by this change — only the false "everything needs the network"
+ * assumption is corrected. See `../../../test/commerce_ipfs_media_store.test.ts`
+ * (test 16, rewritten this arc) for the regression coverage: a
+ * network-REQUIRING fake transport is still refused under `"local-only"`,
+ * while the real, always-local `InMemoryIpfsTransport` is now allowed.
+ *
  * SYNCHRONOUS PORT, AND WHY THIS ADAPTER STAYS SYNCHRONOUS TOO: every
  * `MediaStorePort` method (`put`/`get`/`exists`/`remove`/`metadata`) is a
  * plain, NON-`Promise`-returning function — `./local_media_store.ts`'s
@@ -131,6 +170,17 @@ export interface IpfsTransport {
   cat(cid: string): Uint8Array | null;
   /** Best-effort pin; `true` iff the backend confirms the CID is pinned. Never required for `get()`/`exists()` to succeed. */
   pin(cid: string): boolean;
+  /**
+   * BLOCKER 4 FIX (this file's own header) — an HONEST, transport-specific
+   * self-report of whether `add()`/`cat()` actually reach a network. A
+   * purely local/in-memory transport (`InMemoryIpfsTransport` below)
+   * declares `false`; a future real network-backed transport (gateway
+   * HTTP call, libp2p round trip — not built by this arc) MUST declare
+   * `true`. `IpfsMediaStore.put()`/`get()` consult this — never a
+   * hard-coded assumption either way — before calling
+   * `evaluateNetworkAccess()`.
+   */
+  readonly requiresNetwork: boolean;
 }
 
 /**
@@ -150,6 +200,8 @@ export class InMemoryIpfsTransport implements IpfsTransport {
   readonly #objects = new Map<string, Uint8Array>();
   readonly #pinned = new Set<string>();
   #simulateOffline: boolean;
+  /** BLOCKER 4 FIX (this file's own header) — always `false`: a `Map` never reaches a network, honestly, under any circumstance. */
+  readonly requiresNetwork = false;
 
   constructor(options: { readonly simulateOffline?: boolean } = {}) {
     this.#simulateOffline = options.simulateOffline ?? false;
@@ -262,7 +314,9 @@ export class IpfsMediaStore implements MediaStorePort {
     if (!this.#supportedContentTypes.has(request.contentType)) {
       return { outcome: "unsupported-content-type" };
     }
-    if (!evaluateNetworkAccess(this.#networkProfile, true).allowed) {
+    // BLOCKER 4 FIX (this file's own header) — the TRANSPORT's own honest
+    // self-report, never a hard-coded `true`.
+    if (!evaluateNetworkAccess(this.#networkProfile, this.#transport.requiresNetwork).allowed) {
       return { outcome: "failed" };
     }
 
@@ -317,7 +371,9 @@ export class IpfsMediaStore implements MediaStorePort {
   get(key: string): MediaObject | null {
     const entry = this.#index.get(key);
     if (entry === undefined) return null;
-    if (!evaluateNetworkAccess(this.#networkProfile, true).allowed) return null;
+    // BLOCKER 4 FIX (this file's own header) — the TRANSPORT's own honest
+    // self-report, never a hard-coded `true`.
+    if (!evaluateNetworkAccess(this.#networkProfile, this.#transport.requiresNetwork).allowed) return null;
 
     let bytes: Uint8Array | null;
     try {

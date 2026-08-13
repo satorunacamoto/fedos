@@ -239,6 +239,66 @@ const MAX_PRODUCT_IMAGE_BASE64_CHARS = 12_000_000;
 const MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS = 300;
 const MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS = 64;
 const COMMERCE_PUBLIC_IMAGE_CONTENT_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg"]);
+/**
+ * Buyer Discovery + Digital Content Delivery mega-arc (Agent M) — bounds
+ * for the new PROTECTED product-content-attach IPC surface
+ * (`handleCommerceProductContentAttach()` below). Mirrors
+ * `MAX_PRODUCT_IMAGE_BASE64_CHARS`'s own base64-transport-vs-decoded-byte
+ * discipline exactly (see that constant's own comment): this bound is the
+ * base64-encoded TRANSPORT form only; `COMMERCE_MEDIA_MAX_PAYLOAD_BYTES`
+ * (already declared near `commerceMediaStoreFor()`) is the real,
+ * authoritative decoded-byte gate `IpfsMediaStore.put()` itself enforces
+ * on the CIPHERTEXT it actually stores. Deliberately smaller than the
+ * image bound (~3 MB decoded) — this is meant for a bounded "sample"/
+ * "purchased file" digital artifact (a small PDF/ZIP), never an
+ * unbounded upload surface; a genuinely large deliverable is out of this
+ * arc's scope (see `MAX_MEDIA_ACCESS_GRANT_RELEASE_PAYLOAD_BYTES`'s own
+ * 64 KiB cross-process release cap, `media_access_grant_key_release.ts`,
+ * which any protected item this store holds must additionally clear
+ * before a buyer's own process could ever redeem it — a cross-process
+ * concern this arc does not touch).
+ */
+const MAX_PRODUCT_CONTENT_BASE64_CHARS = 4_000_000;
+const MAX_PRODUCT_CONTENT_LABEL_CHARS = 300;
+const MAX_PRODUCT_CONTENT_TYPE_CHARS = 64;
+/**
+ * Deliberately NARROWER than `commerceMediaStoreFor()`'s own
+ * `COMMERCE_MEDIA_SUPPORTED_CONTENT_TYPES` (which additionally allows the
+ * two image MIME types for the separate public-image-attach surface
+ * above) — this handler follows this codebase's own pre-existing
+ * "purchased digital deliverable" MIME precedent
+ * (`src/os/commerce/catalog/sample_products.ts`'s own fixture data: a PDF
+ * guide, a ZIP pro-pack) rather than inventing a new policy. Both are
+ * bounded, non-scriptable content types: never `text/html`, never
+ * `image/svg+xml`, never any `application/*script*`/executable MIME —
+ * the exact class of "renderable as active content" type this domain's
+ * own `safe_media_reference.ts` header warns against.
+ */
+const COMMERCE_PROTECTED_CONTENT_TYPES: ReadonlySet<string> = new Set(["application/pdf", "application/zip"]);
+/**
+ * Untrusted, seller-supplied display label for a protected content
+ * attachment (e.g. "Chapter 1 sample", "Full source ZIP") — NEVER
+ * interpreted as a filesystem path or URL anywhere downstream (the real
+ * storage key is always the content-addressed CID `IpfsMediaStore.put()`
+ * derives, never anything caller-supplied). Still validated defensively,
+ * exactly like a filename would be, per this arc's own untrusted-input
+ * mandate: no path separators, no `..` traversal segment, no control
+ * characters/NUL, bounded length, and not empty-after-trim.
+ */
+function isSafeProductContentLabel(value: unknown): value is string {
+  if (!isBoundedString(value, MAX_PRODUCT_CONTENT_LABEL_CHARS)) return false;
+  if (value.trim().length === 0) return false;
+  if (value.includes("/") || value.includes("\\")) return false;
+  if (value.includes("..")) return false;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    // Reject NUL and every C0/DEL control character (codepoints 0-31, and
+    // 127) via explicit numeric comparison -- deliberately never a raw
+    // control-character regex literal embedded in this source file.
+    if (code <= 0x1f || code === 0x7f) return false;
+  }
+  return true;
+}
 /** Secure Runtime Alpha 7001-7080 — same bound class as `MAX_LABEL_CHARS` above, sized for a real chat message body rather than a short label. */
 const MAX_MESSAGE_BODY_CHARS = 8192;
 /** Secure Runtime Alpha 7001-7080 — a real Device-pairing encoded request/approval string is larger than an id but still bounded (JSON envelope + one signature + one public key, never unbounded). */
@@ -4539,6 +4599,48 @@ async function handleCommerceMerchantProductsList(payload: unknown) {
 }
 
 /**
+ * Buyer Discovery + Digital Content Delivery mega-arc (Agent M) — a
+ * read-only, creator-only listing of every `ProductMedia` record attached
+ * to a product, plain-language `classification` included, so the seller's
+ * own Create/Edit-product UI can show a clear, non-technical "what buyers
+ * will see before they pay vs. after" summary BEFORE publish (mandate
+ * requirement: "make sure the seller's create-product UI clearly,
+ * non-technically communicates which is which"). Never returns
+ * `storageRef`/`checksum`/`checksumSubject` — only what a plain-language
+ * seller-facing list needs (`role`/`classification`/`contentType`/
+ * `label`). `canEditProduct`-equivalent creator-only gate (same direct
+ * equality check this file already uses for read paths, e.g.
+ * `handleCommerceProductDetail`'s own `creatorPubkey === previewActorPubkey`) —
+ * a product's attached-content list is never shown to a non-owner via
+ * this channel (a buyer's own separate view of a product's public/
+ * protected media is `commerceProductMediaFor()`/`handleCommerceMediaGrantRedeem()`,
+ * both already creator-agnostic by design for their own reasons).
+ */
+async function handleCommerceMerchantProductMediaList(payload: unknown) {
+  const body = payload as { actorPubkey?: unknown; productId?: unknown } | null;
+  if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+  const product = commerceState().products.get(body.productId);
+  if (product === undefined) return { outcome: "not-found", reason: "no such product" };
+  if (product.creatorPubkey !== body.actorPubkey) {
+    return { outcome: "forbidden", reason: "only this product's own creator may view its attached-content list" };
+  }
+  const media = commerceProductMediaState().listForProduct(body.productId);
+  return {
+    outcome: "ok",
+    media: media.map((item) => ({
+      id: item.id,
+      role: item.role,
+      classification: item.classification,
+      contentType: item.contentType,
+      label: item.altText ?? "",
+    })),
+  };
+}
+
+/**
  * Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) — friction
  * ledger row #2 / arc §12: the P0 "Unknown merchant" mis-attributed
  * listing fix. `actorRole` travels explicitly with EVERY create call,
@@ -4652,6 +4754,120 @@ async function handleCommerceProductImageAttach(payload: unknown) {
   return {
     outcome: "ok",
     media: { id: addResult.media.id, productId: addResult.media.productId, contentType: addResult.media.contentType, altText: addResult.media.altText ?? "" },
+  };
+}
+
+/**
+ * Buyer Discovery + Digital Content Delivery mega-arc (Agent M) —
+ * P0-2's content-creation half: "no production product can currently be
+ * marked/provisioned as protected purchased content." This is the first
+ * real IPC path that ever calls `commerceMediaStoreFor().putProtected()`
+ * with a REAL, caller-chosen `classification: "protected"` — until this
+ * handler, `classification` was reachable from exactly one place
+ * (`handleCommerceProductImageAttach()` above) and that path always wrote
+ * `"public"`, hard-coded. This handler is deliberately SEPARATE from that
+ * one, never a shared branch on a caller-suppliable `classification`
+ * field — a seller cannot accidentally (or a hostile renderer bug cannot)
+ * downgrade a protected upload to public or vice versa by flipping one
+ * field; which handler is called IS the classification.
+ *
+ * SELLER LANGUAGE, NEVER INTERNALS: this handler's own request/response
+ * shape never accepts or returns a CID, an AEAD/content-key detail, a
+ * `MediaAccessGrant`, or a ciphertext hash — only `contentType`/`label`
+ * in, and `media.id`/`media.contentType`/`media.label` out (mirrors
+ * `handleCommerceProductImageAttach()`'s own `media` response shape,
+ * which likewise never echoes `storageRef`/`checksum`).
+ *
+ * UNTRUSTED INPUT, validated the same way every other seller-input
+ * handler in this file already does (never a new discipline):
+ *   - `contentType` is checked against `COMMERCE_PROTECTED_CONTENT_TYPES`
+ *     — a small, closed, non-scriptable allowlist (PDF/ZIP, this domain's
+ *     own pre-existing "purchased deliverable" MIME precedent,
+ *     `sample_products.ts`), never `text/html`/`image/svg+xml`/anything
+ *     that could be interpreted as active content by any future viewer.
+ *   - `contentBase64` is bounded BEFORE decode
+ *     (`MAX_PRODUCT_CONTENT_BASE64_CHARS`) and `IpfsMediaStore.put()`
+ *     itself re-bounds the DECODED ciphertext against
+ *     `COMMERCE_MEDIA_MAX_PAYLOAD_BYTES` — belt and suspenders, never a
+ *     single source of truth, mirroring the image-attach handler's own
+ *     documented discipline.
+ *   - `label` (the seller-facing display name, e.g. "Full guide PDF") is
+ *     validated by `isSafeProductContentLabel()` — bounded, non-blank,
+ *     no path separators, no `..` traversal segment, no control
+ *     characters — even though the REAL storage key is always the
+ *     content-addressed CID `putProtected()` derives, never this label;
+ *     this is defense-in-depth against any future code path that might
+ *     someday treat a "file name"-shaped field as a path.
+ *   - A malformed base64 payload is caught and reported as
+ *     `"invalid-input"`, never an unhandled throw/crash (mirrors
+ *     `handleCommerceProductImageAttach()`'s own identical try/catch).
+ *
+ * REAL ENCRYPTION, NOT A NEW PRIMITIVE: routes through the EXISTING
+ * `commerceMediaStoreFor().putProtected()` (`./ipfs_media_store.ts`),
+ * which always calls the injected `WasmProductMediaEncryption` first and
+ * structurally cannot reach `put()` with plaintext (that file's own
+ * header, "ENFORCEMENT MECHANISM"). `checksumSubject: "ciphertext"` is
+ * the only value `validateProductMedia()` accepts for `classification:
+ * "protected"` (`product_media_types.ts`) — this handler's own literal
+ * matches that invariant, never left to caller discipline.
+ *
+ * COMPATIBILITY WITH THE BUYER-SIDE REDEEM PATH (Agent A's scope, not
+ * rebuilt here): `handleCommerceMediaGrantRedeem()` (below) already reads
+ * `commerceProductMediaState().listForProduct(...).filter(classification
+ * === "protected")` and calls `commerceMediaStoreFor().getProtected(media.storageRef)`
+ * — a `ProductMedia` record created here (real `storageRef` from a real
+ * `putProtected()` call, real `checksum`/`checksumSubject`) is exactly
+ * the shape that path already expects; nothing about that reader was
+ * changed by this handler.
+ */
+async function handleCommerceProductContentAttach(payload: unknown) {
+  const body = payload as { actorPubkey?: unknown; productId?: unknown; contentBase64?: unknown; contentType?: unknown; label?: unknown } | null;
+  if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+  if (!isBoundedString(body.contentType, MAX_PRODUCT_CONTENT_TYPE_CHARS) || !COMMERCE_PROTECTED_CONTENT_TYPES.has(body.contentType)) {
+    return { outcome: "invalid-input", reason: `contentType must be one of: ${[...COMMERCE_PROTECTED_CONTENT_TYPES].join(", ")}` };
+  }
+  if (!isBoundedString(body.contentBase64, MAX_PRODUCT_CONTENT_BASE64_CHARS) || body.contentBase64.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed or missing content data" };
+  }
+  if (!isSafeProductContentLabel(body.label)) {
+    return { outcome: "invalid-input", reason: "label must be a short, non-blank name with no path separators or control characters" };
+  }
+  const label = body.label;
+
+  const product = commerceState().products.get(body.productId);
+  if (product === undefined) return { outcome: "not-found", reason: "no such product" };
+
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(Buffer.from(body.contentBase64, "base64"));
+  } catch {
+    return { outcome: "invalid-input", reason: "content data is not valid base64" };
+  }
+  if (bytes.length === 0) return { outcome: "invalid-input", reason: "content data decoded to zero bytes" };
+
+  const putResult = await commerceMediaStoreFor().putProtected(bytes, body.contentType);
+  if (putResult.outcome !== "stored" && putResult.outcome !== "already-present") {
+    return { outcome: "rejected", reason: `protected content storage failed: ${putResult.outcome}` };
+  }
+
+  const addResult = commerceProductMediaState().add(body.actorPubkey, product, {
+    role: "sample",
+    classification: "protected",
+    contentType: body.contentType,
+    sizeBytes: putResult.metadata.sizeBytes,
+    checksum: putResult.metadata.checksum,
+    checksumSubject: "ciphertext",
+    altText: label,
+    storageRef: putResult.metadata.key,
+  });
+  if (addResult.outcome !== "ok") return { outcome: addResult.outcome, reason: addResult.reason };
+
+  return {
+    outcome: "ok",
+    media: { id: addResult.media.id, productId: addResult.media.productId, contentType: addResult.media.contentType, label: addResult.media.altText ?? "" },
   };
 }
 
@@ -6044,6 +6260,11 @@ function registerIpcHandlers(): void {
   // (arc §35-37), public product-image attach (arc §38), and the real
   // activity/badge data query (arc §32/§36).
   ipcMain.handle("fedos-app:commerce-product-image-attach", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductImageAttach(payload));
+  // Buyer Discovery + Digital Content Delivery mega-arc (Agent M) --
+  // protected ("buyers only") content attach, and the creator-only
+  // plain-language attached-content list.
+  ipcMain.handle("fedos-app:commerce-product-content-attach", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceProductContentAttach(payload));
+  ipcMain.handle("fedos-app:commerce-merchant-product-media-list", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceMerchantProductMediaList(payload));
   ipcMain.handle("fedos-app:commerce-media-grant-redeem", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceMediaGrantRedeem(payload));
   ipcMain.handle("fedos-app:commerce-activity-summary", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceActivitySummary(payload));
 }
