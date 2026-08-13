@@ -802,6 +802,20 @@ interface RootModules {
     readonly applyDeliveryAction: (delivery: CommerceDeliveryRecordLike, action: CommerceDeliveryActionLike, now: number) => CommerceDeliveryTransitionResultLike;
     readonly issueSignedTradeReceiptProof: (payload: unknown, keys: unknown, options: unknown) => unknown;
     readonly verifySignedTradeReceiptProof: (envelope: unknown, policy: unknown) => { readonly status: string; readonly payload?: unknown };
+    /**
+     * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- the
+     * `DeliveryReceiptProofPayload` sibling of `issueSignedTradeReceiptProof`/
+     * `verifySignedTradeReceiptProof` (both already real,
+     * already-tested -- `commerce_trust_receipt_adapter.ts` -- but never
+     * wired into this composition root before now). Used by
+     * `handleCommerceReceiptIssue()` ONLY when the completed Order's product
+     * actually had protected media released to this buyer, to carry a
+     * `deliveryConfirmationRef` referencing the real release digest -- see
+     * that handler's own comment for the full "never claims quality, only
+     * that delivery evidence exists" account (this arc's own mandate item 7).
+     */
+    readonly issueSignedDeliveryReceiptProof: (payload: unknown, keys: unknown, options: unknown) => unknown;
+    readonly verifySignedDeliveryReceiptProof: (envelope: unknown, policy: unknown) => { readonly status: string; readonly payload?: unknown };
     readonly encodeCommerceReceiptProofToQrText: (envelope: unknown) => string;
     readonly decodeCommerceReceiptProofFromQrText: (text: string) => unknown;
     /**
@@ -875,6 +889,41 @@ interface RootModules {
       createIfAbsent: boolean,
       nowUnixSeconds: number,
     ) => Promise<CommerceMediaGrantSigningKeyResolveResultLike>;
+    /**
+     * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- the
+     * pure decision layer backing the 4th private-sync channel (media
+     * release request/response) and the order-completion "digital content
+     * delivery invariant" -- see `media_access_grant_release_channel_policy.ts`'s
+     * own header for the full account of all three.
+     */
+    readonly evaluateInboundMediaReleaseRequestAuthorization: (input: {
+      readonly payload: { readonly orderId: string; readonly mediaId: string; readonly buyerPubkey: string; readonly sellerPubkey: string };
+      readonly senderPubkeyHex: string;
+      readonly ownPubkeyHex: string;
+      readonly order: { readonly id: string; readonly productId: string; readonly buyerPubkey: string; readonly sellerPubkey: string } | undefined;
+      readonly media: { readonly id: string; readonly productId: string; readonly classification: "public" | "protected" } | undefined;
+    }) => { readonly authorized: true } | { readonly authorized: false; readonly reason: string };
+    readonly evaluateInboundMediaReleaseResponseAuthorization: (input: {
+      readonly payload: { readonly orderId: string; readonly mediaId: string; readonly buyerPubkey: string; readonly sellerPubkey: string };
+      readonly senderPubkeyHex: string;
+      readonly ownPubkeyHex: string;
+      readonly order: { readonly id: string; readonly sellerPubkey: string };
+      readonly expectedMediaId: string;
+    }) => { readonly authorized: true } | { readonly authorized: false; readonly reason: string };
+    readonly evaluateDigitalContentDeliveryInvariantForOrderCompletion: (input: {
+      readonly productId: string;
+      readonly productMedia: readonly { readonly id: string; readonly productId: string; readonly classification: "public" | "protected" }[];
+      readonly hasReleasedContent: (mediaId: string) => boolean;
+    }) =>
+      | { readonly satisfied: true }
+      | { readonly satisfied: false; readonly reason: "digital-content-not-delivered"; readonly missingMediaIds: readonly string[] };
+    /**
+     * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) --
+     * buyer-side durable, restart-surviving cache for an already
+     * digest-verified `MediaAccessGrant` release
+     * (`durable_media_release_content_cache.ts`).
+     */
+    readonly DurableMediaReleaseContentCache: new (filePath: string) => CommerceMediaReleaseContentCacheLike;
     /**
      * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
      * (Agent D) -- friction-ledger row #14 / arc §32/§36: real,
@@ -1217,6 +1266,82 @@ interface RootModules {
     ) =>
       | { readonly accepted: true; readonly result: CommerceSettlementApplyResultLike }
       | { readonly accepted: false; readonly reason: string };
+    /**
+     * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- the
+     * FOURTH private-sync channel: `MediaAccessGrant` release
+     * request/response. `commerce_private_media_release_bridge.ts` (two
+     * transports/two verify functions, request + response directions) plus
+     * `commerce_private_media_release_apply.ts` (the pure orchestration
+     * layer building/applying each direction) -- see those files' own
+     * headers for the full design.
+     */
+    readonly RealCommercePrivateMediaReleaseRequestTransport: new (options: {
+      readonly signingAuthority: unknown;
+      readonly relayPublisher: unknown;
+      readonly nip44Wire: unknown;
+      readonly accountIndex: number;
+    }) => {
+      send(
+        payload: { readonly orderId: string; readonly mediaId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly at: number },
+        counterpartyPublicKeyHex: string,
+      ): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+    };
+    readonly verifyAndDecryptInboundPrivateMediaReleaseRequestEnvelope: (
+      event: unknown,
+      options: { readonly nip44Wire: unknown; readonly localAccountIndex: number },
+    ) => Promise<{
+      readonly outcome: string;
+      readonly eventId: string;
+      readonly senderPubkeyHex: string;
+      readonly payload?: { readonly orderId: string; readonly mediaId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly at: number };
+    }>;
+    readonly COMMERCE_PRIVATE_MEDIA_RELEASE_REQUEST_TAG: string;
+    readonly RealCommercePrivateMediaReleaseTransport: new (options: {
+      readonly signingAuthority: unknown;
+      readonly relayPublisher: unknown;
+      readonly nip44Wire: unknown;
+      readonly accountIndex: number;
+    }) => {
+      send(payload: CommercePrivateMediaReleasePayloadLike, counterpartyPublicKeyHex: string): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+    };
+    readonly verifyAndDecryptInboundPrivateMediaReleaseEnvelope: (
+      event: unknown,
+      options: { readonly nip44Wire: unknown; readonly localAccountIndex: number },
+    ) => Promise<{
+      readonly outcome: string;
+      readonly eventId: string;
+      readonly senderPubkeyHex: string;
+      readonly payload?: CommercePrivateMediaReleasePayloadLike;
+    }>;
+    readonly COMMERCE_PRIVATE_MEDIA_RELEASE_TAG: string;
+    readonly buildOutboundPrivateMediaReleaseResponse: (input: {
+      readonly requestPayload: { readonly orderId: string; readonly mediaId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly at: number };
+      readonly senderPubkeyHex: string;
+      readonly ownPubkeyHex: string;
+      readonly order: { readonly id: string; readonly productId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly status: string } | undefined;
+      readonly media: { readonly id: string; readonly productId: string; readonly classification: "public" | "protected"; readonly storageRef: string; readonly contentType: string } | undefined;
+      readonly candidateGrantEnvelope: unknown;
+      readonly latestKnownGrantVersion: number;
+      readonly now: number;
+      readonly merchantAccountIndex: number;
+      readonly authority: MasterSeedAuthorityLike;
+      readonly getProtectedContent: (storageRef: string) => Promise<Uint8Array | null>;
+    }) => Promise<CommercePrivateMediaReleasePayloadLike>;
+    readonly applyInboundPrivateMediaReleaseResponse: (input: {
+      readonly payload: CommercePrivateMediaReleasePayloadLike;
+      readonly senderPubkeyHex: string;
+      readonly ownPubkeyHex: string;
+      readonly order: { readonly id: string; readonly sellerPubkey: string };
+      readonly expectedMediaId: string;
+      readonly buyerAccountIndex: number;
+      readonly authority: MasterSeedAuthorityLike;
+    }) => Promise<
+      | { readonly outcome: "verified"; readonly record: CommerceMediaReleaseContentRecordLike }
+      | { readonly outcome: "denied"; readonly reason: string }
+      | { readonly outcome: "unauthorized"; readonly reason: string }
+      | { readonly outcome: "wrap-unavailable" }
+      | { readonly outcome: "content-corrupt" }
+    >;
   };
 }
 
@@ -1367,6 +1492,50 @@ type CommerceMediaGrantSigningKeyResolveResultLike =
   | { readonly outcome: "restored" | "created"; readonly keypair: { readonly publicKeyHex: string }; readonly generation: number }
   | { readonly outcome: "not-found" | "sealing-unavailable" | "seal-failed" }
   | { readonly outcome: "corrupted"; readonly reason: string };
+/** BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A). */
+interface CommerceMediaReleaseContentRecordLike {
+  readonly orderId: string;
+  readonly mediaId: string;
+  readonly buyerPubkey: string;
+  readonly sellerPubkey: string;
+  readonly grantVersion: number;
+  readonly contentType: string;
+  readonly contentDigest: string;
+  readonly contentBase64: string;
+  readonly obtainedAt: number;
+}
+interface CommerceMediaReleaseContentCacheLike {
+  putRelease(record: CommerceMediaReleaseContentRecordLike): "inserted" | "already-present" | "conflict" | "failed";
+  getRelease(orderId: string, mediaId: string, buyerPubkey: string): CommerceMediaReleaseContentRecordLike | undefined;
+  hasRelease(orderId: string, mediaId: string, buyerPubkey: string): boolean;
+}
+/** BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- `PrivateMediaReleasePayload`'s structural mirror (discriminated union: released | denied). */
+type CommercePrivateMediaReleasePayloadLike =
+  | {
+      readonly category: "private-media-release";
+      readonly formatVersion: 1;
+      readonly outcome: "released";
+      readonly orderId: string;
+      readonly mediaId: string;
+      readonly buyerPubkey: string;
+      readonly sellerPubkey: string;
+      readonly grantVersion: number;
+      readonly contentType: string;
+      readonly contentDigest: string;
+      readonly wireCiphertext: string;
+      readonly at: number;
+    }
+  | {
+      readonly category: "private-media-release";
+      readonly formatVersion: 1;
+      readonly outcome: "denied";
+      readonly orderId: string;
+      readonly mediaId: string;
+      readonly buyerPubkey: string;
+      readonly sellerPubkey: string;
+      readonly reason: string;
+      readonly at: number;
+    };
 interface CommercePaymentEvidenceLike {
   readonly paymentId: string;
   readonly productId: string;
@@ -1816,6 +1985,26 @@ async function loadRootModules(): Promise<RootModules> {
   const commercePaymentEvidencePort = (await import(distUrl("os", "commerce", "payment", "payment_evidence_port.js"))) as {
     applyInboundPaymentEvidenceSync: RootModules["CommerceNostr"]["applyInboundPaymentEvidenceSync"];
   };
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- the
+  // FOURTH private-sync channel: `MediaAccessGrant` release
+  // request/response, mirroring the Delivery pair's own two-plus-apply
+  // import shape exactly. Five new `tsconfig.beta-runtime.json` entries
+  // (bridge, apply, sync, and the two `os/commerce` barrel additions
+  // pulled in transitively through `commerce` above).
+  const commercePrivateMediaReleaseBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_private_media_release_bridge.js")
+  )) as {
+    RealCommercePrivateMediaReleaseRequestTransport: RootModules["CommerceNostr"]["RealCommercePrivateMediaReleaseRequestTransport"];
+    verifyAndDecryptInboundPrivateMediaReleaseRequestEnvelope: RootModules["CommerceNostr"]["verifyAndDecryptInboundPrivateMediaReleaseRequestEnvelope"];
+    COMMERCE_PRIVATE_MEDIA_RELEASE_REQUEST_TAG: string;
+    RealCommercePrivateMediaReleaseTransport: RootModules["CommerceNostr"]["RealCommercePrivateMediaReleaseTransport"];
+    verifyAndDecryptInboundPrivateMediaReleaseEnvelope: RootModules["CommerceNostr"]["verifyAndDecryptInboundPrivateMediaReleaseEnvelope"];
+    COMMERCE_PRIVATE_MEDIA_RELEASE_TAG: string;
+  };
+  const commercePrivateMediaReleaseApply = (await import(distUrl("os", "commerce", "events", "commerce_private_media_release_apply.js"))) as {
+    buildOutboundPrivateMediaReleaseResponse: RootModules["CommerceNostr"]["buildOutboundPrivateMediaReleaseResponse"];
+    applyInboundPrivateMediaReleaseResponse: RootModules["CommerceNostr"]["applyInboundPrivateMediaReleaseResponse"];
+  };
   return {
     createElectronMainHostAttestation: attestation.createElectronMainHostAttestation,
     activateFedosProductionProfileMasterSeed: activation.activateFedosProductionProfileMasterSeed,
@@ -1853,6 +2042,8 @@ async function loadRootModules(): Promise<RootModules> {
       applyDeliveryAction: commerce.applyDeliveryAction,
       issueSignedTradeReceiptProof: commerce.issueSignedTradeReceiptProof,
       verifySignedTradeReceiptProof: commerce.verifySignedTradeReceiptProof,
+      issueSignedDeliveryReceiptProof: commerce.issueSignedDeliveryReceiptProof,
+      verifySignedDeliveryReceiptProof: commerce.verifySignedDeliveryReceiptProof,
       encodeCommerceReceiptProofToQrText: commerce.encodeCommerceReceiptProofToQrText,
       decodeCommerceReceiptProofFromQrText: commerce.decodeCommerceReceiptProofFromQrText,
       issueSignedProductShareProof: commerce.issueSignedProductShareProof,
@@ -1869,6 +2060,10 @@ async function loadRootModules(): Promise<RootModules> {
       evaluateMediaAccessGrant: commerce.evaluateMediaAccessGrant,
       wrapMediaAccessGrantRelease: commerce.wrapMediaAccessGrantRelease,
       resolveCommerceMediaGrantSigningKeypair: commerce.resolveCommerceMediaGrantSigningKeypair,
+      evaluateInboundMediaReleaseRequestAuthorization: commerce.evaluateInboundMediaReleaseRequestAuthorization,
+      evaluateInboundMediaReleaseResponseAuthorization: commerce.evaluateInboundMediaReleaseResponseAuthorization,
+      evaluateDigitalContentDeliveryInvariantForOrderCompletion: commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion,
+      DurableMediaReleaseContentCache: commerce.DurableMediaReleaseContentCache,
       computeCommerceBuyerActivitySummary: commerce.computeCommerceBuyerActivitySummary,
       computeCommerceSellerActivitySummary: commerce.computeCommerceSellerActivitySummary,
     },
@@ -1918,6 +2113,14 @@ async function loadRootModules(): Promise<RootModules> {
         commercePrivatePaymentEvidenceBridge.verifyAndDecryptInboundPrivatePaymentEvidenceEnvelope,
       COMMERCE_PRIVATE_PAYMENT_EVIDENCE_SYNC_TAG: commercePrivatePaymentEvidenceBridge.COMMERCE_PRIVATE_PAYMENT_EVIDENCE_SYNC_TAG,
       applyInboundPaymentEvidenceSync: commercePaymentEvidencePort.applyInboundPaymentEvidenceSync,
+      RealCommercePrivateMediaReleaseRequestTransport: commercePrivateMediaReleaseBridge.RealCommercePrivateMediaReleaseRequestTransport,
+      verifyAndDecryptInboundPrivateMediaReleaseRequestEnvelope: commercePrivateMediaReleaseBridge.verifyAndDecryptInboundPrivateMediaReleaseRequestEnvelope,
+      COMMERCE_PRIVATE_MEDIA_RELEASE_REQUEST_TAG: commercePrivateMediaReleaseBridge.COMMERCE_PRIVATE_MEDIA_RELEASE_REQUEST_TAG,
+      RealCommercePrivateMediaReleaseTransport: commercePrivateMediaReleaseBridge.RealCommercePrivateMediaReleaseTransport,
+      verifyAndDecryptInboundPrivateMediaReleaseEnvelope: commercePrivateMediaReleaseBridge.verifyAndDecryptInboundPrivateMediaReleaseEnvelope,
+      COMMERCE_PRIVATE_MEDIA_RELEASE_TAG: commercePrivateMediaReleaseBridge.COMMERCE_PRIVATE_MEDIA_RELEASE_TAG,
+      buildOutboundPrivateMediaReleaseResponse: commercePrivateMediaReleaseApply.buildOutboundPrivateMediaReleaseResponse,
+      applyInboundPrivateMediaReleaseResponse: commercePrivateMediaReleaseApply.applyInboundPrivateMediaReleaseResponse,
     },
   };
 }
@@ -1998,6 +2201,8 @@ let commerceReceiptStore: CommerceReceiptStoreLike | null = null;
 let commerceProductMediaRepo: CommerceProductMediaRepositoryLike | null = null;
 let commerceMediaGrantPersistence: CommerceMediaAccessGrantPersistenceLike | null = null;
 let commerceMediaGrantSigningKeyStore: unknown = null;
+/** BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- buyer-side durable, restart-surviving cache for verified `MediaAccessGrant` releases. */
+let commerceMediaReleaseContentCache: CommerceMediaReleaseContentCacheLike | null = null;
 
 function commerceReceiptState(): CommerceReceiptStoreLike {
   const m = requireModules();
@@ -2027,6 +2232,16 @@ function commerceMediaGrantState(): { readonly persistence: CommerceMediaAccessG
     commerceMediaGrantSigningKeyStore = new m.Trust.DurableSealedSigningKeyStore(commerceDurableFilePath("media_grant_signing_keys"));
   }
   return { persistence: commerceMediaGrantPersistence, signingKeyStore: commerceMediaGrantSigningKeyStore };
+}
+
+/** BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- lazily constructs (once) the buyer-side durable release-content cache. Same lazy-construction-on-first-use discipline as every other Commerce state in this file. */
+function commerceMediaReleaseContentCacheState(): CommerceMediaReleaseContentCacheLike {
+  const m = requireModules();
+  if (commerceMediaReleaseContentCache === null) {
+    fs.mkdirSync(path.dirname(commerceDurableFilePath("media_release_content")), { recursive: true });
+    commerceMediaReleaseContentCache = new m.Commerce.DurableMediaReleaseContentCache(commerceDurableFilePath("media_release_content"));
+  }
+  return commerceMediaReleaseContentCache;
 }
 
 /**
@@ -3497,6 +3712,332 @@ async function commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal(): Promise
     }
   } catch (err) {
     console.error("fedos-beta: private PaymentEvidence sync discovery query failed (non-fatal, local settlement state unaffected):", err);
+  }
+}
+
+// ---------------------------------------------------------------------
+// BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- the
+// FOURTH private-sync channel: `MediaAccessGrant` release request/response.
+// Structurally mirrors the Delivery/PaymentEvidence sections immediately
+// above (same lazy transport construction, same process-lifetime dedup
+// discipline), but this channel is request/response, not one-directional
+// assertion -- see `commerce_private_media_release_sync.ts`'s own header
+// for why. `handleCommerceMediaGrantRedeem()` (below) is the ONE real
+// production caller that ties both directions into the buyer-facing
+// "Open Purchased Content" UI action.
+// ---------------------------------------------------------------------
+
+interface CommercePrivateMediaReleaseRequestTransportLike {
+  send(
+    payload: unknown,
+    counterpartyPublicKeyHex: string,
+  ): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+}
+interface CommercePrivateMediaReleaseTransportLike {
+  send(
+    payload: unknown,
+    counterpartyPublicKeyHex: string,
+  ): Promise<{ readonly accepted: boolean; readonly eventId: string; readonly message: string }>;
+}
+
+let commercePrivateMediaReleaseRequestTransport: CommercePrivateMediaReleaseRequestTransportLike | null = null;
+let commercePrivateMediaReleaseRequestTransportProfileRef: CommerceNetworkProfileValue | null = null;
+let commercePrivateMediaReleaseRequestTransportSignerRef: NostrSigningAuthorityLike | null = null;
+let commercePrivateMediaReleaseTransport: CommercePrivateMediaReleaseTransportLike | null = null;
+let commercePrivateMediaReleaseTransportProfileRef: CommerceNetworkProfileValue | null = null;
+let commercePrivateMediaReleaseTransportSignerRef: NostrSigningAuthorityLike | null = null;
+/** Process-lifetime dedup of inbound REQUEST event ids this process (as seller) has already answered -- never re-answered on a later poll (re-answering would mint no new state, but WOULD needlessly re-wrap/re-encrypt; a buyer who wants a fresh answer sends a fresh request, which gets a fresh event id). */
+const commercePrivateMediaReleaseRequestAppliedEventIds = new Set<string>();
+/** Process-lifetime dedup of inbound RESPONSE event ids this process (as buyer) has already applied. */
+const commercePrivateMediaReleaseAppliedEventIds = new Set<string>();
+/**
+ * Best-effort, in-memory-only (never durable -- purely a UX hint, never an
+ * authority) record of the LAST outcome this buyer process observed for a
+ * given `(orderId, mediaId, buyerPubkey)` triple that was NOT a successful
+ * `"verified"` release (that case is already durably reflected by
+ * `commerceMediaReleaseContentCacheState().hasRelease()`). Lets
+ * `handleCommerceMediaGrantRedeem()` surface a truthful, specific denial
+ * reason instead of an indefinite "pending" when a definitive answer has
+ * already arrived -- this arc's own mandate item 4.
+ */
+const commerceMediaReleaseLastKnownDenial = new Map<string, { readonly reason: string; readonly at: number }>();
+function mediaReleaseDenialKey(orderId: string, mediaId: string, buyerPubkey: string): string {
+  return `${orderId} ${mediaId} ${buyerPubkey}`;
+}
+
+function commercePrivateMediaReleaseRequestTransportFor(): CommercePrivateMediaReleaseRequestTransportLike | null {
+  if (commerceNetworkProfile === "local-only") return null;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return null;
+  const m = requireModules();
+  if (
+    commercePrivateMediaReleaseRequestTransport === null ||
+    commercePrivateMediaReleaseRequestTransportProfileRef !== commerceNetworkProfile ||
+    commercePrivateMediaReleaseRequestTransportSignerRef !== activeNostrSigningAuthority
+  ) {
+    const relayUrl = activeRelays[0]?.url ?? "";
+    const relayPublisher = new m.CommerceNostr.WebSocketRelayPublisher(relayUrl, { factory: m.createNodeWebSocketRelaySocketFactory() });
+    commercePrivateMediaReleaseRequestTransport = new m.CommerceNostr.RealCommercePrivateMediaReleaseRequestTransport({
+      signingAuthority: activeNostrSigningAuthority,
+      relayPublisher,
+      nip44Wire: activeMasterSeedAuthority,
+      accountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+    });
+    commercePrivateMediaReleaseRequestTransportProfileRef = commerceNetworkProfile;
+    commercePrivateMediaReleaseRequestTransportSignerRef = activeNostrSigningAuthority;
+  }
+  return commercePrivateMediaReleaseRequestTransport;
+}
+
+function commercePrivateMediaReleaseTransportFor(): CommercePrivateMediaReleaseTransportLike | null {
+  if (commerceNetworkProfile === "local-only") return null;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return null;
+  const m = requireModules();
+  if (
+    commercePrivateMediaReleaseTransport === null ||
+    commercePrivateMediaReleaseTransportProfileRef !== commerceNetworkProfile ||
+    commercePrivateMediaReleaseTransportSignerRef !== activeNostrSigningAuthority
+  ) {
+    const relayUrl = activeRelays[0]?.url ?? "";
+    const relayPublisher = new m.CommerceNostr.WebSocketRelayPublisher(relayUrl, { factory: m.createNodeWebSocketRelaySocketFactory() });
+    commercePrivateMediaReleaseTransport = new m.CommerceNostr.RealCommercePrivateMediaReleaseTransport({
+      signingAuthority: activeNostrSigningAuthority,
+      relayPublisher,
+      nip44Wire: activeMasterSeedAuthority,
+      accountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+    });
+    commercePrivateMediaReleaseTransportProfileRef = commerceNetworkProfile;
+    commercePrivateMediaReleaseTransportSignerRef = activeNostrSigningAuthority;
+  }
+  return commercePrivateMediaReleaseTransport;
+}
+
+/** Buyer-side: best-effort, non-fatal request send. Never throws; a failure here just means the buyer's own next poll (or explicit retry) tries again. */
+async function sendPrivateMediaReleaseRequestNonFatal(
+  orderId: string,
+  mediaId: string,
+  buyerPubkey: string,
+  sellerPubkey: string,
+  now: number,
+): Promise<string> {
+  const transport = commercePrivateMediaReleaseRequestTransportFor();
+  if (transport === null) return "network-disabled";
+  try {
+    const payload = { category: "private-media-release-request", formatVersion: 1, orderId, mediaId, buyerPubkey, sellerPubkey, at: now };
+    const result = await transport.send(payload, sellerPubkey);
+    if (result.accepted) return "published";
+    return result.message.length > 0 ? result.message : "transport-error";
+  } catch (err) {
+    console.error("fedos-beta: private media-release REQUEST send failed (non-fatal):", err);
+    return "transport-error";
+  }
+}
+
+/** Seller-side: best-effort, non-fatal response send. */
+async function sendPrivateMediaReleaseResponseNonFatal(payload: CommercePrivateMediaReleasePayloadLike, recipientPubkeyHex: string): Promise<string> {
+  const transport = commercePrivateMediaReleaseTransportFor();
+  if (transport === null) return "network-disabled";
+  try {
+    const result = await transport.send(payload, recipientPubkeyHex);
+    if (result.accepted) return "published";
+    return result.message.length > 0 ? result.message : "transport-error";
+  } catch (err) {
+    console.error("fedos-beta: private media-release RESPONSE send failed (non-fatal):", err);
+    return "transport-error";
+  }
+}
+
+/**
+ * Seller-side: turns ONE already-decrypted, already-signature-verified
+ * inbound `private-media-release-request` envelope into a real response,
+ * via `buildOutboundPrivateMediaReleaseResponse()` (the fixed-gate-order
+ * orchestration -- see that function's own header), and sends it back.
+ * Never throws; any internal failure is a silent, safe drop -- the buyer's
+ * own request stays eligible to be answered on a LATER poll (this process
+ * never wrote the event id into the dedup set in that case).
+ */
+async function applyInboundPrivateMediaReleaseRequestNonFatal(envelope: {
+  readonly outcome: string;
+  readonly eventId: string;
+  readonly senderPubkeyHex: string;
+  readonly payload?: { readonly orderId: string; readonly mediaId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly at: number };
+}): Promise<void> {
+  if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
+  if (commercePrivateMediaReleaseRequestAppliedEventIds.has(envelope.eventId)) return;
+  if (activeMasterSeedAuthority === null || activeNostrSigningAuthority === null) return;
+
+  const payload = envelope.payload;
+  try {
+    const m = requireModules();
+    const ownIdentity = await activeNostrSigningAuthority.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+
+    const state = commerceState();
+    const order = state.orders.findById(payload.orderId);
+    const media = order === undefined ? undefined : commerceProductMediaState().listForProduct(order.productId).find((item) => item.id === payload.mediaId);
+
+    const grantState = commerceMediaGrantState();
+    const allGrants = grantState.persistence.listGrants();
+    const latestVersion = order === undefined ? 0 : m.Commerce.latestGrantVersion(allGrants, payload.mediaId, payload.buyerPubkey, order.id);
+    const candidate = allGrants.find(
+      (entry) =>
+        entry.payload.mediaId === payload.mediaId &&
+        entry.payload.buyerPubkey === payload.buyerPubkey &&
+        entry.payload.orderId === payload.orderId &&
+        entry.payload.grantVersion === latestVersion,
+    );
+
+    const now = Math.floor(Date.now() / 1000);
+    const response = await m.CommerceNostr.buildOutboundPrivateMediaReleaseResponse({
+      requestPayload: payload,
+      senderPubkeyHex: envelope.senderPubkeyHex,
+      ownPubkeyHex: ownIdentity.publicKeyHex,
+      order: order === undefined ? undefined : { id: order.id, productId: order.productId, buyerPubkey: order.buyerPubkey, sellerPubkey: order.sellerPubkey, status: order.status },
+      media: media === undefined || media.classification !== "protected" ? undefined : { id: media.id, productId: media.productId, classification: media.classification, storageRef: media.storageRef, contentType: media.contentType },
+      candidateGrantEnvelope: candidate,
+      latestKnownGrantVersion: latestVersion,
+      now,
+      merchantAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+      authority: activeMasterSeedAuthority,
+      getProtectedContent: (storageRef) => commerceMediaStoreFor().getProtected(storageRef),
+    });
+
+    commercePrivateMediaReleaseRequestAppliedEventIds.add(envelope.eventId);
+    await sendPrivateMediaReleaseResponseNonFatal(response, payload.buyerPubkey);
+  } catch (err) {
+    console.error("fedos-beta: private media-release request handling failed (non-fatal, request stays eligible for a later poll):", err);
+  }
+}
+
+/**
+ * Buyer-side: applies ONE already-decrypted, already-signature-verified
+ * inbound `private-media-release` RESPONSE envelope via
+ * `applyInboundPrivateMediaReleaseResponse()`. On `"verified"`, durably
+ * persists the digest-checked release (restart-survival, this arc's own
+ * mandate item 6). On any other outcome, records a truthful, bounded
+ * denial hint for `handleCommerceMediaGrantRedeem()` to surface -- never
+ * silently dropped.
+ */
+async function applyInboundPrivateMediaReleaseResponseNonFatal(envelope: {
+  readonly outcome: string;
+  readonly eventId: string;
+  readonly senderPubkeyHex: string;
+  readonly payload?: CommercePrivateMediaReleasePayloadLike;
+}): Promise<void> {
+  if (envelope.outcome !== "decrypted" || envelope.payload === undefined) return;
+  if (commercePrivateMediaReleaseAppliedEventIds.has(envelope.eventId)) return;
+  if (activeMasterSeedAuthority === null || activeNostrSigningAuthority === null) return;
+
+  const payload = envelope.payload;
+  try {
+    const m = requireModules();
+    const ownIdentity = await activeNostrSigningAuthority.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+    const order = commerceState().orders.findById(payload.orderId);
+    if (order === undefined) return; // out of order -- may still arrive on a later poll once the local Order materializes
+
+    const applied = await m.CommerceNostr.applyInboundPrivateMediaReleaseResponse({
+      payload,
+      senderPubkeyHex: envelope.senderPubkeyHex,
+      ownPubkeyHex: ownIdentity.publicKeyHex,
+      order: { id: order.id, sellerPubkey: order.sellerPubkey },
+      expectedMediaId: payload.mediaId,
+      buyerAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+      authority: activeMasterSeedAuthority,
+    });
+
+    commercePrivateMediaReleaseAppliedEventIds.add(envelope.eventId);
+    const denialKey = mediaReleaseDenialKey(payload.orderId, payload.mediaId, payload.buyerPubkey);
+    if (applied.outcome === "verified") {
+      commerceMediaReleaseContentCacheState().putRelease(applied.record);
+      commerceMediaReleaseLastKnownDenial.delete(denialKey);
+    } else {
+      const reason = applied.outcome === "denied" || applied.outcome === "unauthorized" ? applied.reason : applied.outcome;
+      commerceMediaReleaseLastKnownDenial.set(denialKey, { reason, at: payload.at });
+    }
+  } catch (err) {
+    console.error("fedos-beta: private media-release response handling failed (non-fatal):", err);
+  }
+}
+
+/** Seller-side discovery: mirrors `commercePrivateDeliveryDiscoverAndApplyNonFatal()`'s own shape exactly, subscribing to REQUEST events addressed to this process's own identity. */
+async function commercePrivateMediaReleaseRequestDiscoverAndRespondNonFatal(): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return;
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return;
+
+  const m = requireModules();
+  const signer = activeNostrSigningAuthority;
+  const nip44Wire = activeMasterSeedAuthority;
+  try {
+    const ownIdentity = await signer.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      { kinds: [1], "#t": [m.CommerceNostr.COMMERCE_PRIVATE_MEDIA_RELEASE_REQUEST_TAG], "#p": [ownIdentity.publicKeyHex], limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT },
+    ]);
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndDecryptInboundPrivateMediaReleaseRequestEnvelope(event, {
+          nip44Wire,
+          localAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+        });
+        await applyInboundPrivateMediaReleaseRequestNonFatal(envelope);
+      } catch (err) {
+        console.error("fedos-beta: private media-release REQUEST discovery -- one candidate event failed (non-fatal, skipped):", err);
+      }
+    }
+  } catch (err) {
+    console.error("fedos-beta: private media-release REQUEST discovery query failed (non-fatal):", err);
+  }
+}
+
+/** Buyer-side discovery: mirrors the REQUEST discovery function immediately above, for RESPONSE events. */
+async function commercePrivateMediaReleaseDiscoverAndApplyNonFatal(): Promise<void> {
+  if (commerceNetworkProfile === "local-only") return;
+  if (activeNostrSigningAuthority === null || activeRelays.length === 0 || activeMasterSeedAuthority === null) return;
+  const relayUrl = activeRelays[0]?.url;
+  if (relayUrl === undefined || relayUrl.length === 0) return;
+
+  const m = requireModules();
+  const signer = activeNostrSigningAuthority;
+  const nip44Wire = activeMasterSeedAuthority;
+  try {
+    const ownIdentity = await signer.publicIdentityForAccount(COMMERCE_NOSTR_ACCOUNT_INDEX);
+    if (ownIdentity === null) return;
+    const subscriber = new m.CommerceNostr.WebSocketRelayAdapter(relayUrl, {
+      factory: m.createNodeWebSocketRelaySocketFactory(),
+      timeoutMs: COMMERCE_NOSTR_DISCOVERY_TIMEOUT_MS,
+    });
+    const events = await subscriber.query([
+      { kinds: [1], "#t": [m.CommerceNostr.COMMERCE_PRIVATE_MEDIA_RELEASE_TAG], "#p": [ownIdentity.publicKeyHex], limit: COMMERCE_NOSTR_DISCOVERY_EVENT_LIMIT },
+    ]);
+    const ordered = [...events].sort((a, b) => {
+      const aAt = typeof (a as { created_at?: unknown })?.created_at === "number" ? (a as { created_at: number }).created_at : 0;
+      const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
+      return aAt - bAt;
+    });
+    for (const event of ordered) {
+      try {
+        const envelope = await m.CommerceNostr.verifyAndDecryptInboundPrivateMediaReleaseEnvelope(event, {
+          nip44Wire,
+          localAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
+        });
+        await applyInboundPrivateMediaReleaseResponseNonFatal(envelope);
+      } catch (err) {
+        console.error("fedos-beta: private media-release RESPONSE discovery -- one candidate event failed (non-fatal, skipped):", err);
+      }
+    }
+  } catch (err) {
+    console.error("fedos-beta: private media-release RESPONSE discovery query failed (non-fatal):", err);
   }
 }
 
@@ -5386,6 +5927,11 @@ async function handleCommerceOrdersListMine(payload: unknown) {
   // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
   await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- same
+  // bounded reliable-refresh, for the media-release request/response
+  // channel (seller-side answer, then buyer-side apply).
+  await commercePrivateMediaReleaseRequestDiscoverAndRespondNonFatal();
+  await commercePrivateMediaReleaseDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listByBuyer(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -5402,6 +5948,11 @@ async function handleCommerceOrdersListIncoming(payload: unknown) {
   // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
   await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- same
+  // bounded reliable-refresh, for the media-release request/response
+  // channel (seller-side answer, then buyer-side apply).
+  await commercePrivateMediaReleaseRequestDiscoverAndRespondNonFatal();
+  await commercePrivateMediaReleaseDiscoverAndApplyNonFatal();
   return { outcome: "ok", orders: commerceState().orders.listBySeller(actorPubkey).map(commerceOrderDto) };
 }
 
@@ -5582,6 +6133,11 @@ async function handleCommerceDeliveryStatus(payload: unknown) {
   // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
   await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- same
+  // bounded reliable-refresh, for the media-release request/response
+  // channel (seller-side answer, then buyer-side apply).
+  await commercePrivateMediaReleaseRequestDiscoverAndRespondNonFatal();
+  await commercePrivateMediaReleaseDiscoverAndApplyNonFatal();
   const delivery = commerceState().deliveries.findByOrderId(orderId);
   if (delivery === undefined) return { outcome: "not-found", reason: "no delivery record for this order yet" };
   return { outcome: "ok", delivery: commerceDeliveryDto(delivery) };
@@ -5603,6 +6159,11 @@ async function handleCommerceDeliveryAcknowledgeReceipt(payload: unknown) {
   // (see `applyInboundPrivatePaymentEvidenceNonFatal()`'s own header).
   await commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal();
   await commercePrivateDeliveryDiscoverAndApplyNonFatal();
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- same
+  // bounded reliable-refresh, for the media-release request/response
+  // channel (seller-side answer, then buyer-side apply).
+  await commercePrivateMediaReleaseRequestDiscoverAndRespondNonFatal();
+  await commercePrivateMediaReleaseDiscoverAndApplyNonFatal();
   const state = commerceState();
   const order = state.orders.findById(body.orderId);
   if (order === undefined) return { outcome: "not-found", reason: "no such order" };
@@ -5652,6 +6213,30 @@ async function handleCommerceOrderComplete(payload: unknown) {
   const actorKind: "customer" | "merchant" = order.buyerPubkey === body.actorPubkey ? "customer" : "merchant";
   const now = Math.floor(Date.now() / 1000);
   const m = requireModules();
+
+  // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- THE
+  // "digital content delivery invariant" (`media_access_grant_release_channel_policy.ts`'s
+  // own header, point 3): an Order for a product carrying ANY protected
+  // media may reach `"completed"` ONLY once every one of those items has a
+  // REAL, digest-verified release on file for this Order's own buyer.
+  // Checked and enforced HERE, BEFORE `applyOrderAction(..., {type:
+  // "complete"})` is ever called -- never after, and never as a
+  // best-effort/non-fatal side note like the reputation/sync calls further
+  // below, because this one is NOT allowed to fail open. A physical-goods
+  // Order (no protected media at all) is completely unaffected -- see that
+  // function's own header for why this never touches
+  // `order_state_machine.ts` itself.
+  const productMediaForInvariant = commerceProductMediaState()
+    .listForProduct(order.productId)
+    .map((item) => ({ id: item.id, productId: item.productId, classification: item.classification }));
+  const deliveryInvariant = m.Commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion({
+    productId: order.productId,
+    productMedia: productMediaForInvariant,
+    hasReleasedContent: (mediaId) => commerceMediaReleaseContentCacheState().hasRelease(order.id, mediaId, order.buyerPubkey),
+  });
+  if (!deliveryInvariant.satisfied) {
+    return { outcome: "rejected", reason: deliveryInvariant.reason, missingMediaIds: deliveryInvariant.missingMediaIds };
+  }
 
   const orderResult = m.Commerce.applyOrderAction(order, { type: "complete", actor: { kind: actorKind, pubkey: body.actorPubkey } } as CommerceOrderActionLike, now);
   if (!orderResult.ok || orderResult.order === undefined) return { outcome: "rejected", reason: orderResult.reason };
@@ -5804,18 +6389,65 @@ async function handleCommerceReceiptIssue(payload: unknown) {
     envelope = existing.envelope;
   } else {
     const { issuerId, keypair } = signingState;
-    const payloadRecord = {
-      kind: "trade_completion" as const,
-      orderId: order.id,
-      productRef: order.productId,
-      buyerRef: order.buyerPubkey,
-      sellerRef: order.sellerPubkey,
-      paymentEvidenceRef: order.paymentId ?? undefined,
-      completedAt: now,
-      formatVersion: 1 as const,
-    };
+    // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) --
+    // arc mandate item 7: when this Order's product carried protected media
+    // that were genuinely released to (and digest-verified by) this Order's
+    // own buyer, the receipt references that DELIVERY EVIDENCE via the
+    // existing, already-signed `DeliveryReceiptProofPayload.deliveryConfirmationRef`
+    // opaque string field (`../../../../src/os/commerce/receipt/receipt_types.ts` --
+    // never a new field; `issueSignedDeliveryReceiptProof()`/
+    // `verifySignedDeliveryReceiptProof()` are ALREADY real, already-tested,
+    // just never wired to a production caller before now). This proves
+    // ONLY that a real release with this digest occurred -- never that the
+    // content is authentic/high-quality/matches the listing, exactly the
+    // limitation `receipt_types.ts`'s own header already documents for
+    // every opaque reference field it carries. A physical-goods Order (no
+    // protected media) is unaffected -- still a plain `trade_completion`
+    // receipt, exactly as before.
+    const releasedMediaRefs = commerceProductMediaState()
+      .listForProduct(order.productId)
+      .filter((item) => item.classification === "protected")
+      .map((item) => commerceMediaReleaseContentCacheState().getRelease(order.id, item.id, order.buyerPubkey))
+      .filter((record): record is CommerceMediaReleaseContentRecordLike => record !== undefined)
+      .map((record) => `${record.mediaId}:${record.contentDigest}`);
+    let deliveryConfirmationRef: string | undefined;
+    if (releasedMediaRefs.length > 0) {
+      const joined = `media-release:${releasedMediaRefs.join(",")}`;
+      // Bounded to receipt_types.ts's own COMMERCE_RECEIPT_MAX_FIELD_LENGTH
+      // (512) -- falls back to a bounded count-only reference rather than
+      // ever truncating a digest (a truncated digest would be worse than no
+      // reference at all: it would look verifiable but not actually be).
+      deliveryConfirmationRef = joined.length <= 480 ? joined : `media-release-count:${releasedMediaRefs.length}`;
+    }
+
+    const payloadRecord =
+      deliveryConfirmationRef !== undefined
+        ? {
+            kind: "delivery_confirmation" as const,
+            orderId: order.id,
+            productRef: order.productId,
+            buyerRef: order.buyerPubkey,
+            sellerRef: order.sellerPubkey,
+            paymentEvidenceRef: order.paymentId ?? undefined,
+            completedAt: now,
+            formatVersion: 1 as const,
+            deliveryConfirmationRef,
+          }
+        : {
+            kind: "trade_completion" as const,
+            orderId: order.id,
+            productRef: order.productId,
+            buyerRef: order.buyerPubkey,
+            sellerRef: order.sellerPubkey,
+            paymentEvidenceRef: order.paymentId ?? undefined,
+            completedAt: now,
+            formatVersion: 1 as const,
+          };
     try {
-      envelope = m.Commerce.issueSignedTradeReceiptProof(payloadRecord, { keypair, issuer: issuerId }, { issuedAt: now });
+      envelope =
+        deliveryConfirmationRef !== undefined
+          ? m.Commerce.issueSignedDeliveryReceiptProof(payloadRecord, { keypair, issuer: issuerId }, { issuedAt: now })
+          : m.Commerce.issueSignedTradeReceiptProof(payloadRecord, { keypair, issuer: issuerId }, { issuedAt: now });
     } catch (err) {
       return { outcome: "rejected", reason: err instanceof Error ? err.message : "receipt issuance failed" };
     }
@@ -5831,7 +6463,14 @@ async function handleCommerceReceiptIssue(payload: unknown) {
 
   const qrText = m.Commerce.encodeCommerceReceiptProofToQrText(envelope);
   const decoded = m.Commerce.decodeCommerceReceiptProofFromQrText(qrText);
-  const verified = m.Commerce.verifySignedTradeReceiptProof(decoded, policy);
+  // Kind-agnostic verify: try the (far more common) trade_completion shape
+  // first, fall back to delivery_confirmation only on a shape mismatch --
+  // never assumed from local state, since `envelope` may be one durably
+  // issued by an EARLIER call (or an earlier arc's build) under either kind.
+  let verified = m.Commerce.verifySignedTradeReceiptProof(decoded, policy);
+  if (verified.status === "INVALID_PAYLOAD_SHAPE") {
+    verified = m.Commerce.verifySignedDeliveryReceiptProof(decoded, policy);
+  }
 
   let qrImageDataUrl: string | undefined;
   try {
@@ -6054,24 +6693,39 @@ async function handleCommerceShareOpen(payload: unknown) {
  * gate order below is fixed and cannot be reordered by a caller:
  *   1. Look up the REAL Order via the durable repository (never a
  *      caller-supplied Order shape) and the REAL `ProductMedia` record.
- *   2. Look up the REAL, durably-persisted candidate grant envelope for
- *      the exact `(mediaId, actorPubkey, orderId)` triple -- never
- *      trusted from the renderer.
- *   3. `evaluateMediaAccessGrant()` -- signature, Order-status,
- *      expiry/revocation/version, wrong-buyer/wrong-media/wrong-signer,
- *      ALL real checks, not re-implemented here.
- *   4. ONLY on `allowed: true` does this handler ever touch the
- *      Master-Seed-derived `CommerceMedia` key AT ALL, via
- *      `wrapMediaAccessGrantRelease()` (which itself re-runs step 3
- *      before ever calling `authority.encryptNip44Wire()`) --
- *      `commerceMediaStoreFor().getProtected()` decrypts the merchant's
- *      OWN stored ciphertext (never handed to the buyer directly), and
- *      the plaintext bytes are then re-wrapped end-to-end for the ONE
- *      grant-authorized buyer.
- * Never returns the `MediaAccessGrant` envelope, a content key, AEAD
- * internals, or a CID/storageRef to the caller -- only opaque
- * `contentBase64`/`contentType` on success, or a closed-vocabulary denial
- * reason on failure.
+ *   2. Check the buyer's OWN durable `DurableMediaReleaseContentCache`
+ *      first -- a release already digest-verified via a REAL cross-process
+ *      round trip on an earlier call/poll returns immediately, including
+ *      after a full process restart (this arc's own mandate item 6). This
+ *      is the ONLY success path this handler has -- there is no
+ *      same-process shortcut.
+ *   3. If nothing is cached yet, runs one bounded discover-and-apply pass
+ *      in EACH direction (in case a seller's response, or this seller
+ *      process's own not-yet-answered request, is already sitting on the
+ *      relay) and re-checks the cache.
+ *   4. Still nothing: consults the in-memory `commerceMediaReleaseLastKnownDenial`
+ *      hint for a truthful, specific denial reason already observed on an
+ *      earlier poll; otherwise sends a FRESH
+ *      `private-media-release-request` (best-effort) and returns
+ *      `outcome: "pending"` -- never a false `"ok"`, never a silent hang,
+ *      never an ask for the buyer to blindly attest receipt (arc mandate
+ *      item 4).
+ *
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A): this
+ * handler is the REAL cross-process production caller this arc's brief
+ * asked for -- see `docs/commerce/PROTECTED-MEDIA-CROSS-PROCESS-REACHABILITY.md`
+ * ("Blocker 3") for the single-process wrap/unwrap stand-in this replaces
+ * (it called `wrapMediaAccessGrantRelease()` bound to the buyer's pubkey,
+ * then immediately `decryptNip44Wire()`d with the SELLER as counterparty --
+ * structurally only self-consistent when buyer === seller). This handler
+ * now NEVER calls `wrapMediaAccessGrantRelease()`/`evaluateMediaAccessGrant()`/
+ * `commerceMediaStoreFor().getProtected()` directly at all -- every one of
+ * those only ever runs inside `buildOutboundPrivateMediaReleaseResponse()`
+ * (`applyInboundPrivateMediaReleaseRequestNonFatal()`, seller-process-only),
+ * gated by the real, cryptographically-verified requesting buyer's own
+ * identity -- see that function's own header. This handler also never calls
+ * the raw `resolveCommerceMediaKey()` primitive (it never even imports
+ * anything that could) -- this arc's own mandate item 2.
  */
 async function handleCommerceMediaGrantRedeem(payload: unknown) {
   const body = payload as { orderId?: unknown; actorPubkey?: unknown } | null;
@@ -6079,7 +6733,6 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
   if (!isBoundedString(body.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
-  const m = requireModules();
   const order = commerceState().orders.findById(body.orderId);
   if (order === undefined) return { outcome: "not-found", reason: "no such order" };
 
@@ -6090,55 +6743,50 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
   const media = protectedMedia[0];
   if (media === undefined) return { outcome: "not-found", reason: "this product has no protected content" };
 
-  const grantState = commerceMediaGrantState();
-  const allGrants = grantState.persistence.listGrants();
-  const latestVersion = m.Commerce.latestGrantVersion(allGrants, media.id, body.actorPubkey, order.id);
-  const candidate = allGrants.find(
-    (entry) =>
-      entry.payload.mediaId === media.id &&
-      entry.payload.buyerPubkey === body.actorPubkey &&
-      entry.payload.orderId === order.id &&
-      entry.payload.grantVersion === latestVersion,
-  );
-  if (candidate === undefined) return { outcome: "denied", reason: "no-grant-on-file" };
+  const actorPubkey = body.actorPubkey;
+  const cache = commerceMediaReleaseContentCacheState();
+  const cached = cache.getRelease(order.id, media.id, actorPubkey);
+  if (cached !== undefined) {
+    return { outcome: "ok", contentBase64: cached.contentBase64, contentType: cached.contentType, source: "cache" };
+  }
 
-  if (activeMasterSeedAuthority === null) return { outcome: "denied", reason: "wrap-unavailable" };
+  // Bounded reliable-refresh, same posture as every other cross-process
+  // handler in this file: a response (or an unanswered request THIS
+  // process itself owes, if it is the seller) may already be sitting on
+  // the relay from an earlier poll.
+  await commercePrivateMediaReleaseRequestDiscoverAndRespondNonFatal();
+  await commercePrivateMediaReleaseDiscoverAndApplyNonFatal();
+
+  const cachedAfterRefresh = cache.getRelease(order.id, media.id, actorPubkey);
+  if (cachedAfterRefresh !== undefined) {
+    return { outcome: "ok", contentBase64: cachedAfterRefresh.contentBase64, contentType: cachedAfterRefresh.contentType, source: "cache" };
+  }
+
+  const denialKey = mediaReleaseDenialKey(order.id, media.id, actorPubkey);
+  const knownDenial = commerceMediaReleaseLastKnownDenial.get(denialKey);
+  if (knownDenial !== undefined) {
+    return { outcome: "denied", reason: knownDenial.reason };
+  }
 
   const now = Math.floor(Date.now() / 1000);
-  const decision = m.Commerce.evaluateMediaAccessGrant({
-    envelope: candidate,
-    media: { id: media.id, productId: media.productId },
-    actorPubkey: body.actorPubkey,
-    order,
-    now,
-    latestKnownGrantVersion: latestVersion,
-  });
-  // The candidate grant must independently evaluate ALLOW here -- BEFORE
-  // this handler ever calls `getProtected()` -- so a denial never touches
-  // the Master-Seed-derived decrypt path at all.
-  if (!decision.allowed) return { outcome: "denied", reason: decision.reason };
+  const requestSyncOutcome = await sendPrivateMediaReleaseRequestNonFatal(order.id, media.id, actorPubkey, order.sellerPubkey, now);
+  // One more immediate pass -- covers a fast/local relay where the
+  // seller's own process (or this SAME process acting in a different role
+  // in a single-process demo/test topology) can answer within the same
+  // call. Genuinely cross-machine two-party flows will not resolve here;
+  // that is honestly reported as `"pending"` below, not `"ok"`.
+  await commercePrivateMediaReleaseRequestDiscoverAndRespondNonFatal();
+  await commercePrivateMediaReleaseDiscoverAndApplyNonFatal();
+  const cachedAfterRequest = cache.getRelease(order.id, media.id, actorPubkey);
+  if (cachedAfterRequest !== undefined) {
+    return { outcome: "ok", contentBase64: cachedAfterRequest.contentBase64, contentType: cachedAfterRequest.contentType, source: "cache" };
+  }
+  const denialAfterRequest = commerceMediaReleaseLastKnownDenial.get(denialKey);
+  if (denialAfterRequest !== undefined) {
+    return { outcome: "denied", reason: denialAfterRequest.reason };
+  }
 
-  const decrypted = await commerceMediaStoreFor().getProtected(media.storageRef);
-  if (decrypted === null) return { outcome: "denied", reason: "content-unavailable" };
-
-  const finalWrap = await m.Commerce.wrapMediaAccessGrantRelease({
-    envelope: candidate,
-    media: { id: media.id, productId: media.productId },
-    actorPubkey: body.actorPubkey,
-    order,
-    now,
-    latestKnownGrantVersion: latestVersion,
-    merchantAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
-    releasePayload: decrypted,
-    authority: activeMasterSeedAuthority,
-  });
-  if (finalWrap.outcome !== "released") return { outcome: "denied", reason: finalWrap.outcome === "denied" ? finalWrap.reason : finalWrap.outcome };
-
-  if (typeof activeMasterSeedAuthority.decryptNip44Wire !== "function") return { outcome: "denied", reason: "wrap-unavailable" };
-  const unwrapped = await activeMasterSeedAuthority.decryptNip44Wire(COMMERCE_NOSTR_ACCOUNT_INDEX, order.sellerPubkey, finalWrap.wireCiphertext);
-  if (unwrapped === null) return { outcome: "denied", reason: "wrap-unavailable" };
-
-  return { outcome: "ok", contentBase64: Buffer.from(unwrapped).toString("base64"), contentType: media.contentType };
+  return { outcome: "pending", reason: "requested-awaiting-seller-response", requestSyncOutcome };
 }
 
 /**

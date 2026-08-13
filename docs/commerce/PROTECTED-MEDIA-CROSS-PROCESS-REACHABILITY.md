@@ -164,3 +164,89 @@ through a redeem path that decrypts against the wrong counterparty
 (blocker 3). The honest state is the current one — the buyer's UI truthfully
 says the product has no protected content — and it stays until a future arc
 takes the protocol decision above.
+
+---
+
+## Addendum (BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc, Agent A) — blockers 1/2/3 CLOSED
+
+This arc built exactly the protocol this doc's own "smallest honest version"
+section named: a fourth private-sync channel,
+`private-media-release-request` (buyer -> seller) /
+`private-media-release` (seller -> buyer), reusing
+`wrapMediaAccessGrantRelease()`/`unwrapMediaAccessGrantRelease()` unchanged.
+Verified by direct source inspection and by
+`test/commerce_private_media_release_end_to_end.test.ts` (real Order state
+machine, real grant issuance, real `evaluateMediaAccessGrant()`, a
+directional fake-NIP-44 authority standing in for the real WASM primitive
+— the same modeling convention every other private-sync bridge test in this
+repo already uses):
+
+- **Blocker 1 (no byte transport)** — CLOSED for this one channel, within
+  its inherited 64 KiB cap (`MAX_MEDIA_ACCESS_GRANT_RELEASE_PAYLOAD_BYTES`).
+  Bytes now travel as `PrivateMediaReleaseReleasedPayload.wireCiphertext`
+  over the real relay, exactly like the other three private-sync channels.
+  `IpfsMediaStore`/`InMemoryIpfsTransport` remain irrelevant to the
+  cross-process story, as this doc predicted — they are only ever consulted
+  by the SELLER's own process, to decrypt its own already-stored ciphertext
+  before re-wrapping the plaintext for the buyer.
+- **Blocker 2 (no per-counterparty content key)** — closed the SAME way
+  `media_access_grant_key_release.ts` already did for the single-process
+  case: no per-media key is minted (still structurally impossible without a
+  new Rust/WASM raw-key-import primitive — untouched, per this arc's own
+  crypto guardrail); the release payload itself is grant-gated,
+  buyer-specific re-encryption via `encryptNip44Wire()`.
+- **Blocker 3 (wrap/unwrap counterparty mismatch)** — CLOSED. The wrap now
+  genuinely happens in the seller's own process
+  (`buildOutboundPrivateMediaReleaseResponse()`,
+  `src/os/commerce/events/commerce_private_media_release_apply.ts`) and the
+  unwrap in the buyer's own, different process
+  (`applyInboundPrivateMediaReleaseResponse()`, same file), each against its
+  own real, independently-unlocked `FedosMasterSeedAuthority` — no longer a
+  single-process stand-in. `fedos_electron_beta_main.cts`'s
+  `handleCommerceMediaGrantRedeem()` no longer calls
+  `wrapMediaAccessGrantRelease()`/`evaluateMediaAccessGrant()`/
+  `commerceMediaStoreFor().getProtected()` directly at all — those only run
+  inside the seller-side request handler now, gated on the real,
+  cryptographically-verified requesting buyer's identity.
+
+**Blockers 4 and 5 are UNCHANGED, and are the reason this channel still
+cannot succeed end-to-end in the shipped app today**, even though the
+transport/crypto/protocol gap above is closed:
+
+- **Blocker 4** (`commerceMediaStoreFor()` hard-codes `"local-only"` to
+  `IpfsMediaStore`'s constructor, independent of the real
+  `commerceNetworkProfile`) is still live — re-verified by direct source
+  read this arc. `getProtected()` still unconditionally returns `null` for
+  any real product, so the seller-side response handler still answers
+  every real request with `outcome: "denied", reason: "content-unavailable"`.
+  This is store/catalog territory this arc's mandate did not include.
+- **Blocker 5** (grant issuance requires a signing keypair whose public key
+  equals `order.sellerPubkey` literally) is also still live, and this arc
+  specifically investigated whether it is now fixable for a REAL (not
+  demo-fixed) seller identity: `FedosNostrSigningAuthority` — the one
+  signing surface a seller's real account identity actually exposes — is
+  scoped to `signEvent(request: FedosNostrUnsignedEventRequest)` only (a
+  whole, allowlisted Nostr event shape), never an arbitrary-bytes-sign
+  primitive, and no accessor anywhere in
+  `fedos_production_master_seed_authority.ts` exposes the account's raw
+  secret key material (grepped directly, zero matches for
+  `secretKeyBytes`/`SecretKey`/`privateKeyBytes`/`signBytes` in that file).
+  Backing a `MediaAccessGrantSigningKeypair` for a real seller identity
+  would therefore require EITHER a new raw-secret-exposing accessor (weakens
+  key separation between the Nostr identity and the grant-signing purpose —
+  exactly this arc's own "STOP and document" crypto guardrail) OR a redesign
+  of `MediaAccessGrant`'s own sign/verify scheme to be Nostr-event-shaped
+  instead of a raw canonical-bytes Schnorr signature (a real, cross-cutting
+  design change, not a wiring fix). **Verdict: structurally blocked, not
+  fixed, deliberately** — same disclosed-limitation posture this doc and
+  `durable_media_grant_signing_key_store.ts`'s own header already document
+  for the demo actors, now confirmed to extend to real seller identities
+  too under the currently-exposed signing surface.
+
+Since protected media can never actually be attached in the shipped app
+today (the `classification: "public"` hard-code above, still in place),
+none of this is reachable live yet — this addendum documents that the
+transport/protocol half of the gap is closed and tested, while the
+store-availability and seller-signing-capability halves remain the two
+concrete blockers a future arc (or Agent M's sibling work landing first)
+would need to close before a buyer can ever see real released bytes.

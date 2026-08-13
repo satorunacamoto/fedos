@@ -190,11 +190,17 @@ export { UnavailableProductMediaDecryption, type ProductMediaDecryptionPort } fr
 // Commerce Durability + Protected-Media Entitlement + Packaged-E2E FINAL
 // Closure arc (Agent G) -- `MediaAccessGrant`: binds protected-media
 // decryption capability to a specific buyer/media/qualifying-Order/time
-// window via a signed, revocable grant. Barreled here so a future
-// composition-root wiring (no live "download protected media" IPC surface
-// exists in the shipped app yet — see this arc's own final report) has a
-// single, public entry point to import from, same as every other
-// Commerce capability in this file.
+// window via a signed, revocable grant. Barreled here so composition-root
+// wiring has a single, public entry point to import from, same as every
+// other Commerce capability in this file. BUYER DISCOVERY + DIGITAL CONTENT
+// DELIVERY mega-arc (Agent A) -- the "no live 'download protected media'
+// IPC surface exists in the shipped app yet" gap this comment used to
+// describe is now closed: see the media-release private-sync channel
+// barreled further below, and `handleCommerceMediaGrantRedeem()`
+// (`fedos_electron_beta_main.cts`), now a real cross-process buyer read
+// path rather than the single-process wrap/unwrap stand-in
+// `docs/commerce/PROTECTED-MEDIA-CROSS-PROCESS-REACHABILITY.md` ("Blocker
+// 3") described.
 export {
   isQualifyingOrderStatusForMediaAccess,
   evaluateMediaAccessGrant,
@@ -253,6 +259,36 @@ export {
   type MediaGrantSigningKeyResolveResult,
   type MediaGrantSigningKeySealingAuthorityLike,
 } from "./media_grant/persistence/durable_media_grant_signing_key_store.js";
+
+// BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- THE live
+// "download protected media" wiring the comment above (Agent G's own arc)
+// flagged as not yet existing: a real, cross-process private-sync channel
+// (`../events/commerce_private_media_release_sync.ts`,
+// `./catalog/adapters/nostr/commerce_private_media_release_bridge.ts`, both
+// imported directly by `fedos_electron_beta_main.cts`, mirroring how the
+// Order/Delivery/PaymentEvidence private-sync bridges are each imported
+// directly rather than re-exported here) now reaches
+// `handleCommerceMediaGrantRedeem()`'s real cross-process buyer read path.
+// The two pieces barreled here are the pure decision layer and the
+// buyer-side durable content cache -- domain-shaped, like every other
+// Commerce capability in this file.
+export {
+  evaluateInboundMediaReleaseRequestAuthorization,
+  evaluateInboundMediaReleaseResponseAuthorization,
+  evaluateDigitalContentDeliveryInvariantForOrderCompletion,
+  type MediaReleaseRequestAuthorizationDecision,
+  type MediaReleaseRequestAuthorizationDenialReason,
+  type MediaReleaseResponseAuthorizationDecision,
+  type MediaReleaseResponseAuthorizationDenialReason,
+  type DigitalContentDeliveryInvariantResult,
+} from "./media_grant/media_access_grant_release_channel_policy.js";
+export {
+  DurableMediaReleaseContentCache,
+  MAX_MEDIA_RELEASE_CONTENT_CACHE_BASE64_CHARS,
+  type MediaReleaseContentRecord,
+  type MediaReleaseContentCache,
+  type MediaReleaseContentCacheWriteResult,
+} from "./media_grant/persistence/durable_media_release_content_cache.js";
 
 export type {
   PaymentProvider,
