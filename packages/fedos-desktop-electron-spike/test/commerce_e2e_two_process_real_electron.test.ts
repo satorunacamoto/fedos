@@ -428,12 +428,32 @@ const PRODUCT_DESCRIPTION = "Real cross-process discovery/order-sync proof produ
 
 /**
  * The shared 14-step opening every RETURNING launch uses: real unlock with
- * the real passphrase against the real persisted on-disk profile, then the
- * per-session Commerce network profile (this build deliberately does NOT
- * persist it -- the Settings screen says so in its own copy: "it resets to
- * Local Only every launch"), then the real "Acting as" identity selection.
- * Returned as a fixed-length array so downstream step indices are a simple
- * `PREAMBLE_STEPS + n` everywhere.
+ * the real passphrase against the real persisted on-disk profile, then a
+ * real, EXPLICIT Settings -> Network Profile choice (saved through the real
+ * `fedos-app:commerce-network-profile-set` IPC), then the real "Acting as"
+ * identity selection. Returned as a fixed-length array so downstream step
+ * indices are a simple `PREAMBLE_STEPS + n` everywhere.
+ *
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc -- IMPORTANT, AND THE
+ * REASON `returningLaunchPreambleVerifyingPersistedNetworkProfile()` below
+ * exists: the Network Profile is now DURABLE (Agent U's
+ * `persistCommerceNetworkProfile()`, honoured over Agent D's relay-derived
+ * default by the Coordinator's `hasPersistedCommerceNetworkProfileChoice()`
+ * guard, and reloaded in `app.whenReady()` BEFORE any window exists). The
+ * old "it resets to Local Only every launch" behaviour this comment used to
+ * describe is GONE -- the Settings screen's own copy now correctly says
+ * "this choice will still be in effect the next time you launch FedOS".
+ *
+ * The practical consequence for THIS suite: a save performed at step 8/10
+ * below lands ~3 SECONDS AFTER unlock, and `renderReady()` fires a one-shot
+ * `refreshCommerceMyOrdersList()` + `refreshCommerceMerchantOrdersList()`
+ * the instant the Ready screen renders -- i.e. a full bounded reliable
+ * refresh (order-sync, payment-evidence, delivery, media-release) has
+ * already run to completion under the PREVIOUSLY PERSISTED profile before
+ * this preamble's own save is even dispatched. This preamble therefore
+ * CANNOT be used to put a launch "offline"; only a choice persisted in an
+ * EARLIER session can do that, which is exactly what a real user's own
+ * durable Settings choice does.
  */
 const PREAMBLE_STEPS = 14;
 function returningLaunchPreamble(
@@ -454,6 +474,43 @@ function returningLaunchPreamble(
     { action: "fill", selector: "#commerce-network-profile-select", value: networkProfile }, // 8
     { action: "wait", ms: 100 }, // 9
     { action: "click", selector: "#commerce-network-profile-save" }, // 10
+    { action: "wait", ms: 300 }, // 11
+    { action: "fill", selector: actingAsSelector, value: actingAsPubkey }, // 12
+    { action: "wait", ms: 200 }, // 13
+  ];
+}
+
+/**
+ * Same 14-step shape and same step indices as `returningLaunchPreamble()`
+ * above, but it deliberately CHANGES NOTHING about the Commerce network
+ * profile: it opens Settings and READS the Network Profile control back,
+ * so the caller can assert that the choice the user made in an EARLIER
+ * session is genuinely already in force -- which, because
+ * `commerceNetworkProfile` is restored inside `app.whenReady()` before any
+ * window is created, means it was in force for this launch's ENTIRE
+ * lifetime, including `renderReady()`'s own one-shot orders refresh.
+ *
+ * This is the only way this suite can drive a genuinely offline launch: see
+ * `returningLaunchPreamble()`'s own header for why a same-launch save is
+ * always too late.
+ */
+function returningLaunchPreambleVerifyingPersistedNetworkProfile(
+  passphrase: string,
+  actingAsSelector: string,
+  actingAsPubkey: string,
+): readonly UiStep[] {
+  return [
+    { action: "wait", ms: 300 }, // 0
+    { action: "read", selector: "#current-screen" }, // 1 -- expect "unlock"
+    { action: "fill", selector: "#unlock-pass", value: passphrase }, // 2
+    { action: "click", selector: "#unlock-submit" }, // 3
+    { action: "wait", ms: 2500 }, // 4 -- real Argon2 + real WASM master-seed unwrap
+    { action: "read", selector: "#current-screen" }, // 5 -- expect "ready"
+    { action: "click", selector: "#nav-settings" }, // 6
+    { action: "wait", ms: 300 }, // 7
+    { action: "read", selector: "#commerce-network-profile-select", as: "value" }, // 8 -- the RESTORED durable choice, read straight off the real control
+    { action: "wait", ms: 100 }, // 9
+    { action: "read", selector: "#commerce-network-profile-report" }, // 10 -- deliberately NOT a save (no click): nothing about the profile is changed this launch
     { action: "wait", ms: 300 }, // 11
     { action: "fill", selector: actingAsSelector, value: actingAsPubkey }, // 12
     { action: "wait", ms: 200 }, // 13
@@ -732,6 +789,29 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
         { action: "wait", ms: 500 }, // 24 -- also sends a real private-order-sync EVENT back to Alice
         { action: "read", selector: "#commerce-order-status-text" }, // 25 -- expect "accepted"
         { action: "screenshot", value: "bob-06-accepted" }, // 26
+        // ---------------------------------------------------------------
+        // PHASE B SETUP, performed here on purpose (see PHASE B's own
+        // header): Bob finishes his seller turn and then GOES OFFLINE the
+        // only way this product actually offers -- Settings -> Network
+        // Profile -> "Local Only", saved explicitly. That choice is now
+        // DURABLE (Agent U), so it is restored in `app.whenReady()` of his
+        // NEXT launch before any window exists. Done at the end of THIS
+        // launch, not the start of the next one, because a save can only
+        // ever take effect after unlock -- by which point the Ready
+        // screen's own one-shot orders refresh has already run.
+        //
+        // This is also the last moment at which it is provably free of any
+        // side effect: Alice has not paid yet (STEP 6 is still ahead), so
+        // there is no payment evidence anywhere on the relay for this
+        // still-online launch to adopt.
+        // ---------------------------------------------------------------
+        { action: "click", selector: "#nav-settings" }, // 27
+        { action: "wait", ms: 300 }, // 28
+        { action: "fill", selector: "#commerce-network-profile-select", value: "local-only" }, // 29
+        { action: "wait", ms: 100 }, // 30
+        { action: "click", selector: "#commerce-network-profile-save" }, // 31
+        { action: "wait", ms: 400 }, // 32
+        { action: "read", selector: "#commerce-network-profile-report" }, // 33 -- the real product's own durability promise, read back off the live DOM
       ], true);
       expect(readAt(bob3, 1)).toBe("unlock");
       expect(readAt(bob3, 5)).toBe("ready");
@@ -745,6 +825,14 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
       // a locally-minted lookalike.
       expect(bobOrderIdLine).toBe(aliceOrderIdLine);
       expect(readAt(bob3, 25)).toBe("accepted");
+      const bobOfflineChoiceReport = readAt(bob3, 33);
+      record(
+        `PHASE B SETUP (performed in this launch, see its own inline comment) -- Bob explicitly set Settings -> Network Profile = "Local Only" and saved it through the real IPC. The product's own response, read back off the live DOM: "${bobOfflineChoiceReport}".`,
+      );
+      expect(
+        bobOfflineChoiceReport,
+        "Bob's explicit \"go offline\" choice must be reported as DURABLE -- PHASE B's whole offline half depends on it surviving into the next launch's `app.whenReady()`",
+      ).toMatch(/still be in effect the next time you launch/);
       record(`STEP 5 PASS -- Bob's process independently discovered+materialized Alice's real Order (parties: ${readAt(bob3, 21)}; identical real order identity on both sides: "${bobOrderIdLine}") purely from the real relay's replayed event, then real-Accepted it (also sending a real private-order-sync EVENT back to Alice's real pubkey).`);
 
       // =====================================================================
@@ -815,8 +903,41 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
   //
   // "Offline" here is the real, user-reachable, product-level offline this
   // build actually has: Settings -> Network Profile = "Local Only -- never
-  // publish to Nostr", which this build resets to on EVERY launch by design
-  // (the Settings screen says so in its own copy). With that profile,
+  // publish to Nostr".
+  //
+  // HOW THAT CHOICE GETS INTO THE OFFLINE LAUNCH, AND WHY IT CANNOT BE MADE
+  // INSIDE IT (live-reproduced during this arc's validation gate, root-caused
+  // with real main-process instrumentation, recorded here so the same wrong
+  // assumption is not made again):
+  //
+  //   * This comment previously claimed the profile "resets to Local Only on
+  //     EVERY launch by design". That WAS true, and is now FALSE. Agent U made
+  //     an explicit choice durable (`persistCommerceNetworkProfile()`), Agent D
+  //     made the unset default derive from the user's own relay config
+  //     (`initializeCommerceNetworkProfileFromRelayConfig()`), and the
+  //     Coordinator made the durable explicit choice win over that default
+  //     (`hasPersistedCommerceNetworkProfileChoice()`). This suite pre-seeds a
+  //     real relay into `settings.json` before Bob's first launch, and Bob's
+  //     earlier phases explicitly save "direct", so a launch here starts
+  //     ONLINE, never Local Only.
+  //   * `renderReady()` fires a one-shot `refreshCommerceMerchantOrdersList()`
+  //     the moment the Ready screen renders -- measured at ~38ms after unlock,
+  //     which is ~2.9 SECONDS before a Settings save issued by the preamble
+  //     could land. That one refresh is a complete bounded reliable refresh,
+  //     so it legitimately adopted Alice's payment evidence while Bob's own
+  //     standing, explicitly-saved choice was still "direct".
+  //   * That is CORRECT product behaviour, not a defect: at that instant the
+  //     user's own durable instruction was "direct". The fix therefore belongs
+  //     to this suite's choreography -- Bob makes the "Local Only" choice at
+  //     the END of his previous launch (BOB_3, before Alice has paid), exactly
+  //     as a real user does, and it is restored in `app.whenReady()` here
+  //     BEFORE any window exists. The launch below is consequently offline for
+  //     its ENTIRE lifetime, `renderReady()`'s own refresh included -- a
+  //     strictly stronger offline than the old script ever achieved -- and it
+  //     doubles as the live proof that the durable-choice/relay-derived-default
+  //     reconciliation actually holds end to end in a real process.
+  //
+  // With that profile,
   // `commercePrivatePaymentEvidenceDiscoverAndApplyNonFatal()` /
   // `commercePrivateOrderDiscoverAndApplyNonFatal()` /
   // `commercePrivateDeliveryDiscoverAndApplyNonFatal()` all return before
@@ -833,10 +954,12 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
       expect(bobPubkey.length, "PHASE A must have run first").toBe(64);
 
       // ---------------------------------------------------------------
-      // BOB_4_OFFLINE -- genuinely not talking to the relay this launch.
+      // BOB_4_OFFLINE -- genuinely not talking to the relay this launch,
+      // from `app.whenReady()` onward: the preamble CHANGES nothing, it
+      // only reads back the choice Bob durably made last launch.
       // ---------------------------------------------------------------
       const bob4 = await runBetaUiScript("BOB_4_OFFLINE_WHILE_EVIDENCE_WAITS", bobDataDir, [
-        ...returningLaunchPreamble(BOB_PASSPHRASE, "local-only", "#commerce-merchant-acting-as", bobPubkey), // 0..13
+        ...returningLaunchPreambleVerifyingPersistedNetworkProfile(BOB_PASSPHRASE, "#commerce-merchant-acting-as", bobPubkey), // 0..13
         { action: "click", selector: "#nav-commerce-merchant" }, // 14
         { action: "wait", ms: 4000 }, // 15 -- same generous bound as an online pass, so "offline" is never confused with "not enough time"
         { action: "read", selector: "#commerce-merchant-orders-list" }, // 16
@@ -848,6 +971,19 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
         { action: "screenshot", value: "bob-09-offline-still-accepted" }, // 22
       ], true);
       expect(readAt(bob4, 5)).toBe("ready");
+      // The durable choice, read straight off the real Settings control in a
+      // brand-new process: proof this launch was Local Only from
+      // `app.whenReady()` onward, i.e. before `renderReady()`'s own one-shot
+      // orders refresh could have run -- not merely from some later point in
+      // the script. Nothing in this launch changed it.
+      const offlineProfileInEffect = readAt(bob4, 8);
+      record(
+        `SS23 (offline half) -- Bob's brand-new process restored his OWN explicit Settings choice from the previous session: Network Profile control reads "${offlineProfileInEffect}" (restored in \`app.whenReady()\`, before any window exists; this launch never saves anything).`,
+      );
+      expect(
+        offlineProfileInEffect,
+        "Bob's durable \"Local Only\" choice must already be in force at launch -- otherwise this phase is not testing an offline process at all",
+      ).toBe("local-only");
       const offlineOrdersText = readAt(bob4, 16);
       const offlineSyncStatus = softReadAt(bob4, 17);
       const offlineStatus = readAt(bob4, 20);
