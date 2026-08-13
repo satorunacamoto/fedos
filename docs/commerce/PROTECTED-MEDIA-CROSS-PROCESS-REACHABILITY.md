@@ -302,13 +302,38 @@ appear in no event shape). Consequences on a genuinely two-process trade:
 That policy module's own header claim that `"completed"` "can no longer be
 reached for an under-delivered digital Order", and the transitive reputation
 claim built on it, therefore hold only in a single-process/tabletop topology.
-A second, independent bypass exists even there: an inbound
+A second, independent bypass existed even there: an inbound
 `private-order-sync` payload with `status: "completed"`
-(`PRIVATE_ORDER_SYNC_STATUS_ACTION.completed`, `actorKind: "either"`) reaches
+(`PRIVATE_ORDER_SYNC_STATUS_ACTION.completed`, `actorKind: "either"`) reached
 `applyOrderAction(order, { type: "complete" })` through
 `applyInboundPrivateOrderSyncPayload()` without consulting the invariant at
-all — so `handleCommerceOrderComplete()` is not the "ONE call site" that
-header describes. Both are recorded here as disclosed limitations rather than
-patched: making the invariant real needs cross-process `ProductMedia`
-knowledge and a decision about which process owns completion authority, which
-is protocol design, not wiring.
+all. **FIXED** (commit `6384eec0`, same review):
+`applyInboundPrivateOrderSyncNonFatal()` now re-runs the same invariant check
+before saving any inbound transition into `"completed"`, symmetrically with
+the local path — see that function's own comment and
+`media_access_grant_release_channel_policy.ts`'s own updated header. The
+per-process vacuity above is NOT fixed by this — both call sites now enforce
+the SAME check, and that check is still vacuous on a process that never
+listed the product itself.
+
+**The identical vacuity also blocks the buyer-facing redeem attempt itself,
+not just the completion invariant.** `handleCommerceMediaGrantRedeem()`
+(`fedos_electron_beta_main.cts`) short-circuits to `{outcome: "not-found",
+reason: "this product has no protected content"}` from the SAME
+`commerceProductMediaState().listForProduct(order.productId)` lookup, BEFORE
+ever calling `sendPrivateMediaReleaseRequestNonFatal()` — confirmed by direct
+inspection, not inference. So even with Blockers 4/5 both fixed and a real
+seller identity, a genuinely independent buyer's process today reports "no
+protected content" for a product that actually has some, without ever
+attempting the cross-process request — this is INDISTINGUISHABLE in the UI
+from the product genuinely having no protected media, which is also the
+scenario the two-process E2E suite's own STEP 9 currently exercises (that
+test's product never calls the protected-content attach path at all, so its
+"no protected content" result is separately, truthfully correct for THAT
+product — it does not exercise, and therefore cannot by itself disprove, this
+vacuity). Making the invariant and the redeem attempt both real needs
+cross-process `ProductMedia` metadata knowledge (id + classification, never
+bytes) and a decision about which process owns completion authority, which is
+protocol design, not wiring — the closest existing scaffold remains the
+drafted-but-unwired `MediaManifestReferenceEventDraft` this doc's Blocker 1
+section already names.
