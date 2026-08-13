@@ -112,6 +112,20 @@ export {
 } from "./catalog/directory.js";
 export type { Product, ProductKind, ProductStatus, ProductVisibility, PurchaseGrant, PurchaseGrantSource } from "./catalog/types.js";
 
+// FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+// pure Shop discovery-status derivation (arc mandate item 2: honest
+// LOCAL DEMO / OFFLINE / CONNECTING / SYNCING / CONNECTED / SYNC FAILED /
+// NO LISTINGS states). See `./catalog/discovery_state.ts`'s own header.
+export {
+  deriveCommerceDiscoveryView,
+  describeCommerceDiscoveryStatus,
+  COMMERCE_DISCOVERY_NO_LISTINGS_TEXT,
+  type CommerceDiscoveryStatus,
+  type CommerceDiscoverySnapshot,
+  type CommerceDiscoveryView,
+  type CommerceDiscoveryStatusText,
+} from "./catalog/discovery_state.js";
+
 export { LocalProductRepository } from "./catalog/local_product_repository.js";
 export type {
   ProductRepositoryPort,
@@ -440,6 +454,35 @@ export {
   type PersistedCommerceReceiptRecordV1,
   type DurableReceiptStorePutResult,
 } from "./receipt/persistence/durable_receipt_store.js";
+
+// FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+// signed Product/Store Share Proof (arc mandate item 3), mirroring the
+// receipt barrel immediately above file-for-file. See
+// `./share/commerce_trust_share_adapter.ts`'s own header for the two-layer
+// trust model a caller MUST implement on top of a "VALID" self-asserted
+// verify result before ever treating a share artifact's contents as more
+// than an unconfirmed preview.
+export {
+  type CommerceShareProofKind,
+  type ProductShareProofPayload,
+  type StoreShareProofPayload,
+  isWellFormedProductShareProofPayload,
+  isWellFormedStoreShareProofPayload,
+  canonicalizeProductShareProofPayloadV1,
+  canonicalizeStoreShareProofPayloadV1,
+  type SignedCommerceShareProofEnvelope,
+  type CommerceShareSigningKeys,
+  type IssueCommerceShareProofOptions,
+  type CommerceShareVerifyStatus,
+  type CommerceShareVerifyResult,
+  issueSignedProductShareProof,
+  issueSignedStoreShareProof,
+  buildSelfAssertedShareTrustPolicy,
+  verifySelfAssertedProductShareProof,
+  verifySelfAssertedStoreShareProof,
+  encodeCommerceShareProofToQrText,
+  decodeCommerceShareProofFromQrText,
+} from "./share/index.js";
 
 export type {
   MarketplaceProvider,

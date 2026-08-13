@@ -745,6 +745,21 @@ interface RootModules {
     readonly encodeCommerceReceiptProofToQrText: (envelope: unknown) => string;
     readonly decodeCommerceReceiptProofFromQrText: (text: string) => unknown;
     /**
+     * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D)
+     * -- arc mandate item 3 (signed Product Share Proof: "Bob: Share
+     * Product... Alice: Scan/Paste/Open -> verifies seller/product identity
+     * via SIGNATURE"). Same loose `unknown`-shape discipline as the receipt
+     * functions immediately above -- see
+     * `src/os/commerce/share/commerce_trust_share_adapter.ts`'s own header
+     * for the full two-layer trust model `handleCommerceShareOpen()` below
+     * implements on top of `verifySelfAssertedProductShareProof`'s own
+     * narrow, self-consistency-only guarantee.
+     */
+    readonly issueSignedProductShareProof: (payload: unknown, keys: unknown, options: unknown) => unknown;
+    readonly verifySelfAssertedProductShareProof: (envelope: unknown, options?: unknown) => { readonly status: string; readonly resolvedPublicKeyHex?: string; readonly payload?: unknown };
+    readonly encodeCommerceShareProofToQrText: (envelope: unknown) => string;
+    readonly decodeCommerceShareProofFromQrText: (text: string) => unknown;
+    /**
      * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
      * (Agent D) -- friction-ledger row #5 / arc §33: durable, idempotent
      * receipt-envelope persistence (never a new mechanism -- same
@@ -1608,6 +1623,10 @@ async function loadRootModules(): Promise<RootModules> {
     verifySignedTradeReceiptProof: RootModules["Commerce"]["verifySignedTradeReceiptProof"];
     encodeCommerceReceiptProofToQrText: RootModules["Commerce"]["encodeCommerceReceiptProofToQrText"];
     decodeCommerceReceiptProofFromQrText: RootModules["Commerce"]["decodeCommerceReceiptProofFromQrText"];
+    issueSignedProductShareProof: RootModules["Commerce"]["issueSignedProductShareProof"];
+    verifySelfAssertedProductShareProof: RootModules["Commerce"]["verifySelfAssertedProductShareProof"];
+    encodeCommerceShareProofToQrText: RootModules["Commerce"]["encodeCommerceShareProofToQrText"];
+    decodeCommerceShareProofFromQrText: RootModules["Commerce"]["decodeCommerceShareProofFromQrText"];
     DurableReceiptStore: RootModules["Commerce"]["DurableReceiptStore"];
     LocalProductMediaRepository: RootModules["Commerce"]["LocalProductMediaRepository"];
     generateFedosProductMediaId: RootModules["Commerce"]["generateFedosProductMediaId"];
@@ -1776,6 +1795,10 @@ async function loadRootModules(): Promise<RootModules> {
       verifySignedTradeReceiptProof: commerce.verifySignedTradeReceiptProof,
       encodeCommerceReceiptProofToQrText: commerce.encodeCommerceReceiptProofToQrText,
       decodeCommerceReceiptProofFromQrText: commerce.decodeCommerceReceiptProofFromQrText,
+      issueSignedProductShareProof: commerce.issueSignedProductShareProof,
+      verifySelfAssertedProductShareProof: commerce.verifySelfAssertedProductShareProof,
+      encodeCommerceShareProofToQrText: commerce.encodeCommerceShareProofToQrText,
+      decodeCommerceShareProofFromQrText: commerce.decodeCommerceShareProofFromQrText,
       DurableReceiptStore: commerce.DurableReceiptStore,
       LocalProductMediaRepository: commerce.LocalProductMediaRepository,
       generateFedosProductMediaId: commerce.generateFedosProductMediaId,
@@ -2415,6 +2438,45 @@ function commerceMediaStoreFor(): CommerceMediaStoreLike {
 type CommerceNetworkProfileValue = "local-only" | "direct" | "tor-optional";
 const COMMERCE_NETWORK_PROFILE_VALUES: readonly CommerceNetworkProfileValue[] = ["local-only", "direct", "tor-optional"];
 let commerceNetworkProfile: CommerceNetworkProfileValue = "local-only";
+
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 1 ("Commerce should inherit the user's existing relay
+ * config... prefer one network model"). Before this pass,
+ * `commerceNetworkProfile` above ALWAYS reset to `"local-only"` on every
+ * relaunch regardless of whether the user had genuinely configured a
+ * Relay for messaging -- a real buyer who configured a Relay in Settings
+ * still saw Commerce silently stuck on a static local catalog every
+ * session until they separately discovered and flipped a second,
+ * unrelated "Commerce Nostr Publication (experimental)" toggle (see
+ * `docs/commerce/usability-v3/BUYER-TABLETOP-AFTER.md`'s own friction
+ * log). Called ONCE, immediately after a successful create/unlock (both
+ * call sites below), this makes Commerce inherit the SAME network
+ * decision the user already made for messaging: a configured Relay means
+ * Commerce discovery/publish default ON (`"direct"`) this session, no
+ * separate opt-in step required; no configured Relay means Commerce
+ * honestly stays `"local-only"` (nothing to reach). The manual
+ * `fedos-app:commerce-network-profile-set` surface (Settings) remains
+ * fully available afterward for a privacy-conscious user who wants
+ * Commerce OFF even with messaging relays configured, or who wants the
+ * Tor-routing-preference profile -- this function only sets the DEFAULT
+ * for the session, never removes the override.
+ *
+ * DELIBERATELY NOT PERSISTED ACROSS RESTARTS BEYOND THIS RE-DERIVATION:
+ * an explicit in-session override (e.g. a user who flips back to
+ * `"local-only"` this session) is still lost on the NEXT relaunch --
+ * `commerceNetworkProfile` is process-local, in-memory-only, same as
+ * before this pass. Making an EXPLICIT override durable would require a
+ * Settings-schema change (a new persisted field + `fedos_settings_
+ * application_class.ts` classification + migration) which this pass
+ * deliberately left as a documented, non-blocking gap rather than forcing
+ * through a wider Settings-schema change for a UX-polish increment on top
+ * of the already-real fix here (a correct-by-default value every launch,
+ * instead of a wrong-by-default one) -- see this arc's own final report.
+ */
+function initializeCommerceNetworkProfileFromRelayConfig(): void {
+  commerceNetworkProfile = activeRelays.length > 0 ? "direct" : "local-only";
+}
 const COMMERCE_NOSTR_ACCOUNT_INDEX = 0;
 /** Bounded wait for a catalog-load discovery query -- short enough that a
  * slow/unreachable Relay never makes the Catalog view feel hung; the
@@ -2516,10 +2578,29 @@ function commerceNostrReadModelFor(): CommerceNostrReadModelLike {
  * never a standing subscription/live push -- the arc's own accepted
  * "bounded reliable-refresh" fallback (see this Agent's final report).
  */
-async function commerceNostrDiscoverAndIngestProductsNonFatal(): Promise<void> {
-  if (commerceNetworkProfile === "local-only") return;
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 2: this function's return value is what lets
+ * `handleCommerceCatalogList()` report an HONEST discovery status
+ * (LOCAL DEMO / OFFLINE / CONNECTING / SYNCING / CONNECTED / SYNC FAILED)
+ * to the renderer, instead of the prior `void`-returning version silently
+ * discarding whether the attempt was skipped, succeeded, or failed. See
+ * `../../../../src/os/commerce/catalog/discovery_state.ts` for the pure
+ * derivation this outcome feeds (via the renderer's own attempt tracker,
+ * mirroring `CommerceSyncTracker`'s established "renderer tracks in-flight/
+ * last-result, main process reports only THIS attempt's own outcome"
+ * division of responsibility).
+ */
+type CommerceDiscoveryAttemptOutcome =
+  | { readonly outcome: "skipped-local-only" }
+  | { readonly outcome: "skipped-no-relay" }
+  | { readonly outcome: "ok"; readonly ingestedCount: number }
+  | { readonly outcome: "failed"; readonly reason: string };
+
+async function commerceNostrDiscoverAndIngestProductsNonFatal(): Promise<CommerceDiscoveryAttemptOutcome> {
+  if (commerceNetworkProfile === "local-only") return { outcome: "skipped-local-only" };
   const relayUrl = activeRelays[0]?.url;
-  if (relayUrl === undefined || relayUrl.length === 0) return;
+  if (relayUrl === undefined || relayUrl.length === 0) return { outcome: "skipped-no-relay" };
 
   const m = requireModules();
   const readModel = commerceNostrReadModelFor();
@@ -2545,16 +2626,20 @@ async function commerceNostrDiscoverAndIngestProductsNonFatal(): Promise<void> {
       const bAt = typeof (b as { created_at?: unknown })?.created_at === "number" ? (b as { created_at: number }).created_at : 0;
       return aAt - bAt;
     });
+    let ingestedCount = 0;
     for (const event of ordered) {
       try {
         const envelope = await m.CommerceNostr.verifyAndBuildInboundCommerceNostrEnvelope(event);
-        readModel.ingest(envelope);
+        const result = readModel.ingest(envelope);
+        if (result.outcome === "applied") ingestedCount += 1;
       } catch (err) {
         console.error("fedos-beta: Nostr Commerce discovery -- one candidate event failed to verify/ingest (non-fatal, skipped):", err);
       }
     }
+    return { outcome: "ok", ingestedCount };
   } catch (err) {
     console.error("fedos-beta: Nostr Commerce discovery query failed (non-fatal, local catalog unaffected):", err);
+    return { outcome: "failed", reason: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -3693,6 +3778,7 @@ async function handleCreate(payload: unknown) {
       // Master Seed Authority injection (and the outbound Nostr Port's
       // real signer/relay wiring) is genuinely live immediately on every
       // successful create/unlock, not merely "would be live if called".
+      initializeCommerceNetworkProfileFromRelayConfig();
       commerceMediaStoreFor();
       commerceNostrOutboundPortFor();
       await attachPresentationLayer(assembly);
@@ -3738,6 +3824,7 @@ async function handleUnlock(payload: unknown) {
       // Master Seed Authority injection (and the outbound Nostr Port's
       // real signer/relay wiring) is genuinely live immediately on every
       // successful create/unlock, not merely "would be live if called".
+      initializeCommerceNetworkProfileFromRelayConfig();
       commerceMediaStoreFor();
       commerceNostrOutboundPortFor();
       await attachPresentationLayer(assembly);
@@ -4370,37 +4457,78 @@ function commerceNostrDiscoveredActiveProducts(localIds: ReadonlySet<string>): r
     .filter((view) => view.status === "active" && !localIds.has(view.productId));
 }
 
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 5 ("Cleanly separate the real synchronized Shop catalog
+ * from demo/example fixtures... never silently blended into the real
+ * Shop, with no distinguishing signal").
+ *
+ * SCOPE NOTE, read before "fixing" this into two separate arrays: an
+ * earlier version of this pass DID split `products` into a real-only array
+ * plus a separate `demoProducts` array (and removed demo items from
+ * `#commerce-catalog-list`'s DOM position count entirely). That was
+ * reverted after discovering it breaks ~9 pre-existing REAL Electron E2E
+ * tests (`commerce_e2e_full_happy_path_real_electron.test.ts` and
+ * siblings) that click `#commerce-catalog-list li:nth-child(4) button`,
+ * relying on the documented "3 seeded [demo] + 1 new [real]" positional
+ * ordering. Rather than force through a DOM-structure change that would
+ * require rewriting that many real, expensive, already-passing E2E specs
+ * (a call this arc's own "document rather than force through" convention
+ * says NOT to force through unilaterally), this pass keeps `products` as
+ * ONE array in the EXACT SAME order/count as before (demo items still
+ * seeded first, so still occupy the same leading positions), and instead
+ * closes the ACTUAL gap the arc mandate names -- "no distinguishing
+ * signal" -- by labeling every item with `isDemo`, computed purely from
+ * this fixed, closed id set (never a guess/heuristic). The renderer
+ * (`fedos_electron_beta_renderer.ts`) renders an explicit "DEMO" pill on
+ * every `isDemo: true` row so a real listing can never be mistaken for a
+ * demo one or vice versa -- the "silently blended, zero distinguishing
+ * signal" problem is fixed; the DOM restructuring is deliberately left
+ * undone, documented here and in this arc's own final report.
+ */
+const COMMERCE_DEMO_PRODUCT_IDS: ReadonlySet<string> = new Set(FEDOS_COMMERCE_DEMO_PRODUCTS.map((p) => p.id));
+
 async function handleCommerceCatalogList() {
-  await commerceNostrDiscoverAndIngestProductsNonFatal();
+  const discoveryAttempt = await commerceNostrDiscoverAndIngestProductsNonFatal();
   const localProducts = commerceState().products.listPublished();
   const localIds = new Set(localProducts.map((product) => product.id));
   const discovered = commerceNostrDiscoveredActiveProducts(localIds);
+  const products = [
+    ...localProducts.map((product) => ({
+      id: product.id,
+      title: product.title,
+      priceCents: product.priceCents,
+      currency: product.currency,
+      merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
+      status: product.status,
+      hasImage: commerceProductMediaFor(product.id) !== null,
+      isDemo: COMMERCE_DEMO_PRODUCT_IDS.has(product.id),
+    })),
+    ...discovered.map((product) => ({
+      id: product.productId,
+      title: product.title,
+      priceCents: product.priceCents,
+      currency: product.currency,
+      merchantLabel: commerceMerchantLabelFor(product.creatorPubkeyHex),
+      status: product.status,
+      // No wired media path for a Nostr-discovered listing yet (same
+      // scoping decision `commerceProductMediaFor()`'s own comment
+      // already states for an un-imaged local product) -- never a fake
+      // placeholder photo.
+      hasImage: false,
+      // A Nostr-discovered product can never be one of the fixed local demo
+      // fixtures (those are never published to Nostr) -- always real.
+      isDemo: false,
+    })),
+  ];
+  const realListingCount = products.filter((item) => !item.isDemo).length;
   return {
     outcome: "ok",
-    products: [
-      ...localProducts.map((product) => ({
-        id: product.id,
-        title: product.title,
-        priceCents: product.priceCents,
-        currency: product.currency,
-        merchantLabel: commerceMerchantLabelFor(product.creatorPubkey),
-        status: product.status,
-        hasImage: commerceProductMediaFor(product.id) !== null,
-      })),
-      ...discovered.map((product) => ({
-        id: product.productId,
-        title: product.title,
-        priceCents: product.priceCents,
-        currency: product.currency,
-        merchantLabel: commerceMerchantLabelFor(product.creatorPubkeyHex),
-        status: product.status,
-        // No wired media path for a Nostr-discovered listing yet (same
-        // scoping decision `commerceProductMediaFor()`'s own comment
-        // already states for an un-imaged local product) -- never a fake
-        // placeholder photo.
-        hasImage: false,
-      })),
-    ],
+    products,
+    discoveryAttempt,
+    networkProfile: commerceNetworkProfile,
+    hasConfiguredRelay: activeRelays.length > 0,
+    realListingCount,
   };
 }
 
@@ -5557,6 +5685,150 @@ async function handleCommerceReceiptLookup(payload: unknown) {
   return { outcome: "ok", qrText, qrImageDataUrl, verifyStatus: verified.status };
 }
 
+const MAX_SHARE_QR_TEXT_CHARS = 20000;
+
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 3, SELLER side: "Bob... Share Product -> FedOS emits a
+ * signed deep-link/QR/compact code". Only the product's own established
+ * `creatorPubkey` may issue a share for it (mirrors every other
+ * owner-only-mutation check in this file, e.g.
+ * `handleCommerceProductUpdate`'s equivalent gate) -- a share link can
+ * never be minted on someone else's behalf. Reuses the SAME durable
+ * Commerce Trust issuer identity `commerceReceiptSigningState()` already
+ * establishes for receipts (see that function's own header) -- no second
+ * signing identity, no new key-management surface. See
+ * `src/os/commerce/share/commerce_trust_share_adapter.ts`'s own header for
+ * exactly what a resulting "VALID" verification on the RECEIVING end does
+ * and does not prove.
+ */
+async function handleCommerceShareProductIssue(payload: unknown) {
+  const body = payload as { actorPubkey?: unknown; productId?: unknown } | null;
+  if (!isBoundedString(body?.actorPubkey, MAX_ID_LENGTH) || body.actorPubkey.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed actorPubkey" };
+  }
+  if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
+
+  const product = commerceState().products.get(body.productId);
+  if (product === undefined) return { outcome: "not-found", reason: "no such product" };
+  if (product.creatorPubkey !== body.actorPubkey) {
+    return { outcome: "forbidden", reason: "only this product's own creator may issue a share link for it" };
+  }
+
+  const m = requireModules();
+  const now = Math.floor(Date.now() / 1000);
+  const signingState = await commerceReceiptSigningState();
+  if (signingState.outcome === "issuer-identity-corrupted") {
+    return { outcome: "rejected", reason: `local Commerce Trust issuer identity is corrupted and cannot safely issue a share link: ${signingState.reason}` };
+  }
+  const { issuerId, keypair } = signingState;
+
+  const sharePayload = {
+    kind: "product_share" as const,
+    productId: product.id,
+    title: product.title,
+    priceCents: product.priceCents,
+    currency: product.currency,
+    sellerPubkey: product.creatorPubkey,
+    issuedAt: now,
+    formatVersion: 1 as const,
+  };
+
+  let envelope: unknown;
+  try {
+    envelope = m.Commerce.issueSignedProductShareProof(sharePayload, { keypair, issuer: issuerId }, { issuedAt: now });
+  } catch (err) {
+    return { outcome: "rejected", reason: err instanceof Error ? err.message : "share proof issuance failed" };
+  }
+  const qrText = m.Commerce.encodeCommerceShareProofToQrText(envelope);
+
+  let qrImageDataUrl: string | undefined;
+  try {
+    qrImageDataUrl = await m.Trust.renderFedosTrustQrTextToPngDataUrl(qrText);
+  } catch (err) {
+    console.error("fedos-beta: share proof QR image rendering failed (non-fatal, the signed text code above remains authoritative):", err);
+  }
+
+  return { outcome: "ok", qrText, qrImageDataUrl, productId: product.id, title: product.title };
+}
+
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 3, BUYER side: "Alice: Scan/Paste/Open -> verifies
+ * seller/product identity via SIGNATURE (never trust the link/QR content
+ * itself) -> subscribes/fetches via the existing network layer -> Product
+ * Detail". Implements the TWO-LAYER trust model
+ * `commerce_trust_share_adapter.ts`'s own header documents in full:
+ *
+ *   1. `verifySelfAssertedProductShareProof()` -- rejects any
+ *      malformed/tampered/corrupted code outright (`"invalid"` below).
+ *      This alone proves only internal self-consistency, NEVER seller
+ *      identity (see that adapter's own "Case F" test).
+ *   2. THIS function's own mandatory cross-check: triggers the SAME real
+ *      discovery query `handleCommerceCatalogList()` uses
+ *      (`commerceNostrDiscoverAndIngestProductsNonFatal()`), then looks
+ *      for `productId` in EITHER this process's own local, authoritative
+ *      `LocalProductRepository`/`DurableProductRepository` (covers the
+ *      same-process merchant/buyer tabletop path, and a product this
+ *      buyer already separately discovered before) OR the real,
+ *      signature-verified `CommerceNostrProductReadModel` (covers a
+ *      genuinely independent buyer). ONLY if a record is found AND its
+ *      own real `creatorPubkey` matches the share artifact's CLAIMED
+ *      `sellerPubkey` is the result ever reported `confirmed: true` --
+ *      this is the step that actually proves seller identity, delegated
+ *      entirely to the ALREADY-HARDENED verification this app's Nostr
+ *      discovery pipeline already performs (never re-implemented here).
+ *
+ * NEVER returns full product details to the renderer directly -- on
+ * `confirmed: true` the renderer is expected to call the EXISTING
+ * `commerceProductDetail(productId)` IPC (same as clicking "View" from the
+ * ordinary catalog) to open Product Detail from the real, authoritative
+ * record, never from this handler's own preview copy.
+ */
+async function handleCommerceShareOpen(payload: unknown) {
+  const qrText = (payload as { qrText?: unknown } | null)?.qrText;
+  if (!isBoundedString(qrText, MAX_SHARE_QR_TEXT_CHARS) || qrText.length === 0) {
+    return { outcome: "invalid-input", reason: "malformed or missing share code" };
+  }
+
+  const m = requireModules();
+  const decoded = m.Commerce.decodeCommerceShareProofFromQrText(qrText);
+  const verified = m.Commerce.verifySelfAssertedProductShareProof(decoded);
+  if (verified.status !== "VALID" || verified.payload === undefined) {
+    return { outcome: "invalid", reason: `share code failed verification: ${verified.status}` };
+  }
+  const preview = verified.payload as {
+    readonly productId: string;
+    readonly title: string;
+    readonly priceCents: number;
+    readonly currency: string;
+    readonly sellerPubkey: string;
+  };
+
+  // Mandatory cross-check (step 2 above) -- never skipped, never optional.
+  await commerceNostrDiscoverAndIngestProductsNonFatal();
+  const localMatch = commerceState().products.get(preview.productId);
+  const discoveredMatch = commerceNostrReadModelFor().getProduct(preview.productId) as CommerceReadModelProductViewLike | undefined;
+
+  const realCreatorPubkey = localMatch !== undefined ? localMatch.creatorPubkey : discoveredMatch?.creatorPubkeyHex;
+  if (realCreatorPubkey === undefined) {
+    return {
+      outcome: "ok",
+      confirmed: false,
+      reason: "not yet confirmed on the network -- could not independently verify this seller/product",
+      preview,
+    };
+  }
+  if (realCreatorPubkey !== preview.sellerPubkey) {
+    return {
+      outcome: "rejected",
+      reason: "seller mismatch -- this share code's claimed seller does not match the real, network-verified record. Rejected.",
+      preview,
+    };
+  }
+  return { outcome: "ok", confirmed: true, productId: preview.productId, preview };
+}
+
 /**
  * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
  * (Agent D) -- friction-ledger row #15 / arc §35-37: the buyer-side
@@ -6034,6 +6306,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle("fedos-app:commerce-receipt-issue", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptIssue(payload));
   // FedOS Commerce Purchase Completion mega-arc (Agent R) -- read-only receipt lookup (never mints), closes the dev-vs-packaged restart-visibility gap.
   ipcMain.handle("fedos-app:commerce-receipt-lookup", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceReceiptLookup(payload));
+  // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+  // arc mandate item 3: signed Product Share Proof issue (seller) + open (buyer).
+  ipcMain.handle("fedos-app:commerce-share-product-issue", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceShareProductIssue(payload));
+  ipcMain.handle("fedos-app:commerce-share-open", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommerceShareOpen(payload));
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's read-only Persona Board query.
   ipcMain.handle("fedos-app:commerce-persona-board-query", async (_e: IpcMainInvokeEvent, payload: unknown) => handleCommercePersonaBoardQuery(payload));
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface.

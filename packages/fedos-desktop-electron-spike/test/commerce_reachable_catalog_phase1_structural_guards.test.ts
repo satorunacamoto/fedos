@@ -156,6 +156,13 @@ describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
       "commerce-product-image-attach",
       "commerce-media-grant-redeem",
       "commerce-activity-summary",
+      // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent
+      // D) -- arc mandate item 3: signed Product Share Proof issue (seller)
+      // + open (buyer). Baseline intentionally widened 28 -> 30, see
+      // `commerce_buyer_discovery_share_structural_guards.test.ts` for the
+      // full coverage of these two channels' own behavior.
+      "commerce-share-product-issue",
+      "commerce-share-open",
     ];
     expect(channelMatches.length).toBe(EXPECTED_CHANNELS.length);
     for (const channel of EXPECTED_CHANNELS) {

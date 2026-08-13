@@ -61,6 +61,8 @@ const MAX_ORDER_REJECTION_REASON_CHARS = 500;
 const MAX_PRODUCT_IMAGE_BASE64_CHARS = 12_000_000;
 const MAX_PRODUCT_IMAGE_ALT_TEXT_CHARS = 300;
 const MAX_PRODUCT_IMAGE_CONTENT_TYPE_CHARS = 64;
+/** FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) -- mirrors `fedos_electron_beta_main.cts`'s own identical `MAX_SHARE_QR_TEXT_CHARS` exactly. */
+const MAX_SHARE_QR_TEXT_CHARS = 20000;
 
 function boundedString(value: unknown, max: number): string {
   return typeof value === "string" ? value.slice(0, max) : "";
@@ -289,6 +291,18 @@ const fedosApp: FedosAppBridge = Object.freeze({
   commerceReceiptIssue: (orderId: string) => ipcRenderer.invoke("fedos-app:commerce-receipt-issue", { orderId: boundedString(orderId, MAX_ID_CHARS) }),
   // FedOS Commerce Purchase Completion mega-arc (Agent R) -- read-only companion to commerceReceiptIssue: looks up an already-issued receipt without ever minting one.
   commerceReceiptLookup: (orderId: string) => ipcRenderer.invoke("fedos-app:commerce-receipt-lookup", { orderId: boundedString(orderId, MAX_ID_CHARS) }),
+  // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+  // arc mandate item 3: signed Product Share Proof. `commerceShareOpen`
+  // sends only the pasted/scanned text itself -- the renderer never
+  // pre-parses or trusts it before main verifies (see that handler's own
+  // header for the two-layer trust model).
+  commerceShareProductIssue: (actorPubkey: string, productId: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-share-product-issue", {
+      actorPubkey: boundedString(actorPubkey, MAX_ID_CHARS),
+      productId: boundedString(productId, MAX_ID_CHARS),
+    }),
+  commerceShareOpen: (qrText: string) =>
+    ipcRenderer.invoke("fedos-app:commerce-share-open", { qrText: boundedString(qrText, MAX_SHARE_QR_TEXT_CHARS) }),
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's
   // read-only Persona Board query. Same bounded-string discipline as every
   // method above; the renderer never selects a disclosure layer -- the
