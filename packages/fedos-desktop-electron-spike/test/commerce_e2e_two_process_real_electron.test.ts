@@ -184,6 +184,19 @@
  *       seller's ciphertext is structurally undecryptable by any other
  *       profile. Left unbuilt on purpose -- see the fix round's own report.
  *
+ *    c. ADDENDUM (Commerce Product-Media Sync + Truthful Completion
+ *       mega-arc) -- paragraph (b) above is now materially outdated on one
+ *       point: Alice's buyer-side "Open Purchased Content" answer for a
+ *       product with no protected media is `"availability-unknown"`, not
+ *       the unqualified `"this product has no protected content"` this
+ *       paragraph describes -- the false-confident version of that answer
+ *       was the exact bug this later arc closed (a buyer's process cannot
+ *       actually prove absence, only that it hasn't synced a declaration).
+ *       The byte-transport gap this paragraph documents (no IPFS client,
+ *       no cross-process key import) is UNCHANGED and still real; only the
+ *       DECLARATION-level honesty improved. See STEP 9's own updated
+ *       comment below for the full current picture.
+ *
  * DELIBERATE SECURITY BOUNDARY THAT IS *STILL* REAL AND MUST STAY REAL
  * (unchanged by anything in this file): `PrivateOrderSyncStatus`
  * (`src/os/commerce/events/commerce_private_order_sync.ts`) is a CLOSED
@@ -1194,44 +1207,39 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
       // ---------------------------------------------------------------
       // PURCHASED CONTENT -- reported exactly as the real handler answered.
       //
-      // THE PRECISE BOUNDARY (source-confirmed after this live result, and
-      // it is NOT the boundary the Purchase Completion arc's own carry-
-      // forward note describes): the arc's known gap is stated as
-      // "protected-media ciphertext bytes cannot cross a real process
-      // boundary -- IpfsMediaStore has only an in-memory per-process fake
-      // transport; authorization is cross-process, byte transport is not."
-      // This live run shows the real app never even reaches that gap,
-      // because a PRODUCT CAN NEVER HAVE PROTECTED MEDIA AT ALL:
+      // UPDATED by the Commerce Product-Media Sync + Truthful Completion
+      // mega-arc: the paragraph this replaces (still visible in git
+      // history) asserted a false "this product has no protected content"
+      // was the CORRECT answer here, reasoning that no attach path could
+      // ever produce protected media. That reasoning was already stale
+      // when it was written (`handleCommerceProductContentAttach()` /
+      // `fedos-app:commerce-product-content-attach` already existed as the
+      // real protected-content attach handler) -- what was actually true,
+      // and remains true, is only that THIS SUITE'S OWN test product never
+      // calls it, so it genuinely has zero protected media. The bug this
+      // arc closed is that Alice's process used to report that fact as an
+      // unqualified, false-sounding-confident "no protected content" --
+      // indistinguishable on screen from a seller who never attached
+      // anything -- when the correct honest answer, from a buyer's process
+      // that can never be certain its own ProductMedia sync is complete,
+      // is "availability-unknown". `handleCommerceMediaGrantRedeem()` now
+      // reaches this answer via `resolveProductMediaForCompletionInvariant()`'s
+      // real merge with Agent M's cross-process declaration sync, not a
+      // local-only vacuous check.
       //
-      //   * `handleCommerceProductImageAttach()` -- the ONLY media-attach
-      //     IPC handler that exists (`fedos-app:commerce-product-image-attach`,
-      //     the only one registered in `fedos_electron_beta_main.cts`) --
-      //     hard-codes `classification: "public"` on every record it adds.
-      //     There is no parameter, no second handler, and no UI control
-      //     anywhere that can produce a `"protected"` `ProductMedia`.
-      //   * `issueCommerceMediaAccessGrantsNonFatal()` therefore always
-      //     sees `protectedMedia.length === 0` and returns before issuing
-      //     anything, so no `MediaAccessGrant` is ever minted by the real
-      //     app for any order.
-      //   * `handleCommerceMediaGrantRedeem()` consequently short-circuits
-      //     at its own `protectedMedia.length === 0` guard, which is
-      //     exactly the honest answer captured below.
-      //
-      // So the arc's PURCHASED CONTENT classification cannot be decided on
-      // a byte-transport argument: end-to-end, through the real shipped
-      // app, the purchased-content path is UNREACHABLE one layer earlier
-      // than the disclosed gap. Reported here, not papered over -- the
-      // control is real, visible and enabled, the handler is real, and its
-      // real answer is asserted verbatim.
+      // If this assertion ever needs to change again: a plain
+      // "no protected content" (not "availability-unknown") reappearing
+      // here would mean the honest-uncertainty fix regressed -- investigate
+      // from scratch, do not just relax the assertion back.
       // ---------------------------------------------------------------
       const purchasedContentError = softReadAt(alice4, 24);
       record(
-        `STEP 9 (purchased-content half, REAL captured result -- never faked) -- Alice clicked the real, VISIBLE "Open Purchased Content" control on her own genuinely paid+fulfilling order. The real grant-gated redeem handler (\`handleCommerceMediaGrantRedeem\`) answered, and the DOM shows: "${purchasedContentError}". See this phase's own comment for the precise, source-confirmed boundary this represents (it is one layer EARLIER than the arc's disclosed byte-transport gap).`,
+        `STEP 9 (purchased-content half, REAL captured result -- never faked) -- Alice clicked the real, VISIBLE "Open Purchased Content" control on her own genuinely paid+fulfilling order. The real grant-gated redeem handler (\`handleCommerceMediaGrantRedeem\`) answered, and the DOM shows: "${purchasedContentError}". See this phase's own comment for the precise, source-confirmed boundary this represents (Commerce Product-Media Sync arc: an honest "can't confirm yet", not a false "no protected content").`,
       );
       expect(
         purchasedContentError,
-        "if this ever stops saying \"no protected content\", a protected-media attach path has appeared in the real app and the purchased-content boundary must be re-investigated from scratch -- do not just relax this assertion",
-      ).toMatch(/no protected content/i);
+        "the Commerce Product-Media Sync arc's own fix: a buyer's process must never report an unqualified false \"no protected content\" -- if this ever reverts to that instead of the honest \"availability-unknown\", the regression must be investigated from scratch, not papered over by relaxing this assertion",
+      ).toMatch(/availability-unknown/i);
 
       const acknowledgedStatus = readAt(alice4, 28);
       const aliceDeliveryAfterAck = softReadAt(alice4, 29);
