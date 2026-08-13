@@ -55,7 +55,7 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     expect(appBlockers).toEqual([]);
   });
 
-  it("does not regress past the currently-measured blocker baseline (28, up from 16 -- FedOS 'Real Two-Party Purchase Completion + UX Closure' mega-arc, Agents P/D, Coordinator-directed pass -- a new violation must update this number deliberately, never silently)", () => {
+  it("does not regress past the currently-measured blocker baseline (35, up from 28 -- FedOS 'Buyer Discovery + Digital Content Delivery' mega-arc, Agents D/M/A, Coordinator-directed integration pass -- a new violation must update this number deliberately, never silently)", () => {
     // Commerce E2E Completion arc, Wave B: 4 new, DELIBERATE, reviewed blockers on
     // top of the pre-existing 3 (os/core -> packages/fedos-core-rust; the two
     // pre-existing catalog/adapters/nostr/{bridge,classify}.ts -> os/messenger
@@ -141,8 +141,42 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     // is exactly 2 x 6 -- confirmed by running
     // `node scripts/package_extraction_boundary_scan.mjs` directly and
     // diffing its output against the pre-existing 16-line blocker list.
+    //
+    // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agents
+    // D/M/A, Coordinator-directed integration pass): 7 more new,
+    // DELIBERATE, reviewed blockers on top of the prior 28 -- 6 from one
+    // new file plus 1 from another, both the SAME already-reviewed pattern
+    // this file's own history above already established, not a new
+    // category of leak:
+    //   - catalog/adapters/nostr/commerce_private_media_release_bridge.ts
+    //     (Agent A) -- the private MediaAccessGrant-release transport
+    //     (private-media-release-request / private-media-release), the
+    //     FOURTH private-sync channel following the exact same convention
+    //     as the order/delivery/payment-evidence bridges above. Imports
+    //     the IDENTICAL 6 os/messenger Nostr protocol symbols those three
+    //     already established (byte-for-byte the same import list:
+    //     `event.js`'s `isNostrEvent`, `noble_signature.js`'s
+    //     `NobleSignatureVerifier`, `signature.js`'s `SignatureVerifier`
+    //     type, `types.js`'s `NostrEvent` type, `publish.js`'s
+    //     `RelayPublisher` type, and `sign/fedos_nostr_signing_authority.js`'s
+    //     signing-authority exports) -- lives in the SAME NOSTR_ADAPTER_DIR
+    //     allowlist, unchanged by this pass.
+    //   - share/commerce_trust_share_adapter.ts (Agent D) ->
+    //     src/os/trust/index.js, 1 import site -- the SAME reviewed
+    //     Commerce->Trust seam receipt/commerce_trust_receipt_adapter.ts
+    //     already established above (Commerce E2E Completion arc, Wave B),
+    //     applied to a second Trust `contracts/` artifact kind
+    //     (`fedos.contract-artifact.v1`-backed Share Proof instead of a
+    //     receipt). `test/architecture_boundary_commerce.test.ts` still
+    //     does not forbid this direction; `test/architecture_boundary_trust.test.ts`
+    //     still only forbids the opposite one.
+    // Verified mechanically: 35 - 28 = 7 = 6 + 1, confirmed by running
+    // `node scripts/package_extraction_boundary_scan.mjs` directly and
+    // diffing its output against the pre-existing 28-line blocker list --
+    // every added line is one of the two files named above, nothing else
+    // changed.
     const { blockers } = runScan();
-    expect(blockers.length).toBeLessThanOrEqual(28);
+    expect(blockers.length).toBeLessThanOrEqual(35);
   });
 
   it("every blocker belongs to one of the three os/* roots (never the already-clean Electron app)", () => {
