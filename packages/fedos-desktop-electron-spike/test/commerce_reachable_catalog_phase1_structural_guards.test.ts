@@ -163,6 +163,17 @@ describe("Commerce Reachable Catalog Phase 1 -- bounded IPC family", () => {
       // full coverage of these two channels' own behavior.
       "commerce-share-product-issue",
       "commerce-share-open",
+      // Buyer Discovery + Digital Content Delivery mega-arc (Agent M) --
+      // P0-2 content-creation half: PROTECTED ("buyers only") content
+      // attach (a SEPARATE channel from the public image-attach one
+      // above, never a shared `classification` field), and the
+      // creator-only plain-language attached-media list the seller UI
+      // uses to show public-vs-protected before publish.
+      // Coordinator integration pass: baseline widened again 30 -> 32 as
+      // Agent D's two share channels and Agent M's two content channels are
+      // disjoint additions to the same reviewed set.
+      "commerce-product-content-attach",
+      "commerce-merchant-product-media-list",
     ];
     expect(channelMatches.length).toBe(EXPECTED_CHANNELS.length);
     for (const channel of EXPECTED_CHANNELS) {

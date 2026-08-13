@@ -81,8 +81,21 @@
       .commerce-sim-pill { display: inline-block; padding: 0 0.35rem; border-radius: 3px; font-size: 0.7rem; background: #3a341a; color: #fd7; margin-left: 0.4rem; }
       /* FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D). */
       #commerce-order-receipt-qr-image { width: 176px; height: 176px; display: block; margin-bottom: 0.5rem; border-radius: 4px; background: #fff; }
-      .commerce-product-image-attach { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+      .commerce-product-image-attach { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
       .commerce-product-image-attach .error { margin: 0; }
+      .commerce-product-image-attach-label { flex-basis: 100%; font-size: 0.78rem; color: #9bd; }
+      /* Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- P0-2 content-creation half. */
+      .commerce-product-content-attach { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
+      .commerce-product-content-attach .error { margin: 0; }
+      .commerce-product-content-attach-label { flex-basis: 100%; font-size: 0.78rem; color: #fd7; }
+      .commerce-product-content-attach input[type="text"] { flex: 1 1 14rem; min-width: 0; }
+      .commerce-product-media-summary { margin-top: 0.4rem; font-size: 0.78rem; }
+      .commerce-product-media-summary-empty { color: #789; }
+      .commerce-product-media-summary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+      .commerce-product-media-summary-label { color: #cde; }
+      .commerce-media-badge-public, .commerce-media-badge-protected { display: inline-block; padding: 0 0.4rem; border-radius: 3px; font-size: 0.7rem; font-weight: 600; }
+      .commerce-media-badge-public { background: #1f4d2e; color: #cfe; }
+      .commerce-media-badge-protected { background: #4d3a1a; color: #fd7; }
       .commerce-order-status { font-weight: 600; }
       .commerce-order-status-paid, .commerce-order-status-completed, .commerce-order-status-delivered { color: #7fd; }
       .commerce-order-status-rejected, .commerce-order-status-cancelled { color: #f97; }

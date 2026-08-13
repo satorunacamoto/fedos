@@ -433,6 +433,34 @@ interface FedosCommerceProductImageAttachResult {
 }
 
 /**
+ * Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- the
+ * PROTECTED ("buyers only") counterpart to
+ * `FedosCommerceProductImageAttachResult` above. Never carries a
+ * storageRef/checksum/CID -- only what a plain-language seller UI needs.
+ */
+interface FedosCommerceProductContentAttachResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly media?: { readonly id: string; readonly productId: string; readonly contentType: string; readonly label: string };
+}
+
+/** Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- one attached-media row, plain-language `classification` included, for the seller's own create/edit-product UI. */
+interface FedosCommerceProductMediaListItem {
+  readonly id: string;
+  readonly role: string;
+  readonly classification: "public" | "protected";
+  readonly contentType: string;
+  readonly label: string;
+}
+
+/** Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- creator-only, read-only listing of a product's attached media. */
+interface FedosCommerceMerchantProductMediaListResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly media?: readonly FedosCommerceProductMediaListItem[];
+}
+
+/**
  * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
  * (Agent D) -- arc §35-37 / friction-ledger row #15. Deliberately carries
  * ONLY opaque `contentBase64`/`contentType` on success, or a
@@ -564,6 +592,16 @@ interface FedosAppBridge {
   readonly commerceNetworkProfileSet: (profile: FedosCommerceNetworkProfile) => Promise<FedosCommerceNetworkProfileResult>;
   /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §38 / friction-ledger row #17: attach a real, public product image. */
   readonly commerceProductImageAttach: (actorPubkey: string, productId: string, imageBase64: string, contentType: string, altText?: string) => Promise<FedosCommerceProductImageAttachResult>;
+  /**
+   * Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- P0-2
+   * content-creation half: attach real PROTECTED ("buyers only") content
+   * to a product -- a SEPARATE method/channel from `commerceProductImageAttach`
+   * above, never a shared `classification` field (see
+   * `handleCommerceProductContentAttach()`'s own header, main process).
+   */
+  readonly commerceProductContentAttach: (actorPubkey: string, productId: string, contentBase64: string, contentType: string, label: string) => Promise<FedosCommerceProductContentAttachResult>;
+  /** Buyer Discovery + Digital Content Delivery mega-arc (Agent M) -- creator-only, plain-language listing of a product's attached media (public + protected), for the seller's own create/edit-product UI. */
+  readonly commerceMerchantProductMediaList: (actorPubkey: string, productId: string) => Promise<FedosCommerceMerchantProductMediaListResult>;
   /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §35-37 / friction-ledger row #15: redeem a grant-gated purchased digital content item. */
   readonly commerceMediaGrantRedeem: (orderId: string, actorPubkey: string) => Promise<FedosCommerceMediaGrantRedeemResult>;
   /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §32/§36 / friction-ledger row #14: real activity/badge counts for both buyer and seller roles. */
