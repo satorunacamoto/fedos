@@ -245,9 +245,26 @@ describe("IpfsMediaStore.putProtected / putPublic -- encrypt-first enforcement",
     const transport = new InMemoryIpfsTransport();
     const store = newStore(transport); // default encryption = WasmProductMediaEncryption(), default (empty, un-booted) authority
     const result = await store.putProtected(PNG_BYTES, "image/png");
-    expect(result.outcome).toBe("failed");
+    // Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+    // validation-gate fix): this used to assert the bare `"failed"` that
+    // `putProtected()` shared with `put()`'s own storage/network failures.
+    // The refusal itself is UNCHANGED (nothing stored, no plaintext ever
+    // reaches the transport -- still asserted below); only the outcome NAME
+    // is now specific enough for a caller to tell an encryption outage from
+    // a storage outage. See `IpfsMediaStoreProtectedPutResult`.
+    expect(result.outcome).toBe("encryption-unavailable");
     // Prove the plaintext bytes were never handed to the transport under their own plaintext CID.
     expect(transport.cat(`fake-cid:${computeCommerceMediaContentHash(PNG_BYTES)}`)).toBeNull();
+  });
+
+  it('17b. REGRESSION GUARD for the same fix: an encryption failure and a STORAGE failure are no longer the same outcome string -- a caller can distinguish "nothing was encrypted" from "nothing was stored" without guessing. (The live bug this guards: a real seller saw "protected content storage failed: failed" for a pure encryption outage, with no way for anyone to tell which half had failed.)', async () => {
+    const encryptionFailure = await newStore(new InMemoryIpfsTransport(), 1_000_000, new FakeAlwaysFailsEncryption()).putProtected(PNG_BYTES, "image/png");
+    // A transport that cannot store anything, with encryption that WORKS.
+    const offlineTransport = new InMemoryIpfsTransport({ simulateOffline: true });
+    const storageFailure = await newStore(offlineTransport, 1_000_000, new FakeAlwaysSucceedsEncryption()).putProtected(PNG_BYTES, "image/png");
+    expect(encryptionFailure.outcome).toBe("encryption-unavailable");
+    expect(storageFailure.outcome).toBe("failed");
+    expect(encryptionFailure.outcome).not.toBe(storageFailure.outcome);
   });
 
 
@@ -255,7 +272,9 @@ describe("IpfsMediaStore.putProtected / putPublic -- encrypt-first enforcement",
     const transport = new InMemoryIpfsTransport();
     const store = newStore(transport, 1_000_000, new FakeAlwaysFailsEncryption());
     const result = await store.putProtected(PNG_BYTES, "image/png");
-    expect(result.outcome).toBe("failed");
+    // See test 17's own note on why this outcome name changed; the refusal
+    // and the "never a plaintext fallback" guarantee are unchanged.
+    expect(result.outcome).toBe("encryption-unavailable");
     expect(transport.cat(`fake-cid:${computeCommerceMediaContentHash(PNG_BYTES)}`)).toBeNull();
   });
 

@@ -337,3 +337,96 @@ bytes) and a decision about which process owns completion authority, which is
 protocol design, not wiring — the closest existing scaffold remains the
 drafted-but-unwired `MediaManifestReferenceEventDraft` this doc's Blocker 1
 section already names.
+
+## Addendum 3 (Coordinator validation gate, live bug fix) — the encrypt/decrypt row above was true only in tests, never in a real launch
+
+This doc's own "What genuinely already exists" table calls protected-media
+encrypt/decrypt **"Real. Genuine Rust/WASM ChaCha20Poly1305 … round-trip
+tested … wired as the store's constructor defaults."** Every clause of that
+is literally true of the code and of the test suite, and the conclusion a
+reader draws from it — "so a real seller can encrypt a real file" — was
+nevertheless **false in every real launch of the app**, from the day
+`WasmProductMediaEncryption` was written until this fix.
+
+**Reproduced live, three times, 100% of attempts** (fresh profile, real
+packaged and dev Electron, real unlocked Master Seed, real 1 KB `%PDF-1.4`
+file, both draft and published products): the seller-facing
+"Attach Purchased File" control answered `protected content storage failed:
+failed`, with zero console output, zero main-process output, and an empty
+`<userdata>/profile/logs/`.
+
+**Root cause** (captured, not inferred — from instrumentation inside the
+running app): `WasmProductMediaEncryption`'s DEFAULT dependencies were
+`encrypt()`/`exportCiphertext()` from
+`src/os/core/vault/wasm/fedos_runtime_encrypt.ts` /
+`fedos_runtime_export_ciphertext.ts`. Those are **development-runtime
+scaffolding**: each constructs its own fresh `FedosWasmLoader` per call and
+reaches Rust only through `attemptDevOnly*` methods gated on
+`NODE_ENV === "development"`. In the real app the gate reported
+
+```
+{ artifactsExist: false, developmentAllowed: false, reason: "UnknownRuntime",
+  ready: false, importSucceeded: false, module: false, wasmInit: false }
+-> attemptDevOnlyEncryptCall() = { attempted: false, succeeded: false,
+                                   reason: "NotInitialized" }
+```
+
+so `encrypt_aead()` was **never called at all**. Everything on either side of
+it was healthy: the real `FedosProductionMasterSeedAuthority` was present and
+resolved a genuine `AeadKeyHandle` from `resolveCommerceMediaKey()`, and the
+store's own `put()` succeeded on the same bytes via `putPublic()` — i.e.
+Blocker 4's fix is genuinely good and was NOT the cause.
+
+**This is a pre-existing defect of the underlying machinery, not of the
+attach handler.** `fedos_production_conversation_encryption_runtime_boundary.ts`'s
+own header had already documented this exact trap and already solved it for
+Conversations (reach `FedosProductionMasterSeedAuthority`'s own
+`encryptAead()`/`serializeAeadCiphertext()` — the same Rust exports, on the
+same module instance that minted the key handle). Commerce media never got
+that treatment, and nothing exercised it, because until this arc wired the
+first real IPC caller there was no production caller at all. Every existing
+test passed throughout: they all inject a fake `ProductMediaEncryptionPort`
+or a fake `deps`, so the adapter's real default resolution was never crossed.
+
+**Fixed** by making both Commerce media adapters prefer the injected
+authority's own production AEAD bridge when it structurally offers one, and
+fall back to the dev-only exports otherwise (structural duck-typing only —
+`src/os/commerce/` still imports nothing from `src/os/messenger/**`). The
+decrypt side was fixed identically; left alone it would have failed the
+buyer's redeem for exactly the same reason.
+
+**Two diagnosability defects fixed alongside it**, both of which are why this
+took a live repro to find at all:
+
+- `IpfsMediaStore.putProtected()` returned the bare `MediaStorePutResult`
+  `{ outcome: "failed" }` for an encryption failure — the same value `put()`
+  returns for a refused network profile or a transport failure. Its return
+  type is now widened (never narrowed) with a protected-put-only
+  `"encryption-unavailable"`; `MediaStorePort` itself is unchanged.
+  `handleCommerceProductContentAttach()` maps each outcome to its own
+  actionable seller sentence instead of one unactionable string.
+- `<userdata>/profile/logs/` has been declared (`logsDirectory`) and created
+  on every first run since Alpha 4661-4740, and — verified by direct search —
+  **nothing in this repository had ever written a byte to it.** A narrow,
+  append-only, non-secret NDJSON failure sink
+  (`logs/commerce-diagnostics.ndjson`, mirrored to `console.error`) now
+  records this failure class with its real outcome, product id, content type,
+  size and unlock state.
+
+**Also fixed, found while proving the above:** the seller's own
+"what's attached" summary never rendered for ANY product, ever —
+`refreshCommerceMerchantProductMediaSummary()` resolved its container by
+`document.getElementById()` synchronously, before its first `await`, while
+the row was still detached from the document, so the lookup always returned
+`null`. And Windows' Chromium reports a `.zip` file's `File.type` as
+`application/x-zip-compressed` (from `HKCR\.zip\Content Type`), which the
+allowlist rejected; a tiny closed alias map now canonicalizes that (and
+`application/x-zip`, `application/x-pdf`) to the already-allowed value, so no
+new format is admitted and no second spelling ever reaches storage.
+
+Live regression coverage:
+`packages/fedos-desktop-electron-spike/test/commerce_protected_content_attach_real_electron.test.ts`
+— a real Electron launch, real WASM, real unlocked profile, driving the real
+DOM file picker via the `ui-script` harness's new `attachFile` action (the
+one thing that harness could not previously do, and therefore the reason this
+whole class of failure had no automated coverage).

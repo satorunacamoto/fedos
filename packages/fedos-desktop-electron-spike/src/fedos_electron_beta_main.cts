@@ -276,6 +276,75 @@ const MAX_PRODUCT_CONTENT_TYPE_CHARS = 64;
  */
 const COMMERCE_PROTECTED_CONTENT_TYPES: ReadonlySet<string> = new Set(["application/pdf", "application/zip"]);
 /**
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+ * validation-gate fix) -- REPRODUCED LIVE by this arc's own usability
+ * tester: choosing an ordinary `.zip` file on Windows was rejected with
+ * "contentType must be one of: application/pdf, application/zip", because
+ * Chromium on Windows reports a `.zip` file's `File.type` from the
+ * REGISTRY (`HKCR\.zip\Content Type`), where the long-standing Windows
+ * value is `application/x-zip-compressed`, not the IANA-registered
+ * `application/zip`. That is a platform naming quirk, not a different
+ * format and not a different security posture -- both spellings name the
+ * exact same, already-allowlisted, non-scriptable ZIP container this
+ * handler has always intended to accept.
+ *
+ * These are ALIASES ONLY, never additional accepted types: each maps to
+ * one of the two canonical values above, and `canonicalCommerceProtectedContentType()`
+ * below returns the CANONICAL spelling, so nothing downstream (the stored
+ * `ProductMedia.contentType`, `COMMERCE_MEDIA_SUPPORTED_CONTENT_TYPES`,
+ * the buyer-side redeem path, any future viewer) ever sees a second
+ * spelling of the same type. Deliberately a tiny, closed map -- never a
+ * prefix/wildcard match, never "anything containing zip".
+ */
+const COMMERCE_PROTECTED_CONTENT_TYPE_ALIASES: ReadonlyMap<string, string> = new Map([
+  // Windows registry / Chromium-on-Windows spelling for `.zip`.
+  ["application/x-zip-compressed", "application/zip"],
+  // Older, still-seen alternates for the same two containers.
+  ["application/x-zip", "application/zip"],
+  ["application/x-pdf", "application/pdf"],
+]);
+
+/**
+ * Returns the CANONICAL protected content type for `candidate` (itself if
+ * already canonical, its canonical form if a known alias), or `null` if it
+ * is neither -- see `COMMERCE_PROTECTED_CONTENT_TYPE_ALIASES` above. The
+ * comparison is lower-cased and strips any `; charset=...` parameter,
+ * since a browser is free to report either; the allowlist itself is
+ * unchanged and is still the only thing that can admit a type.
+ */
+function canonicalCommerceProtectedContentType(candidate: string): string | null {
+  const normalized = candidate.split(";")[0]!.trim().toLowerCase();
+  if (COMMERCE_PROTECTED_CONTENT_TYPES.has(normalized)) return normalized;
+  return COMMERCE_PROTECTED_CONTENT_TYPE_ALIASES.get(normalized) ?? null;
+}
+
+/**
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+ * validation-gate fix) -- one distinct, actionable, SELLER-LANGUAGE
+ * sentence per closed-vocabulary `putProtected()` outcome
+ * (`CommerceMediaStoreProtectedPutResultLike`), replacing the single
+ * unactionable `"protected content storage failed: failed"` every failure
+ * used to collapse into. Never leaks an internal term (no "ciphertext",
+ * no "CID", no "classification") -- same discipline
+ * `handleCommerceProductContentAttach()`'s own header already states for
+ * its request/response shape. The raw outcome is still recorded verbatim
+ * to `<dataDir()>/logs/` for support/debugging (`recordDiagnosticEvent()`).
+ */
+function commerceProtectedContentAttachFailureReason(outcome: string): string {
+  switch (outcome) {
+    case "encryption-unavailable":
+      return "This file could not be encrypted, so nothing was saved. Your profile must be unlocked to attach a purchased file — lock and unlock it, then try again.";
+    case "oversized":
+      return "That file is too large to attach as a purchased file.";
+    case "unsupported-content-type":
+      return "Only PDF and ZIP files can be attached as a purchased file.";
+    case "conflict":
+      return "A different file is already stored under the same content, so this one was not saved. Try attaching it under a different name.";
+    default:
+      return "This file could not be saved. Nothing was attached, and you can safely try again.";
+  }
+}
+/**
  * Untrusted, seller-supplied display label for a protected content
  * attachment (e.g. "Chapter 1 sample", "Full source ZIP") — NEVER
  * interpreted as a filesystem path or URL anywhere downstream (the real
@@ -346,6 +415,55 @@ function navigationLogPath(): string {
  */
 function commerceDurableFilePath(name: string): string {
   return path.join(dataDir(), "commerce", `${name}.ndjson`);
+}
+
+/**
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+ * validation-gate fix) -- `<dataDir()>/logs/`, the "local application log
+ * directory (non-secret diagnostics only)" that
+ * `src/os/messenger/desktop/onboarding/fedos_local_profile_paths.ts` has
+ * declared (as `logsDirectory`) and `ensureFedosLocalProfileDirectories()`
+ * has genuinely CREATED on every first run since Alpha 4661-4740 -- and
+ * that, verified by direct search, NOTHING in this repository has ever
+ * written a single byte to. That emptiness is why a 100%-reproducible
+ * core-feature failure (protected content attach) left a real user and a
+ * real support person with zero diagnostic trail: no console output
+ * reaches a double-clicked packaged app, and this directory was empty.
+ *
+ * This is deliberately NOT a general-purpose logger (inventing one is its
+ * own scoped design decision, not a bug fix): it is one narrow,
+ * append-only NDJSON sink for FAILURE records from paths that would
+ * otherwise be silent, sharing the SAME `FEDOS_ELECTRON_BETA_DATA_DIR`
+ * override and the same append-only NDJSON shape as every other durable
+ * file this process owns.
+ */
+function diagnosticsLogFilePath(): string {
+  return path.join(dataDir(), "logs", "commerce-diagnostics.ndjson");
+}
+
+/**
+ * Appends ONE non-secret diagnostic record to `diagnosticsLogFilePath()`
+ * and mirrors it to `console.error` (this file's own established
+ * `catch (err) { console.error("fedos-beta: ...", err); }` convention --
+ * the disk record is ADDITIVE, never a replacement, since a dev launch
+ * reads the console and a packaged launch cannot).
+ *
+ * NON-SECRET BY CONSTRUCTION: `details` is written verbatim, so every
+ * call site below passes only closed-vocabulary outcome strings, sizes,
+ * content types and ids -- never file bytes, never a passphrase, never a
+ * key/handle, never a seller's own file content. Best-effort: a
+ * filesystem failure here is swallowed (a diagnostic sink must never turn
+ * a recoverable failure into a crash), and the console mirror still ran.
+ */
+function recordDiagnosticEvent(event: string, details: Record<string, unknown>): void {
+  const record = { at: new Date().toISOString(), event, ...details };
+  console.error(`fedos-beta: ${event}`, JSON.stringify(details));
+  try {
+    fs.mkdirSync(path.dirname(diagnosticsLogFilePath()), { recursive: true });
+    fs.appendFileSync(diagnosticsLogFilePath(), `${JSON.stringify(record)}\n`);
+  } catch (err) {
+    console.error("fedos-beta: diagnostics log write failed (non-fatal)", err instanceof Error ? err.message : String(err));
+  }
 }
 
 const rootDistDir = path.join(__dirname, "..", "..", "..", "dist");
@@ -1730,10 +1848,24 @@ interface CommerceMediaObjectMetadataLike {
 type CommerceMediaStorePutResultLike =
   | { readonly outcome: "stored" | "already-present"; readonly metadata: CommerceMediaObjectMetadataLike }
   | { readonly outcome: "conflict" | "oversized" | "unsupported-content-type" | "failed" };
+/**
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+ * validation-gate fix) -- the structural mirror of `IpfsMediaStore`'s own
+ * new `IpfsMediaStoreProtectedPutResult` (`src/os/commerce/catalog/ipfs_media_store.ts`):
+ * every `MediaStorePutResult` outcome PLUS the protected-put-only
+ * `"encryption-unavailable"`, which names "nothing was stored because the
+ * content could not be encrypted" -- previously indistinguishable from a
+ * storage failure, and the exact reason a live, 100%-reproducible
+ * encryption outage surfaced to a seller as an unactionable
+ * "protected content storage failed: failed".
+ */
+type CommerceMediaStoreProtectedPutResultLike =
+  | CommerceMediaStorePutResultLike
+  | { readonly outcome: "encryption-unavailable" };
 interface CommerceMediaStoreLike {
   put(request: { readonly bytes: Uint8Array; readonly contentType: string }): CommerceMediaStorePutResultLike;
   putPublic(plaintext: Uint8Array, contentType: string): CommerceMediaStorePutResultLike;
-  putProtected(plaintext: Uint8Array, contentType: string): Promise<CommerceMediaStorePutResultLike>;
+  putProtected(plaintext: Uint8Array, contentType: string): Promise<CommerceMediaStoreProtectedPutResultLike>;
   get(key: string): { readonly metadata: CommerceMediaObjectMetadataLike; readonly bytes: Uint8Array } | null;
   getProtected(key: string): Promise<Uint8Array | null>;
   readonly [key: string]: unknown;
@@ -5656,6 +5788,13 @@ async function handleCommerceProductImageAttach(payload: unknown) {
  *     own pre-existing "purchased deliverable" MIME precedent,
  *     `sample_products.ts`), never `text/html`/`image/svg+xml`/anything
  *     that could be interpreted as active content by any future viewer.
+ *     Resolved through `canonicalCommerceProtectedContentType()`, which
+ *     additionally accepts a tiny closed set of platform ALIASES for those
+ *     same two types (notably Windows' own `application/x-zip-compressed`
+ *     spelling of `.zip`) and always returns the CANONICAL value that is
+ *     then used for storage and for the `ProductMedia` record — see that
+ *     function's own doc comment. The allowlist itself is unchanged; no
+ *     new format is admitted.
  *   - `contentBase64` is bounded BEFORE decode
  *     (`MAX_PRODUCT_CONTENT_BASE64_CHARS`) and `IpfsMediaStore.put()`
  *     itself re-bounds the DECODED ciphertext against
@@ -5697,8 +5836,12 @@ async function handleCommerceProductContentAttach(payload: unknown) {
     return { outcome: "invalid-input", reason: "malformed actorPubkey" };
   }
   if (!isBoundedString(body.productId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed productId" };
-  if (!isBoundedString(body.contentType, MAX_PRODUCT_CONTENT_TYPE_CHARS) || !COMMERCE_PROTECTED_CONTENT_TYPES.has(body.contentType)) {
-    return { outcome: "invalid-input", reason: `contentType must be one of: ${[...COMMERCE_PROTECTED_CONTENT_TYPES].join(", ")}` };
+  if (!isBoundedString(body.contentType, MAX_PRODUCT_CONTENT_TYPE_CHARS)) {
+    return { outcome: "invalid-input", reason: "malformed contentType" };
+  }
+  const contentType = canonicalCommerceProtectedContentType(body.contentType);
+  if (contentType === null) {
+    return { outcome: "invalid-input", reason: "Only PDF and ZIP files can be attached as a purchased file." };
   }
   if (!isBoundedString(body.contentBase64, MAX_PRODUCT_CONTENT_BASE64_CHARS) || body.contentBase64.length === 0) {
     return { outcome: "invalid-input", reason: "malformed or missing content data" };
@@ -5719,15 +5862,30 @@ async function handleCommerceProductContentAttach(payload: unknown) {
   }
   if (bytes.length === 0) return { outcome: "invalid-input", reason: "content data decoded to zero bytes" };
 
-  const putResult = await commerceMediaStoreFor().putProtected(bytes, body.contentType);
+  const putResult = await commerceMediaStoreFor().putProtected(bytes, contentType);
   if (putResult.outcome !== "stored" && putResult.outcome !== "already-present") {
-    return { outcome: "rejected", reason: `protected content storage failed: ${putResult.outcome}` };
+    // BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+    // validation-gate fix) -- this branch used to emit exactly one string,
+    // "protected content storage failed: failed", for every one of these
+    // structurally different causes, log nothing anywhere, and leave the
+    // seller with no next action. Both halves are fixed: a distinct,
+    // actionable sentence per closed-vocabulary outcome, and a real
+    // durable diagnostic record (`<dataDir()>/logs/`) plus the console
+    // mirror this file already uses everywhere else.
+    recordDiagnosticEvent("commerce-protected-content-attach-failed", {
+      outcome: putResult.outcome,
+      productId: body.productId,
+      contentType,
+      plaintextBytes: bytes.length,
+      profileUnlocked: activeMasterSeedAuthority !== null,
+    });
+    return { outcome: "rejected", reason: commerceProtectedContentAttachFailureReason(putResult.outcome) };
   }
 
   const addResult = commerceProductMediaState().add(body.actorPubkey, product, {
     role: "sample",
     classification: "protected",
-    contentType: body.contentType,
+    contentType,
     sizeBytes: putResult.metadata.sizeBytes,
     checksum: putResult.metadata.checksum,
     checksumSubject: "ciphertext",
@@ -7680,7 +7838,7 @@ app.whenReady().then(async () => {
       }
       try {
         const scriptRaw = process.env.FEDOS_BETA_UI_SCRIPT ?? "[]";
-        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait" | "copy" | "screenshot"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number; readonly targetSelector?: string }> = JSON.parse(scriptRaw);
+        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait" | "copy" | "screenshot" | "attachFile"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number; readonly targetSelector?: string; readonly fileName?: string; readonly fileType?: string }> = JSON.parse(scriptRaw);
         for (let i = 0; i < script.length; i++) {
           const step = script[i]!;
           if (step.action === "wait") {
@@ -7695,6 +7853,29 @@ app.whenReady().then(async () => {
             const value = step.value ?? "";
             result = await window.webContents.executeJavaScript(
               `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event("input", { bubbles: true })); return { outcome: "ok" }; })()`,
+            );
+          } else if (step.action === "attachFile") {
+            // Buyer Discovery + Digital Content Delivery mega-arc
+            // (Coordinator validation-gate bug fix) -- the ONE thing this
+            // `ui-script` harness could not previously do, and therefore the
+            // reason a 100%-reproducible real-app failure in the protected
+            // "Attach Purchased File" control had ZERO automated coverage:
+            // populate a real `<input type="file">`. `fill` cannot do it
+            // (assigning `.value` on a file input throws in every browser),
+            // so this action builds a REAL `File` object from the caller's
+            // base64 bytes and installs it via the page's own real
+            // `DataTransfer`/`FileList` API -- exactly what a real OS file
+            // picker hands the page. Everything downstream (the renderer's
+            // own `FileReader` read, `file.type`, the real preload bridge,
+            // the real IPC channel, the real main-process handler) is then
+            // byte-for-byte the same path a human user drives; nothing here
+            // reaches around the renderer. Test-only, same `AUTOTEST_MODE`
+            // gate as every other action in this loop.
+            const fileBase64 = step.value ?? "";
+            const fileName = step.fileName ?? "attachment.bin";
+            const fileType = step.fileType ?? "application/octet-stream";
+            result = await window.webContents.executeJavaScript(
+              `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; const bin = atob(${JSON.stringify(fileBase64)}); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); const file = new File([bytes], ${JSON.stringify(fileName)}, { type: ${JSON.stringify(fileType)} }); const dt = new DataTransfer(); dt.items.add(file); el.files = dt.files; el.dispatchEvent(new Event("change", { bubbles: true })); return { outcome: "ok", value: String(el.files.length) + ":" + String(el.files[0] ? el.files[0].size : 0) + ":" + String(el.files[0] ? el.files[0].type : "") }; })()`,
             );
           } else if (step.action === "click") {
             result = await window.webContents.executeJavaScript(

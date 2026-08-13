@@ -65,14 +65,59 @@
  * (`{ encrypt, exportCiphertext }`), mirroring this codebase's own
  * established "accept an optional dependency purely for testability"
  * convention (e.g. `attemptDevOnlyRuntimeEncrypt()`'s own optional
- * `loader` parameter, `fedos_runtime_encrypt.ts`). Every REAL call site
- * omits it and gets the real `encrypt`/`exportCiphertext` Runtime Service
- * exports, which each construct their own fresh, real `FedosWasmLoader`
- * internally — this file never reaches around them. A test may inject
- * fakes for both to exercise this file's OWN wiring/fail-closed logic
- * without any real WASM artifact present (this worktree currently has no
- * built `packages/fedos-core-rust/pkg/` — see this arc's test file for
- * the exact check).
+ * `loader` parameter, `fedos_runtime_encrypt.ts`). An explicitly-injected
+ * `deps` ALWAYS wins over every default below. A test may inject fakes
+ * for both to exercise this file's OWN wiring/fail-closed logic without
+ * any real WASM artifact present (see this arc's test file for the exact
+ * check).
+ *
+ * ============================================================
+ * PRODUCTION BRIDGE FIRST — THE DEV-ONLY RUNTIME SERVICE EXPORTS CANNOT
+ * WORK IN A REAL LAUNCH (Buyer Discovery + Digital Content Delivery
+ * mega-arc, Coordinator validation-gate fix).
+ * ============================================================
+ * REPRODUCED LIVE, not reasoned about: a real packaged/dev Electron
+ * launch with a real, unlocked `FedosProductionMasterSeedAuthority`
+ * reached this adapter, resolved a genuine `AeadKeyHandle` from
+ * `resolveCommerceMediaKey()` — and then `encrypt()` below returned
+ * `null` every single time, because `runtimeEncrypt`
+ * (`../../core/vault/wasm/fedos_runtime_encrypt.ts`) drives the DEV-ONLY
+ * `FedosWasmLoader` chain, whose own gate reported
+ * `{ artifactsExist: false, developmentAllowed: false, reason:
+ * "UnknownRuntime", ready: false, ... }` and therefore
+ * `attemptDevOnlyEncryptCall() -> { attempted: false, succeeded: false,
+ * reason: "NotInitialized" }`. `encrypt_aead()` was never called at all.
+ * That gate is CORRECT and is not being weakened here: those Runtime
+ * Service files are development-runtime scaffolding by construction (each
+ * builds its OWN fresh WASM module instance per call, behind
+ * `NODE_ENV=development`), so a production caller could never have
+ * succeeded through them — and, even with the gate open, the
+ * `AeadKeyHandle` resolved from the PRODUCTION authority's own module
+ * instance would still fail on a cross-instantiation opaque-handle
+ * mismatch.
+ *
+ * `fedos_production_conversation_encryption_runtime_boundary.ts`'s own
+ * header already documented this exact trap and already solved it for
+ * Conversations, by reaching `FedosProductionMasterSeedAuthority`'s own
+ * `encryptAead()`/`serializeAeadCiphertext()` accessors — the SAME
+ * already-real, already-tested `encrypt_aead`/`serialize_aead_ciphertext`
+ * Rust exports, on the SAME module instance that minted the key handle.
+ * Commerce media simply never got the same treatment, and until this arc
+ * wired a real IPC caller nothing ever exercised it to find out.
+ *
+ * The fix, below: when the INJECTED authority itself structurally offers
+ * that production AEAD bridge, this adapter uses it; otherwise it falls
+ * back to the dev-only Runtime Service exports exactly as before (which
+ * is what a development launch and every existing unit test rely on).
+ * The check is STRUCTURAL (`typeof ... === "function"`), never an
+ * `instanceof`/import of `src/os/messenger/**` — `src/os/commerce/` must
+ * not depend on the Messenger desktop tree
+ * (`test/architecture_boundary_commerce.test.ts`), and the same
+ * shape-only coupling is exactly what
+ * `FedosProductionConversationAeadHandleSource` already established. No
+ * new cryptography, no new Rust export, no new serialization; and still
+ * never a plaintext downgrade in any branch — every failure path returns
+ * `null`.
  */
 
 import type { FedosMasterSeedAuthority } from "../../core/vault/wasm/fedos_master_seed_authority.js";
@@ -105,6 +150,56 @@ const DEFAULT_DEPS: WasmProductMediaEncryptionDeps = {
   encrypt: runtimeEncrypt,
   exportCiphertext: runtimeExportCiphertext,
 };
+
+/**
+ * The narrow, STRUCTURAL shape of a production Master Seed Authority's own
+ * synchronous AEAD bridge — satisfied by `FedosProductionMasterSeedAuthority`
+ * (`src/os/messenger/desktop/production_activation/`) without this file
+ * importing it, exactly as `FedosProductionConversationAeadHandleSource`
+ * already does for Conversations. See this file's own header for why this
+ * is the only bridge that can actually work in a real launch.
+ */
+interface ProductionCommerceMediaEncryptSource {
+  encryptAead(
+    key: AeadKeyHandle,
+    algorithm: typeof COMMERCE_MEDIA_ALGORITHM,
+    aadDomain: typeof COMMERCE_MEDIA_AAD_DOMAIN,
+    plaintext: Uint8Array,
+  ): AeadCiphertextHandle | null;
+  serializeAeadCiphertext(ciphertext: AeadCiphertextHandle): AeadCiphertextWire | null;
+}
+
+/**
+ * Returns a `WasmProductMediaEncryptionDeps` backed by `authority`'s own
+ * production AEAD bridge if — and only if — it genuinely offers BOTH
+ * halves as callable functions; `null` otherwise (a dev/test authority,
+ * or any object that only partially matches). Both wrappers convert a
+ * thrown error to `null`, preserving this file's own "never throws"
+ * contract, and neither ever returns anything but a real ciphertext
+ * handle/wire or `null` — never plaintext.
+ */
+export function productionCommerceMediaEncryptionDepsFor(authority: unknown): WasmProductMediaEncryptionDeps | null {
+  const candidate = authority as Partial<ProductionCommerceMediaEncryptSource> | null | undefined;
+  if (candidate === null || candidate === undefined) return null;
+  const { encryptAead, serializeAeadCiphertext } = candidate;
+  if (typeof encryptAead !== "function" || typeof serializeAeadCiphertext !== "function") return null;
+  return {
+    encrypt: async (key, algorithm, aadDomain, plaintext) => {
+      try {
+        return encryptAead.call(candidate, key, algorithm, aadDomain, plaintext);
+      } catch {
+        return null;
+      }
+    },
+    exportCiphertext: async (ciphertext) => {
+      try {
+        return serializeAeadCiphertext.call(candidate, ciphertext);
+      } catch {
+        return null;
+      }
+    },
+  };
+}
 
 /**
  * The REAL `ProductMediaEncryptionPort` adapter — see this file's own
@@ -153,10 +248,14 @@ export class WasmProductMediaEncryption implements ProductMediaEncryptionPort {
 
   constructor(
     authority: FedosMasterSeedAuthority = new FedosWasmMasterSeedAuthority(),
-    deps: WasmProductMediaEncryptionDeps = DEFAULT_DEPS,
+    deps?: WasmProductMediaEncryptionDeps,
   ) {
     this.#authority = authority;
-    this.#deps = deps;
+    // Explicit injection always wins (testability, unchanged); otherwise
+    // prefer the injected authority's OWN production AEAD bridge, and only
+    // then fall back to the dev-only Runtime Service exports. See this
+    // file's own header, "PRODUCTION BRIDGE FIRST".
+    this.#deps = deps ?? productionCommerceMediaEncryptionDepsFor(authority) ?? DEFAULT_DEPS;
   }
 
   async encrypt(plaintext: Uint8Array): Promise<Uint8Array | null> {

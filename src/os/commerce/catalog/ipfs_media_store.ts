@@ -35,8 +35,11 @@
  * `this.put()` with plaintext bytes — there is no code path in
  * `putProtected()` between "received plaintext" and "call put()" that
  * skips the encryption step. If encryption is unavailable/fails, it
- * returns `{ outcome: "failed" }` (an existing `MediaStorePutResult`
- * outcome — no new outcome invented) and `put()` is never called at all.
+ * returns `{ outcome: "encryption-unavailable" }` (`IpfsMediaStoreProtectedPutResult`
+ * below — this method's OWN widened vocabulary, never `MediaStorePort`'s;
+ * see `putProtected()`'s own doc comment for why the original bare
+ * `"failed"` was a real diagnosability defect) and `put()` is never
+ * called at all.
  * `getProtected()` (Commerce FINAL Closure arc, Agent M) is the read-side
  * mirror: it ALWAYS runs the fetched bytes through the injected
  * `ProductMediaDecryptionPort` and never returns ciphertext mislabeled as
@@ -254,6 +257,19 @@ interface StoredEntryMetadata {
   readonly metadata: MediaObjectMetadata;
 }
 
+/**
+ * `IpfsMediaStore.putProtected()`'s own result vocabulary — every
+ * `MediaStorePutResult` outcome (unchanged, same meanings), PLUS the one
+ * outcome only a protected put can produce: the injected
+ * `ProductMediaEncryptionPort` did not yield ciphertext, so `put()` was
+ * never called and NOTHING was stored. See `putProtected()`'s own doc
+ * comment for why this distinction exists. Deliberately a closed
+ * vocabulary, mirroring this domain's own established outcome-union
+ * convention (`WrapMediaAccessGrantReleaseResult`,
+ * `IssueMediaAccessGrantsForOrderOutcome`) — never a free-text reason.
+ */
+export type IpfsMediaStoreProtectedPutResult = MediaStorePutResult | { readonly outcome: "encryption-unavailable" };
+
 export class IpfsMediaStore implements MediaStorePort {
   readonly #transport: IpfsTransport;
   readonly #maxPayloadByteLength: number;
@@ -422,14 +438,30 @@ export class IpfsMediaStore implements MediaStorePort {
    * ENFORCEMENT MECHANISM for protected media — see this file's own
    * header. Always runs `plaintext` through the injected
    * `ProductMediaEncryptionPort` FIRST; only a genuine ciphertext result
-   * ever reaches `put()`. Returns `{ outcome: "failed" }` (never throws,
-   * never falls back to storing plaintext) if encryption is unavailable
-   * or fails for any reason.
+   * ever reaches `put()`. Never throws, and never falls back to storing
+   * plaintext under any outcome.
+   *
+   * DISTINGUISHABLE FAILURE (Buyer Discovery + Digital Content Delivery
+   * mega-arc, Coordinator validation-gate fix) — this used to return the
+   * bare `MediaStorePutResult` `{ outcome: "failed" }` for an encryption
+   * failure, which is the SAME value `put()` itself returns for a refused
+   * network profile or a transport `add()` failure. The one real caller
+   * (`handleCommerceProductContentAttach()`, `fedos_electron_beta_main.cts`)
+   * therefore surfaced `"protected content storage failed: failed"` for
+   * three structurally different causes, and a live 100%-reproducible
+   * encryption outage was indistinguishable from a storage outage from
+   * anywhere outside this method. The return type is now WIDENED (never
+   * narrowed) with one additional, protected-media-specific outcome, so
+   * every pre-existing `MediaStorePutResult` outcome still means exactly
+   * what it meant. `MediaStorePort`/`MediaStorePutResult` themselves are
+   * UNCHANGED — `putProtected()` is an additive method on this class, not
+   * part of that interface (this file's own header), so this widening
+   * cannot reach `put()`'s own callers or `LocalMediaStore`.
    */
-  async putProtected(plaintext: Uint8Array, contentType: string): Promise<MediaStorePutResult> {
+  async putProtected(plaintext: Uint8Array, contentType: string): Promise<IpfsMediaStoreProtectedPutResult> {
     const encrypted = await encryptThenContentAddressProtectedMedia(plaintext, this.#encryption);
     if (encrypted.outcome !== "ok") {
-      return { outcome: "failed" };
+      return { outcome: "encryption-unavailable" };
     }
     return this.put({ bytes: encrypted.ciphertext, contentType });
   }

@@ -94,7 +94,17 @@ describe("Protected content attach -- IPC wiring is real and separate from the p
     const start = source.indexOf("async function handleCommerceProductContentAttach");
     const end = source.indexOf("async function handleCommerceProductUpdate");
     const body = source.slice(start, end);
-    expect(body).toMatch(/commerceMediaStoreFor\(\)\.putProtected\(bytes, body\.contentType\)/);
+    // Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+    // validation-gate fix): the stored type is now the CANONICALIZED
+    // `contentType` local (`canonicalCommerceProtectedContentType()`), not the
+    // raw `body.contentType` a browser reported -- so Windows' own
+    // `application/x-zip-compressed` spelling of an ordinary `.zip` is
+    // accepted without a second spelling ever reaching storage. The
+    // enforcement property this test exists to protect is unchanged and
+    // still asserted: the bytes go through `putProtected()`, never `put()`
+    // or `putPublic()`.
+    expect(body).toMatch(/commerceMediaStoreFor\(\)\.putProtected\(bytes, contentType\)/);
+    expect(body).toMatch(/const contentType = canonicalCommerceProtectedContentType\(body\.contentType\)/);
     expect(body).not.toMatch(/\.putPublic\(/);
     // put() is never called directly on bytes in this handler -- only putProtected(), which itself calls put() internally after encryption (ipfs_media_store.ts).
     expect(body).not.toMatch(/commerceMediaStoreFor\(\)\.put\(/);

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 
 import {
   WasmProductMediaEncryption,
+  productionCommerceMediaEncryptionDepsFor,
   type WasmProductMediaEncryptionDeps,
 } from "../src/os/commerce/catalog/wasm_product_media_encryption.js";
 import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_master_seed_authority.js";
@@ -230,4 +231,82 @@ describe("WasmProductMediaEncryption", () => {
       }
     },
   );
+});
+
+/**
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+ * validation-gate fix) — regression coverage for the LIVE, 100%-reproducible
+ * bug this suite could never have caught before: every test above injects a
+ * fake `deps`, so the adapter's REAL default dependency resolution was
+ * completely unexercised. In the real app that default resolved to the
+ * DEV-ONLY `FedosWasmLoader` chain (`fedos_runtime_encrypt.ts`), whose gate
+ * is unconditionally closed outside `NODE_ENV=development` — so a real,
+ * unlocked production authority produced a genuine `AeadKeyHandle` and then
+ * `encrypt()` returned `null` every single time, surfacing to a seller as
+ * "protected content storage failed: failed".
+ *
+ * These tests assert the DEFAULT-RESOLUTION behavior directly, with no
+ * injected `deps` — the exact thing the real composition root relies on.
+ */
+describe("WasmProductMediaEncryption -- production AEAD bridge preference (validation-gate fix)", () => {
+  /** The structural shape a real `FedosProductionMasterSeedAuthority` satisfies -- see the adapter's own header for why this is duck-typed, never imported. */
+  function productionLikeAuthority(overrides: Record<string, unknown> = {}): FedosMasterSeedAuthority {
+    return {
+      ...fakeAuthority({ resolveCommerceMediaKey: vi.fn(async () => FAKE_KEY) }),
+      encryptAead: vi.fn(() => FAKE_CIPHERTEXT_HANDLE),
+      serializeAeadCiphertext: vi.fn(() => FAKE_WIRE),
+      ...overrides,
+    } as unknown as FedosMasterSeedAuthority;
+  }
+
+  it("P1. with NO injected deps, an authority that offers the production AEAD bridge is used for BOTH halves -- the dev-only Runtime Service exports are never reached", async () => {
+    const authority = productionLikeAuthority();
+    const adapter = new WasmProductMediaEncryption(authority); // no deps -- the real composition-root call shape
+    const result = await adapter.encrypt(PLAINTEXT);
+
+    expect(result).not.toBeNull();
+    expect(new TextDecoder().decode(result as Uint8Array)).toBe(FAKE_WIRE);
+    expect((authority as unknown as { encryptAead: ReturnType<typeof vi.fn> }).encryptAead).toHaveBeenCalledTimes(1);
+    expect((authority as unknown as { serializeAeadCiphertext: ReturnType<typeof vi.fn> }).serializeAeadCiphertext).toHaveBeenCalledTimes(1);
+  });
+
+  it("P2. the production bridge receives the SAME opaque key handle resolveCommerceMediaKey() returned, plus the fixed CommerceMedia/ChaCha20Poly1305 pair -- never a re-derived key, never a different domain", async () => {
+    const authority = productionLikeAuthority();
+    await new WasmProductMediaEncryption(authority).encrypt(PLAINTEXT);
+    const encryptAead = (authority as unknown as { encryptAead: ReturnType<typeof vi.fn> }).encryptAead;
+    expect(encryptAead).toHaveBeenCalledWith(FAKE_KEY, "ChaCha20Poly1305", "CommerceMedia", PLAINTEXT);
+  });
+
+  it("P3. an explicitly-injected deps object still wins over the production bridge (testability seam unchanged)", async () => {
+    const authority = productionLikeAuthority();
+    const deps = fakeDeps();
+    await new WasmProductMediaEncryption(authority, deps).encrypt(PLAINTEXT);
+    expect(deps.encrypt).toHaveBeenCalledTimes(1);
+    expect((authority as unknown as { encryptAead: ReturnType<typeof vi.fn> }).encryptAead).not.toHaveBeenCalled();
+  });
+
+  it("P4. productionCommerceMediaEncryptionDepsFor() is all-or-nothing: a HALF-matching object (or null/undefined/a plain authority) yields null, so the adapter falls back rather than half-using a bridge", () => {
+    expect(productionCommerceMediaEncryptionDepsFor(null)).toBeNull();
+    expect(productionCommerceMediaEncryptionDepsFor(undefined)).toBeNull();
+    expect(productionCommerceMediaEncryptionDepsFor(fakeAuthority())).toBeNull();
+    expect(productionCommerceMediaEncryptionDepsFor({ encryptAead: () => null })).toBeNull();
+    expect(productionCommerceMediaEncryptionDepsFor({ serializeAeadCiphertext: () => null })).toBeNull();
+    expect(productionCommerceMediaEncryptionDepsFor({ encryptAead: () => null, serializeAeadCiphertext: () => null })).not.toBeNull();
+  });
+
+  it("P5. a THROWING production bridge still fails closed to null -- never a throw, never a plaintext fallback", async () => {
+    const throwing = productionLikeAuthority({
+      encryptAead: vi.fn(() => {
+        throw new Error("wasm boundary blew up");
+      }),
+    });
+    await expect(new WasmProductMediaEncryption(throwing).encrypt(PLAINTEXT)).resolves.toBeNull();
+
+    const throwingSerialize = productionLikeAuthority({
+      serializeAeadCiphertext: vi.fn(() => {
+        throw new Error("wasm boundary blew up");
+      }),
+    });
+    await expect(new WasmProductMediaEncryption(throwingSerialize).encrypt(PLAINTEXT)).resolves.toBeNull();
+  });
 });

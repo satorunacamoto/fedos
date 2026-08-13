@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 
 import {
   WasmProductMediaDecryption,
+  productionCommerceMediaDecryptionDepsFor,
   type WasmProductMediaDecryptionDeps,
 } from "../src/os/commerce/catalog/wasm_product_media_decryption.js";
 import { WasmProductMediaEncryption } from "../src/os/commerce/catalog/wasm_product_media_encryption.js";
@@ -219,4 +220,78 @@ describe("WasmProductMediaDecryption", () => {
       }
     },
   );
+});
+
+/**
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
+ * validation-gate fix) — the decrypt-direction mirror of
+ * `test/commerce_wasm_product_media_encryption.test.ts`'s own
+ * "production AEAD bridge preference" suite. Same gap, same reason: every
+ * test above injects a fake `deps`, so the adapter's REAL default
+ * dependency resolution — which in a real launch resolved to the
+ * unconditionally-closed dev-only Loader chain — was never exercised.
+ */
+describe("WasmProductMediaDecryption -- production AEAD bridge preference (validation-gate fix)", () => {
+  function productionLikeAuthority(overrides: Record<string, unknown> = {}): FedosMasterSeedAuthority {
+    return {
+      ...fakeAuthority({ resolveCommerceMediaKey: vi.fn(async () => FAKE_KEY) }),
+      deserializeAeadCiphertext: vi.fn(() => FAKE_CIPHERTEXT_HANDLE),
+      decryptAead: vi.fn(() => FAKE_PLAINTEXT),
+      ...overrides,
+    } as unknown as FedosMasterSeedAuthority;
+  }
+
+  it("P1. with NO injected deps, an authority that offers the production AEAD bridge is used for BOTH halves -- the dev-only Runtime Service exports are never reached", async () => {
+    const authority = productionLikeAuthority();
+    const result = await new WasmProductMediaDecryption(authority).decrypt(CIPHERTEXT_BYTES);
+
+    expect(result).not.toBeNull();
+    expect(Buffer.from(result as Uint8Array).equals(Buffer.from(FAKE_PLAINTEXT))).toBe(true);
+    expect((authority as unknown as { deserializeAeadCiphertext: ReturnType<typeof vi.fn> }).deserializeAeadCiphertext).toHaveBeenCalledTimes(1);
+    expect((authority as unknown as { decryptAead: ReturnType<typeof vi.fn> }).decryptAead).toHaveBeenCalledTimes(1);
+  });
+
+  it("P2. the production bridge receives the SAME opaque key handle plus the fixed CommerceMedia/ChaCha20Poly1305 pair the encrypt side uses", async () => {
+    const authority = productionLikeAuthority();
+    await new WasmProductMediaDecryption(authority).decrypt(CIPHERTEXT_BYTES);
+    expect((authority as unknown as { decryptAead: ReturnType<typeof vi.fn> }).decryptAead).toHaveBeenCalledWith(
+      FAKE_KEY,
+      "ChaCha20Poly1305",
+      "CommerceMedia",
+      FAKE_CIPHERTEXT_HANDLE,
+    );
+  });
+
+  it("P3. an explicitly-injected deps object still wins over the production bridge (testability seam unchanged)", async () => {
+    const authority = productionLikeAuthority();
+    const deps = fakeDeps();
+    await new WasmProductMediaDecryption(authority, deps).decrypt(CIPHERTEXT_BYTES);
+    expect(deps.decrypt).toHaveBeenCalledTimes(1);
+    expect((authority as unknown as { decryptAead: ReturnType<typeof vi.fn> }).decryptAead).not.toHaveBeenCalled();
+  });
+
+  it("P4. productionCommerceMediaDecryptionDepsFor() is all-or-nothing -- a half-matching object yields null so the adapter falls back rather than half-using a bridge", () => {
+    expect(productionCommerceMediaDecryptionDepsFor(null)).toBeNull();
+    expect(productionCommerceMediaDecryptionDepsFor(undefined)).toBeNull();
+    expect(productionCommerceMediaDecryptionDepsFor(fakeAuthority())).toBeNull();
+    expect(productionCommerceMediaDecryptionDepsFor({ decryptAead: () => null })).toBeNull();
+    expect(productionCommerceMediaDecryptionDepsFor({ deserializeAeadCiphertext: () => null })).toBeNull();
+    expect(productionCommerceMediaDecryptionDepsFor({ decryptAead: () => null, deserializeAeadCiphertext: () => null })).not.toBeNull();
+  });
+
+  it("P5. a THROWING production bridge still fails closed to null -- never a throw, never ciphertext mislabeled as plaintext", async () => {
+    const throwingImport = productionLikeAuthority({
+      deserializeAeadCiphertext: vi.fn(() => {
+        throw new Error("wasm boundary blew up");
+      }),
+    });
+    await expect(new WasmProductMediaDecryption(throwingImport).decrypt(CIPHERTEXT_BYTES)).resolves.toBeNull();
+
+    const throwingDecrypt = productionLikeAuthority({
+      decryptAead: vi.fn(() => {
+        throw new Error("wasm boundary blew up");
+      }),
+    });
+    await expect(new WasmProductMediaDecryption(throwingDecrypt).decrypt(CIPHERTEXT_BYTES)).resolves.toBeNull();
+  });
 });

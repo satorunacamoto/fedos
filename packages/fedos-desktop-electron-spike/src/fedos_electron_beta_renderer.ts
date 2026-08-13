@@ -2235,7 +2235,17 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
   summaryContainer.className = "commerce-product-media-summary";
   summaryContainer.id = `commerce-product-media-summary-${product.id}`;
   li.appendChild(summaryContainer);
-  void refreshCommerceMerchantProductMediaSummary(product.id);
+  // Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+  // validation-gate fix) -- pass the container ELEMENT, never rely on a
+  // `document.getElementById()` lookup here. This `li` is not yet in the
+  // document at this point (the caller appends it after this function
+  // returns), and `refreshCommerceMerchantProductMediaSummary()` reads its
+  // container BEFORE its first `await` -- i.e. synchronously, while the
+  // row is still detached -- so the lookup returned `null` and the summary
+  // silently never rendered for ANY product, ever. Reproduced live: every
+  // row's summary was empty even with real attached content, which is why a
+  // seller had no visible confirmation their purchased file was attached.
+  void refreshCommerceMerchantProductMediaSummary(product.id, summaryContainer);
 
   // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
   // arc mandate item 3: "Share Product" -- emits a signed deep-link/QR/
@@ -2309,13 +2319,20 @@ async function onCommerceShareProductIssue(productId: string, btn: HTMLButtonEle
  * checksum, or any other internal detail -- `FedosCommerceProductMediaListItem`
  * itself never carries one (see `fedos_electron_beta_window.d.ts`).
  */
-async function refreshCommerceMerchantProductMediaSummary(productId: string): Promise<void> {
-  const container = document.getElementById(`commerce-product-media-summary-${productId}`);
+async function refreshCommerceMerchantProductMediaSummary(productId: string, containerEl?: HTMLElement): Promise<void> {
+  // `containerEl` is the caller's own freshly-built element when the row is
+  // not yet mounted (see `commerceMerchantProductRow()`'s own comment at the
+  // call site); the id lookup remains the fallback for an already-mounted row.
+  const container = containerEl ?? document.getElementById(`commerce-product-media-summary-${productId}`);
   if (container === null) return; // row no longer mounted (list re-rendered/removed) -- nothing to update.
   try {
     const result = await window.fedosApp.commerceMerchantProductMediaList(commerceActingAsPubkey, productId);
     if (result.outcome !== "ok" || result.media === undefined) {
-      container.textContent = "";
+      // Buyer Discovery + Digital Content Delivery mega-arc (Coordinator
+      // validation-gate fix) -- a refused/failed listing used to blank the
+      // container, which is visually identical to "nothing attached yet" and
+      // is the reason this control could fail totally silently. Say so.
+      container.textContent = "Couldn't load what's attached to this product.";
       return;
     }
     container.textContent = "";
@@ -2343,7 +2360,7 @@ async function refreshCommerceMerchantProductMediaSummary(productId: string): Pr
     }
     container.appendChild(list);
   } catch {
-    container.textContent = "";
+    container.textContent = "Couldn't load what's attached to this product.";
   }
 }
 

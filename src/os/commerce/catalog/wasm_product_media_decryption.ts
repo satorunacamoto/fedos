@@ -40,6 +40,21 @@
  * default behaves safely (fails closed) until a real composition root
  * injects the app's actual, already-unlocked, SHARED
  * `FedosMasterSeedAuthority` instance.
+ *
+ * PRODUCTION BRIDGE FIRST (Buyer Discovery + Digital Content Delivery
+ * mega-arc, Coordinator validation-gate fix) — this file mirrors, exactly,
+ * the fix `./wasm_product_media_encryption.ts` carries for the same reason:
+ * `runtimeImportCiphertext`/`runtimeDecrypt` drive the DEV-ONLY
+ * `FedosWasmLoader` chain, which is unconditionally closed in a real
+ * launch (`developmentAllowed: false`, reproduced live on the ENCRYPT side
+ * of this same pair — see that file's own header for the captured gate
+ * state). Left unfixed, this adapter would fail closed to `null` on every
+ * real buyer redeem for exactly the same reason the seller-side attach
+ * failed. When the injected authority itself structurally offers
+ * `deserializeAeadCiphertext()`/`decryptAead()`, this adapter uses that
+ * production bridge instead; otherwise it falls back to the dev-only
+ * exports exactly as before. Structural check only — never an
+ * `instanceof`/import of `src/os/messenger/**`.
  */
 
 import type { FedosMasterSeedAuthority } from "../../core/vault/wasm/fedos_master_seed_authority.js";
@@ -74,6 +89,52 @@ const DEFAULT_DEPS: WasmProductMediaDecryptionDeps = {
 };
 
 /**
+ * The narrow, STRUCTURAL shape of a production Master Seed Authority's own
+ * synchronous AEAD bridge, decrypt direction — the exact mirror of
+ * `ProductionCommerceMediaEncryptSource`
+ * (`./wasm_product_media_encryption.ts`). See this file's own header.
+ */
+interface ProductionCommerceMediaDecryptSource {
+  deserializeAeadCiphertext(wire: AeadCiphertextWire): AeadCiphertextHandle | null;
+  decryptAead(
+    key: AeadKeyHandle,
+    algorithm: typeof COMMERCE_MEDIA_ALGORITHM,
+    aadDomain: typeof COMMERCE_MEDIA_AAD_DOMAIN,
+    ciphertext: AeadCiphertextHandle,
+  ): Uint8Array | null;
+}
+
+/**
+ * Returns a `WasmProductMediaDecryptionDeps` backed by `authority`'s own
+ * production AEAD bridge if — and only if — it genuinely offers BOTH
+ * halves as callable functions; `null` otherwise. Mirrors
+ * `productionCommerceMediaEncryptionDepsFor()` exactly, including its
+ * "never throws" wrapping.
+ */
+export function productionCommerceMediaDecryptionDepsFor(authority: unknown): WasmProductMediaDecryptionDeps | null {
+  const candidate = authority as Partial<ProductionCommerceMediaDecryptSource> | null | undefined;
+  if (candidate === null || candidate === undefined) return null;
+  const { deserializeAeadCiphertext, decryptAead } = candidate;
+  if (typeof deserializeAeadCiphertext !== "function" || typeof decryptAead !== "function") return null;
+  return {
+    importCiphertext: async (serialized) => {
+      try {
+        return deserializeAeadCiphertext.call(candidate, serialized);
+      } catch {
+        return null;
+      }
+    },
+    decrypt: async (key, algorithm, aadDomain, ciphertext) => {
+      try {
+        return decryptAead.call(candidate, key, algorithm, aadDomain, ciphertext);
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
+/**
  * The REAL `ProductMediaDecryptionPort` adapter — see this file's own
  * header for the full account. `./ipfs_media_store.ts`'s own DEFAULT
  * `ProductMediaDecryptionPort` as of this arc, exactly mirroring
@@ -85,10 +146,13 @@ export class WasmProductMediaDecryption implements ProductMediaDecryptionPort {
 
   constructor(
     authority: FedosMasterSeedAuthority = new FedosWasmMasterSeedAuthority(),
-    deps: WasmProductMediaDecryptionDeps = DEFAULT_DEPS,
+    deps?: WasmProductMediaDecryptionDeps,
   ) {
     this.#authority = authority;
-    this.#deps = deps;
+    // Explicit injection always wins (testability, unchanged); otherwise
+    // prefer the injected authority's OWN production AEAD bridge. See this
+    // file's own header, "PRODUCTION BRIDGE FIRST".
+    this.#deps = deps ?? productionCommerceMediaDecryptionDepsFor(authority) ?? DEFAULT_DEPS;
   }
 
   async decrypt(ciphertext: Uint8Array): Promise<Uint8Array | null> {
