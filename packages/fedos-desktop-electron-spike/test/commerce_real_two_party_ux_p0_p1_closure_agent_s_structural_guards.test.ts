@@ -168,11 +168,47 @@ describe("Item 4 -- Publish/Unpublish P0: explicit semantics, debounce, confirm-
     expect(body).toMatch(/finally \{\s*btn\.disabled = false;\s*\}/);
   });
 
-  it("15. unpublishing is ALWAYS confirmed (window.confirm) before the call -- publish is never confirmed (nothing real is removed from buyer view)", () => {
+  it("15. unpublishing is ALWAYS confirmed before the call -- publish is never confirmed (nothing real is removed from buyer view)", () => {
     const source = stripComments(read(RENDERER_PATH));
     const start = source.indexOf("async function onCommercePublishAction(");
     const body = source.slice(start, start + 900);
-    expect(body).toMatch(/action === "unpublish" && !window\.confirm\(/);
+    // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+    // follow-up fix): the confirmation itself is unchanged in intent
+    // (unpublish is always confirmed, publish never is) but is no longer
+    // `window.confirm()` -- that native dialog blocks the renderer's whole
+    // JS main thread, which reproduced live as a permanently frozen app.
+    // It is now the shared in-page `confirmInPage()` dialog, awaited.
+    expect(body).toMatch(/action === "unpublish" &&\s*!\(await confirmInPage\(/);
+    // ...and it still happens BEFORE the unpublish call actually fires.
+    expect(body.indexOf("confirmInPage(")).toBeLessThan(body.indexOf("commerceProductUnpublish("));
+  });
+
+  // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+  // follow-up fix) -- the durable never-regress guard for the real
+  // app-freezing bug a live usability run found: clicking "Unpublish"
+  // called `window.confirm()`, whose native dialog suspends the renderer's
+  // JS main thread entirely (`Runtime.evaluate("1+1")` never returned).
+  // `armDevicePairingApproveConfirm()` had already documented this exact
+  // hazard for Device Pairing (Secure Runtime Alpha 8201-8280); this guard
+  // makes the rule apply to the whole renderer so no future call site can
+  // reintroduce it.
+  it("15b. the renderer NEVER calls window.confirm()/alert()/prompt() anywhere -- native JS dialogs block the renderer's JS main thread", () => {
+    const source = stripComments(read(RENDERER_PATH));
+    expect(source).not.toMatch(/window\.(confirm|alert|prompt)\(/);
+    // The replacement primitive really exists and is promise-based (never
+    // a synchronous blocking call dressed up with a different name).
+    expect(source).toMatch(/function confirmInPage\(title: string, body: string, confirmLabel: string\): Promise<boolean> \{/);
+    expect(source).toMatch(/function settleAppConfirm\(confirmed: boolean\): void \{/);
+  });
+
+  it("15c. the shared confirmation dialog's markup exists in the page, is hidden by default, and is answerable by ordinary DOM clicks", () => {
+    const html = read(HTML_PATH);
+    expect(html).toMatch(/<div id="app-confirm-overlay"[^>]*hidden>/);
+    expect(html).toMatch(/id="app-confirm-title"/);
+    expect(html).toMatch(/id="app-confirm-body"/);
+    expect(html).toMatch(/<button id="app-confirm-accept" type="button"/);
+    expect(html).toMatch(/<button id="app-confirm-cancel" type="button"/);
+    expect(html).toMatch(/role="dialog" aria-modal="true"/);
   });
 });
 

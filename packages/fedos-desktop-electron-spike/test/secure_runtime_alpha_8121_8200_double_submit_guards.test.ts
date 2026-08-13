@@ -122,7 +122,14 @@ realSuite("Alpha 8121-8200 -- Security Finding 2 (6873d24f): double-submit guard
     const source = readFileSync(rendererSourcePath, "utf8");
     const start = source.indexOf("async function decideIdentityTransition(");
     expect(start).toBeGreaterThanOrEqual(0);
-    const body = source.slice(start, start + 1700);
+    // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+    // follow-up fix): the slice window below was widened because this
+    // function's body grew -- its `window.confirm()` (which froze the whole
+    // renderer JS thread) became an awaited in-page confirmation INSIDE the
+    // try block, so the guard now also covers the confirmation itself. The
+    // invariant asserted here is unchanged, and the window still ends inside
+    // this function (its full length is measured in the fix's own commit).
+    const body = source.slice(start, start + 1900);
     expect(body).toMatch(/if \(decisionButtons\.some\(\(b\) => b\.disabled\)\) return;/);
     expect(body).toMatch(/for \(const b of decisionButtons\) b\.disabled = true;/);
     expect(body).toMatch(/finally \{\s*for \(const b of decisionButtons\) b\.disabled = false;/);
@@ -132,7 +139,14 @@ realSuite("Alpha 8121-8200 -- Security Finding 2 (6873d24f): double-submit guard
     const source = readFileSync(rendererSourcePath, "utf8");
     const start = source.indexOf("async function decideDeletionRequest(");
     expect(start).toBeGreaterThanOrEqual(0);
-    const body = source.slice(start, start + 1100);
+    // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+    // follow-up fix): the slice window below was widened because this
+    // function's body grew -- its `window.confirm()` (which froze the whole
+    // renderer JS thread) became an awaited in-page confirmation INSIDE the
+    // try block, so the guard now also covers the confirmation itself. The
+    // invariant asserted here is unchanged, and the window still ends inside
+    // this function (its full length is measured in the fix's own commit).
+    const body = source.slice(start, start + 1250);
     expect(body).toMatch(/if \(decisionButtons\.some\(\(b\) => b\.disabled\)\) return;/);
     expect(body).toMatch(/for \(const b of decisionButtons\) b\.disabled = true;/);
     expect(body).toMatch(/finally \{\s*for \(const b of decisionButtons\) b\.disabled = false;/);
@@ -142,7 +156,14 @@ realSuite("Alpha 8121-8200 -- Security Finding 2 (6873d24f): double-submit guard
     const source = readFileSync(rendererSourcePath, "utf8");
     const start = source.indexOf("async function onDeviceRevoke(");
     expect(start).toBeGreaterThanOrEqual(0);
-    const body = source.slice(start, start + 900);
+    // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+    // follow-up fix): the slice window below was widened because this
+    // function's body grew -- its `window.confirm()` (which froze the whole
+    // renderer JS thread) became an awaited in-page confirmation INSIDE the
+    // try block, so the guard now also covers the confirmation itself. The
+    // invariant asserted here is unchanged, and the window still ends inside
+    // this function (its full length is measured in the fix's own commit).
+    const body = source.slice(start, start + 1100);
     expect(body).toMatch(/if \(revokeBtn\.disabled\) return;/);
     expect(body).toMatch(/revokeBtn\.disabled = true;/);
     expect(body).toMatch(/finally \{\s*revokeBtn\.disabled = false;/);

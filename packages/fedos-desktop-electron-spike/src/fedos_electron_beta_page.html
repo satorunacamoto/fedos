@@ -126,6 +126,19 @@
          stays reachable, just not primary). */
       #commerce-order-technical-details { margin-top: 0.75rem; }
       #commerce-order-technical-details summary { cursor: pointer; font-size: 0.8rem; color: #9bd; }
+      /* Buyer Discovery + Digital Content Delivery mega-arc (post-report follow-up
+         fix) -- the ONE in-page confirmation dialog that replaced every
+         `window.confirm()` in this renderer. A native JS dialog blocks the
+         renderer's whole JS main thread for as long as it is open (reproduced
+         live: Unpublish froze the app so hard that `Runtime.evaluate("1+1")`
+         never returned); this one is ordinary DOM, so nothing blocks.
+         `[hidden]` needs its own higher-specificity rule here because the base
+         rule sets `display: flex`. */
+      .app-confirm-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.66); padding: 1rem; }
+      .app-confirm-overlay[hidden] { display: none; }
+      .app-confirm-box { max-width: 32rem; background: #1a1d22; border: 1px solid #445; border-radius: 8px; padding: 1rem 1.25rem 1.25rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55); }
+      .app-confirm-box h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+      .app-confirm-box p { margin: 0; font-size: 0.9rem; color: #cdd; }
     </style>
   </head>
   <body>
@@ -589,7 +602,7 @@
                Nostr is fire-and-forget -- this app has no live check that a
                past publish is still visible/current on the relay, so it says
                so honestly instead of implying a guarantee it can't back up. -->
-          <p class="muted" id="commerce-merchant-products-staleness-note">Publishing is one-way: FedOS confirms your listing reached your configured Relay at the moment you published it, but cannot confirm it's still there later (a relay can drop or expire events). If a buyer can't find a listing you believe is live, try Edit → Save to re-publish it.</p>
+          <p class="muted" id="commerce-merchant-products-staleness-note">Publishing is one-way: FedOS confirms your listing reached your configured Relay at the moment you published it, but cannot confirm it's still there later (a relay can drop or expire events). If a buyer can't find a listing you believe is live, use Unpublish and then Publish again — Publish re-announces the whole listing. Edit → Save only sends the fields you changed, which a buyer who never received the original announcement has nothing to apply them to, so on its own it cannot fix this.</p>
           <ul class="plain-list" id="commerce-merchant-products-list"></ul>
 
           <!-- FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
@@ -803,6 +816,26 @@
         </div>
       </div>
     </section>
+
+    <!-- Buyer Discovery + Digital Content Delivery mega-arc (post-report follow-up
+         fix) -- the ONE in-page confirmation dialog, shared by every destructive
+         action that used to call `window.confirm()` (Unpublish a live listing,
+         Revoke a Device, Accept a replaced identity, Approve a deletion request).
+         Hidden in the markup itself, never relying on JS to hide it; the renderer
+         (`confirmInPage()`) fills in the title/body/confirm label and shows it.
+         This is the SAME "real inline confirmation, never a native dialog"
+         posture Secure Runtime Alpha 8201-8280 already established for Device
+         Pairing approval (`#device-pairing-approve-confirm` above) -- and unlike
+         a native dialog it is answerable by ordinary DOM clicks, so real
+         E2E tests and assistive tech can both operate it. -->
+    <div id="app-confirm-overlay" class="app-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="app-confirm-title" aria-describedby="app-confirm-body" hidden>
+      <div class="app-confirm-box">
+        <h2 id="app-confirm-title">Please confirm</h2>
+        <p id="app-confirm-body"></p>
+        <button id="app-confirm-accept" type="button" class="commerce-btn-primary">Yes, continue</button>
+        <button id="app-confirm-cancel" type="button" class="commerce-btn-secondary">Cancel</button>
+      </div>
+    </div>
 
     <script src="fedos_electron_beta_renderer.js"></script>
   </body>

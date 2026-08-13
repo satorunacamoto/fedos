@@ -132,6 +132,61 @@ function clearError(elementId: string): void {
   byId(elementId).textContent = "";
 }
 
+// ---------------------------------------------------------------------
+// Buyer Discovery + Digital Content Delivery mega-arc (post-report
+// follow-up fix) -- the ONE confirmation primitive this renderer uses for
+// destructive actions.
+//
+// ROOT CAUSE THIS REPLACES: `window.confirm()` in an Electron renderer is
+// a SYNCHRONOUS blocking primitive. Chromium suspends the renderer's JS
+// main thread for the entire time the native dialog is open, so nothing
+// else in the page runs at all -- no timers, no IPC replies, no repaint,
+// and (reproduced live on `2a21ef17`, three times, in production mode on
+// a fresh profile) not even a bare `Runtime.evaluate("1+1")` over CDP,
+// which never returned inside a 100s budget while the browser process
+// itself answered normally. Clicking "Unpublish" therefore looked like a
+// permanently frozen app to anything driving the UI programmatically, and
+// the unpublish never committed. `armDevicePairingApproveConfirm()` below
+// already documents this exact hazard for Device Pairing (Secure Runtime
+// Alpha 8201-8280 removed `window.confirm()` there for the same reason);
+// this helper generalises that fix so no call site can reintroduce it --
+// `..._agent_s_structural_guards.test.ts` now fails if `window.confirm(`
+// reappears anywhere in this file.
+//
+// The replacement is ordinary DOM: it resolves on a real click, so the
+// caller simply `await`s it and the JS thread stays free throughout.
+// ---------------------------------------------------------------------
+
+let appConfirmPendingResolve: ((confirmed: boolean) => void) | undefined;
+
+/**
+ * Shows the shared in-page confirmation dialog and resolves `true` only if
+ * the user really clicked its confirm button. Never blocks the JS thread.
+ *
+ * Re-entrancy: if a confirmation is somehow already open, this resolves
+ * `false` immediately rather than stacking dialogs or orphaning the first
+ * one's promise -- refusing is always the safe answer for a destructive
+ * action.
+ */
+function confirmInPage(title: string, body: string, confirmLabel: string): Promise<boolean> {
+  if (appConfirmPendingResolve !== undefined) return Promise.resolve(false);
+  byId("app-confirm-title").textContent = title;
+  byId("app-confirm-body").textContent = body;
+  byId<HTMLButtonElement>("app-confirm-accept").textContent = confirmLabel;
+  byId("app-confirm-overlay").hidden = false;
+  byId<HTMLButtonElement>("app-confirm-accept").focus();
+  return new Promise<boolean>((resolve) => {
+    appConfirmPendingResolve = resolve;
+  });
+}
+
+function settleAppConfirm(confirmed: boolean): void {
+  const resolve = appConfirmPendingResolve;
+  appConfirmPendingResolve = undefined;
+  byId("app-confirm-overlay").hidden = true;
+  if (resolve !== undefined) resolve(confirmed);
+}
+
 /**
  * Commerce E2E Completion arc — Commerce/Order/Payment handlers return a
  * specific, developer-authored `reason` string for their `"rejected"`/
@@ -2511,13 +2566,29 @@ async function onCommercePublishAction(productId: string, action: "publish" | "u
   // arc §14 ("removing something real from view is different from
   // never-published-yet draft state"). Publish (draft/archived -> active)
   // never needs this — nothing real is being taken away from a buyer.
-  if (action === "unpublish" && !window.confirm("Unpublish this listing? It will stop appearing in the Shop catalog for buyers immediately. You can publish it again later.")) {
-    return;
-  }
+  //
+  // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+  // follow-up fix): this confirmation used to be `window.confirm()`, which
+  // froze the entire renderer JS thread for as long as the native dialog
+  // stayed open — see `confirmInPage()`'s own header for the live evidence.
+  // The button is now disabled BEFORE the (asynchronous) confirmation is
+  // shown, so the double-submit guard still covers the whole action
+  // including the time the dialog is on screen, and the existing
+  // `finally { btn.disabled = false; }` still releases it on every path.
   if (btn.disabled) return;
   btn.disabled = true;
   clearError("commerce-merchant-products-error");
   try {
+    if (
+      action === "unpublish" &&
+      !(await confirmInPage(
+        "Unpublish this listing?",
+        "It will stop appearing in the Shop catalog for buyers immediately. You can publish it again later.",
+        "Yes, unpublish it",
+      ))
+    ) {
+      return;
+    }
     const result =
       action === "publish"
         ? await window.fedosApp.commerceProductPublish(commerceActingAsPubkey, productId)
@@ -3224,10 +3295,23 @@ async function refreshDevicesList(): Promise<void> {
  * idempotent revoke handling; disabling the button never substitutes for it.
  */
 async function onDeviceRevoke(deviceId: string, devicePublicKeyHex: string, label: string, revokeBtn: HTMLButtonElement): Promise<void> {
-  if (!window.confirm(`Revoke "${label}"? This removes its trust for future messages. It does not delete copies that Device already has.`)) return;
+  // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+  // follow-up fix): was `window.confirm()`, which blocks the renderer's
+  // whole JS thread while it is open (see `confirmInPage()`'s header for
+  // the live evidence from the Unpublish freeze this same fix closed).
+  // Disabled first, so the guard covers the confirmation too.
   if (revokeBtn.disabled) return;
   revokeBtn.disabled = true;
   try {
+    if (
+      !(await confirmInPage(
+        `Revoke "${label}"?`,
+        "This removes its trust for future messages. It does not delete copies that Device already has.",
+        "Yes, revoke this Device",
+      ))
+    ) {
+      return;
+    }
     const result = await window.fedosApp.deviceRevoke(deviceId, devicePublicKeyHex);
     if (result.outcome !== "ok") {
       showError("devices-error", result);
@@ -3601,10 +3685,21 @@ async function decideIdentityTransition(
   target: { readonly peerAccountRef: unknown; readonly peerDeviceRef: string; readonly transitionId: string },
   decisionButtons: readonly HTMLButtonElement[],
 ): Promise<void> {
-  if (decision === "accept" && !window.confirm("Accept this new identity? This is a trust decision you make yourself — it cannot be undone automatically.")) return;
+  // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+  // follow-up fix): was `window.confirm()` -- see `confirmInPage()`.
   if (decisionButtons.some((b) => b.disabled)) return;
   for (const b of decisionButtons) b.disabled = true;
   try {
+    if (
+      decision === "accept" &&
+      !(await confirmInPage(
+        "Accept this new identity?",
+        "This is a trust decision you make yourself — it cannot be undone automatically.",
+        "Yes, accept this identity",
+      ))
+    ) {
+      return;
+    }
     const result =
       decision === "accept"
         ? await window.fedosApp.identityTransitionAccept(target.peerAccountRef, target.peerDeviceRef, target.transitionId)
@@ -3715,10 +3810,21 @@ function renderDeletionRequestDetail(result: { readonly outcome: string; readonl
 }
 
 async function decideDeletionRequest(decision: "approve" | "reject", targetRequestId: string, decisionButtons: readonly HTMLButtonElement[]): Promise<void> {
-  if (decision === "approve" && !window.confirm("Approve this deletion request? This never guarantees removal everywhere — see the warnings above.")) return;
+  // Buyer Discovery + Digital Content Delivery mega-arc (post-report
+  // follow-up fix): was `window.confirm()` -- see `confirmInPage()`.
   if (decisionButtons.some((b) => b.disabled)) return;
   for (const b of decisionButtons) b.disabled = true;
   try {
+    if (
+      decision === "approve" &&
+      !(await confirmInPage(
+        "Approve this deletion request?",
+        "This never guarantees removal everywhere — see the warnings above.",
+        "Yes, approve this deletion request",
+      ))
+    ) {
+      return;
+    }
     await (decision === "approve" ? window.fedosApp.deletionRequestApprove(targetRequestId) : window.fedosApp.deletionRequestReject(targetRequestId));
     // Only clear the detail view if `targetRequestId` is STILL what's open --
     // mirrors `decideIdentityTransition()`'s own reasoning.
@@ -4305,6 +4411,24 @@ async function onLock(): Promise<void> {
 // ---------------------------------------------------------------------
 // Event wiring.
 // ---------------------------------------------------------------------
+
+// Buyer Discovery + Digital Content Delivery mega-arc (post-report
+// follow-up fix) -- the shared in-page confirmation dialog (see
+// `confirmInPage()`). Escape cancels, exactly as a native dialog would,
+// and is listened for on the document (capture phase) because focus may
+// sit on either of the two dialog buttons.
+byId<HTMLButtonElement>("app-confirm-accept").addEventListener("click", () => settleAppConfirm(true));
+byId<HTMLButtonElement>("app-confirm-cancel").addEventListener("click", () => settleAppConfirm(false));
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key === "Escape" && !byId("app-confirm-overlay").hidden) {
+      event.preventDefault();
+      settleAppConfirm(false);
+    }
+  },
+  true,
+);
 
 byId<HTMLButtonElement>("welcome-create-btn").addEventListener("click", () => {
   showScreen("create");

@@ -123,7 +123,7 @@ PUBLIC PUSH: **NO**.
 FORCE PUSH: **NO**.
 WORKTREE: **CLEAN** (as of this commit).
 REMAINING P0: **1** — cross-process protected-content delivery (buyer-side `ProductMedia` sync does not exist; this is what makes the false-success completion chain possible). Everything downstream of this single gap (Blocker 5's grant-signing-key limitation, the vacuous completion invariant, the vacuous redeem short-circuit) is a direct consequence of it, not an independent gap.
-REMAINING P1 (multiple, all disclosed above, none forced through): Unpublish hard-freezes the app; `Edit → Save`'s in-UI recovery advice emits the wrong event type; the seller's visible share button and the buyer's share-code input use two different, incompatible artifact shapes; reputation attestations never sync to the counterparty; one observed reputation-display persona-id mismatch; "Needs your attention" counters observed wrong on both sides in one run; deep-linked Settings navigation's Add-relay control silently no-ops; no relay is reachable from inside the app without external knowledge (unchanged from the prior arc); the honest sync-status line reads "Up to date." even during a fully offline refresh where every channel early-returned.
+REMAINING P1 (multiple, all disclosed above, none forced through): ~~Unpublish hard-freezes the app~~ (FIXED post-report — see the addendum below); `Edit → Save`'s in-UI recovery advice emits the wrong event type (the misleading COPY is fixed post-report; the underlying event-shape design question is documented, not forced — see the addendum); the seller's visible share button and the buyer's share-code input use two different, incompatible artifact shapes; reputation attestations never sync to the counterparty; one observed reputation-display persona-id mismatch; "Needs your attention" counters observed wrong on both sides in one run; deep-linked Settings navigation's Add-relay control silently no-ops; no relay is reachable from inside the app without external knowledge (unchanged from the prior arc); the honest sync-status line reads "Up to date." even during a fully offline refresh where every channel early-returned.
 
 ---
 
@@ -142,3 +142,38 @@ No same-process fallback anywhere in this arc's own validation. No hidden develo
 ---
 
 *Full agent-by-agent detail, every commit's own reasoning, and the complete tabletop transcripts are preserved in this arc's own commit history (`git log b4304f22..3d1a69d8`) and in `docs/commerce/PROTECTED-MEDIA-CROSS-PROCESS-REACHABILITY.md`'s Addendum 2/3 — both written to be re-checked, not trusted.*
+
+
+---
+
+## Post-report follow-up fix (Unpublish freeze + `Edit → Save` recovery advice)
+
+Written after this report's CandidateHead `2a21ef17`, closing the highest-severity item the follow-up usability pass left open.
+
+### The Unpublish freeze — root cause, fixed
+
+**Root cause: `window.confirm()`.** `onCommercePublishAction()` confirmed every unpublish with a native JS dialog. In an Electron renderer that is a *synchronous blocking primitive*: Chromium suspends the renderer's entire JS main thread for as long as the dialog is open, so nothing in the page runs — no timers, no IPC replies, no repaint.
+
+**Evidence (reproduced live twice more before touching any code, production mode, fresh profile, real synthesized mouse input at real on-screen coordinates):**
+
+- The CDP `Input.dispatchMouseEvent` for the click itself never returned.
+- `Runtime.evaluate("1+1")` was then issued 12 times in a row and answered **none** of them (8s budget each, 96s total), while the *browser* process answered `/json/list` normally every time with `"title": "FedOS Desktop — Beta"`. That asymmetry is the signature of a blocked renderer main thread, not a stalled network call.
+- Enumerating the app's real top-level windows during the hang found a genuine native Windows dialog (class `#32770`, title `"Electron"`, 571×145 at (347,273), foreground, `OK` / `キャンセル` buttons). So a human sitting at the physical screen *does* get an answerable dialog — unbranded and OS-locale, but answerable. The permanent, unrecoverable freeze specifically hits **any programmatic/scripted control of the app** (the follow-up usability pass drove the packaged app over CDP), and it is what made Unpublish untestable by every real-Electron test in this package.
+
+**This was pre-existing, not introduced by this arc.** The line came from `1de00033` (2026-08-12, *Real Two-Party Commerce + UX P0/P1 Closure*, Agent S) — the previous mega-arc. No test had ever exercised it.
+
+**The fix** is the one this repository had already chosen for exactly this hazard and then not applied here: `armDevicePairingApproveConfirm()` (Secure Runtime Alpha 8201-8280) removed `window.confirm()` from Device Pairing approval with a header that names this precise failure mode. That posture is now generalised into one shared, promise-based, ordinary-DOM confirmation dialog (`confirmInPage()` + `#app-confirm-overlay`), and **all four** `window.confirm()` call sites in the renderer were converted — Unpublish, Device Revoke, Accept-replaced-identity, Approve-deletion-request. The other three were the same latent freeze; none had test coverage either. Each call site's double-submit guard now disables its button *before* the confirmation opens, so the guard covers the confirmation too.
+
+Two guards were added so this cannot come back: a structural guard asserting `window.confirm(`/`alert(`/`prompt(` never appears anywhere in the renderer, and `commerce_product_unpublish_no_freeze_real_electron.test.ts`, a real-Electron regression test. The regression test was verified to genuinely detect the bug: replaying the old `window.confirm()` call in the built renderer makes it hang for the full 120s harness budget and emit no UI step after the Unpublish click, exactly as the live repro did.
+
+### `Edit → Save` — copy fixed, design question documented
+
+The in-app staleness note used to say: *"If a buyer can't find a listing you believe is live, try Edit → Save to re-publish it."* Confirmed false by reading both sides:
+
+- `handleCommerceProductUpdate()` emits `category: "product-update"` carrying **only the changed fields** — no `creatorPubkey`, no `status`. It also emits nothing at all when nothing changed (`Object.keys(patch).length > 0` gate), so a bare Save is a literal no-op.
+- `CommerceNostrEventReadModel` **rejects** a `product-update` for a `productId` it has never seen a `product-publication` for (`rejected-unknown-product`, "arrived before any product-publication — out of order"). That is precisely the situation the copy addresses, so the advice could never work.
+
+**Fixed (bounded, no design call):** the copy now points at the action that genuinely re-emits a full `product-publication` today — Unpublish, then Publish — and states plainly why Edit → Save cannot repair a missing announcement on its own.
+
+**Documented, not forced (a real product decision):** should there be an explicit "Re-publish / Re-announce" control on an already-active row, and/or should `Edit → Save` on an already-public product emit a full `product-publication` instead of a `product-update`? Both are mechanically available — `LocalProductRepository.publish()` is an unconditional status transition, so re-publishing an already-`active` product returns `ok` — but either choice changes public event semantics (`product-update` exists as a deliberately distinct category with its own read-model path, allowed-key set, and tests) and adds a third per-row control to a merchant row this arc has already flagged as crowded. Left to a product decision rather than settled here.
+
