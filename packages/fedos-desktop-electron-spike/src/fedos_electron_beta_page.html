@@ -247,6 +247,14 @@
                hidden whenever nothing needs attention (never a fabricated "all clear"
                line). -->
           <p class="muted" id="commerce-landing-pointer" role="status" aria-live="polite" hidden></p>
+          <!-- Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+               item 6 (order recovery): the pointer above was TEXT-only -- a real
+               "point back to the in-progress order" needs to also be one click
+               away, not just described. These jump straight to the screen that
+               has the relevant activity; each stays hidden unless that role
+               actually has something outstanding. -->
+          <button id="commerce-landing-pointer-shop-btn" type="button" hidden>Go to Shop</button>
+          <button id="commerce-landing-pointer-store-btn" type="button" hidden>Go to My Store</button>
           <div id="conversations-error" class="error" role="alert"></div>
           <label for="conversations-filter">Filter</label>
           <input id="conversations-filter" type="text" placeholder="Filter by title or id" />
@@ -274,6 +282,30 @@
 
         <div class="app-screen" id="app-screen-commerce">
           <h2>Shop</h2>
+
+          <!-- Coordinator integration pass: Agent D and Agent U each replaced
+               the same prior static "Fictional/local demo data only" sentence,
+               but along DIFFERENT axes, so both survive here rather than one
+               being dropped:
+                 - Agent U's `#commerce-mode-banner` answers "WHO am I acting
+                   as, and is that a demo fixture or my own real profile?"
+                 - Agent D's `#commerce-discovery-banner` answers "what is my
+                   NETWORK/DISCOVERY state right now?"
+               They are complementary, are rendered by two independent
+               functions (`renderCommerceCatalogModeBanner()` and
+               `renderCommerceDiscoveryBanner()`), and are each covered by
+               their own agent's structural guards. Identity context is placed
+               first, then network state. -->
+
+          <!-- Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+               item 3 ("never let an apparently-working empty/demo catalog silently
+               substitute for real discovery"): this banner is now dynamic
+               (`renderCommerceCatalogModeBanner()`) -- it shows the honest
+               fictional-data warning ONLY while "Acting as" a demo fixture, and a
+               truthful real/sync-state line while acting as your own real profile,
+               instead of one static "LOCAL DEMO" claim shown unconditionally even
+               over a real seller's own real listing. -->
+          <p class="muted" id="commerce-mode-banner"></p>
 
           <!-- FedOS "Buyer Discovery + Digital Content Delivery" mega-arc
                (Agent D) -- arc mandate item 2: an honest, always-visible
@@ -336,12 +368,20 @@
           <p class="muted" id="commerce-detail-merchant"></p>
           <p class="muted" id="commerce-detail-status"></p>
           <p id="commerce-detail-description"></p>
+          <!-- Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+               item 4/item 5: what's public vs buyers-only, and what you'll actually
+               receive and when -- answered up front, BEFORE checkout, never only
+               discovered afterward. -->
+          <p class="muted" id="commerce-detail-visibility-note">Title, price, description, and this seller's public reputation are visible to anyone. Any digital content attached to this product is buyers-only and is not shown here.</p>
+          <p class="muted" id="commerce-detail-delivery-expectation"></p>
 
           <h3>Seller Reputation</h3>
+          <p class="muted">What FedOS can and cannot verify about this seller:</p>
           <p class="muted" id="commerce-detail-reputation-summary"></p>
 
           <div id="commerce-detail-order-form">
             <h3>Create Order</h3>
+            <p class="muted" id="commerce-detail-order-form-delivery-note"></p>
             <label for="commerce-order-quantity">Quantity</label>
             <input id="commerce-order-quantity" type="number" min="1" step="1" value="1" />
             <div id="commerce-order-create-error" class="error" role="alert"></div>
@@ -471,7 +511,11 @@
 
         <div class="app-screen" id="app-screen-commerce-merchant">
           <h2>My Store</h2>
-          <p class="muted">Fictional/local demo data only. <span class="commerce-sim-pill">LOCAL DEMO</span></p>
+          <!-- Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+               see `#commerce-mode-banner`'s own comment on the Shop screen above;
+               same dynamic real/demo + sync-status banner, rendered here by the
+               SAME `renderCommerceCatalogModeBanner()` function. -->
+          <p class="muted" id="commerce-merchant-mode-banner"></p>
           <div class="commerce-actor-bar">
             <label for="commerce-merchant-acting-as">Acting as</label>
             <select id="commerce-merchant-acting-as"></select>
@@ -490,6 +534,15 @@
                panel already calls (`renderCommerceSellerReputation()`) -- never a duplicate query. -->
           <h3>My Reputation</h3>
           <p class="muted" id="commerce-merchant-reputation-summary"></p>
+
+          <!-- Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+               item 2 ("how do I share my store/product?"). UI surface + honest
+               copy only -- see `commerceMerchantProductShareControls()`'s own
+               header for the plumbing/scope split with Agent D. -->
+          <h3>Share My Store</h3>
+          <p class="muted">Give this to someone so they can find your store. They'll still need a working Relay connection on their own device to actually discover your listings — this is not yet a scannable/verified proof.</p>
+          <button id="commerce-merchant-share-store" type="button">Copy My Store Info</button>
+          <span class="muted" id="commerce-merchant-share-store-feedback" role="status" aria-live="polite"></span>
 
           <h3>Create Product</h3>
           <label for="commerce-merchant-create-title">Title</label>
@@ -515,6 +568,12 @@
                `#commerce-order-sync-note`'s own comment above; same honest,
                non-blocking `nostrSyncOutcome` note, here for publish/unpublish/update. -->
           <p id="commerce-merchant-products-sync-note" class="muted" role="status" aria-live="polite"></p>
+          <!-- Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+               item 7 ("publication stale" error-recovery copy): publishing to
+               Nostr is fire-and-forget -- this app has no live check that a
+               past publish is still visible/current on the relay, so it says
+               so honestly instead of implying a guarantee it can't back up. -->
+          <p class="muted" id="commerce-merchant-products-staleness-note">Publishing is one-way: FedOS confirms your listing reached your configured Relay at the moment you published it, but cannot confirm it's still there later (a relay can drop or expire events). If a buyer can't find a listing you believe is live, try Edit → Save to re-publish it.</p>
           <ul class="plain-list" id="commerce-merchant-products-list"></ul>
 
           <!-- FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
@@ -719,8 +778,8 @@
               <option value="direct">Nostr Optional — direct connection</option>
               <option value="tor-optional">Serverless Privacy — prefer Tor routing when available</option>
             </select>
-            <p class="muted">This setting is not persisted across restarts in this Beta — it resets to Local Only every launch.</p>
-            <button id="commerce-network-profile-save" type="button">Save for this session</button>
+            <p class="muted">This choice is saved to this device and stays in effect across restarts, until you change it again.</p>
+            <button id="commerce-network-profile-save" type="button">Save</button>
           </fieldset>
 
           <h3>Feedback</h3>

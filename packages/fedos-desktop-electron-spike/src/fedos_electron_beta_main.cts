@@ -2152,6 +2152,20 @@ let activeRelays: readonly RelayLike[] = [];
 let activeMasterSeedAuthority: MasterSeedAuthorityLike | null = null;
 /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- the SAME real Nostr signing authority `buildFreshCoordinator()` already constructs (see `NostrSigningAuthorityLike`'s own doc comment), retained for `commerceNostrOutboundPortFor()` below. */
 let activeNostrSigningAuthority: NostrSigningAuthorityLike | null = null;
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+ * seller-display-name P1 fix ("Unknown merchant" on a seller's OWN real
+ * listing, `docs/commerce/COMMERCE-PURCHASE-COMPLETION-FINAL-REPORT.md`'s
+ * own UX-P1 list). The real, durable per-profile label a user already
+ * typed at profile creation (`displayLabel`, e.g. "Bob's Digital Shop") IS
+ * the seller display-name field this arc's brief asks for -- it just was
+ * never consulted by `commerceMerchantLabelFor()` below, which only ever
+ * checked the static 2-entry demo-merchant map. Set/cleared at the SAME
+ * points `activeViewerParticipant` already is (`handleCreate()`/
+ * `handleUnlock()`/`handleLock()`/`performCleanShutdown()`), never a
+ * second, independently-derived identity source.
+ */
+let activeLocalIdentity: { readonly displayLabel: string; readonly accountPublicIdentifier: string } | null = null;
 const notificationAdapter = new FedosElectronNotificationAdapter();
 const trayAdapter = new FedosElectronTrayAdapter();
 let badgeAdapter: FedosElectronBadgeAdapter | null = null;
@@ -2704,14 +2718,72 @@ function commerceMediaStoreFor(): CommerceMediaStoreLike {
 // `commerceNetworkProfile` defaults to `"local-only"` (LOCAL_ONLY) --
 // Nostr publication stays unreachable (`evaluateNetworkAccess()` inside
 // `CommerceNostrEventPortImpl.publish()` refuses it unconditionally) until
-// a user EXPLICITLY changes this via the new Settings surface below. This
-// is in-memory, per-process state, NOT persisted to the Settings file --
-// a deliberate, minimal scoping decision for this pass (see this arc's own
-// coordinator report); it resets to the safe default on every relaunch.
+// a user EXPLICITLY changes this via the new Settings surface below.
+//
+// Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+// durability fix (`docs/commerce/COMMERCE-PURCHASE-COMPLETION-FINAL-REPORT.md`'s
+// own named UX-P1: "local-only Nostr-publish default doesn't persist across
+// restarts"). Previously in-memory-only, resetting to `"local-only"` on
+// every relaunch even after a user explicitly opted in to real publication
+// -- confirmed a genuine durability gap, not a security-motivated reset (a
+// SAFE default is still always the fallback on a corrupt/missing/first-run
+// read, see `loadPersistedCommerceNetworkProfile()` below; this only stops
+// re-asking a user to re-opt-in every single session). Persisted to its
+// OWN small file (never the shared, closed-vocabulary
+// `FedosSettingsDescriptorV1` in `src/os/core/settings/` -- that descriptor
+// is a deliberately closed, schema-versioned shape covering a fixed,
+// exhaustively-listed field set, see its own header; adding a field there
+// is a real schema migration, out of scope for this narrow durability fix),
+// same `FEDOS_ELECTRON_BETA_DATA_DIR`-override discipline as every other
+// durable file in this process (`dataDir()`/`settingsFilePath()`/
+// `commerceDurableFilePath()`), so tests/E2E harnesses can point it at an
+// isolated scratch directory exactly like every other durable file here.
 // ---------------------------------------------------------------------
 
 type CommerceNetworkProfileValue = "local-only" | "direct" | "tor-optional";
 const COMMERCE_NETWORK_PROFILE_VALUES: readonly CommerceNetworkProfileValue[] = ["local-only", "direct", "tor-optional"];
+
+function commerceNetworkProfileFilePath(): string {
+  const override = process.env.FEDOS_ELECTRON_BETA_DATA_DIR;
+  const root = override !== undefined && override.length > 0 ? override : app.getPath("userData");
+  return path.join(root, "commerce_network_profile.json");
+}
+
+/** Fails closed to the safe `"local-only"` default on ANY read/parse problem (missing file, corrupt JSON, unrecognized value) -- never throws, never silently turns Nostr publication on from a bad read. */
+function loadPersistedCommerceNetworkProfile(): CommerceNetworkProfileValue {
+  try {
+    const raw = fs.readFileSync(commerceNetworkProfileFilePath(), "utf8");
+    const parsed: unknown = JSON.parse(raw);
+    const candidate = (parsed as { profile?: unknown } | null)?.profile;
+    if (typeof candidate === "string" && (COMMERCE_NETWORK_PROFILE_VALUES as readonly string[]).includes(candidate)) {
+      return candidate as CommerceNetworkProfileValue;
+    }
+  } catch {
+    // No file yet (first run), unreadable, or corrupt -- safe default below.
+  }
+  return "local-only";
+}
+
+/** Best-effort persistence -- a write failure never throws into the IPC handler; the in-memory value the caller already set is still correct for THIS session even if it won't survive a restart. */
+function persistCommerceNetworkProfile(profile: CommerceNetworkProfileValue): void {
+  try {
+    const filePath = commerceNetworkProfileFilePath();
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify({ profile }), "utf8");
+  } catch (err) {
+    console.error("fedos-beta: failed to persist Commerce Network Profile setting (in-memory value for this session is unaffected)", err);
+  }
+}
+
+// Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+// starts at the same safe static default every prior pass used; the real
+// persisted value (if any) is loaded from disk inside `app.whenReady()`
+// below (`loadPersistedCommerceNetworkProfile()`'s own call site), never
+// eagerly at module-load time -- `app.getPath("userData")` is only
+// reliably meaningful once Electron's `app` module has actually reached
+// `ready`, matching every other disk access in this file (`dataDir()`/
+// `settingsFilePath()` are themselves plain functions, never called at
+// module scope either).
 let commerceNetworkProfile: CommerceNetworkProfileValue = "local-only";
 
 /**
@@ -4370,6 +4442,7 @@ async function handleCreate(payload: unknown) {
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
+      activeLocalIdentity = { displayLabel: result.value.displayLabel, accountPublicIdentifier: result.value.accountPublicIdentifier };
       activeMasterSeedAuthority = built.masterSeedAuthority;
       activeNostrSigningAuthority = built.signer;
       // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- forces
@@ -4416,6 +4489,7 @@ async function handleUnlock(payload: unknown) {
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
+      activeLocalIdentity = { displayLabel: result.value.displayLabel, accountPublicIdentifier: result.value.accountPublicIdentifier };
       activeMasterSeedAuthority = built.masterSeedAuthority;
       activeNostrSigningAuthority = built.signer;
       // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- forces
@@ -4449,6 +4523,7 @@ async function handleLock() {
     activeCoordinator = null;
     activeAssembly = null;
     activeViewerParticipant = null;
+    activeLocalIdentity = null;
     activeRelays = [];
     activeMasterSeedAuthority = null;
     activeNostrSigningAuthority = null;
@@ -4579,6 +4654,7 @@ async function performCleanShutdown(): Promise<void> {
     activeCoordinator = null;
     activeAssembly = null;
     activeViewerParticipant = null;
+    activeLocalIdentity = null;
     activeRelays = [];
     activeMasterSeedAuthority = null;
     activeNostrSigningAuthority = null;
@@ -5011,8 +5087,33 @@ async function handleAppDeviceSyncStatus() {
 // contact, zero real payment reachable from any handler in this section.
 // ---------------------------------------------------------------------
 
+/**
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+ * "Unknown merchant" P1 fix (`docs/commerce/usability-v3/SELLER-TABLETOP-AFTER.md`
+ * friction row: "Seller's own real listing showed 'Unknown merchant'... a
+ * real bug, not a demo-data quirk"). Resolution order:
+ *   1. The CURRENT process's own unlocked real local Persona
+ *      (`activeLocalIdentity`) -- a seller always sees (and buyers viewing
+ *      that seller's own listing from the SAME process see) their real,
+ *      durable profile label, never "Unknown".
+ *   2. The static demo-merchant map (unchanged, for the two demo fixtures).
+ *   3. A genuinely unattributed pubkey (e.g. a real OTHER seller discovered
+ *      cross-process over Nostr, whose display name this process was never
+ *      told -- propagating a real seller's chosen display name into the
+ *      Nostr product event itself is a discovery/event-schema change
+ *      outside this fix's scope, see this arc's own final report) gets an
+ *      honest "a real seller, name not shared yet" label instead of the
+ *      alarming, bug-flavored "Unknown merchant" -- still non-fabricated
+ *      (never invents a name), just doesn't read as broken.
+ */
 function commerceMerchantLabelFor(creatorPubkey: string): string {
-  return fedosCommerceDemoMerchantLabel(creatorPubkey);
+  if (activeLocalIdentity !== null && creatorPubkey === activeLocalIdentity.accountPublicIdentifier) {
+    return activeLocalIdentity.displayLabel;
+  }
+  const demoLabel = fedosCommerceDemoMerchantLabel(creatorPubkey);
+  if (demoLabel !== "Unknown merchant") return demoLabel;
+  const shortId = creatorPubkey.length > 10 ? `${creatorPubkey.slice(0, 10)}…` : creatorPubkey;
+  return `Independent seller ${shortId} (display name not shared yet)`;
 }
 
 /**
@@ -6319,9 +6420,12 @@ async function handleCommercePersonaBoardQuery(payload: unknown) {
 /**
  * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal
  * Settings surface: view/select the `NetworkProfile` gating Nostr Commerce
- * publication. In-memory only this pass (see `commerceNetworkProfile`'s
- * own doc comment) -- resets to the safe `"local-only"` default on every
- * relaunch, never silently turning Nostr on by default.
+ * publication.
+ *
+ * Commerce Discovery + Digital Content Delivery mega-arc (Agent U) -- now
+ * durably persisted (see `persistCommerceNetworkProfile()`'s own doc
+ * comment); a user's explicit choice survives a restart instead of
+ * silently reverting to `"local-only"` every relaunch.
  */
 async function handleCommerceNetworkProfileGet() {
   return { outcome: "ok", profile: commerceNetworkProfile };
@@ -6333,6 +6437,7 @@ async function handleCommerceNetworkProfileSet(payload: unknown) {
     return { outcome: "invalid-input", reason: `profile must be one of ${COMMERCE_NETWORK_PROFILE_VALUES.join(", ")}` };
   }
   commerceNetworkProfile = profile as CommerceNetworkProfileValue;
+  persistCommerceNetworkProfile(commerceNetworkProfile);
   return { outcome: "ok", profile: commerceNetworkProfile };
 }
 
@@ -7255,6 +7360,11 @@ function createBetaWindow(): BrowserWindow {
 app.whenReady().then(async () => {
   try {
     fs.mkdirSync(dataDir(), { recursive: true });
+    // Commerce Discovery + Digital Content Delivery mega-arc (Agent U) --
+    // real Commerce Network Profile durability fix; see
+    // `loadPersistedCommerceNetworkProfile()`'s own header for why this is
+    // loaded here (post-ready) rather than eagerly at module scope.
+    commerceNetworkProfile = loadPersistedCommerceNetworkProfile();
     modules = await loadRootModules();
     registerIpcHandlers();
     mainWindow = createBetaWindow();
