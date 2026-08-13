@@ -383,6 +383,8 @@ interface FedosCommerceMediaGrantRedeemResult {
   readonly reason?: string;
   readonly contentBase64?: string;
   readonly contentType?: string;
+  /** BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- `"cache"` on `outcome: "ok"` when this content was already durably on this device (e.g. after a restart) rather than freshly received this call. */
+  readonly source?: string;
 }
 
 /** FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc (Agent D) -- arc §32/§36 / friction-ledger row #14. */

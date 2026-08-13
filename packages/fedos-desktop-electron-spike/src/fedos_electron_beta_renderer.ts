@@ -1301,6 +1301,25 @@ function renderCommerceOrderScreen(): void {
  * only the plain content bytes (as a downloadable data URL) once the
  * grant-gated redeem call succeeds, or an honest denial reason.
  */
+/**
+ * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- friendly
+ * copy for the real, closed-vocabulary outcomes the now-real cross-process
+ * `commerceMediaGrantRedeem()` can return. Never invents a reassuring
+ * message for a failure — every branch here maps to a genuinely distinct,
+ * truthful state (arc mandate item 4/5): still negotiating with the seller
+ * ("pending"), a specific denial reason, or an unexpected error.
+ */
+function commerceMediaGrantRedeemFriendlyReason(outcome: string, reason: string | undefined): string {
+  if (outcome === "pending") return "Requested from the seller — this can take a moment. Click again shortly to check.";
+  if (reason === "no-grant-on-file" || reason === "order-not-qualifying") return "No protected digital content is available for this order yet.";
+  if (reason === "content-unavailable") return "The seller's copy of this content is currently unavailable. Try again later.";
+  if (reason === "content-corrupt") return "The content received did not match what the seller signed for — treated as undelivered, not opened.";
+  if (reason === "wrap-unavailable") return "Could not securely receive this content right now. Try again once your connection/profile is ready.";
+  if (reason === "revoked" || reason === "expired" || reason === "superseded") return "Access to this content has been revoked or has expired.";
+  if (reason === "buyer-mismatch" || reason === "wrong-signer") return "This content was not granted to the current identity.";
+  return reason ?? outcome;
+}
+
 async function onCommerceOpenPurchasedContentClick(): Promise<void> {
   if (currentCommerceOrder === null) return;
   clearError("commerce-order-purchased-content-error");
@@ -1309,16 +1328,21 @@ async function onCommerceOpenPurchasedContentClick(): Promise<void> {
   try {
     const result = await window.fedosApp.commerceMediaGrantRedeem(currentCommerceOrder.id, commerceActingAsPubkey);
     if (result.outcome !== "ok" || result.contentBase64 === undefined) {
-      const reason = result.reason === "no-grant-on-file" || result.reason === "order-not-qualifying"
-        ? "No protected digital content is available for this order yet."
-        : (result.reason ?? result.outcome);
+      const reason = commerceMediaGrantRedeemFriendlyReason(result.outcome, result.reason);
       showCommerceError("commerce-order-purchased-content-error", { outcome: result.outcome, reason });
+      byId("commerce-order-purchased-content-result").setAttribute("hidden", "");
       return;
     }
     byId("commerce-order-purchased-content-result").removeAttribute("hidden");
+    const contentType = result.contentType ?? "application/octet-stream";
     const link = byId<HTMLAnchorElement>("commerce-order-purchased-content-link");
-    link.href = `data:${result.contentType ?? "application/octet-stream"};base64,${result.contentBase64}`;
-    link.download = "purchased-content";
+    link.href = `data:${contentType};base64,${result.contentBase64}`;
+    const extension = contentType.includes("/") ? contentType.split("/")[1]?.split(";")[0] ?? "" : "";
+    link.download = extension.length > 0 ? `purchased-content.${extension}` : "purchased-content";
+    const statusEl = document.getElementById("commerce-order-purchased-content-status");
+    if (statusEl !== null) {
+      statusEl.textContent = result.source === "cache" ? `Content type: ${contentType} — already on this device` : `Content type: ${contentType} — received from seller`;
+    }
   } catch (err) {
     showCommerceError("commerce-order-purchased-content-error", { outcome: "error", reason: err instanceof Error ? err.message : "purchased content request failed unexpectedly" });
   } finally {
