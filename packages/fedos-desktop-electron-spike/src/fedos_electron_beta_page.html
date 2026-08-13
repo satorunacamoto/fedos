@@ -261,7 +261,25 @@
 
         <div class="app-screen" id="app-screen-commerce">
           <h2>Shop</h2>
-          <p class="muted">Fictional/local demo data only — nothing here is a real product, merchant, or payment. <span class="commerce-sim-pill">LOCAL DEMO</span></p>
+
+          <!-- FedOS "Buyer Discovery + Digital Content Delivery" mega-arc
+               (Agent D) -- arc mandate item 2: an honest, always-visible
+               discovery-connection status, replacing the prior single
+               static "Fictional/local demo data only" sentence that used
+               to apply (misleadingly) to the WHOLE screen regardless of
+               whether any real listing was present. Every item in the list
+               below that IS a demo/tutorial fixture still carries its own
+               "DEMO" pill (see `renderCommerceCatalogList()`) -- this
+               banner instead reports the NETWORK/DISCOVERY state itself
+               (LOCAL DEMO / OFFLINE / CONNECTING / SYNCING / CONNECTED /
+               SYNC FAILED), never Nostr/relay jargon. -->
+          <div id="commerce-discovery-banner" role="status" aria-live="polite">
+            <span class="commerce-sim-pill" id="commerce-discovery-badge"></span>
+            <span id="commerce-discovery-detail"></span>
+            <button id="commerce-discovery-connect-btn" type="button" hidden></button>
+          </div>
+          <p class="muted" id="commerce-no-listings-note" hidden>No real sellers' listings found yet.</p>
+
           <div class="commerce-actor-bar">
             <label for="commerce-acting-as">Acting as</label>
             <select id="commerce-acting-as"></select>
@@ -269,6 +287,19 @@
           <p class="muted" id="commerce-acting-as-note"></p>
           <div id="commerce-error" class="error" role="alert"></div>
           <ul class="plain-list" id="commerce-catalog-list"></ul>
+
+          <!-- FedOS "Buyer Discovery + Digital Content Delivery" mega-arc
+               (Agent D) -- arc mandate item 3: a real, user-oriented path
+               to find a specific seller/product, never a raw 64-char
+               pubkey typed by hand. Paste/Open only this pass (no camera
+               scan surface exists in this build) -- see this arc's own
+               final report for that scope note. -->
+          <h3>Find a seller by share code</h3>
+          <p class="muted">If a seller gave you a QR code or a signed share code (never their raw public key), paste the code's text here. FedOS verifies it by SIGNATURE before showing you anything — the code's own content is never trusted directly.</p>
+          <textarea id="commerce-share-open-input" rows="3" placeholder="fedos:trust:v1:..."></textarea>
+          <div id="commerce-share-open-error" class="error" role="alert"></div>
+          <p class="muted" id="commerce-share-open-status" role="status" aria-live="polite"></p>
+          <button id="commerce-share-open-btn" type="button">Open</button>
 
           <h3>My Orders</h3>
           <p class="muted">Orders you created as the currently selected "Acting as" customer identity.</p>
@@ -471,6 +502,18 @@
                non-blocking `nostrSyncOutcome` note, here for publish/unpublish/update. -->
           <p id="commerce-merchant-products-sync-note" class="muted" role="status" aria-live="polite"></p>
           <ul class="plain-list" id="commerce-merchant-products-list"></ul>
+
+          <!-- FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+               arc mandate item 3: result panel for "Share Product" (one panel, shared
+               across every product row's own Share button -- only one share is ever
+               being issued/displayed at a time). -->
+          <div id="commerce-share-issue-error" class="error" role="alert"></div>
+          <div id="commerce-share-issue-result" hidden>
+            <p class="muted">Share code for <span class="field" id="commerce-share-issue-title"></span> -- give this to a real buyer (QR, paste, or file). They verify it by SIGNATURE before trusting anything in it.</p>
+            <img id="commerce-share-issue-qr-image" alt="Scannable QR code encoding the signed product share code below" hidden />
+            <label for="commerce-share-issue-qr-text">Signed share code (the signed object itself is authoritative, the QR image above is transport only)</label>
+            <textarea id="commerce-share-issue-qr-text" readonly rows="4"></textarea>
+          </div>
 
           <!-- friction ledger row #16, arc §13: product edit. Hidden until an Edit button (added
                dynamically per product row) opens it for a specific product id. -->

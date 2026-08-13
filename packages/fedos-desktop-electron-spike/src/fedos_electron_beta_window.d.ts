@@ -132,7 +132,14 @@ interface FedosAppCommandResult {
  */
 type FedosCommerceActorRole = "customer" | "merchant";
 
-/** Commerce Reachable Catalog + Product Surface Phase 1 — one catalog row. */
+/** Commerce Reachable Catalog + Product Surface Phase 1 — one catalog row.
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * `isDemo` added (arc mandate item 5): `true` for one of the fixed,
+ * closed-set demo/tutorial fixtures, `false` for a real (local or
+ * genuinely Nostr-discovered) listing. See
+ * `fedos_electron_beta_main.cts`'s `handleCommerceCatalogList()` own
+ * header for why this stays ONE array (never split into two) -- a
+ * pre-existing real Electron E2E test dependency on positional ordering. */
 interface FedosCommerceCatalogListItem {
   readonly id: string;
   readonly title: string;
@@ -141,12 +148,28 @@ interface FedosCommerceCatalogListItem {
   readonly merchantLabel: string;
   readonly status: string;
   readonly hasImage: boolean;
+  readonly isDemo: boolean;
+}
+
+/** FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * mirrors `fedos_electron_beta_main.cts`'s own `CommerceDiscoveryAttemptOutcome`
+ * exactly (arc mandate item 2). */
+interface FedosCommerceDiscoveryAttempt {
+  readonly outcome: "skipped-local-only" | "skipped-no-relay" | "ok" | "failed";
+  readonly ingestedCount?: number;
+  readonly reason?: string;
 }
 
 interface FedosCommerceCatalogListResult {
   readonly outcome: string;
   readonly reason?: string;
+  /** Every item, real AND demo -- see `FedosCommerceCatalogListItem.isDemo` and this file's own header. */
   readonly products?: readonly FedosCommerceCatalogListItem[];
+  readonly discoveryAttempt?: FedosCommerceDiscoveryAttempt;
+  readonly networkProfile?: "local-only" | "direct" | "tor-optional";
+  readonly hasConfiguredRelay?: boolean;
+  /** Count of `products` entries with `isDemo: false` -- what `noListings` (arc mandate item 2) is derived from. */
+  readonly realListingCount?: number;
 }
 
 interface FedosCommerceProductMedia {
@@ -324,6 +347,44 @@ interface FedosCommerceReceiptIssueResult {
   readonly verifyStatus?: string;
 }
 
+/** FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 3, seller-side "Share Product" result. */
+interface FedosCommerceShareIssueResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly qrText?: string;
+  readonly qrImageDataUrl?: string;
+  readonly productId?: string;
+  readonly title?: string;
+}
+
+/** Structural, unconfirmed preview parsed from a share code -- NEVER
+ * trustworthy on its own (see `handleCommerceShareOpen`'s own header);
+ * `confirmed` on the containing result is the only field that says whether
+ * this preview was independently corroborated. */
+interface FedosCommerceSharePreview {
+  readonly productId: string;
+  readonly title: string;
+  readonly priceCents: number;
+  readonly currency: string;
+  readonly sellerPubkey: string;
+}
+
+/** FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 3, buyer-side "Open a share code" result.
+ * `outcome: "ok"` + `confirmed: false` means the code itself verified but
+ * could not yet be independently corroborated (offline/not-yet-synced) --
+ * NEVER equivalent to `confirmed: true`, and the renderer must not open
+ * Product Detail in that case. `outcome: "rejected"` means the code's
+ * claimed seller does NOT match the real, network-verified record. */
+interface FedosCommerceShareOpenResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly confirmed?: boolean;
+  readonly productId?: string;
+  readonly preview?: FedosCommerceSharePreview;
+}
+
 /**
  * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's
  * read-only Persona Board view. Mirrors `PersonaBoardPublicView`/
@@ -487,6 +548,15 @@ interface FedosAppBridge {
   readonly commerceReceiptIssue: (orderId: string) => Promise<FedosCommerceReceiptIssueResult>;
   /** FedOS Commerce Purchase Completion mega-arc (Agent R) -- read-only companion to `commerceReceiptIssue`: looks up an already-issued receipt without ever minting one (`outcome: "not-found"` if none exists yet). */
   readonly commerceReceiptLookup: (orderId: string) => Promise<FedosCommerceReceiptIssueResult>;
+  /** FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+   * arc mandate item 3: signed Product Share Proof. Only the product's own
+   * creator may issue a share for it (enforced main-process-side). */
+  readonly commerceShareProductIssue: (actorPubkey: string, productId: string) => Promise<FedosCommerceShareIssueResult>;
+  /** Decodes+verifies a pasted/scanned share code and cross-checks it
+   * against the real, network-verified record -- see that handler's own
+   * header for the full two-layer trust model. Never trusts `qrText`'s
+   * content directly. */
+  readonly commerceShareOpen: (qrText: string) => Promise<FedosCommerceShareOpenResult>;
   /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent R's read-only Persona Board query, always the "PUBLIC" disclosure layer. */
   readonly commercePersonaBoardQuery: (subjectPubkey: string) => Promise<FedosCommercePersonaBoardQueryResult>;
   /** FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's minimal NetworkProfile Settings surface. */

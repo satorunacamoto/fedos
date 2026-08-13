@@ -289,6 +289,145 @@ function renderCommerceSyncStatus(elementId: string, tracker: CommerceRendererSy
   byId(elementId).textContent = COMMERCE_SYNC_STATUS_TEXT[tracker.status(Date.now())];
 }
 
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 2: the Shop screen's own discovery-connection status.
+ * Mirrors `os/commerce/catalog/discovery_state.ts` (tested there) exactly
+ * -- reimplemented here, NOT imported, for the same reason
+ * `CommerceRendererSyncTracker` above is a reimplementation rather than an
+ * import: this file runs in an isolated renderer context with no `import`
+ * of any kind (see this file's own top-of-file header).
+ */
+type CommerceDiscoveryStatus = "local-demo" | "offline" | "connecting" | "syncing" | "connected" | "sync-failed";
+
+const COMMERCE_DISCOVERY_STATUS_TEXT: Readonly<Record<CommerceDiscoveryStatus, { readonly badge: string; readonly detail: string }>> = {
+  "local-demo": {
+    badge: "LOCAL DEMO",
+    detail: "Network discovery is turned off for Shop. You're seeing only your own local listings and tutorial/demo items — not real sellers on the network.",
+  },
+  offline: {
+    badge: "OFFLINE",
+    detail: "You haven't connected to a network yet. Connect to discover real sellers' listings.",
+  },
+  connecting: { badge: "CONNECTING", detail: "Connecting to look for sellers…" },
+  syncing: { badge: "SYNCING", detail: "Checking for new listings…" },
+  connected: { badge: "CONNECTED", detail: "Connected. Showing listings synced from the network." },
+  "sync-failed": {
+    badge: "SYNC FAILED",
+    detail: "Could not reach the network just now. Showing your own local listings only — try again.",
+  },
+};
+
+class CommerceDiscoveryTracker {
+  inFlight = false;
+  hasEverAttempted = false;
+  lastAttemptSucceeded: boolean | null = null;
+
+  begin(): void {
+    this.inFlight = true;
+  }
+
+  complete(succeeded: boolean): void {
+    this.inFlight = false;
+    this.hasEverAttempted = true;
+    this.lastAttemptSucceeded = succeeded;
+  }
+
+  status(networkProfile: "local-only" | "direct" | "tor-optional", hasConfiguredRelay: boolean): CommerceDiscoveryStatus {
+    if (networkProfile === "local-only") return "local-demo";
+    if (!hasConfiguredRelay) return "offline";
+    if (this.inFlight) return this.hasEverAttempted ? "syncing" : "connecting";
+    if (this.lastAttemptSucceeded === false) return "sync-failed";
+    return "connected";
+  }
+}
+
+const commerceDiscoveryTracker = new CommerceDiscoveryTracker();
+let commerceLastNetworkProfile: "local-only" | "direct" | "tor-optional" = "local-only";
+let commerceLastHasConfiguredRelay = false;
+
+function renderCommerceDiscoveryBanner(noListings: boolean): void {
+  const status = commerceDiscoveryTracker.status(commerceLastNetworkProfile, commerceLastHasConfiguredRelay);
+  const text = COMMERCE_DISCOVERY_STATUS_TEXT[status];
+  byId("commerce-discovery-badge").textContent = text.badge;
+  byId("commerce-discovery-detail").textContent = text.detail;
+  byId("commerce-no-listings-note").toggleAttribute("hidden", !noListings);
+  const connectBtn = byId<HTMLButtonElement>("commerce-discovery-connect-btn");
+  if (status === "offline") {
+    connectBtn.textContent = "Go to Relay Settings";
+    connectBtn.removeAttribute("hidden");
+  } else if (status === "local-demo") {
+    connectBtn.textContent = "Enable network discovery";
+    connectBtn.removeAttribute("hidden");
+  } else {
+    connectBtn.setAttribute("hidden", "");
+  }
+}
+
+/** Click handler for `#commerce-discovery-connect-btn` -- its action depends on WHY discovery is currently unavailable (no Relay configured at all vs. deliberately turned off), recomputed fresh rather than parsed from the button's own label text. */
+async function onCommerceDiscoveryConnectClick(): Promise<void> {
+  const status = commerceDiscoveryTracker.status(commerceLastNetworkProfile, commerceLastHasConfiguredRelay);
+  if (status === "offline") {
+    showAppScreen("settings");
+    return;
+  }
+  if (status === "local-demo") {
+    const result = await window.fedosApp.commerceNetworkProfileSet("direct");
+    if (result.outcome === "ok") {
+      void refreshCommerceCatalogList();
+    }
+  }
+}
+
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * arc mandate item 3, buyer side. Decodes+verifies the pasted/scanned
+ * share code (main-process side, `handleCommerceShareOpen()` -- this
+ * function never parses or trusts the text itself) and, ONLY on a genuine
+ * `confirmed: true` result, opens the REAL Product Detail via the SAME
+ * `openCommerceProduct()` path the ordinary catalog's own "View" button
+ * uses -- never a screen built from this handler's own unconfirmed preview
+ * copy.
+ */
+async function onCommerceShareOpenClick(): Promise<void> {
+  const btn = byId<HTMLButtonElement>("commerce-share-open-btn");
+  if (btn.disabled) return;
+  const input = byId<HTMLTextAreaElement>("commerce-share-open-input");
+  const statusEl = byId("commerce-share-open-status");
+  clearError("commerce-share-open-error");
+  statusEl.textContent = "";
+  const text = input.value.trim();
+  if (text.length === 0) {
+    byId("commerce-share-open-error").textContent = "Paste a share code first.";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const result = await window.fedosApp.commerceShareOpen(text);
+    if (result.outcome === "invalid-input" || result.outcome === "invalid") {
+      byId("commerce-share-open-error").textContent = result.reason ?? "That doesn't look like a valid share code.";
+      return;
+    }
+    if (result.outcome === "rejected") {
+      byId("commerce-share-open-error").textContent = result.reason ?? "This share code was rejected.";
+      return;
+    }
+    if (result.confirmed === true && result.productId !== undefined) {
+      statusEl.textContent = `Confirmed — opening ${result.preview?.title ?? "this product"}…`;
+      input.value = "";
+      await openCommerceProduct(result.productId);
+      return;
+    }
+    // outcome "ok" but confirmed !== true -- a structurally valid,
+    // self-consistent code that could not (yet) be independently
+    // corroborated against a real network record. Shown as an honest
+    // preview, NEVER treated as equivalent to a confirmed listing.
+    statusEl.textContent = `Unconfirmed preview: "${result.preview?.title ?? "unknown product"}" — ${result.reason ?? "could not verify this against the network yet."}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ---------------------------------------------------------------------
 // Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 21
 // (arc §22, §41-42): "SYSTEMATIC action-handler robustness" for every
@@ -824,6 +963,18 @@ function renderCommerceCatalogList(): void {
     merchant.className = "muted field";
     merchant.textContent = product.merchantLabel;
     li.appendChild(merchant);
+    // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D)
+    // -- arc mandate item 5: every demo/tutorial fixture is now explicitly,
+    // individually labeled -- never silently blended with zero
+    // distinguishing signal, even though (see `handleCommerceCatalogList()`'s
+    // own header for why) it still shares this same list/DOM position with
+    // real listings.
+    if (product.isDemo) {
+      const demoPill = document.createElement("span");
+      demoPill.className = "commerce-sim-pill";
+      demoPill.textContent = "DEMO";
+      li.appendChild(demoPill);
+    }
     const openBtn = document.createElement("button");
     openBtn.type = "button";
     openBtn.textContent = "View";
@@ -836,18 +987,32 @@ function renderCommerceCatalogList(): void {
 
 async function refreshCommerceCatalogList(): Promise<void> {
   populateCommerceActorSelect("commerce-acting-as");
+  commerceDiscoveryTracker.begin();
+  renderCommerceDiscoveryBanner(commerceCatalogCache.filter((p) => !p.isDemo).length === 0);
   const result = await runCommerceAction([], "commerce-error", () => window.fedosApp.commerceCatalogList());
   if (result === undefined) {
     commerceCatalogCache = [];
+    commerceDiscoveryTracker.complete(false);
     renderCommerceCatalogList();
   } else if (result.outcome !== "ok") {
     showError("commerce-error", result);
     commerceCatalogCache = [];
+    commerceDiscoveryTracker.complete(false);
     renderCommerceCatalogList();
   } else {
     commerceCatalogCache = result.products ?? [];
+    commerceLastNetworkProfile = result.networkProfile ?? "local-only";
+    commerceLastHasConfiguredRelay = result.hasConfiguredRelay ?? false;
+    // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D)
+    // -- a discovery ATTEMPT that was deliberately skipped (local-only / no
+    // relay configured) is not a FAILURE -- only `outcome: "failed"` (a
+    // genuine query error) counts as `sync-failed`; skipped states are
+    // reported through `commerceLastNetworkProfile`/`commerceLastHasConfiguredRelay`
+    // instead (see `renderCommerceDiscoveryBanner()`'s own priority order).
+    commerceDiscoveryTracker.complete(result.discoveryAttempt?.outcome !== "failed");
     renderCommerceCatalogList();
   }
+  renderCommerceDiscoveryBanner((result?.realListingCount ?? 0) === 0);
   void refreshCommerceMyOrdersList();
   void refreshCommerceBuyerActivitySummary();
 }
@@ -1785,7 +1950,54 @@ function commerceMerchantProductRow(product: FedosCommerceMerchantProduct): HTML
   // (Agent D) -- friction-ledger row #17 / arc §38: per-product image
   // attach control, independent of publish state.
   li.appendChild(commerceMerchantProductImageAttachControls(product.id));
+
+  // FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+  // arc mandate item 3: "Share Product" -- emits a signed deep-link/QR/
+  // compact code a real, independent buyer can Scan/Paste/Open to discover
+  // this exact product, verified via signature (never a raw pubkey typed
+  // by hand).
+  const shareBtn = document.createElement("button");
+  shareBtn.type = "button";
+  shareBtn.className = "commerce-btn-secondary";
+  shareBtn.textContent = "Share Product";
+  shareBtn.setAttribute("aria-label", `Share ${product.title}`);
+  shareBtn.addEventListener("click", () => void onCommerceShareProductIssue(product.id, shareBtn));
+  li.appendChild(shareBtn);
   return li;
+}
+
+/**
+ * FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+ * issues a signed share proof for `productId` (only ever reachable for a
+ * product `commerceActingAsPubkey` genuinely owns -- enforced main-process
+ * side too, this is not the only gate) and renders the resulting QR/text
+ * into the ONE shared result panel below the merchant product list.
+ */
+async function onCommerceShareProductIssue(productId: string, btn: HTMLButtonElement): Promise<void> {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const errorId = "commerce-share-issue-error";
+  clearError(errorId);
+  byId("commerce-share-issue-result").setAttribute("hidden", "");
+  try {
+    const result = await window.fedosApp.commerceShareProductIssue(commerceActingAsPubkey, productId);
+    if (result.outcome !== "ok" || result.qrText === undefined) {
+      showCommerceError(errorId, result);
+      return;
+    }
+    byId("commerce-share-issue-title").textContent = result.title ?? "";
+    byId<HTMLTextAreaElement>("commerce-share-issue-qr-text").value = result.qrText;
+    const img = byId<HTMLImageElement>("commerce-share-issue-qr-image");
+    if (result.qrImageDataUrl !== undefined && isSafeCommerceImageDataUri(result.qrImageDataUrl)) {
+      img.src = result.qrImageDataUrl;
+      img.removeAttribute("hidden");
+    } else {
+      img.setAttribute("hidden", "");
+    }
+    byId("commerce-share-issue-result").removeAttribute("hidden");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // Real Two-Party Commerce + UX P0/P1 Closure arc (coordinator merge note):
@@ -3545,6 +3757,11 @@ byId<HTMLButtonElement>("nav-settings").addEventListener("click", () => {
 byId<HTMLButtonElement>("commerce-my-orders-refresh").addEventListener("click", () =>
   void runCommerceAction(["commerce-my-orders-refresh"], "commerce-error", () => refreshCommerceMyOrdersList()),
 );
+// FedOS "Buyer Discovery + Digital Content Delivery" mega-arc (Agent D) --
+// arc mandate items 1-3: the Shop screen's "Connect to discover sellers"
+// call to action and the share-code "Open" control.
+byId<HTMLButtonElement>("commerce-discovery-connect-btn").addEventListener("click", () => void onCommerceDiscoveryConnectClick());
+byId<HTMLButtonElement>("commerce-share-open-btn").addEventListener("click", () => void onCommerceShareOpenClick());
 byId<HTMLButtonElement>("commerce-merchant-orders-refresh").addEventListener("click", () =>
   void runCommerceAction(["commerce-merchant-orders-refresh"], "commerce-merchant-orders-error", () => refreshCommerceMerchantOrdersList()),
 );
