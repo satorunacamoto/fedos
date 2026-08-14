@@ -4,7 +4,7 @@
 // "regex-extract literal facts from the accepted TS/TOML source, never
 // hand-maintain a duplicate copy" discipline -- this file reads the
 // ALREADY-FROZEN `FedosDesktopBetaReleaseConfigurationV1` literal fields
-// straight out of `src/desktop/beta/fedos_desktop_beta_release_configuration.ts`
+// straight out of `src/os/messenger/desktop/beta/fedos_desktop_beta_release_configuration.ts`
 // (never re-declares them), so a future bump to that one accepted source
 // file is the ONLY place a release's own identity ever needs to change.
 //
@@ -13,6 +13,20 @@
 // the running application itself (`fedosDesktopBetaReleaseConfigurationV1()`),
 // plus build-time-only facts (git commit, WASM artifact hash) that object
 // cannot know at compile time.
+//
+// Real Digital Delivery mega-arc (Coordinator, release-pipeline pass) --
+// both source paths below updated to their REAL, current, physical
+// location. The Compatibility Facade Reduction / Messenger physical
+// migration arc moved both accepted sources under `src/os/messenger/...`
+// and left thin one-line `export * from "..."` shims at their old paths
+// (correct and intentional -- see `docs/architecture/COMPATIBILITY-FACADE-LIFECYCLE.md`)
+// -- but this file's own literal-string regex scrape reads the raw TEXT
+// of the ORIGINAL file, and a re-export shim's text obviously no longer
+// contains `productName: "..."` / the schema-version constant. Every
+// real importer elsewhere in the repo was correctly updated by that
+// migration; this build script's own hardcoded path was not, because
+// nobody had actually run the full `release:electron-beta` pipeline
+// since. It failed immediately the first time this arc did.
 import { readFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
@@ -24,8 +38,8 @@ import { fileURLToPath } from "node:url";
 // every OTHER script in this directory correctly uses `process.cwd()`, since they are never imported,
 // only ever run as `node scripts/....mjs` from that package's own root).
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
-const RELEASE_CONFIG_SOURCE = join(ROOT, "src", "desktop", "beta", "fedos_desktop_beta_release_configuration.ts");
-const ARCHIVE_SCHEMA_SOURCE = join(ROOT, "src", "conversation", "archive", "fedos_conversation_archive_schema_version.ts");
+const RELEASE_CONFIG_SOURCE = join(ROOT, "src", "os", "messenger", "desktop", "beta", "fedos_desktop_beta_release_configuration.ts");
+const ARCHIVE_SCHEMA_SOURCE = join(ROOT, "src", "os", "messenger", "conversations", "archive", "fedos_conversation_archive_schema_version.ts");
 const WASM_MANIFEST_PATH = join(ROOT, "packages", "fedos-core-rust", "pkg", "fedos_wasm_artifact_manifest.v1.json");
 
 function requireMatch(source, pattern, label) {
