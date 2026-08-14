@@ -80,6 +80,7 @@ const CURRENT_SUPPORTED_TEST_FILES = [
   "test/commerce_delivery_state_machine.test.ts",
   "test/commerce_directory.test.ts",
   "test/commerce_durable_payment_settlement_ledger.test.ts",
+  "test/commerce_durable_product_media_repository.test.ts",
   "test/commerce_e2e_tabletop_failure_cases.test.ts",
   "test/commerce_inbound_event_bridge.test.ts",
   "test/commerce_ipfs_media_store.test.ts",

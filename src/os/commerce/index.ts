@@ -143,6 +143,13 @@ export { DurableProductRepository } from "./catalog/persistence/durable_product_
 export { generateFedosProductId, generateFedosProductMediaId } from "./catalog/product_id.js";
 
 export { LocalProductMediaRepository } from "./catalog/local_product_media_repository.js";
+// Real Digital Delivery mega-arc (Coordinator, positive-E2E root-cause fix)
+// -- durable sibling of `LocalProductMediaRepository` above, same
+// `ProductMediaRepositoryPort`, backed by an append-only NDJSON log file --
+// see that file's own header for the live gap this closes (a seller's own
+// ProductMedia catalog, including the `storageRef` needed to locate real
+// protected content, was never surviving a process restart).
+export { DurableProductMediaRepository } from "./catalog/persistence/durable_product_media_repository.js";
 export type {
   ProductMediaRepositoryPort,
   AddProductMediaInput,
