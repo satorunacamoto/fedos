@@ -1040,6 +1040,13 @@ interface RootModules {
      * friction-ledger row #17).
      */
     readonly LocalProductMediaRepository: new (generateId?: () => string) => CommerceProductMediaRepositoryLike;
+    /**
+     * Real Digital Delivery mega-arc (Coordinator, positive-E2E root-cause
+     * fix) -- durable sibling of `LocalProductMediaRepository` immediately
+     * above; see `durable_product_media_repository.ts`'s own header for the
+     * live cross-restart data-loss gap this closes.
+     */
+    readonly DurableProductMediaRepository: new (filePath: string, generateId?: () => string) => CommerceProductMediaRepositoryLike;
     readonly generateFedosProductMediaId: () => string;
     /**
      * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
@@ -2160,6 +2167,7 @@ async function loadRootModules(): Promise<RootModules> {
     decodeCommerceShareProofFromQrText: RootModules["Commerce"]["decodeCommerceShareProofFromQrText"];
     DurableReceiptStore: RootModules["Commerce"]["DurableReceiptStore"];
     LocalProductMediaRepository: RootModules["Commerce"]["LocalProductMediaRepository"];
+    DurableProductMediaRepository: RootModules["Commerce"]["DurableProductMediaRepository"];
     generateFedosProductMediaId: RootModules["Commerce"]["generateFedosProductMediaId"];
     isQualifyingOrderStatusForMediaAccess: RootModules["Commerce"]["isQualifyingOrderStatusForMediaAccess"];
     issueMediaAccessGrantsForOrder: RootModules["Commerce"]["issueMediaAccessGrantsForOrder"];
@@ -2372,6 +2380,7 @@ async function loadRootModules(): Promise<RootModules> {
       decodeCommerceShareProofFromQrText: commerce.decodeCommerceShareProofFromQrText,
       DurableReceiptStore: commerce.DurableReceiptStore,
       LocalProductMediaRepository: commerce.LocalProductMediaRepository,
+      DurableProductMediaRepository: commerce.DurableProductMediaRepository,
       generateFedosProductMediaId: commerce.generateFedosProductMediaId,
       isQualifyingOrderStatusForMediaAccess: commerce.isQualifyingOrderStatusForMediaAccess,
       issueMediaAccessGrantsForOrder: commerce.issueMediaAccessGrantsForOrder,
@@ -2556,10 +2565,29 @@ function commerceReceiptState(): CommerceReceiptStoreLike {
   return commerceReceiptStore;
 }
 
+/**
+ * Real Digital Delivery mega-arc (Coordinator, positive-E2E root-cause fix)
+ * -- was `new m.Commerce.LocalProductMediaRepository()`, a bare in-memory
+ * `Map` with ZERO persistence: a seller's own product-media catalog
+ * (including `storageRef`, the only key that locates real protected content
+ * already durably stored on disk) was silently lost on every restart,
+ * permanently and silently breaking `issueCommerceMediaAccessGrantsNonFatal()`
+ * and the seller-side private-media-release response path for any product
+ * whose content was attached in an earlier process launch -- confirmed live
+ * via a real two-independent-Electron-process positive digital-delivery run
+ * (`media_access_grants.ndjson` was never created after a real "Mark
+ * Fulfilling" click in a fresh Bob process). `DurableProductMediaRepository`
+ * (`durable_product_media_repository.ts`) is the SAME `ProductMediaRepositoryPort`,
+ * append-only-NDJSON-backed like every other Commerce entity in this file --
+ * see that file's own header for the full account of why re-deriving this
+ * from the network was never viable (`storageRef` is deliberately never
+ * published).
+ */
 function commerceProductMediaState(): CommerceProductMediaRepositoryLike {
   const m = requireModules();
   if (commerceProductMediaRepo === null) {
-    commerceProductMediaRepo = new m.Commerce.LocalProductMediaRepository();
+    fs.mkdirSync(path.dirname(commerceDurableFilePath("product_media")), { recursive: true });
+    commerceProductMediaRepo = new m.Commerce.DurableProductMediaRepository(commerceDurableFilePath("product_media"));
   }
   return commerceProductMediaRepo;
 }
@@ -8425,7 +8453,7 @@ app.whenReady().then(async () => {
       }
       try {
         const scriptRaw = process.env.FEDOS_BETA_UI_SCRIPT ?? "[]";
-        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait" | "copy" | "screenshot" | "attachFile"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value"; readonly ms?: number; readonly targetSelector?: string; readonly fileName?: string; readonly fileType?: string }> = JSON.parse(scriptRaw);
+        const script: ReadonlyArray<{ readonly action: "fill" | "click" | "doubleClick" | "read" | "readGlobal" | "wait" | "copy" | "screenshot" | "attachFile"; readonly selector?: string; readonly value?: string; readonly as?: "text" | "value" | "href"; readonly ms?: number; readonly targetSelector?: string; readonly fileName?: string; readonly fileType?: string }> = JSON.parse(scriptRaw);
         for (let i = 0; i < script.length; i++) {
           const step = script[i]!;
           if (step.action === "wait") {
@@ -8550,9 +8578,20 @@ app.whenReady().then(async () => {
               ? { outcome: "ok", value: await window.webContents.executeJavaScript(`typeof window[${JSON.stringify(selector)}]`) }
               : { outcome: "invalid-input", reason: "unrecognized readGlobal selector" };
           } else {
+            // Real Digital Delivery mega-arc (Coordinator, positive E2E) --
+            // `as: "href"` reads a real `<a>` element's resolved `.href`
+            // (never `getAttribute("href")`, which would return the raw,
+            // possibly-relative attribute text) -- the ONE way this harness
+            // can pull the buyer's real received purchased-content
+            // `data:` URL (`#commerce-order-purchased-content-link`) out of
+            // a live page for byte-for-byte SHA-256 verification against a
+            // known digest, without adding any new IPC surface or touching
+            // renderer code. Test-only, same `AUTOTEST_MODE` gate as every
+            // other action in this loop.
             const as = step.as ?? "text";
+            const accessor = as === "value" ? "el.value" : as === "href" ? "el.href" : "el.textContent";
             result = await window.webContents.executeJavaScript(
-              `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; return { outcome: "ok", value: ${as === "value" ? "el.value" : "el.textContent"} }; })()`,
+              `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return { outcome: "not-found" }; return { outcome: "ok", value: ${accessor} }; })()`,
             );
           }
           const stepLine = `FEDOS_ELECTRON_BETA_UI_STEP_JSON:${JSON.stringify({ index: i, action: step.action, selector, result })}`;
