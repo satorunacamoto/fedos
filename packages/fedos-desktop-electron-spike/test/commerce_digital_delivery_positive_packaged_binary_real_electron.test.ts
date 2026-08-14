@@ -47,15 +47,36 @@
  * prior pass, against the dev build -- see
  * `docs/commerce/PROTECTED-MEDIA-BYTE-DURABILITY-GAP.md`).
  *
- * PHASE MAP: identical to `commerce_digital_delivery_positive_real_electron.test.ts`'s
+ * PHASE MAP: STEP 1-9 are near-identical to `commerce_digital_delivery_positive_real_electron.test.ts`'s
  * own STEP 1-9 (see that file's own header for the full phase-by-phase
  * account) -- not repeated narratively here to avoid drift between two
  * copies of the same prose; the UI-step scripts themselves are the
- * authoritative, verbatim-shared source of truth.
+ * authoritative, verbatim-shared source of truth. STEP 8/9 assert the
+ * FIXED, truthful completion-sync behavior (Cross-Process Completion Sync
+ * mega-arc, Coordinator -- see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md's
+ * own "Resolution" section): Bob's independent restarted process genuinely
+ * mirrors "completed" (Finding 1), and Alice's restarted process reopens
+ * her own already-purchased content via a real cache hit, with zero
+ * "availability-unknown" (Finding 2).
+ *
+ * STEP 10-12 are NEW this same arc (mandate section 33, the mandatory
+ * "false-green live negative"): a SECOND, independent protected trade,
+ * reusing Bob/Alice's already-durable Personas, whose stored ciphertext is
+ * deliberately corrupted on real disk (direct Node `fs` write, this TEST
+ * process, no UI, no production code path) immediately after a genuine
+ * attach+publish. Proves that grant issuance (entitlement) genuinely
+ * succeeds independent of content integrity, while redeem/complete/receipt
+ * and the seller's own reputation summary are ALL honestly, fail-closed
+ * rejected for the broken content -- no false complete, no false receipt,
+ * no false reputation, no false content-open, anywhere in the chain, on
+ * the real installed binary. This exercises `buildOutboundPrivateMediaReleaseResponse()`'s
+ * own real content-identity/checksum gate
+ * (`../../../src/os/commerce/events/commerce_private_media_release_apply.ts`),
+ * never a mock.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, appendFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, appendFileSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -257,6 +278,13 @@ const PRODUCT_TITLE = "FedOS Digital Delivery Positive Packaged E2E Item";
 const PRODUCT_DESCRIPTION = "Real protected-content product for the Digital Delivery Positive PACKAGED-BINARY E2E -- declares a real purchased PDF released via a real grant, against the real installed app.";
 const ROW = "#commerce-merchant-products-list li:last-child";
 
+// FALSE-GREEN LIVE NEGATIVE (Cross-Process Completion Sync mega-arc,
+// Coordinator, mandate section 33) -- a SECOND, independently-broken
+// protected trade, reusing Bob/Alice's already-durable Personas from
+// STEP 1/2 above (no new persona-create launches needed).
+const SECOND_PRODUCT_TITLE = "FedOS Digital Delivery False-Green Negative Packaged E2E Item";
+const SECOND_PRODUCT_DESCRIPTION = "A SECOND, deliberately-broken-content protected product for the Digital Delivery False-Green Negative PACKAGED-BINARY proof -- the stored ciphertext is corrupted on real disk after a real attach, so the declared ProductMedia checksum can never match the actual bytes again.";
+
 function returningLaunchPreamble(passphrase: string, networkProfile: "local-only" | "direct", actingAsSelector: string, actingAsPubkey: string): readonly UiStep[] {
   return [
     { action: "wait", ms: 300 }, // 0
@@ -295,6 +323,7 @@ realSuite(
     let bobPubkey = "";
     let alicePubkey = "";
     let orderId = "";
+    let secondOrderId = "";
     let productMediaGrantsFilePath = "";
     let productMediaBlobDir = "";
 
@@ -880,7 +909,7 @@ realSuite(
     // delivered content; issues + verifies a real signed receipt.
     // =====================================================================
     it(
-      "STEP 8: Alice completes the order with REAL delivered content; real signed receipt issued+verified; Bob's independent restarted process mirrors as far as the seller-side sync gate currently allows (KNOWN GAP, see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md)",
+      "STEP 8: Alice completes the order with REAL delivered content; real signed receipt issued+verified; Bob's independent restarted process genuinely mirrors the same truthful completion + reputation",
       async () => {
         const alice8 = await runBetaUiScript(
           installedExePath,
@@ -956,24 +985,23 @@ realSuite(
         expect(readAt(bob6, 1)).toBe("unlock");
         expect(readAt(bob6, 5)).toBe("ready");
         const bobStatus = readAt(bob6, 10);
-        // KNOWN, DOCUMENTED, PRE-EXISTING GAP (not caused by this arc's own
-        // fix -- see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md
-        // Finding 1, first LIVE-reproduced by this exact suite): the seller's
-        // own inbound-order-sync re-validation of
-        // evaluateDigitalContentDeliveryInvariantForOrderCompletion() checks
-        // `commerceMediaReleaseContentCacheState()` -- the BUYER's own
-        // release-content cache -- which the seller's own process never has
-        // an entry in for content it sold (only a buyer receives/decrypts a
-        // release). This is why the mirror stops at "delivered", never
-        // "completed", on the seller's own restarted process, even though
-        // Alice's own completion (asserted above, STEP 8a) was genuinely
-        // truthful. Asserting the REAL, current, honest boundary here (never
-        // a false "completed") rather than the originally-hoped-for full
-        // mirror, which this arc's own mandate did not scope fixing.
-        expect(bobStatus, `Bob's independent restarted process must at least honestly reflect a real delivery (never silently drop the sync, never claim an unrelated status). Full output:\n${bob6.output}`).toBe("delivered");
+        // FIXED (FedOS "Cross-Process Completion Sync + Buyer Restart
+        // Content Re-access + Truthful Reputation Final Closure" mega-arc,
+        // Coordinator) -- see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md
+        // Finding 1's own "Resolution" section for the full account. The
+        // seller's own inbound-order-sync re-validation of
+        // evaluateDigitalContentDeliveryInvariantForOrderCompletion() now
+        // uses a ROLE-AWARE `hasReleasedContent` predicate: on the seller's
+        // own process it checks the NEW, seller-owned, durable
+        // `DurableMediaReleaseIssuanceLog` (genuinely-verified evidence this
+        // process itself already built and sent a real release) instead of
+        // the buyer-only `DurableMediaReleaseContentCache` it could never
+        // have an entry in. Bob's independent, restarted process now
+        // genuinely mirrors Alice's real completion.
+        expect(bobStatus, `Bob's independent restarted process must genuinely mirror Alice's real, truthful completion. Full output:\n${bob6.output}`).toBe("completed");
         const reputationSummary = readAt(bob6, 11);
         record(
-          `STEP 8c PARTIAL (KNOWN GAP, see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md) -- Bob's independent, RESTARTED PACKAGED process (pid ${String(bob6.pid)}) mirrors Alice's genuine completion only as far as "${bobStatus}" (not "completed") -- a pre-existing, already-documented gap in the seller-side inbound-order-sync truthful-completion re-check, first live-reproduced by this suite (previously unreachable because the byte-durability bug this arc's own mandate fixes always failed first, at STEP 7). Reputation summary: "${reputationSummary}". No false positive occurs -- see the finding doc for the full account.`,
+          `STEP 8c PASS (REQUIRED) -- Bob's independent, RESTARTED PACKAGED process (pid ${String(bob6.pid)}) genuinely mirrors Alice's real completion ("${bobStatus}") and reports a reputation summary reflecting a genuine successful digital delivery: "${reputationSummary}".`,
         );
       },
       190000,
@@ -985,7 +1013,7 @@ realSuite(
     // surviving grant with missing bytes is FAIL (never observed here).
     // =====================================================================
     it(
-      "STEP 9 (BOTH-SIDES RESTART): full restart of BOTH apps after successful delivery -- Order/Payment/Delivery/grant/receipt genuinely survive on both sides; content-access re-check and seller-side completion mirror hit the SAME known, pre-existing gap as STEP 8 (see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md)",
+      "STEP 9 (BOTH-SIDES RESTART): full restart of BOTH apps after successful delivery -- Order/Payment/Delivery/grant/receipt genuinely survive on both sides; content remains accessible via a real restart-surviving cache hit and the seller-side completion mirror is genuinely truthful on both sides -- Alice's buyer-restart content re-access (Finding 2) and Bob's seller-restart completion mirror (Finding 1)",
       async () => {
         const alice9 = await runBetaUiScript(
           installedExePath,
@@ -1019,30 +1047,44 @@ realSuite(
         expect(readAt(alice9, 10), `ORDER/PAYMENT/DELIVERY: order status must survive a full restart unchanged. Full output:\n${alice9.output}`).toBe("completed");
         record(`STEP 9a PASS (REQUIRED, ORDER/PAYMENT/DELIVERY) -- Alice's fully-restarted independent PACKAGED process (pid ${String(alice9.pid)}) reads the SAME durable "completed" order after a full restart. This is genuinely durable -- unaffected by either known gap this document's own STEP 8 note cites.`);
 
-        // KNOWN, DOCUMENTED, PRE-EXISTING GAP (not caused by this arc's own
-        // fix -- see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md
-        // Finding 2, first LIVE-reproduced by this exact suite): a fresh
-        // process's own `resolveProductMediaForCompletionInvariant()` view of
-        // a product it did not itself list can be `productMediaKnowledge:
-        // "unsynced"` with an empty list at the exact moment this handler
-        // runs -- reported honestly as "availability-unknown" rather than a
-        // false "here is your content" OR a false "this product never had
-        // protected content". The underlying bytes/checksum genuinely remain
-        // durable (proven in STEP 7); what is not yet reliable across a
-        // restart is THIS process's own re-derived knowledge of whether it
-        // should even attempt to serve them without a fresh network round
-        // trip. Asserting the REAL, current, honest, fail-closed boundary.
+        // FIXED (FedOS "Cross-Process Completion Sync + Buyer Restart
+        // Content Re-access + Truthful Reputation Final Closure" mega-arc,
+        // Coordinator) -- see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md
+        // Finding 2's own "Resolution" section for the full account.
+        // `handleCommerceMediaGrantRedeem()` now checks the buyer's own
+        // already-durable `DurableMediaReleaseContentCache` (via the new
+        // `listReleasesForOrder()` accessor, by `(orderId, buyerPubkey)`
+        // alone) BEFORE ever consulting this process's own `ProductMedia`
+        // knowledge -- so a momentarily-unsynced `ProductMedia` view right
+        // after a fresh restart can no longer shadow content that is
+        // genuinely, durably already sitting on disk. Content remains
+        // accessible via a real restart-surviving cache hit.
         const contentErrorAfterRestart = readAt(alice9, 13);
         expect(
           contentErrorAfterRestart,
-          `CONTENT AFTER RESTART: must be an honest, non-empty state (never a false success, never silence) if content is not immediately servable. Full output:\n${alice9.output}`,
-        ).toBe("availability-unknown");
+          `CONTENT AFTER RESTART: content must remain accessible after a full restart. Full output:\n${alice9.output}`,
+        ).toBe("");
+        const contentStatusAfterRestart = readAt(alice9, 14);
+        expect(contentStatusAfterRestart, "must report a real cache hit, not a fresh network request").toMatch(/already on this device/);
         const contentHrefAfterRestart = readAt(alice9, 15);
-        expect(contentHrefAfterRestart, "must never be a false data: URL when content-access reported an error").not.toMatch(/^data:/);
+        expect(contentHrefAfterRestart, "must be a real data: URL carrying base64 content, byte-for-byte identical to the original fixture").toMatch(
+          /^data:application\/pdf;base64,/,
+        );
+        const base64MarkerAfterRestart = "base64,";
+        const base64IndexAfterRestart = contentHrefAfterRestart.indexOf(base64MarkerAfterRestart);
+        expect(base64IndexAfterRestart).toBeGreaterThan(-1);
+        const receivedContentBase64AfterRestart = contentHrefAfterRestart.slice(base64IndexAfterRestart + base64MarkerAfterRestart.length);
+        const receivedBytesAfterRestart = Buffer.from(receivedContentBase64AfterRestart, "base64");
+        const digestAfterRestart = sha256Hex(receivedBytesAfterRestart);
+        expect(
+          digestAfterRestart,
+          `content re-opened after a full restart must be the EXACT same bytes as STEP 7's original cross-process delivery -- a restart-surviving cache hit, never re-derived/re-decrypted content. received=${digestAfterRestart} known=${REAL_PDF_SHA256}`,
+        ).toBe(REAL_PDF_SHA256);
+        expect(receivedBytesAfterRestart.equals(REAL_PDF_BYTES), "content re-opened after restart must be byte-for-byte identical to the original fixture").toBe(true);
 
         expect(readAt(alice9, 18).toUpperCase()).toContain("VALID");
         record(
-          `STEP 9b PARTIAL (KNOWN GAP, see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md) -- Alice's fully-restarted independent PACKAGED process (pid ${String(alice9.pid)}) honestly reports "${contentErrorAfterRestart}" for content-access immediately after restart (never a false success, never a false denial-of-existence) -- a pre-existing, already-documented ProductMedia cross-process-sync gap, first live-reproduced by this suite. The already-issued receipt remains independently verifiable regardless ("VALID"), and the order/payment/delivery state itself is genuinely durable (STEP 9a).`,
+          `STEP 9b PASS (REQUIRED, BUYER RESTART CONTENT RE-ACCESS) -- Alice's fully-restarted independent PACKAGED process (pid ${String(alice9.pid)}) reopens her own already-purchased content via a real restart-surviving cache hit ("${contentStatusAfterRestart}"), with the EXACT same SHA-256 digest (${digestAfterRestart}) as STEP 7's original cross-process delivery. No availability-unknown, no re-request. The already-issued receipt remains independently verifiable regardless ("VALID"), and the order/payment/delivery state itself is genuinely durable (STEP 9a). Bob's own process was not running at any point during this entire launch (last exited after STEP 8's bob6, next starts below as bob7) -- this is a genuine "seller offline" buyer-restart-after-content proof.`,
         );
 
         const bob7 = await runBetaUiScript(
@@ -1067,14 +1109,15 @@ realSuite(
         );
         expect(readAt(bob7, 1)).toBe("unlock");
         expect(readAt(bob7, 5)).toBe("ready");
-        // Same KNOWN GAP as STEP 8 (Finding 1) -- Bob's own restarted process
-        // still only mirrors "delivered", never "completed", for the same
-        // seller-side inbound-order-sync reason. Asserting the real, stable,
-        // honest boundary, not the originally-hoped-for full mirror.
-        expect(readAt(bob7, 10), `Bob's own fully-restarted process must at least still honestly reflect the real delivery it already mirrored in STEP 8, never regress or drop it. Full output:\n${bob7.output}`).toBe("delivered");
+        // FIXED (Finding 1, same as STEP 8) -- Bob's own restarted process
+        // still genuinely mirrors "completed", now proven stable across a
+        // SECOND restart too (not a transient one-shot artifact): the
+        // seller-owned `DurableMediaReleaseIssuanceLog` evidence this fix
+        // relies on is itself durable, so it survives repeatedly.
+        expect(readAt(bob7, 10), `Bob's own fully-restarted process must still read the SAME real completed order. Full output:\n${bob7.output}`).toBe("completed");
         const bobReputationAfterRestart = readAt(bob7, 11);
         record(
-          `STEP 9c PARTIAL (KNOWN GAP, see docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md) -- Bob's fully-restarted independent PACKAGED process (pid ${String(bob7.pid)}) still mirrors only "delivered" (same Finding 1 as STEP 8, now proven stable across a restart too -- not a transient timing artifact). Reputation: "${bobReputationAfterRestart}". A surviving grant with missing bytes would have been FAIL -- it was not observed: both the grant AND the underlying ciphertext bytes survived both restarts (verified below).`,
+          `STEP 9c(seller) PASS (REQUIRED, SELLER COMPLETION RE-CHECK LIVE PROOF) -- Bob's fully-restarted independent PACKAGED process (pid ${String(bob7.pid)}) still genuinely mirrors "completed" -- stable across a second restart, using no buyer-private cache, only its own seller-owned durable evidence. Reputation: "${bobReputationAfterRestart}". A surviving grant with missing bytes would have been FAIL -- it was not observed: both the grant AND the underlying ciphertext bytes survived both restarts (verified below).`,
         );
 
         expect(existsSync(productMediaBlobDir), "the durable blob directory must still exist after both restarts").toBe(true);
@@ -1092,6 +1135,291 @@ realSuite(
           expect(result.status, `every durably persisted grant envelope must STILL independently verify after both restarts: ${JSON.stringify(result)}`).toBe("VALID");
         }
         record(`STEP 9c PASS -- all ${String(envelopes.length)} durably persisted grant envelope(s) still independently verify (real signature check, this process) after a full restart of BOTH apps, on the real installed binary.`);
+      },
+      220000,
+    );
+
+    // =====================================================================
+    // FALSE-GREEN LIVE NEGATIVE (mandate section 33, mandatory) -- a SECOND,
+    // independent protected trade, deliberately breaking ONE required
+    // content/truth fact (the stored ciphertext, corrupted on real disk
+    // after a real attach) and requiring NO false complete/receipt/
+    // reputation/content-open anywhere in the chain. Reuses Bob/Alice's
+    // already-durable Personas from STEP 1/2 -- no new persona-create
+    // launches needed.
+    // =====================================================================
+    it(
+      "STEP 10 (FALSE-GREEN NEGATIVE, part A): Bob creates a SECOND real protected-content product, whose stored ciphertext is then deliberately corrupted on real disk",
+      async () => {
+        const blobFilesBeforeAttach = existsSync(productMediaBlobDir) ? new Set(readdirSync(productMediaBlobDir)) : new Set<string>();
+
+        const bob8 = await runBetaUiScript(
+          installedExePath,
+          "BOB_8_SECOND_PRODUCT_ATTACH_PUBLISH",
+          bobDataDir,
+          [
+            ...returningLaunchPreamble(BOB_PASSPHRASE, "direct", "#commerce-merchant-acting-as", bobPubkey), // 0..13
+            { action: "click", selector: "#nav-commerce-merchant" }, // 14
+            { action: "wait", ms: 300 }, // 15
+            { action: "fill", selector: "#commerce-merchant-create-title", value: SECOND_PRODUCT_TITLE }, // 16
+            { action: "fill", selector: "#commerce-merchant-create-description", value: SECOND_PRODUCT_DESCRIPTION }, // 17
+            { action: "fill", selector: "#commerce-merchant-create-price", value: "9.00" }, // 18
+            { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 19
+            { action: "click", selector: "#commerce-merchant-create-submit" }, // 20
+            { action: "wait", ms: 400 }, // 21
+            { action: "read", selector: "#commerce-merchant-products-list" }, // 22
+
+            { action: "fill", selector: `${ROW} .commerce-product-content-attach input[type="text"]`, value: "Full guide (PDF)" }, // 23
+            { action: "attachFile", selector: `${ROW} .commerce-product-content-attach input[type="file"]`, value: REAL_PDF_BASE64, fileName: "guide.pdf", fileType: "application/pdf" }, // 24
+            { action: "click", selector: `${ROW} .commerce-product-content-attach button` }, // 25
+            { action: "wait", ms: 2500 }, // 26
+            { action: "read", selector: `${ROW} .commerce-product-content-attach .error` }, // 27 -- expect ""
+            { action: "read", selector: `${ROW} .commerce-product-media-summary` }, // 28
+
+            { action: "click", selector: "li:last-child button.commerce-btn-publish" }, // 29 -- REAL publish, product + product-media-declaration (checksum declared here, BEFORE corruption below)
+            { action: "wait", ms: 600 }, // 30
+            { action: "read", selector: "#commerce-merchant-products-list" }, // 31
+          ],
+          true,
+        );
+        expect(readAt(bob8, 1)).toBe("unlock");
+        expect(readAt(bob8, 5)).toBe("ready");
+        expect(readAt(bob8, 24)).toBe(`1:${REAL_PDF_BYTES.length}:application/pdf`);
+        expect(readAt(bob8, 27), bob8.output).toBe("");
+        expect(readAt(bob8, 31)).toMatch(/—\s*active/);
+        record(
+          `STEP 10a PASS -- Bob's PACKAGED process (pid ${String(bob8.pid)}) attached and published a SECOND real protected-content product ("${SECOND_PRODUCT_TITLE}"), genuinely, with a correctly-matching declared checksum at this point.`,
+        );
+
+        expect(existsSync(productMediaBlobDir), "the durable blob directory must still exist").toBe(true);
+        const blobFilesAfterAttach = readdirSync(productMediaBlobDir);
+        const newBlobFiles = blobFilesAfterAttach.filter((name) => !blobFilesBeforeAttach.has(name));
+        expect(newBlobFiles.length, `expected exactly one new blob file for the second product's attach; before=${JSON.stringify([...blobFilesBeforeAttach])} after=${JSON.stringify(blobFilesAfterAttach)}`).toBe(1);
+        const corruptedBlobFileName = newBlobFiles[0]!;
+        const corruptedBlobPath = join(productMediaBlobDir, corruptedBlobFileName);
+        const originalBlobBytes = readFileSync(corruptedBlobPath);
+        expect(originalBlobBytes.length, "the newly-stored blob must be non-empty before corruption").toBeGreaterThan(0);
+
+        // THE DELIBERATE BREAK: directly overwrite the real, on-disk stored
+        // ciphertext blob (raw Node fs, this TEST process, no UI, no
+        // production code path) so it no longer matches the checksum
+        // `ProductMedia.checksum` already durably declared at attach/publish
+        // time above. This is the exact same real, on-disk file
+        // `commerceMediaBlobDir()`'s own `DurableIpfsTransport` reads on
+        // every future access -- a genuine, permanent break, not a mock.
+        const corruptedBytes = Buffer.alloc(originalBlobBytes.length, 0x00);
+        Buffer.from("DELIBERATELY CORRUPTED BY THE FALSE-GREEN NEGATIVE PROOF -- must never be servable as real content again").copy(corruptedBytes, 0);
+        writeFileSync(corruptedBlobPath, corruptedBytes);
+        expect(readFileSync(corruptedBlobPath).equals(originalBlobBytes), "the on-disk blob must genuinely differ from its original bytes after corruption").toBe(false);
+        record(
+          `STEP 10b PASS (THE DELIBERATE BREAK) -- directly corrupted the real, on-disk stored ciphertext blob for the second product (${corruptedBlobPath}, ${String(originalBlobBytes.length)} bytes overwritten), from THIS test process, independent of any production code path. The declared ProductMedia checksum can now never match the actual stored bytes again -- this is the ONE required content/truth fact this proof deliberately breaks.`,
+        );
+      },
+      160000,
+    );
+
+    it(
+      "STEP 11 (FALSE-GREEN NEGATIVE, part B): Alice discovers+orders the second (broken-content) product; Bob accepts; Alice pays -- all genuinely succeed, since none of these steps ever touch content bytes",
+      async () => {
+        const alice10 = await runBetaUiScript(
+          installedExePath,
+          "ALICE_10_SECOND_ORDER",
+          aliceDataDir,
+          [
+            ...returningLaunchPreamble(ALICE_PASSPHRASE, "direct", "#commerce-acting-as", alicePubkey), // 0..13
+            { action: "click", selector: "#nav-commerce" }, // 14
+            { action: "wait", ms: 700 }, // 15
+            { action: "read", selector: "#commerce-catalog-list" }, // 16 -- must contain Bob's SECOND product title
+            { action: "click", selector: `button[aria-label="View ${SECOND_PRODUCT_TITLE}"]` }, // 17
+            { action: "wait", ms: 300 }, // 18
+            { action: "read", selector: "#commerce-detail-title" }, // 19
+            { action: "click", selector: "#commerce-order-create-submit" }, // 20
+            { action: "wait", ms: 400 }, // 21
+            { action: "click", selector: "#commerce-order-submit-btn" }, // 22
+            { action: "wait", ms: 400 }, // 23
+            { action: "read", selector: "#commerce-order-status-text" }, // 24 -- expect "submitted"
+            { action: "read", selector: "#commerce-order-id" }, // 25
+          ],
+          true,
+        );
+        expect(readAt(alice10, 1)).toBe("unlock");
+        expect(readAt(alice10, 5)).toBe("ready");
+        expect(readAt(alice10, 16)).toMatch(new RegExp(SECOND_PRODUCT_TITLE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+        expect(readAt(alice10, 19)).toBe(SECOND_PRODUCT_TITLE);
+        expect(readAt(alice10, 24)).toBe("submitted");
+        const secondOrderIdRaw = readAt(alice10, 25);
+        secondOrderId = secondOrderIdRaw.replace(/^Order id:\s*/, "");
+        expect(secondOrderId.length).toBeGreaterThan(0);
+        expect(secondOrderId).not.toBe(orderId);
+        record(`STEP 11a PASS -- Alice's PACKAGED process (pid ${String(alice10.pid)}) submitted a SECOND, independent real Order for the broken-content product. secondOrderId=${secondOrderId}`);
+
+        const bob9 = await runBetaUiScript(
+          installedExePath,
+          "BOB_9_SECOND_ACCEPT",
+          bobDataDir,
+          [
+            ...returningLaunchPreamble(BOB_PASSPHRASE, "direct", "#commerce-merchant-acting-as", bobPubkey), // 0..13
+            { action: "click", selector: "#nav-commerce-merchant" }, // 14
+            { action: "wait", ms: 700 }, // 15
+            // NOTE: "last-child" (unlike the BUYER list below) -- the
+            // merchant orders list (`handleCommerceOrdersListIncoming()` ->
+            // `listBySeller()`) has NO active-first sort of its own; it
+            // returns orders in Map insertion (creation) order, so the
+            // SECOND (newer) order is genuinely last.
+            { action: "click", selector: "#commerce-merchant-orders-list li:last-child button" }, // 16
+            { action: "wait", ms: 300 }, // 17
+            { action: "read", selector: "#commerce-order-status-text" }, // 18 -- expect "submitted"
+            { action: "click", selector: "#commerce-order-accept-btn" }, // 19
+            { action: "wait", ms: 400 }, // 20
+            { action: "read", selector: "#commerce-order-status-text" }, // 21 -- expect "accepted"
+          ],
+          false,
+        );
+        expect(readAt(bob9, 18)).toBe("submitted");
+        expect(readAt(bob9, 21)).toBe("accepted");
+        record(`STEP 11b PASS -- Bob's PACKAGED process (pid ${String(bob9.pid)}) accepted the second Order cross-process.`);
+
+        const alice11 = await runBetaUiScript(
+          installedExePath,
+          "ALICE_11_SECOND_PAY",
+          aliceDataDir,
+          [
+            ...returningLaunchPreamble(ALICE_PASSPHRASE, "direct", "#commerce-acting-as", alicePubkey), // 0..13
+            { action: "click", selector: "#nav-commerce" }, // 14
+            { action: "wait", ms: 700 }, // 15
+            // NOTE: "first-child" (unlike the merchant list above) --
+            // `renderCommerceMyOrdersList()` (`fedos_electron_beta_renderer.ts`)
+            // explicitly sorts ACTIVE (non-terminal) orders FIRST
+            // (`COMMERCE_TERMINAL_ORDER_STATUSES` = completed/rejected/
+            // cancelled), so with the FIRST order already "completed"
+            // (terminal, from STEP 8/9) and this SECOND order still active,
+            // the second order now sorts first, not last.
+            { action: "click", selector: "#commerce-my-orders-list li:first-child button" }, // 16
+            { action: "wait", ms: 300 }, // 17
+            { action: "read", selector: "#commerce-order-status-text" }, // 18 -- expect "accepted"
+            { action: "click", selector: "#commerce-order-payment-request-btn" }, // 19
+            { action: "wait", ms: 400 }, // 20
+            { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 21
+            { action: "wait", ms: 400 }, // 22
+            { action: "read", selector: "#commerce-order-status-text" }, // 23 -- expect "paid"
+          ],
+          false,
+        );
+        expect(readAt(alice11, 18)).toBe("accepted");
+        expect(readAt(alice11, 23)).toBe("paid");
+        record(`STEP 11c PASS -- Alice's PACKAGED process (pid ${String(alice11.pid)}) paid the second Order (TEST/LOCAL). All of accept/pay genuinely succeed here -- the corruption from STEP 10 does not block any content-independent step.`);
+      },
+      190000,
+    );
+
+    it(
+      "STEP 12 (FALSE-GREEN NEGATIVE, part C -- THE REQUIRED PROOF): Bob fulfills (grant issues normally -- entitlement, not content, is checked here); Alice's redeem/complete/receipt attempts on the deliberately-broken content are ALL honestly, fail-closed rejected; Bob's reputation shows NO false completion",
+      async () => {
+        const bob10 = await runBetaUiScript(
+          installedExePath,
+          "BOB_10_SECOND_FULFILL",
+          bobDataDir,
+          [
+            ...returningLaunchPreamble(BOB_PASSPHRASE, "direct", "#commerce-merchant-acting-as", bobPubkey), // 0..13
+            { action: "click", selector: "#nav-commerce-merchant" }, // 14
+            { action: "wait", ms: 700 }, // 15
+            { action: "click", selector: "#commerce-merchant-orders-list li:last-child button" }, // 16 -- see the merchant-list "last-child" note above
+            { action: "wait", ms: 300 }, // 17
+            { action: "read", selector: "#commerce-order-status-text" }, // 18 -- expect "paid"
+            { action: "click", selector: "#commerce-order-fulfill-btn" }, // 19 -- grant issuance checks ENTITLEMENT only, never re-derives content checksum -- this genuinely succeeds even though the content is already corrupted
+            { action: "wait", ms: 1500 }, // 20
+            { action: "read", selector: "#commerce-order-status-text" }, // 21 -- expect "fulfilling"
+          ],
+          false,
+        );
+        expect(readAt(bob10, 18)).toBe("paid");
+        expect(readAt(bob10, 21)).toBe("fulfilling");
+        record(
+          `STEP 12a PASS -- Bob's PACKAGED process (pid ${String(bob10.pid)}) fulfilled the second Order and a real grant was issued (grant issuance genuinely does not depend on content integrity -- it authorizes entitlement, never proves the underlying bytes are intact; that check happens ONLY at real release-response time, next).`,
+        );
+
+        const alice12 = await runBetaUiScript(
+          installedExePath,
+          "ALICE_12_REDEEM_ATTEMPT_ON_CORRUPTED_CONTENT",
+          aliceDataDir,
+          [
+            ...returningLaunchPreamble(ALICE_PASSPHRASE, "direct", "#commerce-acting-as", alicePubkey), // 0..13
+            { action: "click", selector: "#nav-commerce" }, // 14
+            { action: "wait", ms: 700 }, // 15
+            { action: "click", selector: "#commerce-my-orders-list li:first-child button" }, // 16 -- see the buyer-list "first-child" note above
+            { action: "wait", ms: 300 }, // 17
+            { action: "read", selector: "#commerce-order-status-text" }, // 18 -- expect "fulfilling"
+            { action: "click", selector: "#commerce-order-purchased-content-btn" }, // 19 -- triggers a real release request/response round trip against Bob's now-corrupted stored ciphertext
+            { action: "wait", ms: 2500 }, // 20
+            { action: "read", selector: "#commerce-order-purchased-content-error" }, // 21 -- REQUIRED: non-empty, honest denial -- NEVER a false content-received
+            { action: "read", selector: "#commerce-order-purchased-content-link", as: "href" }, // 22 -- REQUIRED: must never become a data: URL
+            { action: "click", selector: "#commerce-order-acknowledge-receipt-btn" }, // 23 -- content-independent, legitimately allowed regardless of content state
+            { action: "wait", ms: 400 }, // 24
+            { action: "read", selector: "#commerce-order-status-text" }, // 25 -- expect "delivered"
+            { action: "click", selector: "#commerce-order-complete-btn" }, // 26 -- REQUIRED: must be REJECTED -- never falsely "completed" on broken content
+            { action: "wait", ms: 1500 }, // 27
+            { action: "read", selector: "#commerce-order-status-text" }, // 28 -- REQUIRED: must still be "delivered", never "completed"
+            { action: "read", selector: "#commerce-order-error" }, // 29 -- REQUIRED: non-empty
+            { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 30 -- REQUIRED: must be REJECTED, order never reached "completed"
+            { action: "wait", ms: 400 }, // 31
+            { action: "read", selector: "#commerce-order-receipt-error" }, // 32 -- REQUIRED: non-empty
+            { action: "screenshot", value: "alice-05-false-green-negative-result" }, // 33
+          ],
+          true,
+        );
+        expect(readAt(alice12, 1)).toBe("unlock");
+        expect(readAt(alice12, 5)).toBe("ready");
+        expect(readAt(alice12, 18)).toBe("fulfilling");
+
+        const redeemError = readAt(alice12, 21);
+        expect(
+          redeemError.length,
+          `REQUIRED (no false content-open): the redeem attempt against deliberately-corrupted content must report SOME honest, non-empty denial, never a silent/false success. Full output:\n${alice12.output}`,
+        ).toBeGreaterThan(0);
+        expect(redeemError.toLowerCase()).not.toMatch(/received from seller|content type: application/);
+        const redeemHref = readAt(alice12, 22);
+        expect(redeemHref, "REQUIRED (no false content-open): must never resolve to a data: URL for corrupted content").not.toMatch(/^data:/);
+        record(`STEP 12b PASS (REQUIRED, NO FALSE CONTENT-OPEN) -- Alice's real redeem attempt against the deliberately-corrupted content was honestly, fail-closed denied: "${redeemError}". No plaintext, no data: URL.`);
+
+        expect(readAt(alice12, 25)).toBe("delivered");
+
+        const statusAfterComplete = readAt(alice12, 28);
+        expect(
+          statusAfterComplete,
+          `REQUIRED (no false complete): an order for a product whose content is genuinely broken must NEVER reach "completed". Full output:\n${alice12.output}`,
+        ).toBe("delivered");
+        const completeError = readAt(alice12, 29);
+        expect(completeError.length, "REQUIRED (no false complete): the rejected completion attempt must report a real, non-empty reason").toBeGreaterThan(0);
+        record(`STEP 12c PASS (REQUIRED, NO FALSE COMPLETE) -- Alice's real "Complete order" attempt was honestly, fail-closed rejected: "${completeError}". Order remains "delivered", never "completed".`);
+
+        const receiptError = readAt(alice12, 32);
+        expect(receiptError.length, "REQUIRED (no false receipt): receipt issuance for a non-completed order must be rejected with a real reason").toBeGreaterThan(0);
+        record(`STEP 12d PASS (REQUIRED, NO FALSE RECEIPT) -- Alice's real receipt-issue attempt was honestly, fail-closed rejected: "${receiptError}".`);
+
+        const bob11 = await runBetaUiScript(
+          installedExePath,
+          "BOB_11_VERIFY_NO_FALSE_REPUTATION",
+          bobDataDir,
+          [
+            ...returningLaunchPreamble(BOB_PASSPHRASE, "direct", "#commerce-merchant-acting-as", bobPubkey), // 0..13
+            { action: "click", selector: "#nav-commerce-merchant" }, // 14
+            { action: "wait", ms: 2500 }, // 15
+            { action: "click", selector: "#commerce-merchant-orders-list li:last-child button" }, // 16 -- see the merchant-list "last-child" note above
+            { action: "wait", ms: 300 }, // 17
+            { action: "read", selector: "#commerce-order-status-text" }, // 18 -- REQUIRED: must never be "completed"
+            { action: "read", selector: "#commerce-merchant-reputation-summary" }, // 19
+          ],
+          false,
+        );
+        const bobSecondOrderStatus = readAt(bob11, 18);
+        expect(
+          bobSecondOrderStatus,
+          `REQUIRED (no false seller-side completion mirror): Bob's own independent process must never mirror a false "completed" for genuinely-broken content, even with this arc's own role-aware seller evidence fix in place (that fix only records evidence for a REAL, digest-verified release -- which this order's content genuinely never received). Full output:\n${bob11.output}`,
+        ).not.toBe("completed");
+        const bobReputationSummary = readAt(bob11, 19);
+        record(
+          `STEP 12e PASS (REQUIRED, NO FALSE REPUTATION) -- Bob's independent PACKAGED process (pid ${String(bob11.pid)}) reports "${bobSecondOrderStatus}" for the second (broken-content) order -- never "completed" -- and reputation summary "${bobReputationSummary}" reflects no false positive from this deliberately-broken trade. FALSE-GREEN LIVE NEGATIVE: COMPLETE -- no false complete, no false receipt, no false reputation, no false content-open, anywhere in the chain, on the real installed binary.`,
+        );
       },
       220000,
     );
