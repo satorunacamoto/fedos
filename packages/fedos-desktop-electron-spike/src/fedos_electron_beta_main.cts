@@ -104,6 +104,61 @@
  * existing `fedos-acceptance:*` command already used before this Arc.
  */
 
+// ---------------------------------------------------------------------
+// FedOS Real Digital Delivery Release Closure -- installed-startup
+// root-cause pass. Registered as the FIRST executable statements in this
+// file, before every other import below, so a synchronous throw or
+// unhandled rejection anywhere during THIS file's own module-load (or a
+// transitive local/dependency import's) is captured to disk before
+// Electron's own default main-process-exception behavior (a native
+// "Error" dialog that closes itself with no persisted evidence -- see
+// `docs/commerce/PACKAGED-BINARY-STARTUP-ERROR-FINDING.md`) can hide it.
+// Durable, not a throwaway probe: crash diagnostics for a packaged
+// desktop app are a genuine, permanent operational need. No secrets are
+// ever at risk -- this file has not read any passphrase/Master
+// Seed/key material by the time module-load could fail, and only the
+// thrown error's own message/stack plus a coarse lifecycle label are
+// ever written, the SAME best-effort disk-mirror idiom `logCheckpoint()`
+// below already establishes for later lifecycle points, extended here to
+// also cover the earlier window that idiom's own definition cannot reach
+// (it does not exist yet while this module is still loading).
+// `FEDOS_ELECTRON_BETA_CRASH_LOG_FILE` overrides the path for tests /
+// diagnostics; a real launch with nothing set falls back to the OS temp
+// directory, which every launch (dev, packaged, manual) always has.
+// ---------------------------------------------------------------------
+import * as earlyFs from "node:fs";
+import * as earlyPath from "node:path";
+import * as earlyOs from "node:os";
+
+const EARLY_CRASH_LOG_FILE =
+  process.env.FEDOS_ELECTRON_BETA_CRASH_LOG_FILE ??
+  earlyPath.join(earlyOs.tmpdir(), "fedos-electron-beta-startup-crash.log");
+
+function writeEarlyStartupCrashEvidence(label: string, err: unknown): void {
+  try {
+    const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+    earlyFs.mkdirSync(earlyPath.dirname(EARLY_CRASH_LOG_FILE), { recursive: true });
+    earlyFs.appendFileSync(
+      EARLY_CRASH_LOG_FILE,
+      `FEDOS_ELECTRON_BETA_STARTUP_CRASH:${label}:${Date.now()}:${detail}\n`,
+    );
+  } catch {
+    /* best-effort only -- must never itself throw during startup */
+  }
+}
+
+process.on("uncaughtException", (err) => {
+  writeEarlyStartupCrashEvidence("uncaughtException", err);
+  // Fail closed and deterministic rather than continuing in a state this
+  // process never expected to be running in (Node suppresses its OWN
+  // default crash-and-exit behavior once any listener is registered).
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  writeEarlyStartupCrashEvidence("unhandledRejection", reason);
+  process.exit(1);
+});
+
 import { app, BrowserWindow, ipcMain, dialog, type IpcMainInvokeEvent } from "electron";
 import * as path from "node:path";
 import * as fs from "node:fs";

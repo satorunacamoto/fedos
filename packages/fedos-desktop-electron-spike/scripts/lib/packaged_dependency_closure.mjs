@@ -101,14 +101,15 @@ function resolvePackageEntryFile(packageDir, subpath) {
  *
  * @param {readonly string[]} entryFiles absolute paths to compiled entry files to seed the walk from.
  * @param {readonly string[]} [hostProvidedPackages] package names to treat as resolved-but-not-bundled (e.g. `"electron"` -- provided by the Electron runtime itself, never present in `node_modules` of a packaged app).
- * @returns {{ readonly packages: ReadonlyMap<string, string>; readonly unresolved: readonly { readonly specifier: string; readonly fromFile: string }[] }}
- *   `packages`: packageName -> absolute directory it resolved to on THIS machine (used only to keep walking the graph; the artifact-presence check re-resolves independently against the packaged artifact, never trusts this path). `unresolved`: any bare specifier that could not be resolved from local `node_modules` at all -- a real, actionable finding (either a genuinely missing local install, or a specifier this walker's simplified resolution algorithm cannot handle) that a caller should surface, not silently drop.
+ * @returns {{ readonly packages: ReadonlyMap<string, string>; readonly unresolved: readonly { readonly specifier: string; readonly fromFile: string }[]; readonly localFiles: ReadonlySet<string> }}
+ *   `packages`: packageName -> absolute directory it resolved to on THIS machine (used only to keep walking the graph; the artifact-presence check re-resolves independently against the packaged artifact, never trusts this path). `unresolved`: any bare specifier that could not be resolved from local `node_modules` at all -- a real, actionable finding (either a genuinely missing local install, or a specifier this walker's simplified resolution algorithm cannot handle) that a caller should surface, not silently drop. `localFiles`: every relative (`./`/`../`)-resolved sibling/local file this walk actually visited, as absolute paths on THIS machine -- these are compiled output that lives alongside the entry files themselves (never inside `node_modules`), so their packaging completeness depends on the electron-builder `"files"` allowlist, not the `node_modules` bundling this module otherwise exists to check (see `checkLocalFileClosurePresentInAsarListing` below -- this is precisely the closure a same-directory `Cannot find module './x.js'` packaged-startup failure comes from).
  */
 export function walkRuntimeDependencyGraph(entryFiles, hostProvidedPackages = []) {
   const hostProvided = new Set(hostProvidedPackages);
   const visitedFiles = new Set();
   const packages = new Map();
   const unresolved = [];
+  const localFiles = new Set();
 
   function visit(file) {
     if (visitedFiles.has(file)) return;
@@ -122,7 +123,10 @@ export function walkRuntimeDependencyGraph(entryFiles, hostProvidedPackages = []
     for (const specifier of extractSpecifiers(source)) {
       if (specifier.startsWith(".") || specifier.startsWith("/")) {
         const resolved = resolveFileWithExtensions(path.resolve(path.dirname(file), specifier));
-        if (resolved !== null) visit(resolved);
+        if (resolved !== null) {
+          localFiles.add(resolved);
+          visit(resolved);
+        }
         continue;
       }
       const normalized = specifier.startsWith("node:") ? specifier.slice("node:".length) : specifier;
@@ -142,7 +146,7 @@ export function walkRuntimeDependencyGraph(entryFiles, hostProvidedPackages = []
   }
 
   for (const entryFile of entryFiles) visit(entryFile);
-  return { packages, unresolved };
+  return { packages, unresolved, localFiles };
 }
 
 /** Recursively lists every file under `dir` with one of the given extensions -- used to enumerate a compiled `dist/` tree as walk seed files. */
@@ -173,6 +177,67 @@ export function deriveRuntimeDependencyClosure(dirs) {
   const entryFiles = [...listCompiledFiles(dirs.repoRootDist), ...listCompiledFiles(dirs.packageDist)];
   const { packages, unresolved } = walkRuntimeDependencyGraph(entryFiles, ["electron"]);
   return { names: [...packages.keys()].sort(), unresolved };
+}
+
+/**
+ * Installed-startup root-cause pass (Real Digital Delivery Release
+ * Closure) -- derives the closure of THIS package's own local, relative
+ * (`./`/`../`) `dist/` files that the REAL PACKAGED entry point(s)
+ * actually `require()`/`import` at module-load time, transitively. This
+ * is a DIFFERENT closure than `deriveRuntimeDependencyClosure` above:
+ * that one finds `node_modules` packages (bundled verbatim, so
+ * completeness only depends on the shared install being complete); this
+ * one finds sibling `.js` files this package's OWN build produces, whose
+ * packaging completeness depends entirely on the hand-maintained `files`
+ * allowlist in `electron_builder.beta.config.json` -- exactly the class
+ * of gap that produced a real, reproduced `Cannot find module
+ * './fedos_electron_ipc_command_registry.js'` packaged-startup crash
+ * (three local files imported by `fedos_electron_beta_main.cts` were
+ * simply never added to that allowlist as the file grew new IPC
+ * handlers over time).
+ *
+ * Deliberately seeded ONLY from `entryFiles` (the real packaged main.cjs,
+ * caller-supplied), never from `listCompiledFiles(packageDist)` walking
+ * every compiled file in the package's `dist/` as its own entry point --
+ * this package's `dist/` also holds several OTHER accepted electron
+ * main-process entry points (`fedos_electron_unlock_main.cjs`,
+ * `fedos_electron_badge_main.cjs`, `fedos_electron_settings_*_main.cjs`,
+ * etc. -- see `fedos_electron_beta_main.cts`'s own doc comment: "all
+ * seven remain untouched, preserved as accepted test/harness entry
+ * points"), each with its own local sibling files (e.g. the
+ * `*_selftest.js`/`*_host_bridge_loader.js` files those OTHER mains
+ * import) that are correctly NOT part of the Beta app's own packaged
+ * `files` allowlist -- walking every compiled file as an entry point
+ * would wrongly demand THOSE unrelated files be packaged too, a false
+ * positive this scoping avoids. Only `packageDist`-local relative
+ * resolutions are returned (never `repoRootDist`): the root-compiled
+ * `dist/` tree is bundled whole via `extraFiles` (a real on-disk
+ * directory copy, not a hand-maintained per-file allowlist), so it
+ * cannot suffer this same defect class.
+ *
+ * @param {{ readonly entryFiles: readonly string[]; readonly packageDist: string }} args
+ * @returns {{ readonly relativePaths: readonly string[] }} POSIX-style paths relative to `packageDist` (e.g. `"fedos_electron_ipc_command_registry.js"`), sorted.
+ */
+export function derivePackageLocalFileClosure(args) {
+  const { localFiles } = walkRuntimeDependencyGraph(args.entryFiles, ["electron"]);
+  const packageDistResolved = path.resolve(args.packageDist);
+  const relativePaths = [...localFiles]
+    .filter((file) => path.resolve(file).startsWith(packageDistResolved + path.sep))
+    .map((file) => path.relative(packageDistResolved, file).split(path.sep).join("/"));
+  return { relativePaths: relativePaths.sort() };
+}
+
+/**
+ * Checks that every relative path in `relativePaths` (as returned by
+ * `derivePackageLocalFileClosure`, e.g. `"fedos_electron_ipc_command_registry.js"`)
+ * is present as `dist/<relativePath>` in an already-listed `@electron/asar`
+ * package entry list (backslash- or forward-slash-separated paths, as
+ * `@electron/asar`'s own `listPackage()` returns on Windows).
+ */
+export function checkLocalFileClosurePresentInAsarListing(asarEntries, relativePaths) {
+  const normalized = new Set(asarEntries.map((entry) => entry.replace(/\\/g, "/")));
+  const missing = relativePaths.filter((relativePath) => !normalized.has(`/dist/${relativePath}`));
+  return { ok: missing.length === 0, missing };
 }
 
 /**

@@ -133,6 +133,84 @@ realSuite("Packaged Beta binary -- REAL runtime dependency closure guard", () =>
   });
 });
 
+realSuite("Packaged Beta binary -- REAL local sibling-file packaging closure guard (installed-startup root-cause pass)", () => {
+  // Regression guard for a REAL, reproduced packaged-startup crash: the
+  // packaged `FedOS Desktop Beta.exe`, launched from its own real
+  // `win-unpacked` build, threw `Error: Cannot find module
+  // './fedos_electron_ipc_command_registry.js'` from inside `app.asar`
+  // (captured via the new early `uncaughtException` handler in
+  // `fedos_electron_beta_main.cts`, to a disk log, BEFORE Electron's
+  // default opaque native "Error" dialog could hide it -- see
+  // `docs/commerce/PACKAGED-BINARY-STARTUP-ERROR-FINDING.md`). Root cause:
+  // `electron_builder.beta.config.json`'s `files` allowlist is a
+  // hand-maintained list of this package's own compiled `dist/*.js`
+  // files, and three had been added to `fedos_electron_beta_main.cts`'s
+  // own imports (by the Deletion Request / Identity Transition Ratchet
+  // Reset arcs) without the allowlist ever being updated to match --
+  // `deriveRuntimeDependencyClosure`'s existing npm-package closure guard
+  // above cannot catch this class of gap: `node_modules/**/*` is bundled
+  // wholesale, so it was never sensitive to a specific file being listed
+  // or not; this package's OWN local `.js` siblings are exactly as
+  // hand-maintained as the file that caused the real crash.
+  let relativePaths: readonly string[] = [];
+
+  beforeAll(() => {
+    // Seeded ONLY from the REAL packaged entry point (`dist/fedos_electron_beta_main.cjs`,
+    // the exact file `electron_builder.beta.config.json`'s `extraMetadata.main`
+    // names) -- never every compiled file in `packageDistDir`, which would
+    // wrongly also walk this package's OTHER, unrelated accepted electron
+    // main-process entry points (unlock/badge/settings mains) and demand
+    // THEIR local sibling files be packaged too. See this function's own
+    // doc comment in `packaged_dependency_closure.mjs` for the full reasoning.
+    relativePaths = closureLib.derivePackageLocalFileClosure({
+      entryFiles: [join(packageDistDir, "fedos_electron_beta_main.cjs")],
+      packageDist: packageDistDir,
+    }).relativePaths;
+  });
+
+  it("derivation itself is sane: this package's own compiled entry file's real local siblings are found, including the exact three files the real crash was missing", () => {
+    expect(relativePaths.length).toBeGreaterThan(0);
+    for (const mustInclude of [
+      "fedos_electron_ipc_command_registry.js",
+      "fedos_electron_deletion_request_send_ipc.js",
+      "fedos_electron_identity_transition_ratchet_reset_ipc.js",
+    ]) {
+      expect(relativePaths, `derived local closure: ${JSON.stringify(relativePaths)}`).toContain(mustInclude);
+    }
+  });
+
+  it("every derived local sibling file is present inside the REAL, just-built app.asar as dist/<name> (listed directly via @electron/asar, never assumed from electron-builder's own exit code or from the hand-maintained allowlist text itself)", () => {
+    const entries = asar.listPackage(appAsarPath, { isPack: false });
+    const result = closureLib.checkLocalFileClosurePresentInAsarListing(entries, relativePaths);
+    expect(result.missing, `local files missing from ${appAsarPath}: ${JSON.stringify(result.missing)}`).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("fails closed (negative proof, never mutates the real build output): repacking a COPY of the real app.asar with one required local file stripped out makes the SAME check function report exactly that file missing", async () => {
+    expect(relativePaths.length, "negative-proof test needs at least one real required local file to remove").toBeGreaterThan(0);
+    const targetRelativePath = relativePaths[0]!;
+    const extractDir = scratchDir("fedos-asar-local-corrupt-extract-");
+    asar.extractAll(appAsarPath, extractDir);
+
+    const targetFile = join(extractDir, "dist", ...targetRelativePath.split("/"));
+    expect(existsSync(targetFile), `expected ${targetFile} to exist before corruption`).toBe(true);
+    rmSync(targetFile, { force: true });
+
+    const corruptAsarPath = join(scratchDir("fedos-asar-local-corrupt-out-"), "app.asar");
+    await asar.createPackage(extractDir, corruptAsarPath);
+
+    const entries = asar.listPackage(corruptAsarPath, { isPack: false });
+    const result = closureLib.checkLocalFileClosurePresentInAsarListing(entries, relativePaths);
+    expect(result.ok, "the guard must report FAIL once a required local file is removed from the asar").toBe(false);
+    expect(result.missing).toEqual([targetRelativePath]);
+
+    // Sanity: the REAL, untouched app.asar still passes.
+    const realEntries = asar.listPackage(appAsarPath, { isPack: false });
+    const realResult = closureLib.checkLocalFileClosurePresentInAsarListing(realEntries, relativePaths);
+    expect(realResult.ok, "the real, untouched app.asar must be unaffected by the scratch-copy corruption above").toBe(true);
+  });
+});
+
 realSuite("Packaged Beta binary -- dependency closure guard actually fails closed (negative proof, never mutates the real build output)", () => {
   let closureNames: readonly string[] = [];
 
