@@ -55,7 +55,7 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     expect(appBlockers).toEqual([]);
   });
 
-  it("does not regress past the currently-measured blocker baseline (35, up from 28 -- FedOS 'Buyer Discovery + Digital Content Delivery' mega-arc, Agents D/M/A, Coordinator-directed integration pass -- a new violation must update this number deliberately, never silently)", () => {
+  it("does not regress past the currently-measured blocker baseline (40, up from 35 -- FedOS 'Real Digital Delivery + Security UX + Release Closure' mega-arc, Agent G, Coordinator-directed merge -- a new violation must update this number deliberately, never silently)", () => {
     // Commerce E2E Completion arc, Wave B: 4 new, DELIBERATE, reviewed blockers on
     // top of the pre-existing 3 (os/core -> packages/fedos-core-rust; the two
     // pre-existing catalog/adapters/nostr/{bridge,classify}.ts -> os/messenger
@@ -175,8 +175,33 @@ describe("package extraction boundary scan (scripts/package_extraction_boundary_
     // diffing its output against the pre-existing 28-line blocker list --
     // every added line is one of the two files named above, nothing else
     // changed.
+    //
+    // FedOS "Real Digital Delivery + Security UX + Release Closure"
+    // mega-arc (Agent G, Coordinator-directed merge): 5 more new,
+    // DELIBERATE, reviewed blockers on top of the prior 35 -- all 5 from
+    // ONE new file, catalog/adapters/nostr/commerce_media_grant_signing_key_delegation_bridge.ts,
+    // which closes Blocker 5 (real seller-identity MediaAccessGrant
+    // custody) by having the seller's real Nostr identity sign a small
+    // delegation certificate authorizing the pre-existing durable
+    // media-grant-signing key. Same already-reviewed pattern this file's
+    // own history above already established, not a new category of leak
+    // -- 5 of the SAME 6 os/messenger Nostr protocol symbols
+    // `commerce_private_order_bridge.ts` established (this file has no
+    // `publish.js` import -- it only signs/verifies a certificate, it
+    // never itself publishes to a relay, so it needs one fewer of the six):
+    // `event.js`'s `isNostrEvent`, `noble_signature.js`'s
+    // `NobleSignatureVerifier`, `signature.js`'s `SignatureVerifier` type,
+    // `types.js`'s `NostrEvent` type, and
+    // `sign/fedos_nostr_signing_authority.js`'s `FedosNostrSigningAuthority`
+    // -- lives in the SAME NOSTR_ADAPTER_DIR allowlist, unchanged by this
+    // pass.
+    // Verified mechanically: 40 - 35 = 5, confirmed by running
+    // `node scripts/package_extraction_boundary_scan.mjs` directly and
+    // diffing its output against the pre-existing 35-line blocker list --
+    // every added line is from the one file named above, nothing else
+    // changed.
     const { blockers } = runScan();
-    expect(blockers.length).toBeLessThanOrEqual(35);
+    expect(blockers.length).toBeLessThanOrEqual(40);
   });
 
   it("every blocker belongs to one of the three os/* roots (never the already-clean Electron app)", () => {
