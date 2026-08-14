@@ -104,6 +104,23 @@ export interface FedosLocalProfilePaths {
   readonly identityTransitionObservationLogFile: string;
   /** Identity Transition durable local-decision append-only log. */
   readonly identityTransitionLocalDecisionLogFile: string;
+  /**
+   * Verified Secure Session UI mega-arc (Coordinator) — Identity Transition
+   * per-conversation continuity append-only log
+   * (`FedosIdentityTransitionConversationContinuityPersistence`). Found
+   * unwired at the Desktop Runtime composition (`fedos_desktop_runtime.ts`'s
+   * `conversationIdentityTransitionDeps` never supplied
+   * `continuityPersistence`, despite the field being optional-with-durable-
+   * fallback exactly like `identityTransitionLocalDecisionLogFile` above)
+   * — every real production process was silently falling back to the
+   * non-durable `InMemoryFedosIdentityTransitionConversationContinuityPersistence`
+   * default, losing the per-conversation identity-continuity record on
+   * every restart. Fixed as part of wiring the new conversation Security
+   * State UI, which reads this record as its `IDENTITY_CONTINUITY` axis's
+   * primary fact source and therefore requires it to genuinely survive a
+   * restart.
+   */
+  readonly identityTransitionConversationContinuityLogFile: string;
   /** Signed Deletion Request state append-only log. */
   readonly deletionRequestStateLogFile: string;
   /** Signed Deletion recipient-decision append-only log. */
@@ -183,6 +200,7 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     conversationDraftLogFile: join(root, "conversation-draft.ndjson"),
     identityTransitionObservationLogFile: join(root, "identity-transition-observation.ndjson"),
     identityTransitionLocalDecisionLogFile: join(root, "identity-transition-local-decision.ndjson"),
+    identityTransitionConversationContinuityLogFile: join(root, "identity-transition-conversation-continuity.ndjson"),
     deletionRequestStateLogFile: join(root, "deletion-request-state.ndjson"),
     deletionRequestDecisionLogFile: join(root, "deletion-request-decision.ndjson"),
     deletionRequestAcknowledgementLogFile: join(root, "deletion-request-acknowledgement.ndjson"),

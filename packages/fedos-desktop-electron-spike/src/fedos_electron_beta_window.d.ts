@@ -548,6 +548,11 @@ interface FedosAppBridge {
   /** Real Digital Delivery mega-arc (Agent U) -- sender-side STATUS read (requesting/requested/approved-or-rejected-if-known/failed), never "deleted everywhere". */
   readonly deletionRequestSentStatus: (conversationId: string, messageId: string) => Promise<FedosAppCommandResult>;
   readonly safetyCenterOverview: () => Promise<FedosAppCommandResult>;
+  /** Verified Secure Session UI mega-arc (Coordinator) -- read-only per-conversation security-state truth. `counterpartyAccountRef` omitted degrades every dependent axis to unknown/unavailable honestly, never a guess. */
+  readonly conversationSecurityState: (
+    conversationId: string,
+    counterpartyAccountRef?: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null } | null,
+  ) => Promise<FedosAppCommandResult>;
   readonly settingsLoad: () => Promise<FedosAppCommandResult>;
   readonly relayStatus: () => Promise<FedosAppCommandResult>;
   /** Commerce Reachable Catalog + Product Surface Phase 1 — read-only. */

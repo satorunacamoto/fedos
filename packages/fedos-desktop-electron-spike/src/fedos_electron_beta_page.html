@@ -285,6 +285,15 @@
           <button id="chat-back" type="button">&larr; Back to Conversations</button>
           <h2 id="chat-title">Conversation</h2>
           <p class="muted" id="chat-meta"></p>
+          <!-- Verified Secure Session UI mega-arc (Coordinator) -- compact,
+               non-color-only indicator + expandable Security Details panel.
+               Never a single collapsed "Secure" claim -- each axis keeps
+               its own honest, independent status text. -->
+          <button id="chat-security-indicator" type="button" aria-expanded="false" aria-controls="chat-security-details">Security: <span id="chat-security-indicator-text">unknown</span></button>
+          <div id="chat-security-details" hidden>
+            <ul class="plain-list" id="chat-security-axes"></ul>
+            <p class="muted" id="chat-security-standing-limits">FedOS has no safety number. There is no code you and your contact can compare. This app does not know about, list, or verify all of a contact's devices — only devices it has directly observed.</p>
+          </div>
           <div id="chat-error" class="error" role="alert"></div>
           <ul class="plain-list" id="chat-messages"></ul>
           <label for="chat-compose">Message</label>

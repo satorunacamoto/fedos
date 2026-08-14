@@ -809,6 +809,11 @@ export class FedosProfileInitializationCoordinator {
       identityTransitionEnabled: this.#deps.identityTransitionEnabled === true,
       identityTransitionObservationLogPath: this.#deps.identityTransitionEnabled === true ? paths.identityTransitionObservationLogFile : undefined,
       identityTransitionLocalDecisionLogPath: this.#deps.identityTransitionEnabled === true ? paths.identityTransitionLocalDecisionLogFile : undefined,
+      // Verified Secure Session UI mega-arc (Coordinator) -- was missing
+      // entirely; see fedos_local_profile_paths.ts's own doc comment on
+      // identityTransitionConversationContinuityLogFile for the durability
+      // gap this closes.
+      identityTransitionConversationContinuityLogPath: this.#deps.identityTransitionEnabled === true ? paths.identityTransitionConversationContinuityLogFile : undefined,
       identityTransitionLocalPolicy: this.#deps.identityTransitionEnabled === true ? this.#deps.identityTransitionLocalPolicy : undefined,
       deletionRequestEnabled: this.#deps.deletionRequestEnabled === true,
       deletionRequestResolveLocalPolicy: this.#deps.deletionRequestEnabled === true ? this.#deps.deletionRequestResolveLocalPolicy : undefined,

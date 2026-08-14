@@ -59,6 +59,9 @@ import { FedosIdentityTransitionController } from "./identity_transition/fedos_i
 // Safety Center Arc) -- additive only, mirroring this file's own
 // established pattern.
 import { FedosSafetyCenterController } from "./safety_center/fedos_safety_center_controller.js";
+// Verified Secure Session UI mega-arc (Coordinator) -- additive only,
+// mirroring this file's own established pattern.
+import { FedosConversationSecurityStateController } from "./security_state/fedos_conversation_security_state_controller.js";
 
 export class FedosDesktopConversationUiPresentationBoundary {
   readonly #shell: FedosDesktopApplicationShell;
@@ -82,6 +85,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
   readonly deletionRequests: FedosDeletionRequestController;
   readonly identityTransitions: FedosIdentityTransitionController;
   readonly safetyCenter: FedosSafetyCenterController;
+  readonly securityState: FedosConversationSecurityStateController;
 
   private constructor(shell: FedosDesktopApplicationShell) {
     this.#shell = shell;
@@ -105,6 +109,7 @@ export class FedosDesktopConversationUiPresentationBoundary {
     this.deletionRequests = new FedosDeletionRequestController(shell);
     this.identityTransitions = new FedosIdentityTransitionController(shell);
     this.safetyCenter = new FedosSafetyCenterController(shell);
+    this.securityState = new FedosConversationSecurityStateController(shell);
   }
 
   /** Thin factory — mirrors `createFedosDesktopApplicationShell()`'s own style. No side effect (no Runtime started) until `runtimeStatus.start()` is called. */

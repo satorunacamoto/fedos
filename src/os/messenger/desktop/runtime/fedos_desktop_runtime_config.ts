@@ -624,6 +624,8 @@ export interface FedosDesktopRuntimeConfig {
   readonly identityTransitionEnabled?: boolean;
   readonly identityTransitionObservationLogPath?: string;
   readonly identityTransitionLocalDecisionLogPath?: string;
+  /** Verified Secure Session UI mega-arc (Coordinator) — was missing entirely; see `fedos_local_profile_paths.ts`'s own `identityTransitionConversationContinuityLogFile` doc comment for the durability gap this closes. */
+  readonly identityTransitionConversationContinuityLogPath?: string;
   /** Optional — omitted, `FedosIdentityTransitionPeerRuntime`'s own existing default policy applies (unchanged by this Arc). */
   readonly identityTransitionLocalPolicy?: FedosIdentityTransitionLocalPolicy;
   /** Manual override — see `conversationDirectRatchet`'s own doc comment for the exact same convention. */

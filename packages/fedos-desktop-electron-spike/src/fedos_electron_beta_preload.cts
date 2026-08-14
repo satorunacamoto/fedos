@@ -245,6 +245,14 @@ const fedosApp: FedosAppBridge = Object.freeze({
   deletionRequestSentStatus: (conversationId: string, messageId: string) =>
     ipcRenderer.invoke("fedos-app:deletion-request-sent-status", { conversationId: boundedString(conversationId, MAX_ID_CHARS), messageId: boundedString(messageId, MAX_ID_CHARS) }),
   safetyCenterOverview: () => ipcRenderer.invoke("fedos-app:safety-center-overview"),
+  // Verified Secure Session UI mega-arc (Coordinator) -- read-only, real
+  // per-conversation security-state truth (identity continuity, encryption,
+  // forward secrecy, device knowledge, evidence integrity, metadata
+  // exposure). `counterpartyAccountRef` is OPTIONAL -- omitted, every axis
+  // that depends on it honestly degrades to unknown/unavailable rather than
+  // guessing.
+  conversationSecurityState: (conversationId: string, counterpartyAccountRef?: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null } | null) =>
+    ipcRenderer.invoke("fedos-app:conversation-security-state", { conversationId: boundedString(conversationId, MAX_ID_CHARS), counterpartyAccountRef: counterpartyAccountRef ?? null }),
   settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
   relayStatus: () => ipcRenderer.invoke("fedos-app:relay-status"),
   // Commerce Reachable Catalog + Product Surface Phase 1 -- read-only,

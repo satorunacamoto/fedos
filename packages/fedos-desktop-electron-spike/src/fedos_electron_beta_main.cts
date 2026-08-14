@@ -816,6 +816,11 @@ interface BoundaryLike {
     refreshOverview(ratchetPairs?: readonly unknown[]): Promise<void>;
     readonly overviewState: { readonly status: string; readonly [key: string]: unknown };
   };
+  /** Verified Secure Session UI mega-arc (Coordinator) — narrows `FedosConversationSecurityStateController` (`src/os/messenger/desktop/presentation/security_state/`, this Arc's own new, additive controller). */
+  readonly securityState: {
+    getSecurityState(conversationId: string, counterpartyAccountRef: unknown, now: number): { readonly conversationId: string; readonly [key: string]: unknown };
+    setMessageDeliveryRemoteDeviceRef(value: string | null): void;
+  };
   readonly conversationList: {
     load(filter?: unknown): Promise<unknown>;
     readonly state: { readonly status: string; readonly [key: string]: unknown };
@@ -2565,6 +2570,8 @@ let activeAssembly: AssemblyLike | null = null;
 let activeViewerParticipant: ParticipantRefLike | null = null;
 /** Secure Runtime Alpha 8121-8200 — the real, currently-configured Relay instances this Runtime's own Coordinator constructed (`secureRuntimeBundleConfig()`, unmodified), kept here ONLY so the ordinary UI can honestly report per-Relay connectivity (Phase K "show offline/retry state") — never a second Relay set, never a new connection, just a read-only reference to what already exists. Empty until a real relay is configured and a profile is unlocked. */
 let activeRelays: readonly RelayLike[] = [];
+/** Verified Secure Session UI mega-arc (Coordinator) -- see `secureRuntimeBundleConfig()`'s own comment for where this is set. */
+let activeMessageDeliveryRemoteDeviceRef: string | null = null;
 /**
  * FedOS Commerce FINAL Closure Mega-Arc (coordinator, central integration
  * pass) -- the SAME real, process-lifetime `FedosMasterSeedAuthority`
@@ -5093,6 +5100,12 @@ function secureRuntimeBundleConfig(m: RootModules, signer: unknown): Record<stri
   // discipline exactly -- unset on every ordinary launch, so `sendMessage()`
   // keeps using the legacy static route for every real user by default.
   const messageDeliveryRemoteDeviceRef = process.env.FEDOS_BETA_DIRECT_RATCHET_MESSAGE_DELIVERY_REMOTE_DEVICE_REF;
+  // Verified Secure Session UI mega-arc (Coordinator) -- captured here (the
+  // SAME real read site as the config value immediately below) so
+  // `boundary.securityState` can be told the exact same value right after
+  // `activeAssembly` is set -- see the two `activeAssembly = assembly;`
+  // call sites below.
+  activeMessageDeliveryRemoteDeviceRef = messageDeliveryRemoteDeviceRef !== undefined && messageDeliveryRemoteDeviceRef.length > 0 ? messageDeliveryRemoteDeviceRef : null;
   return {
     privateTransportEnabled: true,
     conversationTransportRelays: relays,
@@ -5270,6 +5283,7 @@ async function handleCreate(payload: unknown) {
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      activeAssembly.boundary.securityState.setMessageDeliveryRemoteDeviceRef(activeMessageDeliveryRemoteDeviceRef);
       ipcCommands.bumpGeneration(); // a new assembly now exists — discard any stale-generation in-flight results
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
       activeLocalIdentity = { displayLabel: result.value.displayLabel, accountPublicIdentifier: result.value.accountPublicIdentifier };
@@ -5319,6 +5333,7 @@ async function handleUnlock(payload: unknown) {
       }
       activeCoordinator = built.coordinator;
       activeAssembly = assembly;
+      activeAssembly.boundary.securityState.setMessageDeliveryRemoteDeviceRef(activeMessageDeliveryRemoteDeviceRef);
       ipcCommands.bumpGeneration(); // a new assembly now exists — discard any stale-generation in-flight results
       activeViewerParticipant = { authority: "nostr", publicIdentifier: result.value.accountPublicIdentifier, identityId: null };
       activeLocalIdentity = { displayLabel: result.value.displayLabel, accountPublicIdentifier: result.value.accountPublicIdentifier };
@@ -8104,6 +8119,34 @@ async function handleAppSafetyCenterOverview() {
   return resultFromViewModelState(boundary.safetyCenter.overviewState);
 }
 
+/**
+ * Verified Secure Session UI mega-arc (Coordinator) -- the conversation
+ * security-state read. `counterpartyAccountRef` is renderer-supplied
+ * (mirrors `handleAppIdentityTransitionOpen()`'s own established
+ * "renderer already resolved and displays this identity for its own
+ * header, so it already has this value" precedent) -- `null` is a valid,
+ * honest input for a conversation whose counterparty this process cannot
+ * currently resolve; every axis degrades to UNKNOWN/UNAVAILABLE rather
+ * than guessing. Delegates entirely to `boundary.securityState`, which
+ * itself delegates entirely to already-real Shell methods -- no new
+ * business logic in this function.
+ */
+async function handleAppConversationSecurityState(payload: unknown) {
+  const boundary = requireBoundary();
+  if (boundary === null) return acceptanceGateRejection();
+  const body = payload as { conversationId?: unknown; counterpartyAccountRef?: unknown } | null;
+  if (!isBoundedString(body?.conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  let counterpartyAccountRef: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null } | null = null;
+  const rawRef = body.counterpartyAccountRef;
+  if (typeof rawRef === "object" && rawRef !== null) {
+    const r = rawRef as Record<string, unknown>;
+    if (typeof r.authority === "string" && isBoundedString(r.publicIdentifier, MAX_ID_LENGTH)) {
+      counterpartyAccountRef = { authority: r.authority, publicIdentifier: r.publicIdentifier, identityId: typeof r.identityId === "string" ? r.identityId : null };
+    }
+  }
+  return { outcome: "ok", value: boundary.securityState.getSecurityState(body.conversationId, counterpartyAccountRef, Date.now()) };
+}
+
 // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent I /
 // Wave B) — Signed Deletion sender-side. The recipient side (approve/
 // reject, below) already exists; this supplies the missing send half. See
@@ -8375,6 +8418,7 @@ function registerIpcHandlers(): void {
   ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-sent-status", (payload: unknown) => handleAppDeletionRequestSentStatus(payload), { allowConcurrentSelf: true });
   // Phase K -- reuse the SAME handler `fedos-acceptance:safety-center-overview` already dispatches to.
   ipcCommands.registerHandle(ipcMain, "fedos-app:safety-center-overview", async () => handleAppSafetyCenterOverview(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:conversation-security-state", (payload: unknown) => handleAppConversationSecurityState(payload), { allowConcurrentSelf: true });
   // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
   ipcCommands.registerHandle(ipcMain, "fedos-app:settings-load", async () => handleAppSettingsLoad(), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-app:relay-status", async () => handleAppRelayStatus(), { allowConcurrentSelf: true });
@@ -8590,6 +8634,7 @@ app.whenReady().then(async () => {
         "app-identity-transition-list": (payload) => handleAppIdentityTransitionList(payload),
         "app-deletion-request-list-received": () => handleAppDeletionRequestListReceived(),
         "app-safety-center-overview": () => handleAppSafetyCenterOverview(),
+        "app-conversation-security-state": (payload) => handleAppConversationSecurityState(payload),
         "app-settings-load": () => handleAppSettingsLoad(),
         "app-relay-status": () => handleAppRelayStatus(),
         "acceptance-safety-center-overview": () => handleAcceptanceSafetyCenterOverview(),

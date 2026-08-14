@@ -296,6 +296,7 @@ import { AppendOnlyFedosConversationInvitationReceivedPersistence } from "../../
 import { FedosSecureRandomConversationInvitationIdGenerator } from "../../conversations/invitation_bootstrap/fedos_secure_random_conversation_invitation_id_generator.js";
 import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../../conversations/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
 import { AppendOnlyFedosIdentityTransitionLocalDecisionPersistence } from "../../conversations/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_local_decision_persistence.js";
+import { AppendOnlyFedosIdentityTransitionConversationContinuityPersistence } from "../../conversations/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_conversation_continuity_persistence.js";
 import { AppendOnlyFedosDeletionRequestStatePersistence } from "../../conversations/deletion_request/append_only_fedos_deletion_request_state_persistence.js";
 import { AppendOnlyFedosDeletionRecipientDecisionPersistence } from "../../conversations/deletion_request/append_only_fedos_deletion_recipient_decision_persistence.js";
 import { AppendOnlyFedosDeletionAcknowledgementPersistence } from "../../conversations/deletion_request/append_only_fedos_deletion_acknowledgement_persistence.js";
@@ -1107,6 +1108,17 @@ export async function startFedosDesktopRuntime(
           // decisions -- is only meaningful in production when this is
           // ACTUALLY append-only; omitted, decisions do not survive restart.
           localDecisionPersistence: config.identityTransitionLocalDecisionLogPath !== undefined ? new AppendOnlyFedosIdentityTransitionLocalDecisionPersistence(config.identityTransitionLocalDecisionLogPath) : undefined,
+          // Verified Secure Session UI mega-arc (Coordinator) -- was missing
+          // entirely (this field is optional-with-durable-fallback exactly
+          // like localDecisionPersistence immediately above, but production
+          // never supplied a path here), so the per-conversation identity-
+          // continuity record silently fell back to
+          // InMemoryFedosIdentityTransitionConversationContinuityPersistence
+          // in every real process -- lost on every restart. The new
+          // conversation Security State UI's IDENTITY_CONTINUITY axis reads
+          // this record as its primary fact source and requires it to
+          // genuinely survive a restart.
+          continuityPersistence: config.identityTransitionConversationContinuityLogPath !== undefined ? new AppendOnlyFedosIdentityTransitionConversationContinuityPersistence(config.identityTransitionConversationContinuityLogPath) : undefined,
           localPolicy: config.identityTransitionLocalPolicy,
         }
       : undefined);

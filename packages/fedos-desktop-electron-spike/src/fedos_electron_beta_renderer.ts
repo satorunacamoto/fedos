@@ -1133,7 +1133,119 @@ async function openConversation(conversationId: string): Promise<void> {
   // still lets the user see messages, only sending will then fail closed.
   await window.fedosApp.conversationActivate(conversationId);
   await loadChatMessages();
+  await refreshChatSecurityState(conversationId);
   startChatPolling();
+}
+
+// ---------------------------------------------------------------------------
+// Verified Secure Session UI mega-arc (Coordinator) -- compact conversation
+// security indicator + expandable Security Details panel. NO single
+// collapsed "Secure"/"Verified" claim anywhere here -- each axis renders its
+// own honest, independent status text, mirroring the Safety Center's own
+// "each section keeps its OWN independent state" convention.
+// ---------------------------------------------------------------------------
+
+const CHAT_SECURITY_AXIS_LABELS: Record<string, string> = {
+  identityContinuity: "Identity",
+  encryption: "Encryption",
+  forwardSecrecy: "Forward secrecy",
+  deviceKnowledge: "Device knowledge",
+  evidenceIntegrity: "Recent security events",
+  metadataExposure: "Metadata",
+};
+
+/** state -> {glyph, word} -- glyph always paired with text, never color alone. */
+const CHAT_SECURITY_STATE_GLYPH: Record<string, { readonly glyph: string; readonly word: string }> = {
+  good: { glyph: "✓", word: "OK" },
+  attention: { glyph: "⚠", word: "Attention" },
+  unknown: { glyph: "?", word: "Unknown" },
+  unavailable: { glyph: "–", word: "Unavailable" },
+  "not-applicable": { glyph: "–", word: "Not applicable" },
+};
+
+/** Closed-vocabulary reasonCode -> a specific, factual sentence. Never a claim stronger than the runtime proves -- see docs/reviews/fedos-verified-secure-session-ui-current-readiness/05_SECURITY_CLAIM_BOUNDARIES.md for the full audited list this mirrors. */
+const CHAT_SECURITY_REASON_TEXT: Record<string, string> = {
+  "no-identity-change-observed": "Same identity as when this contact was first added to this conversation — no unexplained change observed.",
+  "no-history-for-this-contact": "FedOS has no history for this contact's identity yet.",
+  "identity-replacement-auto-accepted-without-asking": "This contact's identity changed and FedOS accepted the new key automatically, without asking you. Confirm with them out of band that they really did change identity.",
+  "identity-change-unresolved": "This contact's identity changed and is waiting for your review.",
+  "identity-change-reviewed-and-accepted": "This contact's identity change was reviewed and accepted.",
+  "identity-change-rejected": "A claimed identity change for this contact was rejected.",
+  "identity-change-conflicting": "Conflicting identity information was received for this contact.",
+  "identity-change-rollback-detected": "A suspicious identity rollback was detected for this contact.",
+  "identity-change-stale": "Identity change evidence for this contact is stale.",
+  "identity-continuity-state-unresolved": "Identity continuity state could not be resolved.",
+  "ratchet-status-unavailable": "Direct Ratchet status is not available for this conversation.",
+  "ratchet-session-active": "A Direct Ratchet session is active for this conversation.",
+  "ratchet-pending": "A Direct Ratchet session is being established for this conversation.",
+  "ratchet-initialization-required": "A Direct Ratchet session has not been established for this conversation yet.",
+  "ratchet-reset-required": "The secure session for this conversation needs to be re-established.",
+  "ratchet-peer-incompatible": "This contact's device is not compatible with Direct Ratchet.",
+  "ratchet-revoked": "The Direct Ratchet session for this conversation was revoked.",
+  "ratchet-unsupported": "Direct Ratchet is not supported for this conversation.",
+  "ratchet-unavailable": "Direct Ratchet is not available for this conversation.",
+  "forward-secrecy-route-unavailable": "Forward-secrecy status is not available for this conversation.",
+  "messages-routed-through-ratchet": "Messages are sent through the Ratchet — a later key compromise would not expose them.",
+  "no-forward-secrecy-ratchet-not-configured": "Messages in this conversation do NOT currently have forward secrecy — a later key compromise could expose them.",
+  "no-forward-secrecy-no-session-for-conversation": "Messages in this conversation do NOT currently have forward secrecy — no secure session is established with this contact.",
+  "no-forward-secrecy-remote-device-unknown": "Messages in this conversation do NOT currently have forward secrecy — this contact's device is not known.",
+  "no-forward-secrecy-remote-device-revoked": "Messages in this conversation do NOT currently have forward secrecy — this contact's device was revoked.",
+  "no-forward-secrecy-remote-device-not-trusted": "Messages in this conversation do NOT currently have forward secrecy — this contact's device is not trusted.",
+  "no-forward-secrecy-ambiguous-remote-device": "Messages in this conversation do NOT currently have forward secrecy — more than one device is known and none was chosen.",
+  "no-device-observed": "FedOS has not observed a device for this contact yet.",
+  "observed-device-revoked": "A device observed for this contact was revoked.",
+  "observed-device-conflicting": "Conflicting device information was observed for this contact.",
+  "observed-device-knowledge-stale": "Device knowledge for this contact is stale — it may no longer be current.",
+  "observed-device-not-usable": "The device observed for this contact is not currently usable.",
+  "observed-device-not-yet-compatible": "The device observed for this contact has not yet confirmed compatibility.",
+  "observed-devices-compatible": "The device(s) this conversation has used are compatible and known.",
+  "no-rejected-security-evidence": "No recent security evidence for this conversation was rejected.",
+  "relay-connected-metadata-exposed": "Relays can see that this conversation is happening. Encryption does not hide that.",
+  "no-relay-connected-metadata-still-exposed-when-connected": "No relay is currently connected. When one is, it can see that this conversation is happening.",
+};
+
+function chatSecurityReasonText(reasonCode: string): string {
+  return CHAT_SECURITY_REASON_TEXT[reasonCode] ?? (reasonCode.startsWith("evidence-rejected-") ? "A recent security event for this contact could not be verified and was rejected." : reasonCode);
+}
+
+async function refreshChatSecurityState(conversationId: string): Promise<void> {
+  const indicatorText = byId("chat-security-indicator-text");
+  const axesList = byId("chat-security-axes");
+  indicatorText.textContent = "checking…";
+  const result = await window.fedosApp.conversationSecurityState(conversationId, null);
+  if (result.outcome !== "ok") {
+    indicatorText.textContent = "unavailable";
+    axesList.textContent = "";
+    return;
+  }
+  const state = result.value as Record<string, { readonly state: string; readonly reasonCode: string }>;
+  const axisKeys = ["identityContinuity", "encryption", "forwardSecrecy", "deviceKnowledge", "evidenceIntegrity", "metadataExposure"];
+  const attentionCount = axisKeys.filter((k) => state[k]?.state === "attention").length;
+  indicatorText.textContent = attentionCount > 0 ? `${String(attentionCount)} need${attentionCount === 1 ? "s" : ""} attention` : "no attention needed";
+
+  axesList.textContent = "";
+  for (const key of axisKeys) {
+    const axis = state[key];
+    if (axis === undefined) continue;
+    const glyphInfo = CHAT_SECURITY_STATE_GLYPH[axis.state] ?? { glyph: "?", word: axis.state };
+    const li = document.createElement("li");
+    const label = document.createElement("strong");
+    label.textContent = `${glyphInfo.glyph} ${CHAT_SECURITY_AXIS_LABELS[key] ?? key}: ${glyphInfo.word}`;
+    li.appendChild(label);
+    const explanation = document.createElement("div");
+    explanation.className = "muted";
+    explanation.textContent = chatSecurityReasonText(axis.reasonCode);
+    li.appendChild(explanation);
+    axesList.appendChild(li);
+  }
+}
+
+function onChatSecurityIndicatorClick(): void {
+  const panel = byId("chat-security-details");
+  const button = byId<HTMLButtonElement>("chat-security-indicator");
+  const nowHidden = !panel.hidden;
+  panel.hidden = nowHidden;
+  button.setAttribute("aria-expanded", nowHidden ? "false" : "true");
 }
 
 async function onChatSend(): Promise<void> {
@@ -4967,6 +5079,7 @@ byId<HTMLButtonElement>("chat-back").addEventListener("click", () => {
   void refreshConversationsList();
 });
 byId<HTMLButtonElement>("chat-send").addEventListener("click", () => void onChatSend());
+byId<HTMLButtonElement>("chat-security-indicator").addEventListener("click", onChatSecurityIndicatorClick);
 
 // Commerce.
 byId<HTMLButtonElement>("commerce-detail-back").addEventListener("click", () => {

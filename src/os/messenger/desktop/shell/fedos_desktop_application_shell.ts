@@ -986,6 +986,24 @@ export class FedosDesktopApplicationShell {
     return fedosDesktopShellOk(it.inspectPeerIdentityTransitionStatus(peerAccountRef, peerDeviceRef, transitionId));
   }
 
+  /**
+   * Verified Secure Session UI mega-arc (Coordinator) -- the ONE narrow,
+   * read-only wrapper this feature needed that did not already exist:
+   * `identityTransitionRecordContinuity()` above is a MUTATING call (it
+   * writes a new continuity record), so it cannot double as a read. This
+   * delegates entirely to the already-public, already-tested
+   * `FedosIdentityTransitionPeerRuntime.getConversationContinuity()`
+   * (Secure Runtime Alpha 6121-6200, unmodified) -- zero new business
+   * logic, mirrors `directRatchetStatus()`'s own exact pattern.
+   */
+  conversationIdentityContinuity(
+    conversationId: string,
+  ): FedosDesktopShellResult<(FedosIdentityTransitionConversationContinuityRecordV1 & { readonly superseded: boolean }) | null> {
+    const it = this.#identityTransitionRuntime();
+    if (it === null) return fedosDesktopShellFailure("unavailable", "identity transition Runtime is not configured");
+    return fedosDesktopShellOk(it.getConversationContinuity(conversationId));
+  }
+
   /** Phase F/G — links a Direct Conversation to an ALREADY-accepted transition. Refuses (`"conflict"`, mapped from the Runtime's own `"not-accepted"`) if the transition is not yet accepted on this Device. */
   identityTransitionRecordContinuity(params: {
     readonly conversationId: string;
