@@ -108,4 +108,24 @@ describe("FedosConversationSecurityStateController -- real Shell wiring (not a m
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("REGRESSION (found live via a real two-process installed E2E): a genuinely brand-new conversation, seconds old, with ZERO exchanged messages, must read IDENTITY_CONTINUITY: unknown -- never GOOD merely because both parties are already members (membership is not history; an earlier version of the adapter used participantCount > 0 and produced exactly this false-green)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-security-state-controller-fresh-conv-"));
+    try {
+      const continuityLogPath = join(dir, "identity-transition-conversation-continuity.ndjson");
+      const { shell } = await makeShell(dir, continuityLogPath);
+      const controller = new FedosConversationSecurityStateController(shell);
+
+      const created = shell.createDirectConversation({ recipient: { authority: "nostr", publicIdentifier: "c".repeat(64) } });
+      expect(created.outcome, JSON.stringify(created)).toBe("ok");
+      const conversationId = (created as { readonly outcome: "ok"; readonly value: { readonly conversationId: string } }).value.conversationId;
+
+      const state = controller.getSecurityState(conversationId, { authority: "nostr", publicIdentifier: "c".repeat(64), identityId: null }, 1_700_000_000_000);
+
+      expect(state.identityContinuity.state, "REQUIRED: a conversation with zero exchanged messages must never read GOOD -- membership alone proves nothing about identity continuity").toBe("unknown");
+      expect(state.identityContinuity.reasonCode).toBe("no-history-for-this-contact");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

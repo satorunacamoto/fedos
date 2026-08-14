@@ -134,9 +134,22 @@ export class FedosConversationSecurityStateController {
     };
   }
 
-  /** Honest "does this conversation have any real history at all" signal, distinguishing a genuinely brand-new peer from a known one with no identity changes. */
+  /**
+   * Honest "does this conversation have any real history at all" signal,
+   * distinguishing a genuinely brand-new peer from a known one with no
+   * identity changes. Found and fixed live, this arc, via a real two-
+   * process installed E2E: an EARLIER version of this method used
+   * `getConversation(conversationId).participantCount > 0`, which is
+   * trivially true the INSTANT a conversation is created (both parties are
+   * already members) -- a real false-green (`IDENTITY_CONTINUITY: GOOD`
+   * for a conversation seconds old, with a peer never before observed),
+   * exactly the "TOFU presented as verified" failure mandate section 27's
+   * scenario 1 forbids. Message history, not membership, is the honest
+   * signal: a conversation with zero exchanged messages has no real basis
+   * for "no unexplained change observed" to mean anything yet.
+   */
   #hasEverExchangedMessages(conversationId: string): boolean {
-    const detail = this.#shell.getConversation(conversationId);
-    return detail.outcome === "ok" && detail.value.participantCount > 0;
+    const messages = this.#shell.listMessages(conversationId);
+    return messages.outcome === "ok" && messages.value.length > 0;
   }
 }
