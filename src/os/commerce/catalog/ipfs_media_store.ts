@@ -270,6 +270,30 @@ interface StoredEntryMetadata {
  */
 export type IpfsMediaStoreProtectedPutResult = MediaStorePutResult | { readonly outcome: "encryption-unavailable" };
 
+/**
+ * Real Digital Delivery mega-arc (Coordinator, protected-media-byte-
+ * durability closure) — OPTIONAL, additive durability seam for THIS
+ * class's own private `#index` (below), separate from `IpfsTransport`.
+ * `IpfsTransport.add()` takes no `contentType` parameter, so a durable
+ * transport ALONE has no way to receive or reconstruct the metadata
+ * (`contentType`/`checksum`/`sizeBytes`/`storedAt`) `#index` holds — and
+ * `get()`/`metadata()`/`getProtected()` below all check `#index` FIRST,
+ * returning a miss WITHOUT EVER CALLING THE TRANSPORT if the entry is
+ * absent. A durable transport is therefore necessary but not sufficient;
+ * this is the seam that closes the remainder. See
+ * `./persistence/durable_ipfs_media_store_index.ts` for the real,
+ * disk-backed implementation (same append-only-NDJSON/replay-on-construct/
+ * fail-closed-on-corruption discipline as `./persistence/durable_product_media_repository.ts`).
+ * `undefined` (the default) preserves EXACTLY today's in-memory-only
+ * behavior — every existing caller/test is unaffected.
+ */
+export interface IpfsMediaStoreIndexPersistence {
+  /** Called once, synchronously, at construction — every already-durably-recorded metadata entry to seed `#index` from. */
+  loadAll(): ReadonlyMap<string, MediaObjectMetadata>;
+  /** Called once per successful `put()`, immediately after `#index.set()` — durably records `metadata` so a FUTURE construction's `loadAll()` returns it too. */
+  record(metadata: MediaObjectMetadata): void;
+}
+
 export class IpfsMediaStore implements MediaStorePort {
   readonly #transport: IpfsTransport;
   readonly #maxPayloadByteLength: number;
@@ -278,7 +302,8 @@ export class IpfsMediaStore implements MediaStorePort {
   readonly #decryption: ProductMediaDecryptionPort;
   readonly #networkProfile: NetworkProfile;
   readonly #now: () => number;
-  /** Local metadata index, keyed by CID — the transport itself only knows bytes, never our descriptor shape. Mirrors `LocalMediaStore`'s own `#objects` map, minus the bytes (the transport already holds those). */
+  readonly #indexPersistence: IpfsMediaStoreIndexPersistence | undefined;
+  /** Local metadata index, keyed by CID — the transport itself only knows bytes, never our descriptor shape. Mirrors `LocalMediaStore`'s own `#objects` map, minus the bytes (the transport already holds those). Seeded from `#indexPersistence` at construction when provided (see that field's own doc comment). */
   readonly #index = new Map<string, StoredEntryMetadata>();
 
   /**
@@ -297,6 +322,17 @@ export class IpfsMediaStore implements MediaStorePort {
    * predecessor's tests, which pass up to `networkProfile` positionally)
    * keeps meaning exactly what it meant before.
    */
+  /**
+   * Real Digital Delivery mega-arc (Coordinator, protected-media-byte-
+   * durability closure) — `indexPersistence` is a NEW parameter this arc
+   * adds, appended LAST (same convention `decryption` itself already
+   * established: "every pre-existing positional call site keeps meaning
+   * exactly what it meant before"). `undefined` (the default) means
+   * exactly today's behavior: an empty, in-memory-only `#index`. When
+   * provided, every already-durably-recorded entry seeds `#index` here,
+   * synchronously, once — see `IpfsMediaStoreIndexPersistence`'s own doc
+   * comment above for the full rationale.
+   */
   constructor(
     transport: IpfsTransport,
     maxPayloadByteLength: number,
@@ -305,6 +341,7 @@ export class IpfsMediaStore implements MediaStorePort {
     networkProfile: NetworkProfile = "direct",
     now: () => number = Date.now,
     decryption: ProductMediaDecryptionPort = new WasmProductMediaDecryption(),
+    indexPersistence?: IpfsMediaStoreIndexPersistence,
   ) {
     this.#transport = transport;
     this.#maxPayloadByteLength = maxPayloadByteLength;
@@ -313,6 +350,12 @@ export class IpfsMediaStore implements MediaStorePort {
     this.#networkProfile = networkProfile;
     this.#now = now;
     this.#decryption = decryption;
+    this.#indexPersistence = indexPersistence;
+    if (indexPersistence !== undefined) {
+      for (const [key, metadata] of indexPersistence.loadAll()) {
+        this.#index.set(key, { metadata });
+      }
+    }
   }
 
   /**
@@ -390,6 +433,7 @@ export class IpfsMediaStore implements MediaStorePort {
       storedAt: this.#now(),
     };
     this.#index.set(cid, { metadata });
+    this.#indexPersistence?.record(metadata);
     return { outcome: "stored", metadata };
   }
 

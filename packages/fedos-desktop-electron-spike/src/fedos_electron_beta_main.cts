@@ -501,6 +501,11 @@ function commerceDurableFilePath(name: string): string {
   return path.join(dataDir(), "commerce", `${name}.ndjson`);
 }
 
+/** Real Digital Delivery mega-arc (Coordinator, protected-media-byte-durability closure) -- profile-scoped directory for `DurableIpfsTransport`'s own per-CID blob files. Sibling of `commerceDurableFilePath()` (same `<dataDir()>/commerce/` root), not a `.ndjson` leaf since this holds raw binary objects, not an append-only log. */
+function commerceMediaBlobDir(): string {
+  return path.join(dataDir(), "commerce", "media_blobs");
+}
+
 /**
  * BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Coordinator
  * validation-gate fix) -- `<dataDir()>/logs/`, the "local application log
@@ -1311,10 +1316,15 @@ interface RootModules {
       networkProfile?: string,
       now?: () => number,
       decryption?: unknown,
+      indexPersistence?: unknown,
     ) => CommerceMediaStoreLike;
     readonly InMemoryIpfsTransport: new (options?: { readonly simulateOffline?: boolean }) => unknown;
     readonly WasmProductMediaEncryption: new (authority?: unknown) => unknown;
     readonly WasmProductMediaDecryption: new (authority?: unknown) => unknown;
+    /** Real Digital Delivery mega-arc (Coordinator, protected-media-byte-durability closure) -- durable `IpfsTransport`, disk-backed, one blob file per content-addressed CID under the given directory. See `src/os/commerce/catalog/persistence/durable_ipfs_transport.ts`'s own header. */
+    readonly DurableIpfsTransport: new (blobDir: string) => unknown;
+    /** Real Digital Delivery mega-arc (Coordinator, protected-media-byte-durability closure) -- durable persistence for `IpfsMediaStore`'s own private metadata index, injected as that class's new `indexPersistence` constructor parameter. See `src/os/commerce/catalog/persistence/durable_ipfs_media_store_index.ts`'s own header. */
+    readonly DurableIpfsMediaStoreIndex: new (filePath: string) => unknown;
   };
   /**
    * FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's
@@ -2269,6 +2279,8 @@ async function loadRootModules(): Promise<RootModules> {
     InMemoryIpfsTransport: RootModules["Media"]["InMemoryIpfsTransport"];
     WasmProductMediaEncryption: RootModules["Media"]["WasmProductMediaEncryption"];
     WasmProductMediaDecryption: RootModules["Media"]["WasmProductMediaDecryption"];
+    DurableIpfsTransport: RootModules["Media"]["DurableIpfsTransport"];
+    DurableIpfsMediaStoreIndex: RootModules["Media"]["DurableIpfsMediaStoreIndex"];
   };
   // FedOS Commerce FINAL Closure Mega-Arc (coordinator) -- Agent N's
   // outbound Port + real Nostr adapter transport (two explicit
@@ -2475,6 +2487,8 @@ async function loadRootModules(): Promise<RootModules> {
       InMemoryIpfsTransport: commerceMedia.InMemoryIpfsTransport,
       WasmProductMediaEncryption: commerceMedia.WasmProductMediaEncryption,
       WasmProductMediaDecryption: commerceMedia.WasmProductMediaDecryption,
+      DurableIpfsTransport: commerceMedia.DurableIpfsTransport,
+      DurableIpfsMediaStoreIndex: commerceMedia.DurableIpfsMediaStoreIndex,
     },
     CommerceNostr: {
       CommerceNostrEventPortImpl: commerceNostrOutbound.CommerceNostrEventPortImpl,
@@ -3103,10 +3117,33 @@ let commerceMediaStoreAuthorityRef: MasterSeedAuthorityLike | null = null;
 const COMMERCE_MEDIA_MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
 const COMMERCE_MEDIA_SUPPORTED_CONTENT_TYPES: readonly string[] = ["image/png", "image/jpeg", "application/pdf", "application/zip"];
 
+/**
+ * Real Digital Delivery mega-arc (Coordinator, protected-media-byte-
+ * durability closure) — was `new m.Media.InMemoryIpfsTransport()`
+ * (in-memory only; see `docs/commerce/PROTECTED-MEDIA-BYTE-DURABILITY-GAP.md`).
+ * Now `DurableIpfsTransport` (raw ciphertext bytes, disk-backed, one file
+ * per content-addressed CID) plus `DurableIpfsMediaStoreIndex` (the
+ * `IpfsMediaStore` metadata index that same bytes-only transport cannot by
+ * itself reconstruct — see `IpfsMediaStoreIndexPersistence`'s own doc
+ * comment, `src/os/commerce/catalog/ipfs_media_store.ts`, for why both
+ * are needed). Both are reconstructed fresh on every call this `if` body
+ * runs — including every lock/unlock cycle within one process run, not
+ * just a process restart (this function's own pre-existing invalidation
+ * trigger, `commerceMediaStoreAuthorityRef !== activeMasterSeedAuthority`,
+ * unchanged) — which is safe and correct precisely BECAUSE both classes
+ * hold no in-process cache of their own: every `add()`/`cat()`/`record()`/
+ * `loadAll()` call reads/writes the SAME on-disk location every time,
+ * keyed only by the stable `commerceMediaBlobDir()`/
+ * `commerceDurableFilePath("media_index")` paths below, never by anything
+ * that changes across a reconstruction.
+ */
 function commerceMediaStoreFor(): CommerceMediaStoreLike {
   const m = requireModules();
   if (commerceMediaStore === null || commerceMediaStoreAuthorityRef !== activeMasterSeedAuthority) {
-    const transport = new m.Media.InMemoryIpfsTransport();
+    fs.mkdirSync(commerceMediaBlobDir(), { recursive: true });
+    fs.mkdirSync(path.dirname(commerceDurableFilePath("media_index")), { recursive: true });
+    const transport = new m.Media.DurableIpfsTransport(commerceMediaBlobDir());
+    const indexPersistence = new m.Media.DurableIpfsMediaStoreIndex(commerceDurableFilePath("media_index"));
     const encryption = new m.Media.WasmProductMediaEncryption(activeMasterSeedAuthority ?? undefined);
     const decryption = new m.Media.WasmProductMediaDecryption(activeMasterSeedAuthority ?? undefined);
     commerceMediaStore = new m.Media.IpfsMediaStore(
@@ -3117,6 +3154,7 @@ function commerceMediaStoreFor(): CommerceMediaStoreLike {
       "local-only",
       Date.now,
       decryption,
+      indexPersistence,
     );
     commerceMediaStoreAuthorityRef = activeMasterSeedAuthority;
   }

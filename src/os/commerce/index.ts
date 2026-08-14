@@ -187,7 +187,15 @@ export type {
 // root needs both constructors to inject the app's real, shared
 // `FedosMasterSeedAuthority` instance (see those two files' own headers for
 // the fail-closed-until-injected discipline this barrel does not change).
-export { IpfsMediaStore, InMemoryIpfsTransport, type IpfsTransport } from "./catalog/ipfs_media_store.js";
+export { IpfsMediaStore, InMemoryIpfsTransport, type IpfsTransport, type IpfsMediaStoreIndexPersistence } from "./catalog/ipfs_media_store.js";
+// Real Digital Delivery mega-arc (Coordinator, protected-media-byte-
+// durability closure) -- the durable `IpfsTransport`/`IpfsMediaStoreIndexPersistence`
+// pair (see both files' own headers). Barreled alongside `IpfsMediaStore`
+// itself for the SAME reason: the composition root needs both to swap
+// `commerceMediaStoreFor()`'s previously in-memory-only construction for a
+// durable one.
+export { DurableIpfsTransport } from "./catalog/persistence/durable_ipfs_transport.js";
+export { DurableIpfsMediaStoreIndex } from "./catalog/persistence/durable_ipfs_media_store_index.js";
 export { WasmProductMediaEncryption, type WasmProductMediaEncryptionDeps } from "./catalog/wasm_product_media_encryption.js";
 export { WasmProductMediaDecryption, type WasmProductMediaDecryptionDeps } from "./catalog/wasm_product_media_decryption.js";
 export {
