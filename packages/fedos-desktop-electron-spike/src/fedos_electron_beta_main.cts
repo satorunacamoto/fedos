@@ -1032,6 +1032,8 @@ interface RootModules {
       readonly order: { readonly id: string; readonly productId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly status: string };
       readonly candidateMedia: readonly { readonly id: string; readonly productId: string; readonly classification: "public" | "protected" }[];
       readonly sellerSigningKeypair: { readonly publicKeyHex: string };
+      /** Real Digital Delivery mega-arc (Agent G, Grant Custody pass) -- see `EvaluateMediaAccessGrantInput.sellerAuthorizedDelegateSigningKeys`'s own header (`src/os/commerce/media_grant/media_access_grant_policy.ts`). */
+      readonly sellerAuthorizedDelegateSigningKeys?: readonly string[];
       readonly latestKnownGrantVersionFor: (mediaId: string) => number;
       readonly now: number;
     }) => CommerceIssueMediaAccessGrantsOutcomeLike;
@@ -1044,6 +1046,7 @@ interface RootModules {
       readonly order: CommerceOrderLike | null;
       readonly now: number;
       readonly latestKnownGrantVersion?: number;
+      readonly sellerAuthorizedDelegateSigningKeys?: readonly string[];
     }) => CommerceMediaAccessDecisionLike;
     readonly wrapMediaAccessGrantRelease: (input: {
       readonly envelope: unknown;
@@ -1052,6 +1055,7 @@ interface RootModules {
       readonly order: CommerceOrderLike | null;
       readonly now: number;
       readonly latestKnownGrantVersion?: number;
+      readonly sellerAuthorizedDelegateSigningKeys?: readonly string[];
       readonly merchantAccountIndex: number;
       readonly releasePayload: Uint8Array;
       readonly authority: MasterSeedAuthorityLike;
@@ -1496,12 +1500,18 @@ interface RootModules {
       readonly senderPubkeyHex: string;
       readonly ownPubkeyHex: string;
       readonly order: { readonly id: string; readonly productId: string; readonly buyerPubkey: string; readonly sellerPubkey: string; readonly status: string } | undefined;
-      readonly media: { readonly id: string; readonly productId: string; readonly classification: "public" | "protected"; readonly storageRef: string; readonly contentType: string } | undefined;
+      readonly media:
+        | { readonly id: string; readonly productId: string; readonly classification: "public" | "protected"; readonly storageRef: string; readonly contentType: string; readonly checksum: string }
+        | undefined;
       readonly candidateGrantEnvelope: unknown;
       readonly latestKnownGrantVersion: number;
+      /** Real Digital Delivery mega-arc (Agent G, Grant Custody pass) — see `EvaluateMediaAccessGrantInput.sellerAuthorizedDelegateSigningKeys`'s own header (`src/os/commerce/media_grant/media_access_grant_policy.ts`). */
+      readonly sellerAuthorizedDelegateSigningKeys?: readonly string[];
       readonly now: number;
       readonly merchantAccountIndex: number;
       readonly authority: MasterSeedAuthorityLike;
+      /** Real Digital Delivery mega-arc (Agent G, Grant Custody pass) — was missing entirely; see `BuildOutboundPrivateMediaReleaseResponseInput.getStoredCiphertextChecksum`'s own header (`src/os/commerce/events/commerce_private_media_release_apply.ts`). */
+      readonly getStoredCiphertextChecksum: (storageRef: string) => string | null;
       readonly getProtectedContent: (storageRef: string) => Promise<Uint8Array | null>;
     }) => Promise<CommercePrivateMediaReleasePayloadLike>;
     readonly applyInboundPrivateMediaReleaseResponse: (input: {
@@ -1533,6 +1543,25 @@ interface RootModules {
       declaredAt: number,
     ) => unknown;
     readonly buildProductMediaRetraction: (productId: string, mediaId: string, sellerPubkey: string, version: number, retractedAt: number) => unknown;
+    /**
+     * Real Digital Delivery mega-arc (Agent G, Grant Custody pass) --
+     * closes Blocker 5. See
+     * `commerce_media_grant_signing_key_delegation_bridge.ts`'s own header
+     * for the full mechanism.
+     */
+    readonly signMediaGrantSigningKeyDelegation: (
+      signingAuthority: unknown,
+      delegateKeyPublicHex: string,
+      accountIndex: number,
+      createdAt: number,
+    ) => Promise<unknown>;
+    readonly verifyMediaGrantSigningKeyDelegationEvent: (
+      event: unknown,
+      options: { readonly expectedSellerPubkeyHex: string; readonly expectedDelegateKeyPublicHex: string },
+    ) => Promise<
+      | { readonly outcome: "valid"; readonly sellerPubkeyHex: string; readonly delegateKeyPublicHex: string }
+      | { readonly outcome: "malformed" | "wrong-kind" | "wrong-tag" | "signature-invalid" | "seller-mismatch" | "delegate-mismatch" }
+    >;
   };
 }
 
@@ -1663,6 +1692,8 @@ interface CommerceMediaAccessGrantEnvelopeLike {
     readonly orderId: string;
     readonly grantVersion: number;
     readonly revoked: boolean;
+    /** Real Digital Delivery mega-arc (Agent G, Grant Custody pass) -- the delegate signing key that actually signed this grant; see `MediaAccessGrantPayload.issuerPubkey`'s own doc (`src/os/commerce/media_grant/media_access_grant_types.ts`). */
+    readonly issuerPubkey: string;
   };
 }
 interface CommerceMediaAccessGrantPersistenceLike {
@@ -1941,6 +1972,15 @@ interface CommerceMediaStoreLike {
   putProtected(plaintext: Uint8Array, contentType: string): Promise<CommerceMediaStoreProtectedPutResultLike>;
   get(key: string): { readonly metadata: CommerceMediaObjectMetadataLike; readonly bytes: Uint8Array } | null;
   getProtected(key: string): Promise<Uint8Array | null>;
+  /**
+   * Real Digital Delivery mega-arc (Agent G, Grant Custody pass) — the
+   * SYNC, non-network-gated metadata-only lookup
+   * `buildOutboundPrivateMediaReleaseResponse()`'s own
+   * `getStoredCiphertextChecksum` callback needs (unlike `get()` above,
+   * which re-fetches full bytes through the network-gated transport and is
+   * therefore the wrong primitive for a cheap checksum re-check).
+   */
+  metadata(key: string): CommerceMediaObjectMetadataLike | null;
   readonly [key: string]: unknown;
 }
 
@@ -2248,6 +2288,15 @@ async function loadRootModules(): Promise<RootModules> {
     buildOutboundPrivateMediaReleaseResponse: RootModules["CommerceNostr"]["buildOutboundPrivateMediaReleaseResponse"];
     applyInboundPrivateMediaReleaseResponse: RootModules["CommerceNostr"]["applyInboundPrivateMediaReleaseResponse"];
   };
+  // Real Digital Delivery mega-arc (Agent G, Grant Custody pass) -- closes
+  // Blocker 5. See `commerce_media_grant_signing_key_delegation_bridge.ts`'s
+  // own header for the full mechanism.
+  const commerceMediaGrantDelegationBridge = (await import(
+    distUrl("os", "commerce", "catalog", "adapters", "nostr", "commerce_media_grant_signing_key_delegation_bridge.js")
+  )) as {
+    signMediaGrantSigningKeyDelegation: RootModules["CommerceNostr"]["signMediaGrantSigningKeyDelegation"];
+    verifyMediaGrantSigningKeyDelegationEvent: RootModules["CommerceNostr"]["verifyMediaGrantSigningKeyDelegationEvent"];
+  };
   const productMediaSyncBridge = (await import(distUrl("os", "commerce", "catalog", "adapters", "nostr", "product_media_sync_bridge.js"))) as {
     NostrProductMediaSyncPort: RootModules["CommerceNostr"]["NostrProductMediaSyncPort"];
   };
@@ -2376,6 +2425,8 @@ async function loadRootModules(): Promise<RootModules> {
       NostrProductMediaSyncPort: productMediaSyncBridge.NostrProductMediaSyncPort,
       deriveProductMediaDeclaration: productMediaDeclarationTypes.deriveProductMediaDeclaration,
       buildProductMediaRetraction: productMediaDeclarationTypes.buildProductMediaRetraction,
+      signMediaGrantSigningKeyDelegation: commerceMediaGrantDelegationBridge.signMediaGrantSigningKeyDelegation,
+      verifyMediaGrantSigningKeyDelegationEvent: commerceMediaGrantDelegationBridge.verifyMediaGrantSigningKeyDelegationEvent,
     },
   };
 }
@@ -4466,12 +4517,34 @@ async function applyInboundPrivateMediaReleaseRequestNonFatal(envelope: {
       senderPubkeyHex: envelope.senderPubkeyHex,
       ownPubkeyHex: ownIdentity.publicKeyHex,
       order: order === undefined ? undefined : { id: order.id, productId: order.productId, buyerPubkey: order.buyerPubkey, sellerPubkey: order.sellerPubkey, status: order.status },
-      media: media === undefined || media.classification !== "protected" ? undefined : { id: media.id, productId: media.productId, classification: media.classification, storageRef: media.storageRef, contentType: media.contentType },
+      media:
+        media === undefined || media.classification !== "protected"
+          ? undefined
+          : { id: media.id, productId: media.productId, classification: media.classification, storageRef: media.storageRef, contentType: media.contentType, checksum: media.checksum },
       candidateGrantEnvelope: candidate,
       latestKnownGrantVersion: latestVersion,
+      // Real Digital Delivery mega-arc (Agent G, Grant Custody pass) --
+      // certifies exactly the delegate key that ACTUALLY signed the
+      // candidate grant (its own `issuerPubkey`), never a freshly-resolved
+      // key that might not match -- `evaluateMediaAccessGrant()`'s
+      // "wrong-signer" check requires the two to agree exactly. `[]` when
+      // there is no candidate grant at all, or no Order -- the evaluation
+      // step below denies on its own pre-existing, correct grounds either way.
+      sellerAuthorizedDelegateSigningKeys:
+        order === undefined || candidate === undefined ? [] : await commerceCertifyMediaGrantDelegateSigningKey(candidate.payload.issuerPubkey, order.sellerPubkey, now),
       now,
       merchantAccountIndex: COMMERCE_NOSTR_ACCOUNT_INDEX,
       authority: activeMasterSeedAuthority,
+      // Real Digital Delivery mega-arc (Agent G, Grant Custody pass) --
+      // fixes a second, independent, pre-existing gap in this same call:
+      // `getStoredCiphertextChecksum` was never supplied at all (the
+      // function would throw calling it), and `media.checksum` above was
+      // never populated either -- together these meant every real request
+      // through this path was unreachable/permanently denied regardless of
+      // the grant-signer fix. `metadata()` is the sync, non-network-gated
+      // lookup this callback needs (see `CommerceMediaStoreLike`'s own
+      // comment).
+      getStoredCiphertextChecksum: (storageRef) => commerceMediaStoreFor().metadata(storageRef)?.checksum ?? null,
       getProtectedContent: (storageRef) => commerceMediaStoreFor().getProtected(storageRef),
     });
 
@@ -6543,6 +6616,40 @@ async function handleCommerceOrderAction(payload: unknown, actionType: "submit" 
  * reported as success. See this arc's own final report for the full
  * account.
  */
+/**
+ * Real Digital Delivery mega-arc (Agent G, Grant Custody pass) — closes
+ * Blocker 5. Mints (via THIS process's own real Nostr identity signing
+ * authority, `activeNostrSigningAuthority`) and immediately, independently
+ * re-verifies a media-grant-signing-key delegation certificate naming
+ * `delegateKeyPublicHex` as an authorized delegate of `claimedSellerPubkey`
+ * — see `commerce_media_grant_signing_key_delegation_bridge.ts`'s own
+ * header for the full mechanism and why this is a real cryptographic proof
+ * (never a rubber stamp: a process whose own real identity is NOT actually
+ * `claimedSellerPubkey` mints a certificate that fails the
+ * `event.pubkey === expectedSellerPubkeyHex` check and correctly gets `[]`
+ * back here — this is what prevents one profile from ever vouching for a
+ * different real seller's identity). Returns the delegate key as a
+ * one-element array on success (ready to pass straight into
+ * `sellerAuthorizedDelegateSigningKeys`), or `[]` on ANY failure — never a
+ * fabricated authorization, never thrown.
+ */
+async function commerceCertifyMediaGrantDelegateSigningKey(delegateKeyPublicHex: string, claimedSellerPubkey: string, now: number): Promise<readonly string[]> {
+  if (activeNostrSigningAuthority === null) return [];
+  try {
+    const m = requireModules();
+    const certEvent = await m.CommerceNostr.signMediaGrantSigningKeyDelegation(activeNostrSigningAuthority, delegateKeyPublicHex, COMMERCE_NOSTR_ACCOUNT_INDEX, now);
+    if (certEvent === null) return [];
+    const certResult = await m.CommerceNostr.verifyMediaGrantSigningKeyDelegationEvent(certEvent, {
+      expectedSellerPubkeyHex: claimedSellerPubkey,
+      expectedDelegateKeyPublicHex: delegateKeyPublicHex,
+    });
+    return certResult.outcome === "valid" ? [delegateKeyPublicHex] : [];
+  } catch (err) {
+    console.error("fedos-beta: media-grant-signing-key delegation mint/verify failed (non-fatal, falls back to direct-signer-only, which will correctly deny for a real seller today):", err);
+    return [];
+  }
+}
+
 async function issueCommerceMediaAccessGrantsNonFatal(order: CommerceOrderLike, now: number): Promise<void> {
   try {
     const m = requireModules();
@@ -6563,11 +6670,14 @@ async function issueCommerceMediaAccessGrantsNonFatal(order: CommerceOrderLike, 
       return;
     }
 
+    const sellerAuthorizedDelegateSigningKeys = await commerceCertifyMediaGrantDelegateSigningKey(signingKeyResult.keypair.publicKeyHex, order.sellerPubkey, now);
+
     const existingGrants = grantState.persistence.listGrants();
     const outcome = m.Commerce.issueMediaAccessGrantsForOrder({
       order: { id: order.id, productId: order.productId, buyerPubkey: order.buyerPubkey, sellerPubkey: order.sellerPubkey, status: order.status },
       candidateMedia: protectedMedia.map((item) => ({ id: item.id, productId: item.productId, classification: item.classification })),
       sellerSigningKeypair: signingKeyResult.keypair,
+      sellerAuthorizedDelegateSigningKeys,
       latestKnownGrantVersionFor: (mediaId) => m.Commerce.latestGrantVersion(existingGrants, mediaId, order.buyerPubkey, order.id),
       now,
     });

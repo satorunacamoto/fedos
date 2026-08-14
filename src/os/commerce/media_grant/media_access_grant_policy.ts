@@ -143,6 +143,25 @@ export interface EvaluateMediaAccessGrantInput {
    * of an otherwise-valid signature.
    */
   readonly latestKnownGrantVersion?: number;
+  /**
+   * Real Digital Delivery mega-arc (Agent G, Grant Custody pass) — BLOCKER
+   * 5 CLOSURE. Step 8's own "wrong-signer" check below used to require
+   * `envelope.keyId === order.sellerPubkey` LITERALLY — structurally
+   * unsatisfiable for a real seller, since the durable media-grant-signing
+   * keypair (`./persistence/durable_media_grant_signing_key_store.ts`) is,
+   * by design, a FRESH keypair independent of the real Nostr identity (see
+   * that file's own header). This field lets a caller who has ALREADY,
+   * independently, cryptographically verified a delegation certificate
+   * (`verifyMediaGrantSigningKeyDelegationEvent()`,
+   * `../catalog/adapters/nostr/commerce_media_grant_signing_key_delegation_bridge.js`
+   * — read that file's own header for why this is a real proof, not a
+   * rubber stamp) supply the resulting delegate key(s) here. This function
+   * performs NO verification of its own on these strings — exactly the
+   * same "caller resolves/verifies, this function only judges" discipline
+   * `order`/`actorPubkey` already follow. Optional; omitting it (or `[]`)
+   * preserves this function's exact original behavior.
+   */
+  readonly sellerAuthorizedDelegateSigningKeys?: readonly string[];
 }
 
 /**
@@ -165,10 +184,14 @@ export interface EvaluateMediaAccessGrantInput {
  *      really was placed by this buyer (defense in depth alongside step 4;
  *      catches a `payload.buyerPubkey` that matches the actor but not the
  *      Order it claims to be backed by).
- *   8. `order.sellerPubkey === envelope.keyId` — "wrong signer": only the
- *      Order's own seller may issue a grant against it. This is the ONE
- *      check that establishes WHO counts as "merchant authority" for this
- *      grant, without needing any separate merchant-registration concept.
+ *   8. `envelope.keyId` is `order.sellerPubkey` OR a member of the
+ *      caller-supplied, ALREADY-VERIFIED `sellerAuthorizedDelegateSigningKeys`
+ *      — "wrong signer": only the Order's own seller (directly, or via a
+ *      real, certificate-authorized delegate key — see this file's own
+ *      "BLOCKER 5 CLOSURE" header note above) may issue a grant against it.
+ *      This is the ONE check that establishes WHO counts as "merchant
+ *      authority" for this grant, without needing any separate
+ *      merchant-registration concept.
  *   9. The full cryptographic verify (`verifyMediaAccessGrantEnvelope()`) —
  *      "tampered grant" (any field mutation invalidates the signature) and
  *      "replayed old/superseded grant version"'s signature half (a forged
@@ -213,7 +236,8 @@ export function evaluateMediaAccessGrant(input: EvaluateMediaAccessGrantInput): 
   if (order.buyerPubkey !== payload.buyerPubkey) {
     return { allowed: false, reason: "buyer-mismatch" };
   }
-  if (order.sellerPubkey !== keyId) {
+  const authorizedSigningKeys = new Set<string>([order.sellerPubkey, ...(input.sellerAuthorizedDelegateSigningKeys ?? [])]);
+  if (!authorizedSigningKeys.has(keyId)) {
     return { allowed: false, reason: "wrong-signer" };
   }
   if (!isQualifyingOrderStatusForMediaAccess(order.status)) {

@@ -262,3 +262,125 @@ describe("MediaAccessGrant policy: failure-mode matrix", () => {
     });
   });
 });
+
+describe("MediaAccessGrant policy: Real Digital Delivery mega-arc (Agent G, Grant Custody pass) — sellerAuthorizedDelegateSigningKeys, closing Blocker 5", () => {
+  /**
+   * The REAL production shape: `order.sellerPubkey` is the seller's real
+   * Nostr identity, structurally UNRELATED to the durable media-grant
+   * signing key that actually signs the envelope (unlike this file's own
+   * `SELLER_KP`/`SELLER` fixture above, which — like every prior test in
+   * this file — sets them equal, the lab condition that never occurs in
+   * production; see `media_access_grant_issuance.ts`'s own updated header).
+   */
+  const REAL_SELLER_IDENTITY = PersonaEpochSigningKeypair.generate();
+  const REAL_SELLER = REAL_SELLER_IDENTITY.publicKeyHex;
+  const DELEGATE_KP = PersonaEpochSigningKeypair.generate();
+
+  function realSellerPaidOrder(overrides: { readonly orderId?: string; readonly buyerPubkey?: string } = {}): Order {
+    return buildPaidOrder({ ...overrides, sellerPubkey: REAL_SELLER });
+  }
+
+  it("ALLOWS a grant signed by the durable delegate key once the caller supplies it as an already-verified authorized delegate", () => {
+    const order = realSellerPaidOrder();
+    const envelope = grantEnvelope({ issuerPubkey: DELEGATE_KP.publicKeyHex }, DELEGATE_KP);
+    const decision = evaluateMediaAccessGrant({
+      envelope,
+      media: MEDIA,
+      actorPubkey: BUYER,
+      order,
+      now: NOW,
+      sellerAuthorizedDelegateSigningKeys: [DELEGATE_KP.publicKeyHex],
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("without the delegate list, the SAME grant is correctly denied wrong-signer (proves the delegate list is load-bearing, not a no-op)", () => {
+    const order = realSellerPaidOrder();
+    const envelope = grantEnvelope({ issuerPubkey: DELEGATE_KP.publicKeyHex }, DELEGATE_KP);
+    const decision = evaluateMediaAccessGrant({ envelope, media: MEDIA, actorPubkey: BUYER, order, now: NOW });
+    expect(decision).toEqual({ allowed: false, reason: "wrong-signer" });
+  });
+
+  it("WRONG SIGNER: Mallory's own real, validly-self-signed grant is REJECTED even if she supplies her OWN key as her own 'delegate' — the list only helps if it names the key that ACTUALLY signed", () => {
+    const order = realSellerPaidOrder(); // Bob's real order
+    const mallory = PersonaEpochSigningKeypair.generate();
+    const forgedEnvelope = grantEnvelope({ issuerPubkey: mallory.publicKeyHex, buyerPubkey: BUYER }, mallory);
+    const decision = evaluateMediaAccessGrant({
+      envelope: forgedEnvelope,
+      media: MEDIA,
+      actorPubkey: BUYER,
+      order,
+      now: NOW,
+      // Mallory cannot make her own real, verified-elsewhere delegate
+      // certificate name Bob's real identity (see
+      // `commerce_media_grant_signing_key_delegation_bridge.test.ts`'s own
+      // "WRONG SIGNER" case) -- a composition root wired correctly never
+      // populates this list with Mallory's key for Bob's order. Proven here
+      // at the policy layer: even if it somehow WERE (mis-)populated with
+      // an UNRELATED key, it does not help unless it is the key that
+      // signed THIS envelope.
+      sellerAuthorizedDelegateSigningKeys: [DELEGATE_KP.publicKeyHex],
+    });
+    expect(decision).toEqual({ allowed: false, reason: "wrong-signer" });
+  });
+
+  it("WRONG BUYER still rejected even with a valid delegate authorization (delegate authority does not bypass buyer binding)", () => {
+    const order = realSellerPaidOrder();
+    const envelope = grantEnvelope({ issuerPubkey: DELEGATE_KP.publicKeyHex }, DELEGATE_KP); // issued to BUYER
+    const decision = evaluateMediaAccessGrant({
+      envelope,
+      media: MEDIA,
+      actorPubkey: "c".repeat(64),
+      order,
+      now: NOW,
+      sellerAuthorizedDelegateSigningKeys: [DELEGATE_KP.publicKeyHex],
+    });
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) expect(decision.reason).toBe("buyer-mismatch");
+  });
+
+  it("WRONG PRODUCT still rejected even with a valid delegate authorization (delegate authority does not bypass product binding)", () => {
+    const order = realSellerPaidOrder();
+    const envelope = grantEnvelope({ issuerPubkey: DELEGATE_KP.publicKeyHex }, DELEGATE_KP);
+    const decision = evaluateMediaAccessGrant({
+      envelope,
+      media: { id: MEDIA.id, productId: "product-999" },
+      actorPubkey: BUYER,
+      order,
+      now: NOW,
+      sellerAuthorizedDelegateSigningKeys: [DELEGATE_KP.publicKeyHex],
+    });
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) expect(decision.reason).toBe("product-id-mismatch");
+  });
+
+  it("RESTART DURABILITY: a grant signed under the delegate key before a restart still verifies + ALLOWS after, given the SAME continuing delegate key", () => {
+    const order = realSellerPaidOrder();
+    const secretBytes = PersonaEpochSigningKeypair.generateSecretKeyBytesForSealedCustody();
+    const delegateBeforeRestart = PersonaEpochSigningKeypair.fromSecretKeyBytes(secretBytes.slice());
+    const envelope = grantEnvelope({ issuerPubkey: delegateBeforeRestart.publicKeyHex }, delegateBeforeRestart);
+
+    // "Restart": a fresh keypair object restored from the same durable secret.
+    const delegateAfterRestart = PersonaEpochSigningKeypair.fromSecretKeyBytes(secretBytes.slice());
+    expect(delegateAfterRestart.publicKeyHex).toBe(delegateBeforeRestart.publicKeyHex);
+
+    const decision = evaluateMediaAccessGrant({
+      envelope, // the historical, pre-restart-issued grant
+      media: MEDIA,
+      actorPubkey: BUYER,
+      order,
+      now: NOW,
+      sellerAuthorizedDelegateSigningKeys: [delegateAfterRestart.publicKeyHex], // re-certified post-restart
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("omitting sellerAuthorizedDelegateSigningKeys entirely is byte-identical to passing [] (backward compatibility)", () => {
+    const order = buildPaidOrder(); // the file's original SELLER/SELLER_KP fixture (direct-signer case)
+    const envelope = grantEnvelope();
+    const omitted = evaluateMediaAccessGrant({ envelope, media: MEDIA, actorPubkey: BUYER, order, now: NOW });
+    const empty = evaluateMediaAccessGrant({ envelope, media: MEDIA, actorPubkey: BUYER, order, now: NOW, sellerAuthorizedDelegateSigningKeys: [] });
+    expect(omitted).toEqual(empty);
+    expect(omitted.allowed).toBe(true);
+  });
+});

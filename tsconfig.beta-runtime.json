@@ -51,6 +51,7 @@
     "src/os/commerce/events/commerce_private_delivery_sync.ts",
     "src/os/commerce/events/commerce_private_delivery_apply.ts",
     "src/os/commerce/catalog/adapters/nostr/commerce_private_media_release_bridge.ts",
+    "src/os/commerce/catalog/adapters/nostr/commerce_media_grant_signing_key_delegation_bridge.ts",
     "src/os/commerce/events/commerce_private_media_release_sync.ts",
     "src/os/commerce/events/commerce_private_media_release_apply.ts",
     "src/os/commerce/media_grant/media_access_grant_release_channel_policy.ts",
