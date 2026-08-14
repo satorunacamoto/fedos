@@ -399,9 +399,31 @@ function settingsFilePath(): string {
   return path.join(root, "settings.json");
 }
 
+/**
+ * Real Digital Delivery Release Closure arc (Agent R) — SECURITY FIX: this
+ * function used to read `FEDOS_ELECTRON_BETA_ARTIFACT_DIR` itself and
+ * return the raw override unconditionally. Its ONLY call site
+ * (`buildFreshCoordinator()`, below) fed that return value straight into
+ * `fedosResolveProductionArtifactDir({ defaultArtifactDir: artifactDir(),
+ * ... })` as the SAFE FALLBACK to use when the override is rejected for
+ * not being test-gated -- so when an attacker set the override in a normal
+ * (non-test-gated) production launch, `artifactDir()` had ALREADY resolved
+ * to the attacker's directory before the gate ever ran, making
+ * `defaultArtifactDir` itself attacker-controlled. The gate's own
+ * "override-rejected-not-test-gated" outcome still fired and still logged
+ * a rejection, but `artifactDirDecision.artifactDir` — the value actually
+ * threaded into `activateFedosProductionProfileMasterSeed()` — was the
+ * malicious directory regardless, completely defeating
+ * `fedos_production_wasm_artifact_verify_before_execute.ts`'s own gate
+ * (see that file's own call-site notes, which specify this exact pinned
+ * expression as `defaultArtifactDir` — never a call back through the
+ * override-reading helper). This function is now the pinned, override-
+ * blind default ONLY; the override itself is read and gated exclusively
+ * by `fedosResolveProductionArtifactDir()` at the call site below. See
+ * `test/fedos_electron_beta_main_artifact_dir_wiring_structural_guard.test.ts`
+ * for the regression guard.
+ */
 function artifactDir(): string {
-  const override = process.env.FEDOS_ELECTRON_BETA_ARTIFACT_DIR;
-  if (override !== undefined && override.length > 0) return override;
   return path.join(__dirname, "..", "..", "fedos-core-rust", "pkg");
 }
 
