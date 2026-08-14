@@ -118,6 +118,18 @@ const OUTCOME_TEXT: Readonly<Record<string, string>> = {
   // real visible-control pairing test, which got the unhelpful generic
   // fallback text here before this entry existed.
   unauthorized: "This approval is from a different account than expected.",
+  // Real Digital Delivery mega-arc (Agent U) -- Signed Deletion sender-side
+  // failure codes (`FedosDeletionRequestOutboundCoordinator`'s own closed
+  // outcome vocabulary, `resolveFedosDeletionRequestRecipient()`'s own
+  // `"recipient-device-unknown"`).
+  "recipient-device-unknown": "This contact hasn't confirmed a device yet — try again once they have.",
+  "recipient-device-revoked": "This contact's device was revoked and can no longer receive this.",
+  "local-device-revoked": "This device has been revoked and can't send this.",
+  "not-author": "You can only request this for a message you sent.",
+  "route-unavailable": "No delivery route is available right now.",
+  "persistence-failed": "Couldn't save this locally. Try again.",
+  "signing-unavailable": "Signing isn't available right now.",
+  "runtime-stopped": "The secure Runtime is stopped.",
 };
 
 function describeOutcome(outcome: string): string {
@@ -200,6 +212,25 @@ function settleAppConfirm(confirmed: boolean): void {
  */
 function showCommerceError(elementId: string, result: { readonly outcome: string; readonly reason?: string }): void {
   byId(elementId).textContent = result.reason !== undefined && result.reason.length > 0 ? result.reason : describeOutcome(result.outcome);
+}
+
+/**
+ * Real Digital Delivery mega-arc (Agent U) -- `deletionRequestCreate()`'s
+ * failure shape carries the FINE-GRAINED reason two different ways
+ * depending on where it was rejected: `resolveFedosDeletionRequestRecipient()`'s
+ * own early check returns it directly as `outcome` (e.g.
+ * `"recipient-device-unknown"`), while a rejection from deeper in
+ * `FedosDeletionRequestOutboundCoordinator` is coarsened to `outcome:
+ * "unauthorized"|"unavailable"|"failed"|"invalid-input"` by the Shell's own
+ * `mapDeletionRequestOutboundOutcomeKind()`, with the ORIGINAL fine-grained
+ * code preserved verbatim in `reason` (see that mapper's own source). This
+ * tries `reason` as a known code FIRST, then falls back to the coarse
+ * `outcome` -- covering both shapes with the SAME `OUTCOME_TEXT` table,
+ * never a second copy of the same strings.
+ */
+function describeDeletionRequestCreateFailure(result: { readonly outcome: string; readonly reason?: string }): string {
+  if (result.reason !== undefined && Object.prototype.hasOwnProperty.call(OUTCOME_TEXT, result.reason)) return OUTCOME_TEXT[result.reason]!;
+  return describeOutcome(result.outcome);
 }
 
 /**
@@ -658,6 +689,24 @@ let currentConversationId: string | null = null;
 let conversationsCache: readonly { readonly conversationId: string; readonly [key: string]: unknown }[] = [];
 let currentIdentityTransitionSelection: { readonly peerAccountRef: unknown; readonly peerDeviceRef: string; readonly transitionId: string } | null = null;
 let currentDeletionRequestId: string | null = null;
+
+/**
+ * Real Digital Delivery mega-arc (Agent U) -- Signed Deletion SENDER-side
+ * per-message presentation state, session-only (never persisted, mirrors
+ * `revealedMessagePlaintext`'s own "in-memory-only, lost on lock/relaunch"
+ * discipline above). Keyed by `messageId`. A message with no entry has
+ * never had a deletion requested from this renderer session -- the
+ * "Request deletion" button is offered. `"requested"` NEVER by itself means
+ * remote deletion occurred; `statusText`, when present, is this renderer's
+ * own last fetched, honest per-Device aggregate (see
+ * `describeDeletionRequestSentStatus()` below) -- absent means "not yet
+ * checked", never "declined"/"applied".
+ */
+type FedosDeletionRequestUiState =
+  | { readonly kind: "requesting" }
+  | { readonly kind: "requested"; readonly statusText: string | null; readonly checkingStatus: boolean }
+  | { readonly kind: "failed"; readonly result: { readonly outcome: string; readonly reason?: string } };
+const deletionRequestUiState = new Map<string, FedosDeletionRequestUiState>();
 let archiveExportDestinationPath: string | null = null;
 let archiveRestoreSourcePath: string | null = null;
 /**
@@ -847,7 +896,15 @@ async function onInviteSubmit(): Promise<void> {
  */
 const revealedMessagePlaintext = new Map<string, string>();
 
-function renderChatMessages(messages: readonly { readonly messageId: string; readonly senderMembershipId: string; readonly createdAt: number; readonly plaintext: { readonly state: string; readonly text?: string; readonly reason?: string }; readonly localDeliveryState: string; readonly retentionState: string }[], localMembershipIds: ReadonlySet<string>): void {
+type FedosChatMessageView = { readonly messageId: string; readonly senderMembershipId: string; readonly createdAt: number; readonly plaintext: { readonly state: string; readonly text?: string; readonly reason?: string }; readonly localDeliveryState: string; readonly retentionState: string };
+
+/** Last-rendered chat data, so `redrawChatMessages()` (Signed Deletion state changes) can re-draw without a fresh, non-decrypting `messagesList()` round trip -- mirrors `revealedMessagePlaintext`'s own "session-only cache, redraw from what we already have" discipline. */
+let lastChatMessages: readonly FedosChatMessageView[] = [];
+let lastChatLocalMembershipIds: ReadonlySet<string> = new Set();
+
+function renderChatMessages(messages: readonly FedosChatMessageView[], localMembershipIds: ReadonlySet<string>): void {
+  lastChatMessages = messages;
+  lastChatLocalMembershipIds = localMembershipIds;
   const list = byId("chat-messages");
   list.textContent = "";
   for (const m of messages) {
@@ -862,9 +919,11 @@ function renderChatMessages(messages: readonly { readonly messageId: string; rea
   const sorted = [...messages].sort((a, b) => a.createdAt - b.createdAt);
   for (const m of sorted) {
     const li = document.createElement("li");
-    li.className = `chat-msg ${localMembershipIds.has(m.senderMembershipId) ? "mine" : "theirs"}`;
+    const mine = localMembershipIds.has(m.senderMembershipId);
+    li.className = `chat-msg ${mine ? "mine" : "theirs"}`;
     const cachedText = revealedMessagePlaintext.get(m.messageId);
-    if (m.retentionState === "tombstoned" || m.retentionState === "payload-removed") {
+    const deleted = m.retentionState === "tombstoned" || m.retentionState === "payload-removed";
+    if (deleted) {
       li.textContent = "[This message was deleted.]";
     } else if (m.plaintext.state === "available") {
       li.textContent = m.plaintext.text ?? "";
@@ -881,8 +940,134 @@ function renderChatMessages(messages: readonly { readonly messageId: string; rea
     meta.className = "meta";
     meta.textContent = `${new Date(m.createdAt * 1000 > Date.now() * 2 ? m.createdAt : m.createdAt * 1000).toLocaleString()} · ${m.localDeliveryState}`;
     li.appendChild(meta);
+    // Real Digital Delivery mega-arc (Agent U) -- Signed Deletion is a
+    // sender action only (`FedosDeletionRequestOutboundCoordinator`'s own
+    // "verify requester is original author" pre-publish self-check, Phase
+    // C step 3) -- offered only on this local sender's OWN messages, and
+    // never on one already locally shown as deleted.
+    if (mine && !deleted) li.appendChild(buildDeletionRequestControl(m.messageId));
     list.appendChild(li);
   }
+}
+
+/** Re-renders the chat list from the LAST real data this renderer fetched, without a fresh network/IPC round trip -- used after a purely local Signed Deletion UI state change (requesting/requested/failed). */
+function redrawChatMessages(): void {
+  renderChatMessages(lastChatMessages, lastChatLocalMembershipIds);
+}
+
+/**
+ * Real Digital Delivery mega-arc (Agent U) -- per-Device sent-status codes
+ * (`FedosDeletionRequestDeviceStatus`, `fedos_deletion_request_device_status.ts`)
+ * translated to plain, honest sentences. Every branch stays within what
+ * that pure function's own header guarantees it can produce -- never
+ * "deleted everywhere"/"account-deleted"/"erased".
+ */
+const DELETION_REQUEST_SENT_STATUS_TEXT: Readonly<Record<string, string>> = {
+  "not-requested": "Not yet requested.",
+  draft: "Preparing the request…",
+  "pending-delivery": "Requested — waiting for delivery.",
+  "relay-acknowledged": "Requested — delivered, waiting for a response.",
+  "recipient-received": "Requested — the recipient's device received it.",
+  "awaiting-recipient-decision": "Requested — the recipient is reviewing it.",
+  approved: "The recipient approved this request.",
+  rejected: "The recipient declined this request.",
+  "applied-local-history": "The recipient's device reports it applied the request to its local history.",
+  "applied-local-history-and-index": "The recipient's device reports it applied the request (history and index).",
+  "partially-applied": "The recipient's device reports it partially applied the request.",
+  expired: "This request expired before the recipient responded.",
+  failed: "This request failed.",
+  "revoked-device": "The recipient's device was revoked — this can't be confirmed.",
+  "unknown-device": "No known device is on file for the recipient yet.",
+  "offline-or-unobserved": "The recipient's device hasn't been observed yet.",
+  unverifiable: "A response arrived but its outcome couldn't be verified.",
+};
+
+function describeDeletionRequestSentStatus(result: { readonly outcome: string; readonly value?: unknown }): string {
+  if (result.outcome !== "ok") return describeOutcome(result.outcome);
+  const view = result.value as { readonly perDevice?: readonly { readonly status: string }[] } | undefined;
+  const status = view?.perDevice?.[0]?.status;
+  if (status === undefined) return "No response yet.";
+  return DELETION_REQUEST_SENT_STATUS_TEXT[status] ?? "No response yet.";
+}
+
+function buildDeletionRequestControl(messageId: string): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "deletion-request-control";
+  const state = deletionRequestUiState.get(messageId);
+  if (state?.kind === "requested") {
+    const note = document.createElement("span");
+    note.className = "muted";
+    note.textContent = state.statusText ?? "Deletion requested";
+    wrap.appendChild(note);
+    const checkBtn = document.createElement("button");
+    checkBtn.type = "button";
+    checkBtn.textContent = state.checkingStatus ? "Checking…" : "Check status";
+    checkBtn.disabled = state.checkingStatus;
+    checkBtn.addEventListener("click", () => void onCheckDeletionRequestStatus(messageId, checkBtn));
+    wrap.appendChild(checkBtn);
+    return wrap;
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.textContent = state?.kind === "requesting" ? "Requesting…" : "Request deletion";
+  btn.disabled = state?.kind === "requesting";
+  btn.addEventListener("click", () => void onRequestDeletion(messageId, btn));
+  wrap.appendChild(btn);
+  if (state?.kind === "failed") {
+    const err = document.createElement("span");
+    err.className = "warn";
+    err.textContent = describeDeletionRequestCreateFailure(state.result);
+    wrap.appendChild(err);
+  }
+  return wrap;
+}
+
+/**
+ * Real Digital Delivery mega-arc (Agent U) -- Signed Deletion, sender side.
+ * NEVER worded "Delete for everyone"/"Erase remotely": this sends a signed
+ * REQUEST -- the recipient may decline it, and it cannot reach copies
+ * outside FedOS. Idempotency (double-click must not create two requests):
+ * (1) `btn.disabled` is set synchronously before the (awaited) confirmation
+ * even opens, mirroring `decideDeletionRequest()`'s/`onDeviceRevoke()`'s
+ * own established pattern one screen over; (2) the REAL, authoritative
+ * guard is `fedos-app:deletion-request-create`'s own per-channel IPC
+ * in-flight guard (`FedosIpcCommandRegistry`, default guard, no
+ * `allowConcurrentSelf`) -- a second concurrent call while the first is
+ * still in flight gets `{outcome:"busy"}` back, never a second real
+ * request, exactly like every other mutating `fedos-app:*` command.
+ */
+async function onRequestDeletion(messageId: string, btn: HTMLButtonElement): Promise<void> {
+  if (btn.disabled || currentConversationId === null) return;
+  btn.disabled = true;
+  try {
+    const confirmed = await confirmInPage(
+      "Request deletion?",
+      "This sends a signed request asking the other person to remove their own local copy of this message. They may decline it. It can't remove copies outside FedOS (screenshots, backups, exports), copies on their other Devices, or the encrypted copy already on a Relay.",
+      "Yes, request deletion",
+    );
+    if (!confirmed) return;
+    deletionRequestUiState.set(messageId, { kind: "requesting" });
+    redrawChatMessages();
+    const result = await window.fedosApp.deletionRequestCreate(currentConversationId, messageId, "local-history-and-index", null, null);
+    deletionRequestUiState.set(messageId, result.outcome === "ok" ? { kind: "requested", statusText: null, checkingStatus: false } : { kind: "failed", result });
+    redrawChatMessages();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function onCheckDeletionRequestStatus(messageId: string, btn: HTMLButtonElement): Promise<void> {
+  if (btn.disabled || currentConversationId === null) return;
+  const current = deletionRequestUiState.get(messageId);
+  if (current?.kind !== "requested") return;
+  deletionRequestUiState.set(messageId, { ...current, checkingStatus: true });
+  redrawChatMessages();
+  const result = await window.fedosApp.deletionRequestSentStatus(currentConversationId, messageId);
+  const latest = deletionRequestUiState.get(messageId);
+  if (latest?.kind === "requested") {
+    deletionRequestUiState.set(messageId, { kind: "requested", statusText: describeDeletionRequestSentStatus(result), checkingStatus: false });
+  }
+  redrawChatMessages();
 }
 
 async function loadChatMessages(): Promise<void> {
@@ -3335,6 +3520,136 @@ async function onDeviceRevoke(deviceId: string, devicePublicKeyHex: string, labe
 }
 
 // ---------------------------------------------------------------------
+// Real Digital Delivery mega-arc (Agent U) — Device Sync inventory. Pure
+// wiring over four already-real `FedosDesktopApplicationShell` reads
+// (`deviceSyncStatus`/`syncSchedulesList`/`syncTransfersList`/
+// `syncConflictsList`) this renderer never called before, plus one safe,
+// closed-vocabulary conflict acknowledgement (`syncConflictAcknowledge`,
+// never a generic "resolve"). Every row shown is this LOCAL account's own
+// already-durable Sync fact -- never a cross-account Device discovery.
+// ---------------------------------------------------------------------
+
+async function refreshDeviceSyncInventory(): Promise<void> {
+  clearError("device-sync-error");
+  const statusResult = await window.fedosApp.deviceSyncStatus();
+  const summaryEl = byId("device-sync-summary");
+  if (statusResult.outcome !== "ok") {
+    // `"unsupported"` is the real, expected outcome when this Runtime was
+    // never configured with Device Sync at all (`config.deviceTrustEnabled`)
+    // -- not an error the user needs to act on.
+    summaryEl.textContent = statusResult.outcome === "unsupported" ? "Device Sync isn't enabled on this build." : "";
+    if (statusResult.outcome !== "unsupported") showError("device-sync-error", statusResult);
+    byId("device-sync-conflicts-list").textContent = "";
+    byId("device-sync-schedules-list").textContent = "";
+    byId("device-sync-transfers-list").textContent = "";
+    return;
+  }
+  const status = statusResult.value as { readonly enabled: boolean; readonly running: boolean; readonly scheduleCount: number; readonly pendingCount: number; readonly inProgressCount: number; readonly completedCount: number; readonly failedCount: number; readonly operatorRequiredCount: number; readonly targetDeviceCount: number };
+  summaryEl.textContent = status.enabled
+    ? `Sync ${status.running ? "running" : "stopped"} — ${status.targetDeviceCount} device(s), ${status.pendingCount} pending, ${status.inProgressCount} in progress, ${status.completedCount} completed, ${status.failedCount} failed${status.operatorRequiredCount > 0 ? `, ${status.operatorRequiredCount} needing your review` : ""}.`
+    : "Sync isn't enabled on this build.";
+  await Promise.all([refreshDeviceSyncConflictsList(), refreshDeviceSyncSchedulesList(), refreshDeviceSyncTransfersList()]);
+}
+
+async function refreshDeviceSyncConflictsList(): Promise<void> {
+  const list = byId("device-sync-conflicts-list");
+  list.textContent = "";
+  const result = await window.fedosApp.deviceSyncConflictsList(false);
+  if (result.outcome !== "ok") return;
+  const conflicts = (result.value as readonly { readonly conflictId: string; readonly conversationId: string; readonly conflictKind: string; readonly reason: string; readonly operatorRequired: boolean; readonly availableActions: readonly string[] }[]) ?? [];
+  if (conflicts.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No unresolved Sync conflicts.";
+    list.appendChild(li);
+    return;
+  }
+  for (const c of conflicts) {
+    const li = document.createElement("li");
+    const title = document.createElement("div");
+    title.textContent = `${c.operatorRequired ? "⚠ " : ""}${c.conflictKind} in conversation ${c.conversationId} — ${c.reason}`;
+    li.appendChild(title);
+    for (const action of c.availableActions) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = SYNC_CONFLICT_ACTION_LABEL[action] ?? action;
+      btn.addEventListener("click", () => void onSyncConflictAcknowledge(c.conflictId, action, btn));
+      li.appendChild(btn);
+    }
+    list.appendChild(li);
+  }
+}
+
+const SYNC_CONFLICT_ACTION_LABEL: Readonly<Record<string, string>> = {
+  "accept-identical": "Accept (identical)",
+  "discard-invalid": "Discard invalid copy",
+  "refresh-missing-dependency": "Refresh missing data",
+  acknowledge: "Acknowledge",
+};
+
+/** Every action here only updates THIS local account's own record of the conflict -- it never itself notifies or changes the other Device (mirrors the static copy above the list). Confirmed every time, matching `onDeviceRevoke()`'s own "state-changing local decision" discipline. */
+async function onSyncConflictAcknowledge(conflictId: string, action: string, btn: HTMLButtonElement): Promise<void> {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    if (
+      !(await confirmInPage(
+        `${SYNC_CONFLICT_ACTION_LABEL[action] ?? action}?`,
+        "This updates only this Device's own local record of the conflict. It does not notify or change the other Device.",
+        "Yes, continue",
+      ))
+    ) {
+      return;
+    }
+    const result = await window.fedosApp.deviceSyncConflictAcknowledge(conflictId, action);
+    if (result.outcome !== "ok") {
+      showError("device-sync-error", result);
+      return;
+    }
+    await refreshDeviceSyncConflictsList();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function refreshDeviceSyncSchedulesList(): Promise<void> {
+  const list = byId("device-sync-schedules-list");
+  list.textContent = "";
+  const result = await window.fedosApp.deviceSyncSchedulesList();
+  if (result.outcome !== "ok") return;
+  const schedules = (result.value as readonly { readonly scheduleId: string; readonly sourceDeviceId: string; readonly targetDeviceId: string; readonly state: string; readonly attemptCount: number; readonly lastCoarseOutcome: string | null }[]) ?? [];
+  if (schedules.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No Sync schedule entries.";
+    list.appendChild(li);
+    return;
+  }
+  for (const s of schedules) {
+    const li = document.createElement("li");
+    li.textContent = `${s.sourceDeviceId} → ${s.targetDeviceId} — ${s.state} (${s.attemptCount} attempt(s))${s.lastCoarseOutcome !== null ? `, last outcome: ${s.lastCoarseOutcome}` : ""}`;
+    list.appendChild(li);
+  }
+}
+
+async function refreshDeviceSyncTransfersList(): Promise<void> {
+  const list = byId("device-sync-transfers-list");
+  list.textContent = "";
+  const result = await window.fedosApp.deviceSyncTransfersList();
+  if (result.outcome !== "ok") return;
+  const sessions = (result.value as readonly { readonly transferSessionId: string; readonly sourceDeviceId: string; readonly targetDeviceId: string; readonly state: string; readonly relayAccepted: boolean; readonly deviceImported: boolean }[]) ?? [];
+  if (sessions.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No Device transfer sessions.";
+    list.appendChild(li);
+    return;
+  }
+  for (const s of sessions) {
+    const li = document.createElement("li");
+    li.textContent = `${s.sourceDeviceId} → ${s.targetDeviceId} — ${s.state}${s.relayAccepted ? ", Relay accepted" : ""}${s.deviceImported ? ", imported by target Device" : ""}`;
+    list.appendChild(li);
+  }
+}
+
+// ---------------------------------------------------------------------
 // Secure Runtime Alpha 8201-8280 (FedOS Desktop Closed-Beta Product Gap
 // Closure and Final Polish Arc) — Device Pairing UI. Every method here
 // calls the SAME `window.fedosApp.devicePairing*` channels that were
@@ -3757,9 +4072,53 @@ async function decideIdentityTransition(
       renderIdentityTransitionDetail(result, target);
     }
     await refreshIdentityTransitionList();
+    // Real Digital Delivery mega-arc (Agent U) -- Identity Replacement
+    // Ratchet-reset. Runs ONLY after Accept itself already succeeded (never
+    // on reject/defer, and never if Accept itself failed) -- the decision
+    // buttons stay disabled for this WHOLE follow-up sequence too (still
+    // inside this same try/finally), mirroring this function's own
+    // existing disable-for-the-duration discipline.
+    if (decision === "accept" && result.outcome === "ok") {
+      await runIdentityTransitionRatchetResetFlow(target);
+    }
   } finally {
     for (const b of decisionButtons) b.disabled = false;
   }
+}
+
+/**
+ * Real Digital Delivery mega-arc (Agent U) -- Identity Replacement
+ * Ratchet-reset confirmation. Step 1 (`identityTransitionAssessContinuity`)
+ * is read-only and always safe to call. Step 2
+ * (`identityTransitionAuthorizeRatchetReset`) is the ONE call that actually
+ * resets a Ratchet session, and is called ONLY after a SECOND explicit
+ * `confirmInPage()` confirmation -- cancelling it means step 2 is never
+ * called at all (negative path: cancel -> no reset).
+ *
+ * Plain language only: this screen never requires the reader to already
+ * know "ratchet"/"key epoch"/"continuity proof" -- the body is built from
+ * `assessContinuity()`'s own already-plain `warningText`
+ * (`fedosIdentityTransitionWarningText()`'s own strings, e.g. "A brand-new
+ * secure session must be established...", never the word "ratchet" itself)
+ * plus one plain count sentence this function adds.
+ *
+ * If nothing live actually needs a reset (`sessions.length === 0`) or the
+ * transition somehow isn't `canAuthorize` yet, this returns silently --
+ * never an empty/confusing confirmation screen for nothing.
+ */
+async function runIdentityTransitionRatchetResetFlow(target: { readonly peerAccountRef: unknown; readonly peerDeviceRef: string; readonly transitionId: string }): Promise<void> {
+  const assessResult = await window.fedosApp.identityTransitionAssessContinuity(target.peerAccountRef, target.peerDeviceRef, target.transitionId);
+  if (assessResult.outcome !== "ok") return;
+  const content = assessResult.value as {
+    readonly canAuthorize: boolean;
+    readonly sessions: readonly { readonly conversationId: string; readonly remoteDeviceRef: string; readonly currentStatus: string; readonly resetRecommended: boolean }[];
+    readonly warningText: readonly string[];
+  };
+  if (!content.canAuthorize || content.sessions.length === 0) return;
+  const countSentence = content.sessions.length === 1 ? "1 existing conversation with this contact will start a new secure session automatically." : `${content.sessions.length} existing conversations with this contact will start a new secure session automatically.`;
+  const confirmed = await confirmInPage("Start new secure sessions?", [countSentence, ...content.warningText].join(" "), "Yes, start new secure sessions");
+  if (!confirmed) return;
+  await window.fedosApp.identityTransitionAuthorizeRatchetReset(target.peerAccountRef, target.peerDeviceRef, target.transitionId);
 }
 
 const DELETION_WARNING_TEXT: Readonly<Record<string, string>> = {
@@ -4565,6 +4924,7 @@ byId<HTMLButtonElement>("nav-archive").addEventListener("click", () => {
 byId<HTMLButtonElement>("nav-devices").addEventListener("click", () => {
   showAppScreen("devices");
   void refreshDevicesList();
+  void refreshDeviceSyncInventory();
 });
 byId<HTMLButtonElement>("nav-safety").addEventListener("click", () => {
   showAppScreen("safety");

@@ -523,6 +523,11 @@ interface FedosAppBridge {
   readonly deviceDetail: (deviceId: string) => Promise<FedosAppCommandResult>;
   readonly deviceRevoke: (deviceId: string, devicePublicKeyHex: string) => Promise<FedosAppCommandResult>;
   readonly deviceSyncStatus: () => Promise<FedosAppCommandResult>;
+  /** Real Digital Delivery mega-arc (Agent U) -- Device Sync inventory (conflicts/schedule/transfer sessions), pure reads over this local account's own already-durable facts, plus one safe closed-vocabulary conflict acknowledgement. */
+  readonly deviceSyncSchedulesList: () => Promise<FedosAppCommandResult>;
+  readonly deviceSyncTransfersList: () => Promise<FedosAppCommandResult>;
+  readonly deviceSyncConflictsList: (includeResolved?: boolean) => Promise<FedosAppCommandResult>;
+  readonly deviceSyncConflictAcknowledge: (conflictId: string, action: string) => Promise<FedosAppCommandResult>;
   readonly devicePairingCreate: (deviceId: string, expectedAccountRef: unknown) => Promise<FedosAppCommandResult>;
   readonly devicePairingInspect: (encodedRequest: string) => Promise<FedosAppCommandResult>;
   readonly devicePairingApprove: (encodedRequest: string) => Promise<FedosAppCommandResult>;
@@ -540,6 +545,8 @@ interface FedosAppBridge {
   readonly deletionRequestApprove: (requestId: string) => Promise<FedosAppCommandResult>;
   readonly deletionRequestReject: (requestId: string) => Promise<FedosAppCommandResult>;
   readonly deletionRequestCreate: (conversationId: string, messageId: string, scope: string, reasonCode: string | null, expiresInSeconds: number | null) => Promise<FedosAppCommandResult>;
+  /** Real Digital Delivery mega-arc (Agent U) -- sender-side STATUS read (requesting/requested/approved-or-rejected-if-known/failed), never "deleted everywhere". */
+  readonly deletionRequestSentStatus: (conversationId: string, messageId: string) => Promise<FedosAppCommandResult>;
   readonly safetyCenterOverview: () => Promise<FedosAppCommandResult>;
   readonly settingsLoad: () => Promise<FedosAppCommandResult>;
   readonly relayStatus: () => Promise<FedosAppCommandResult>;

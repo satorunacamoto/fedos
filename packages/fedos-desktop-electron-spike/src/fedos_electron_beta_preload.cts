@@ -184,6 +184,15 @@ const fedosApp: FedosAppBridge = Object.freeze({
   deviceRevoke: (deviceId: string, devicePublicKeyHex: string) =>
     ipcRenderer.invoke("fedos-app:device-revoke", { deviceId: boundedString(deviceId, MAX_ID_CHARS), devicePublicKeyHex: boundedString(devicePublicKeyHex, MAX_ID_CHARS) }),
   deviceSyncStatus: () => ipcRenderer.invoke("fedos-app:device-sync-status"),
+  // Real Digital Delivery mega-arc (Agent U) -- Device Sync inventory
+  // (conflicts/schedule/transfer sessions). Pure reads (plus one safe,
+  // closed-vocabulary conflict acknowledgement) over this LOCAL account's
+  // own already-durable Sync facts -- no cross-account Device discovery.
+  deviceSyncSchedulesList: () => ipcRenderer.invoke("fedos-app:device-sync-schedules-list"),
+  deviceSyncTransfersList: () => ipcRenderer.invoke("fedos-app:device-sync-transfers-list"),
+  deviceSyncConflictsList: (includeResolved?: boolean) => ipcRenderer.invoke("fedos-app:device-sync-conflicts-list", { includeResolved: includeResolved === true }),
+  deviceSyncConflictAcknowledge: (conflictId: string, action: string) =>
+    ipcRenderer.invoke("fedos-app:device-sync-conflict-acknowledge", { conflictId: boundedString(conflictId, MAX_ID_CHARS), action }),
   devicePairingCreate: (deviceId: string, expectedAccountRef: unknown) =>
     ipcRenderer.invoke("fedos-app:device-pairing-create", { deviceId: boundedString(deviceId, MAX_ID_CHARS), expectedAccountRef }),
   devicePairingInspect: (encodedRequest: string) => ipcRenderer.invoke("fedos-app:device-pairing-inspect", { encodedRequest: boundedString(encodedRequest, MAX_PAIRING_ENVELOPE_CHARS) }),
@@ -230,6 +239,11 @@ const fedosApp: FedosAppBridge = Object.freeze({
       reasonCode,
       expiresInSeconds,
     }),
+  // Real Digital Delivery mega-arc (Agent U) -- sender-side STATUS read
+  // (requesting/requested/approved-or-rejected-if-known/failed), never a
+  // "deleted everywhere" claim -- see the handler's own header.
+  deletionRequestSentStatus: (conversationId: string, messageId: string) =>
+    ipcRenderer.invoke("fedos-app:deletion-request-sent-status", { conversationId: boundedString(conversationId, MAX_ID_CHARS), messageId: boundedString(messageId, MAX_ID_CHARS) }),
   safetyCenterOverview: () => ipcRenderer.invoke("fedos-app:safety-center-overview"),
   settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
   relayStatus: () => ipcRenderer.invoke("fedos-app:relay-status"),

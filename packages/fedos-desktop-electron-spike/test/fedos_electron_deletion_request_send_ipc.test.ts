@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createFedosDeletionRequestSendHandler,
+  createFedosDeletionRequestSentStatusHandler,
   resolveFedosDeletionRequestRecipient,
   validateFedosDeletionRequestSendPayload,
   FEDOS_DELETION_REQUEST_SEND_MAX_LIFETIME_SECONDS,
@@ -113,8 +114,13 @@ function makeDeps(overrides: {
   };
 }
 
-function fakeBoundary(memberships: readonly { readonly participant: FedosDeletionRequestParticipantRefLike }[], createState: unknown = { status: "loaded", data: { requestId: "req-1" } }) {
+function fakeBoundary(
+  memberships: readonly { readonly participant: FedosDeletionRequestParticipantRefLike }[],
+  createState: unknown = { status: "loaded", data: { requestId: "req-1" } },
+  sentStatusState: unknown = { status: "idle" },
+) {
   const createRequest = vi.fn(async () => undefined);
+  const refreshSentStatus = vi.fn(async () => undefined);
   return {
     boundary: {
       membership: {
@@ -126,9 +132,14 @@ function fakeBoundary(memberships: readonly { readonly participant: FedosDeletio
         get createState() {
           return createState;
         },
+        refreshSentStatus,
+        get sentStatusState() {
+          return sentStatusState;
+        },
       },
     } satisfies FedosDeletionRequestSendBoundaryLike,
     createRequest,
+    refreshSentStatus,
   };
 }
 
@@ -200,11 +211,79 @@ describe("createFedosDeletionRequestSendHandler — IPC contract", () => {
     const shell: FedosDeletionRequestSendShellLike = { peerCapabilityListObserved: () => ({ outcome: "ok", value: [] }) };
     const boundary: FedosDeletionRequestSendBoundaryLike = {
       membership: { load: vi.fn(async () => undefined), state: { status: "error" } },
-      deletionRequests: { createRequest: vi.fn(async () => undefined), createState: null },
+      deletionRequests: {
+        createRequest: vi.fn(async () => undefined),
+        createState: null,
+        refreshSentStatus: vi.fn(async () => undefined),
+        sentStatusState: null,
+      },
     };
     const { deps } = makeDeps({ boundary, shell, viewer: VIEWER });
     const handler = createFedosDeletionRequestSendHandler(deps);
     const result = await handler({ conversationId: "conv-1", messageId: "msg-1", scope: "local-history" });
     expect(result).toMatchObject({ outcome: "not-found" });
+  });
+});
+
+describe("createFedosDeletionRequestSentStatusHandler — IPC contract", () => {
+  it("returns the acceptance-gate rejection when no profile is unlocked (boundary null)", async () => {
+    const { deps, acceptanceGateRejection } = makeDeps({});
+    const handler = createFedosDeletionRequestSentStatusHandler(deps);
+    const result = await handler({ conversationId: "c1", messageId: "m1" });
+    expect(acceptanceGateRejection).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ outcome: "unavailable", reason: "acceptance-only" });
+  });
+
+  it("returns invalid-input for a malformed payload, without ever calling membership.load", async () => {
+    const { boundary } = fakeBoundary([]);
+    const shell: FedosDeletionRequestSendShellLike = { peerCapabilityListObserved: vi.fn() };
+    const { deps } = makeDeps({ boundary, shell, viewer: VIEWER });
+    const handler = createFedosDeletionRequestSentStatusHandler(deps);
+    const result = await handler({ conversationId: "", messageId: "m1" });
+    expect(result).toEqual({ outcome: "invalid-input", reason: "malformed deletion-request-sent-status request" });
+    expect(boundary.membership.load).not.toHaveBeenCalled();
+  });
+
+  it("resolves the SAME recipient Device as the sender, and forwards it (as the only known Device) to refreshSentStatus(), then returns sentStatusState", async () => {
+    const sentStatusState = { status: "loaded", data: { conversationId: "conv-1", targetEnvelopeId: "msg-1", perDevice: [{ deviceId: "recipient-device-1", status: "awaiting-recipient-decision", requestId: "req-1" }], aggregate: "some-devices-pending" } };
+    const { boundary, refreshSentStatus } = fakeBoundary([{ participant: VIEWER }, { participant: RECIPIENT }], undefined, sentStatusState);
+    const shell: FedosDeletionRequestSendShellLike = { peerCapabilityListObserved: () => ({ outcome: "ok", value: [{ peerAccountRef: RECIPIENT, peerDeviceRef: "recipient-device-1" }] }) };
+    const { deps, resultFromViewModelState } = makeDeps({ boundary, shell, viewer: VIEWER });
+    const handler = createFedosDeletionRequestSentStatusHandler(deps);
+
+    const result = await handler({ conversationId: "conv-1", messageId: "msg-1" });
+
+    expect(refreshSentStatus).toHaveBeenCalledWith("conv-1", "msg-1", ["recipient-device-1"]);
+    expect(resultFromViewModelState).toHaveBeenCalledWith(sentStatusState);
+    expect(result).toEqual({ outcome: "ok", value: sentStatusState.data });
+  });
+
+  it("still calls refreshSentStatus with an EMPTY known-device list (never fabricates a Device ref) when no observed peer Device resolves", async () => {
+    const { boundary, refreshSentStatus } = fakeBoundary([{ participant: VIEWER }, { participant: RECIPIENT }]);
+    const shell: FedosDeletionRequestSendShellLike = { peerCapabilityListObserved: () => ({ outcome: "ok", value: [] }) };
+    const { deps } = makeDeps({ boundary, shell, viewer: VIEWER });
+    const handler = createFedosDeletionRequestSentStatusHandler(deps);
+
+    await handler({ conversationId: "conv-1", messageId: "msg-1" });
+
+    expect(refreshSentStatus).toHaveBeenCalledWith("conv-1", "msg-1", []);
+  });
+
+  it("returns not-found when membership fails to load, and never calls refreshSentStatus", async () => {
+    const shell: FedosDeletionRequestSendShellLike = { peerCapabilityListObserved: () => ({ outcome: "ok", value: [] }) };
+    const boundary: FedosDeletionRequestSendBoundaryLike = {
+      membership: { load: vi.fn(async () => undefined), state: { status: "error" } },
+      deletionRequests: {
+        createRequest: vi.fn(async () => undefined),
+        createState: null,
+        refreshSentStatus: vi.fn(async () => undefined),
+        sentStatusState: null,
+      },
+    };
+    const { deps } = makeDeps({ boundary, shell, viewer: VIEWER });
+    const handler = createFedosDeletionRequestSentStatusHandler(deps);
+    const result = await handler({ conversationId: "conv-1", messageId: "msg-1" });
+    expect(result).toMatchObject({ outcome: "not-found" });
+    expect(boundary.deletionRequests.refreshSentStatus).not.toHaveBeenCalled();
   });
 });
