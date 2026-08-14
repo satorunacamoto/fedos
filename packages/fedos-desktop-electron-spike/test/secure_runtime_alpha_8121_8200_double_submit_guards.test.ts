@@ -129,7 +129,14 @@ realSuite("Alpha 8121-8200 -- Security Finding 2 (6873d24f): double-submit guard
     // try block, so the guard now also covers the confirmation itself. The
     // invariant asserted here is unchanged, and the window still ends inside
     // this function (its full length is measured in the fix's own commit).
-    const body = source.slice(start, start + 1900);
+    //
+    // Real Digital Delivery mega-arc (Agent U): widened again (1900 -> 2600)
+    // -- the same disable/try/finally block now ALSO covers this function's
+    // own new Identity Replacement Ratchet-reset follow-up sequence
+    // (`runIdentityTransitionRatchetResetFlow()`, called from inside the
+    // SAME try block, after Accept itself succeeds), so the button guard
+    // spans that too. The three invariants asserted below are unchanged.
+    const body = source.slice(start, start + 2600);
     expect(body).toMatch(/if \(decisionButtons\.some\(\(b\) => b\.disabled\)\) return;/);
     expect(body).toMatch(/for \(const b of decisionButtons\) b\.disabled = true;/);
     expect(body).toMatch(/finally \{\s*for \(const b of decisionButtons\) b\.disabled = false;/);

@@ -168,7 +168,38 @@ export interface FedosDeletionRequestSendBoundaryLike {
       readonly reasonCode: FedosDeletionRequestSendReasonCode | null;
     }): Promise<void>;
     readonly createState: unknown;
+    /**
+     * Real Digital Delivery mega-arc (Agent U) — Signed Deletion sender-side
+     * STATUS read, mirroring `createRequest()`/`createState`'s own shape
+     * exactly. Wraps `FedosDeletionRequestController.refreshSentStatus()`
+     * (already real, already independently tested at the Controller layer —
+     * see that file's own header), which itself only aggregates ALREADY-
+     * DURABLE per-Device request/acknowledgement facts this local sender
+     * already has on file (`FedosDesktopApplicationShell.deletionRequestListSentForTarget()`/
+     * `.deletionRequestAcknowledgementOutcome()`/`.deviceDetail()`) — no new
+     * capability, no new protocol message, never a live poll of the
+     * recipient.
+     */
+    refreshSentStatus(conversationId: string, targetEnvelopeId: string, knownDeviceIds: readonly string[]): Promise<void>;
+    readonly sentStatusState: unknown;
   };
+}
+
+export interface FedosDeletionRequestSentStatusPayload {
+  readonly conversationId: string;
+  readonly messageId: string;
+}
+
+/** Mirrors `validateFedosDeletionRequestSendPayload()`'s own closed-validation discipline — fails closed to `null`, never throws. */
+export function validateFedosDeletionRequestSentStatusPayload(
+  candidate: unknown,
+  isBoundedString: (value: unknown, maxLength: number) => boolean,
+  maxIdLength: number,
+): FedosDeletionRequestSentStatusPayload | null {
+  if (typeof candidate !== "object" || candidate === null) return null;
+  const c = candidate as Record<string, unknown>;
+  if (!isBoundedString(c.conversationId, maxIdLength) || !isBoundedString(c.messageId, maxIdLength)) return null;
+  return { conversationId: c.conversationId as string, messageId: c.messageId as string };
 }
 
 export interface FedosDeletionRequestSendShellLike {
@@ -228,6 +259,46 @@ export function createFedosDeletionRequestSendHandler(deps: FedosDeletionRequest
       reasonCode: validated.reasonCode,
     });
     return deps.resultFromViewModelState(boundary.deletionRequests.createState);
+  };
+}
+
+/**
+ * Real Digital Delivery mega-arc (Agent U) — sender-side STATUS read for one
+ * already-sent target. Resolves the SAME recipient Device pair
+ * `createFedosDeletionRequestSendHandler()` resolves (identical membership
+ * + observed-peer cross-reference, never a second resolution rule), then
+ * asks the Controller to aggregate whatever REAL per-Device request/
+ * acknowledgement facts already exist for it. Never invents a
+ * "delivered"/"applied" claim beyond what `FedosDeletionRequestController`'s
+ * own pure aggregation (`fedos_deletion_request_device_status.ts`) already
+ * produces — that file's own header: "Never produces
+ * 'deleted-everywhere'/'account-deleted'/... no branch ... can reach a
+ * value outside its own closed return type."
+ */
+export function createFedosDeletionRequestSentStatusHandler(deps: FedosDeletionRequestSendDeps) {
+  return async function handleAppDeletionRequestSentStatus(payload: unknown): Promise<unknown> {
+    const boundary = deps.requireBoundary();
+    if (boundary === null) return deps.acceptanceGateRejection();
+    const viewer = deps.requireViewerParticipant();
+    if (viewer === null) return deps.acceptanceGateRejection();
+    const validated = validateFedosDeletionRequestSentStatusPayload(payload, deps.isBoundedString, deps.maxIdLength);
+    if (validated === null) return { outcome: "invalid-input", reason: "malformed deletion-request-sent-status request" };
+
+    const shell = deps.requireShell();
+    if (shell === null) return deps.acceptanceGateRejection();
+
+    await boundary.membership.load(validated.conversationId);
+    const membershipState = boundary.membership.state;
+    if (membershipState.status !== "loaded" || membershipState.data === undefined) {
+      return { outcome: "not-found", reason: "conversation membership could not be loaded" };
+    }
+    const peersResult = shell.peerCapabilityListObserved();
+    const observedPeers = peersResult.outcome === "ok" ? (peersResult.value ?? []) : [];
+    const recipient = resolveFedosDeletionRequestRecipient(viewer, membershipState.data.memberships, observedPeers);
+    const knownDeviceIds = recipient === null ? [] : [recipient.peerDeviceRef];
+
+    await boundary.deletionRequests.refreshSentStatus(validated.conversationId, validated.messageId, knownDeviceIds);
+    return deps.resultFromViewModelState(boundary.deletionRequests.sentStatusState);
   };
 }
 

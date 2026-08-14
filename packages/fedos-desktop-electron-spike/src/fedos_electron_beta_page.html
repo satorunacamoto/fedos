@@ -698,6 +698,17 @@
           <ul class="plain-list" id="devices-list"></ul>
           <p class="muted">Revoking a Device removes its trust for future messages — it does not delete copies that Device already has, and does not affect Relay-side or foreign Archive copies.</p>
 
+          <h3>Device Sync</h3>
+          <div id="device-sync-error" class="error" role="alert"></div>
+          <p id="device-sync-summary" class="muted"></p>
+          <h4>Sync conflicts</h4>
+          <p class="muted">A conflict is this account's own local record of two Devices disagreeing about the same data — resolving one only updates your own local record, it does not itself notify or change the other Device.</p>
+          <ul class="plain-list" id="device-sync-conflicts-list"></ul>
+          <h4>Sync schedule</h4>
+          <ul class="plain-list" id="device-sync-schedules-list"></ul>
+          <h4>Device transfer sessions</h4>
+          <ul class="plain-list" id="device-sync-transfers-list"></ul>
+
           <h3>Pair a New Device</h3>
           <p class="muted">Pairing has three steps across two Devices — the NEW Device (this one has its own separate local profile) and your EXISTING, already-trusted Device that holds your account. Pairing trusts this Device under that account for Sync; it does not merge or replace either Device's own local profile. Do this step first on the NEW Device you want to add.</p>
 

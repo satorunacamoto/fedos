@@ -113,7 +113,7 @@ import { FedosElectronNotificationAdapter } from "./fedos_electron_notification_
 import { FedosElectronTrayAdapter } from "./fedos_electron_tray_adapter.js";
 import { FedosElectronBadgeAdapter, type FedosElectronBadgeTrayMenuItemLike } from "./fedos_electron_badge_adapter.js";
 import { FedosIpcCommandRegistry } from "./fedos_electron_ipc_command_registry.js";
-import { createFedosDeletionRequestSendHandler } from "./fedos_electron_deletion_request_send_ipc.js";
+import { createFedosDeletionRequestSendHandler, createFedosDeletionRequestSentStatusHandler } from "./fedos_electron_deletion_request_send_ipc.js";
 import {
   createFedosIdentityTransitionAssessContinuityHandler,
   createFedosIdentityTransitionAuthorizeRatchetResetHandler,
@@ -713,6 +713,20 @@ interface ShellDiagnosticLike {
   identityTransitionStatus(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): { readonly outcome: string; readonly [key: string]: unknown };
   /** Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) — narrows `FedosDesktopApplicationShell.identityTransitionRatchetImpact()`, additive this Arc; see that method's own doc comment. */
   identityTransitionRatchetImpact(oldAccountIdentity: unknown): { readonly outcome: string; readonly [key: string]: unknown };
+  /**
+   * Real Digital Delivery mega-arc (Agent U) — narrows four already-real,
+   * unmodified Shell methods (`syncSchedulesList`/`syncTransfersList`/
+   * `syncConflictsList`/`syncConflictDetail`/`syncConflictAcknowledge`) this
+   * file never called before this Arc. Every one of these already exists
+   * and is already fully real underneath `deviceSyncStatus()`'s own
+   * `FedosDeviceSyncOperationalFacade` (`src/os/messenger/desktop/runtime/fedos_device_sync_operational_facade.ts`)
+   * — this Arc grants no new capability, it only reaches read/act methods
+   * this Shell already exposed.
+   */
+  syncSchedulesList(): { readonly outcome: string; readonly [key: string]: unknown };
+  syncTransfersList(): { readonly outcome: string; readonly [key: string]: unknown };
+  syncConflictsList(includeResolved?: boolean): { readonly outcome: string; readonly [key: string]: unknown };
+  syncConflictAcknowledge(conflictId: string, action: string): { readonly outcome: string; readonly [key: string]: unknown };
 }
 /** Secure Runtime Alpha 7321-7400 — narrows `FedosSafetyCenterController` (`src/desktop/presentation/safety_center/`, unmodified). Secure Runtime Alpha 8041-8120 — widened (never redesigned) to narrow the REST of `FedosDesktopConversationUiPresentationBoundary`'s own already-real ViewModels/Controllers (`src/desktop/presentation/`, unmodified) this file never read before this Arc: conversation list/detail, message list/compose, membership/invitations, search, archive, device inventory, Identity Transition, Signed Deletion. Every accessor below already exists on the real class; this interface only narrows the TYPE, granting no new capability. */
 interface BoundaryLike {
@@ -797,6 +811,11 @@ interface BoundaryLike {
     // already real, previously never called from any IPC channel).
     createRequest(params: unknown): Promise<void>;
     readonly createState: { readonly status: string; readonly [key: string]: unknown };
+    // Real Digital Delivery mega-arc (Agent U) — narrows
+    // `FedosDeletionRequestController.refreshSentStatus()`/`.sentStatusState`,
+    // already real, previously never called from any IPC channel.
+    refreshSentStatus(conversationId: string, targetEnvelopeId: string, knownDeviceIds: readonly string[]): Promise<void>;
+    readonly sentStatusState: { readonly status: string; readonly [key: string]: unknown };
   };
 }
 interface AssemblyLike {
@@ -5583,6 +5602,47 @@ async function handleAppDeviceSyncStatus() {
   return shell.deviceSyncStatus();
 }
 
+// Real Digital Delivery mega-arc (Agent U) — Device Sync inventory. Every
+// method below already exists, real, on `FedosDesktopApplicationShell`
+// (`syncSchedulesList`/`syncTransfersList`/`syncConflictsList`/
+// `syncConflictDetail`/`syncConflictAcknowledge`) -- this Arc only reaches
+// them from `fedos-app:*` for the first time, mirroring `handleAppDeviceSyncStatus()`'s
+// own exact shape immediately above. Pure wiring: no new authority, no new
+// protocol message, no cross-account Device discovery -- every row this
+// surfaces is this LOCAL account's own already-durable Sync fact.
+async function handleAppDeviceSyncSchedulesList() {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  return shell.syncSchedulesList();
+}
+
+async function handleAppDeviceSyncTransfersList() {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  return shell.syncTransfersList();
+}
+
+async function handleAppDeviceSyncConflictsList(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const includeResolved = (payload as { includeResolved?: unknown } | null)?.includeResolved === true;
+  return shell.syncConflictsList(includeResolved);
+}
+
+/** Closed action vocabulary only -- mirrors `FedosDeviceSyncConflictResolutionAction`'s own closed union (`accept-identical`/`discard-invalid`/`refresh-missing-dependency`/`acknowledge`); never a generic "resolve" string reaches the Shell. */
+const DEVICE_SYNC_CONFLICT_RESOLUTION_ACTIONS = ["accept-identical", "discard-invalid", "refresh-missing-dependency", "acknowledge"] as const;
+
+async function handleAppDeviceSyncConflictAcknowledge(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conflictId = (payload as { conflictId?: unknown } | null)?.conflictId;
+  const action = (payload as { action?: unknown } | null)?.action;
+  if (!isBoundedString(conflictId, MAX_ID_LENGTH) || typeof action !== "string" || !(DEVICE_SYNC_CONFLICT_RESOLUTION_ACTIONS as readonly string[]).includes(action)) {
+    return { outcome: "invalid-input", reason: "malformed device-sync-conflict-acknowledge request" };
+  }
+  return shell.syncConflictAcknowledge(conflictId, action);
+}
+
 // ---------------------------------------------------------------------
 // Commerce Reachable Catalog + Product Surface Phase 1.
 //
@@ -7684,6 +7744,20 @@ const handleAppDeletionRequestCreate = createFedosDeletionRequestSendHandler({
   maxIdLength: MAX_ID_LENGTH,
 });
 
+// Real Digital Delivery mega-arc (Agent U) — sender-side STATUS read, the
+// same shared deps as the sender's own `createRequest()` above (identical
+// recipient-resolution rule, never a second one). See
+// `createFedosDeletionRequestSentStatusHandler()`'s own header.
+const handleAppDeletionRequestSentStatus = createFedosDeletionRequestSentStatusHandler({
+  requireBoundary,
+  requireShell,
+  requireViewerParticipant,
+  isBoundedString,
+  resultFromViewModelState: resultFromViewModelStateUnknown,
+  acceptanceGateRejection,
+  maxIdLength: MAX_ID_LENGTH,
+});
+
 async function handleAppDeletionRequestListReceived() {
   const boundary = requireBoundary();
   if (boundary === null) return acceptanceGateRejection();
@@ -7898,6 +7972,10 @@ function registerIpcHandlers(): void {
   ipcCommands.registerHandle(ipcMain, "fedos-app:device-detail", (payload: unknown) => handleAppDeviceDetail(payload), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-app:device-revoke", (payload: unknown) => handleAppDeviceRevoke(payload));
   ipcCommands.registerHandle(ipcMain, "fedos-app:device-sync-status", async () => handleAppDeviceSyncStatus(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-sync-schedules-list", async () => handleAppDeviceSyncSchedulesList(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-sync-transfers-list", async () => handleAppDeviceSyncTransfersList(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-sync-conflicts-list", (payload: unknown) => handleAppDeviceSyncConflictsList(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:device-sync-conflict-acknowledge", (payload: unknown) => handleAppDeviceSyncConflictAcknowledge(payload));
   // Phase H (pairing) -- reuse the SAME handlers the acceptance vocabulary already dispatches to.
   ipcCommands.registerHandle(ipcMain, "fedos-app:device-pairing-create", (payload: unknown) => handleAcceptanceDevicePairingCreate(payload));
   ipcCommands.registerHandle(ipcMain, "fedos-app:device-pairing-inspect", (payload: unknown) => handleAcceptanceDevicePairingInspect(payload));
@@ -7918,6 +7996,7 @@ function registerIpcHandlers(): void {
   ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-approve", (payload: unknown) => handleAppDeletionRequestDecide("approve", payload));
   ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-reject", (payload: unknown) => handleAppDeletionRequestDecide("reject", payload));
   ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-create", (payload: unknown) => handleAppDeletionRequestCreate(payload));
+  ipcCommands.registerHandle(ipcMain, "fedos-app:deletion-request-sent-status", (payload: unknown) => handleAppDeletionRequestSentStatus(payload), { allowConcurrentSelf: true });
   // Phase K -- reuse the SAME handler `fedos-acceptance:safety-center-overview` already dispatches to.
   ipcCommands.registerHandle(ipcMain, "fedos-app:safety-center-overview", async () => handleAppSafetyCenterOverview(), { allowConcurrentSelf: true });
   // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
