@@ -117,6 +117,17 @@ export interface BuildOutboundPrivateMediaReleaseResponseInput {
   /** The candidate `MediaAccessGrantEnvelope` for `(mediaId, buyerPubkey, orderId)` at its latest known version, if any — `undefined` means "no grant on file", handled the same as `evaluateMediaAccessGrant()`'s own `envelope: undefined` case. */
   readonly candidateGrantEnvelope: EvaluateMediaAccessGrantInput["envelope"];
   readonly latestKnownGrantVersion: number;
+  /**
+   * Real Digital Delivery mega-arc (Agent G, Grant Custody pass) — see
+   * `EvaluateMediaAccessGrantInput.sellerAuthorizedDelegateSigningKeys`'s
+   * own header (`../media_grant/media_access_grant_policy.ts`) for the
+   * full account. Threaded straight through, unchanged, to both
+   * `evaluateMediaAccessGrant()` and `wrapMediaAccessGrantRelease()` below
+   * — this file verifies nothing about these strings itself, mirroring
+   * this file's own "pure orchestration, caller resolves references"
+   * discipline for every other field on this input.
+   */
+  readonly sellerAuthorizedDelegateSigningKeys?: readonly string[];
   readonly now: number;
   readonly merchantAccountIndex: number;
   /** The SELLER's own, already-unlocked authority — never constructed fresh by this function. */
@@ -176,6 +187,7 @@ export async function buildOutboundPrivateMediaReleaseResponse(
     order: order as unknown as EvaluateMediaAccessGrantInput["order"],
     now: input.now,
     latestKnownGrantVersion: input.latestKnownGrantVersion,
+    sellerAuthorizedDelegateSigningKeys: input.sellerAuthorizedDelegateSigningKeys,
   });
   if (!decision.allowed) return denied(decision.reason);
 
@@ -200,6 +212,7 @@ export async function buildOutboundPrivateMediaReleaseResponse(
     order: order as unknown as EvaluateMediaAccessGrantInput["order"],
     now: input.now,
     latestKnownGrantVersion: input.latestKnownGrantVersion,
+    sellerAuthorizedDelegateSigningKeys: input.sellerAuthorizedDelegateSigningKeys,
     merchantAccountIndex: input.merchantAccountIndex,
     releasePayload: decrypted,
     authority: input.authority,

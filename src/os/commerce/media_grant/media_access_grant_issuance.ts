@@ -21,12 +21,36 @@
  * issued ONLY when (a) `order.status` is qualifying
  * (`isQualifyingOrderStatusForMediaAccess`) — never for a bare
  * Order-creation or Product-Detail-access alone — and (b) the resolved
- * signing keypair's OWN public key equals `order.sellerPubkey` LITERALLY
- * — never a self-issued/free mapping (see
- * `./persistence/durable_media_grant_signing_key_store.ts`'s own header
- * for the full account of why this second check is a REAL, sometimes
- * unsatisfiable, gate — not a formality). There is no parameter on this
- * function that lets a caller skip either check.
+ * signing keypair's OWN public key equals `order.sellerPubkey` LITERALLY,
+ * OR is a member of the caller-supplied, ALREADY-VERIFIED
+ * `sellerAuthorizedDelegateSigningKeys` — never a self-issued/free
+ * mapping. There is no parameter on this function that lets a caller skip
+ * either check.
+ *
+ * REAL DIGITAL DELIVERY mega-arc (Agent G, Grant Custody pass) — BLOCKER 5
+ * CLOSURE: the literal-equality half of check (b) above is structurally
+ * unsatisfiable for any REAL seller — `order.sellerPubkey` is the
+ * account's real Nostr identity, while the resolved signing keypair
+ * (`./persistence/durable_media_grant_signing_key_store.ts`) is, by
+ * design, a FRESH, unrelated CSPRNG keypair (never derived from the real
+ * identity — see that file's own header). Two independent keys can never
+ * be literally equal, so before this pass, issuance could never succeed
+ * for ANY seller, real or demo. `sellerAuthorizedDelegateSigningKeys`
+ * closes this: the caller (composition root) independently, cryptographically
+ * verifies — via `verifyMediaGrantSigningKeyDelegationEvent()`
+ * (`../catalog/adapters/nostr/commerce_media_grant_signing_key_delegation_bridge.ts`,
+ * that file's own header explains the full mechanism and why it is a REAL
+ * proof, not a rubber stamp) — that the resolved delegate key really is a
+ * certificate-authorized delegate of THIS order's own real
+ * `sellerPubkey`, and passes ONLY already-verified delegate keys here.
+ * This function performs no verification of its own (mirrors its own
+ * long-standing "caller resolves/verifies references, this function only
+ * judges already-resolved facts" discipline, restated in this file's own
+ * original header above) — an unverified/bogus string in this array is
+ * exactly as dangerous as a caller passing a fabricated `Order`, and
+ * equally out of this function's own scope to defend against. OMITTING
+ * this field (or passing `[]`) is BYTE-IDENTICAL to this file's original,
+ * pre-existing behavior.
  */
 
 import { isQualifyingOrderStatusForMediaAccess } from "./media_access_grant_policy.js";
@@ -55,6 +79,16 @@ export interface IssueMediaAccessGrantsForOrderInput {
   readonly candidateMedia: readonly IssueMediaAccessGrantsForOrderMediaLike[];
   /** The seller's REAL, resolved media-grant-signing keypair (see this file's own header for why its public key must equal `order.sellerPubkey` for issuance to actually succeed). */
   readonly sellerSigningKeypair: MediaAccessGrantSigningKeypair;
+  /**
+   * Real Digital Delivery mega-arc (Agent G) — pubkeys the CALLER has
+   * ALREADY, independently verified (via
+   * `verifyMediaGrantSigningKeyDelegationEvent()`,
+   * `../catalog/adapters/nostr/commerce_media_grant_signing_key_delegation_bridge.js`)
+   * are certificate-authorized delegates of `order.sellerPubkey` for
+   * media-grant signing. See this file's own header. Optional; omitting it
+   * (or passing `[]`) preserves this function's exact original behavior.
+   */
+  readonly sellerAuthorizedDelegateSigningKeys?: readonly string[];
   /** The highest `grantVersion` already durably seen for `(mediaId, order.buyerPubkey, order.id)`, if any — `0` for "never granted before". Callers get this from `latestGrantVersion()` (`./media_access_grant_persistence.js`) over their own already-loaded persistence. */
   readonly latestKnownGrantVersionFor: (mediaId: string) => number;
   readonly now: number;
@@ -95,7 +129,8 @@ export function issueMediaAccessGrantsForOrder(input: IssueMediaAccessGrantsForO
     return { outcome: "order-not-qualifying" };
   }
 
-  if (input.sellerSigningKeypair.publicKeyHex !== input.order.sellerPubkey) {
+  const authorizedSigningKeys = new Set<string>([input.order.sellerPubkey, ...(input.sellerAuthorizedDelegateSigningKeys ?? [])]);
+  if (!authorizedSigningKeys.has(input.sellerSigningKeypair.publicKeyHex)) {
     return { outcome: "seller-not-grant-capable" };
   }
 
