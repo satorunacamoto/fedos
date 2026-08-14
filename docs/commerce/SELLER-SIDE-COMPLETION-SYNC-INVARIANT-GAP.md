@@ -1,10 +1,15 @@
 # Seller-Side Completion-Sync Invariant Gap — Coordinator Finding (LIVE, first reproduction)
 
-**Status: DOCUMENTED, DEFERRED (not fixed in this arc). Discovered as a
-by-product of closing `PROTECTED-MEDIA-BYTE-DURABILITY-GAP.md` — that fix is
-what let a real two-process E2E finally REACH this code path for the first
-time; STEP 7 (the byte-durability arc's own core proof) always failed first
-in every prior run, so nobody had ever seen STEP 8/9 execute against real
+**Status: FIXED (FedOS "Cross-Process Completion Sync + Buyer Restart
+Content Re-access + Truthful Reputation Final Closure" mega-arc,
+Coordinator). Both findings below are now closed — see "Resolution" at the
+end of this document for the exact fix, evidence, and the design decision
+made for Finding 1 (a role-blind trust of the inbound sync was considered
+and explicitly rejected). Originally discovered as a by-product of closing
+`PROTECTED-MEDIA-BYTE-DURABILITY-GAP.md` — that fix is what let a real
+two-process E2E finally REACH this code path for the first time; STEP 7
+(the byte-durability arc's own core proof) always failed first in every
+prior run, so nobody had ever seen STEP 8/9 execute against real
 production code before.**
 
 ## Summary
@@ -141,3 +146,68 @@ confirmation it remains open.
    and `commerce_digital_delivery_positive_packaged_binary_real_electron.test.ts`)
    as the acceptance gate for either fix — both are now real, live,
    reproducible regression tests for exactly this boundary.
+
+## Resolution (FedOS "Cross-Process Completion Sync + Buyer Restart
+## Content Re-access + Truthful Reputation Final Closure" mega-arc, Coordinator)
+
+**Finding 1 fix — role-aware evidence, no new cross-party trust claim.**
+Two candidate fixes were weighed explicitly, per this document's own
+"Recommendation" above:
+
+- *Rejected*: skip the delivery-invariant re-check entirely for a
+  non-buyer receiver, trusting the already-signature-verified inbound sync
+  event to the same degree every other inbound sync claim already is.
+  Rejected because a compromised/modified BUYER CLIENT (using the buyer's
+  own genuine private key) could publish a signed `"completed"` event
+  without ever having run its own local invariant check first — the
+  sender-identity check alone cannot catch this, since the signature
+  genuinely is the real buyer's. This would have reopened exactly the
+  false-positive-completion hole this function's own header already
+  documents closing.
+- *Adopted*: `applyInboundPrivateOrderSyncNonFatal()`'s `hasReleasedContent`
+  callback (`fedos_electron_beta_main.cts`) is now ROLE-AWARE, using
+  `activeLocalIdentity.accountPublicIdentifier` (the same cheap,
+  vault-derived, non-spoofable idiom `resolveProductMediaForCompletionInvariant()`
+  already used one call-frame away) to determine whether the receiving
+  process is the order's buyer or seller:
+  - buyer process → unchanged: `DurableMediaReleaseContentCache` (its own
+    digest-verified received content).
+  - seller process → NEW `DurableMediaReleaseIssuanceLog`
+    (`src/os/commerce/media_grant/persistence/durable_media_release_issuance_log.ts`)
+    — a durable, seller-owned record written only once
+    `buildOutboundPrivateMediaReleaseResponse()` has already independently
+    verified authorization, the grant, the content-identity checksum, and
+    a genuine decrypt+re-wrap for this exact `(orderId, mediaId,
+    buyerPubkey)` triple. This is genuinely NEW local evidence the seller's
+    own process already produces today — not a relaxation of any existing
+    check, and not a claim borrowed from the buyer's private storage.
+  - neither role → fails closed (`false`).
+
+**Finding 2 fix — check the buyer's own cache before the ProductMedia
+gate, not after.** `handleCommerceMediaGrantRedeem()` now calls a new
+additive accessor, `DurableMediaReleaseContentCache.listReleasesForOrder(orderId,
+buyerPubkey)`, immediately after the buyer-mismatch check and BEFORE the
+`resolveProductMediaForCompletionInvariant()` gate that used to short-circuit
+to `"availability-unknown"` on a momentarily-unsynced `ProductMedia` view.
+An already-durably-cached, already-digest-verified release is now served
+directly from that cache hit, regardless of whether this process's
+`ProductMedia` knowledge of the product happens to be synced at that exact
+moment. The `ProductMedia` gate itself is untouched and remains the
+correct fallback for a genuinely-first-time redeem.
+
+**Live evidence of both fixes (same arc):**
+- `commerce_digital_delivery_positive_real_electron.test.ts` — 9/9 PASS,
+  including STEP 8 (Bob's independent, restarted process now genuinely
+  mirrors Alice's real completion — Finding 1) and STEP 9 (Alice's
+  restarted process reopens her already-purchased content with zero
+  `"availability-unknown"` — Finding 2).
+- `commerce_digital_delivery_negative_control_real_electron.test.ts` —
+  6/6 PASS, unchanged, confirming the "no false positive" guarantee is
+  fully preserved: Bob's process still never mirrors a false completion
+  it cannot independently verify, and reconnect/replay stays idempotent
+  (STEP 8: "converges exactly once ... never advancing to `completed`").
+- `test/commerce_media_release_issuance_log.test.ts` (new) and the
+  `listReleasesForOrder` additions to
+  `test/commerce_media_release_content_cache.test.ts` — restart-survival,
+  wrong-binding, conflict, and corruption-fail-closed coverage at the
+  persistence layer for both new/changed accessors.

@@ -1192,6 +1192,12 @@ interface RootModules {
      */
     readonly DurableMediaReleaseContentCache: new (filePath: string) => CommerceMediaReleaseContentCacheLike;
     /**
+     * CROSS-PROCESS COMPLETION SYNC mega-arc (Coordinator) -- SELLER-side
+     * durable, restart-surviving record of "I genuinely built and sent a
+     * real, verified release" (`durable_media_release_issuance_log.ts`).
+     */
+    readonly DurableMediaReleaseIssuanceLog: new (filePath: string) => CommerceMediaReleaseIssuanceLogLike;
+    /**
      * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
      * (Agent D) -- friction-ledger row #14 / arc §32/§36: real,
      * repository-derived activity/badge counting logic.
@@ -1821,6 +1827,21 @@ interface CommerceMediaReleaseContentCacheLike {
   putRelease(record: CommerceMediaReleaseContentRecordLike): "inserted" | "already-present" | "conflict" | "failed";
   getRelease(orderId: string, mediaId: string, buyerPubkey: string): CommerceMediaReleaseContentRecordLike | undefined;
   hasRelease(orderId: string, mediaId: string, buyerPubkey: string): boolean;
+  listReleasesForOrder(orderId: string, buyerPubkey: string): readonly CommerceMediaReleaseContentRecordLike[];
+}
+/** CROSS-PROCESS COMPLETION SYNC mega-arc (Coordinator) -- the SELLER's own, independently-verified counterpart to `CommerceMediaReleaseContentRecordLike` above. See `durable_media_release_issuance_log.ts`'s own header. */
+interface CommerceMediaReleaseIssuanceRecordLike {
+  readonly orderId: string;
+  readonly mediaId: string;
+  readonly buyerPubkey: string;
+  readonly sellerPubkey: string;
+  readonly grantVersion: number;
+  readonly contentDigest: string;
+  readonly issuedAt: number;
+}
+interface CommerceMediaReleaseIssuanceLogLike {
+  recordIssuance(record: CommerceMediaReleaseIssuanceRecordLike): "inserted" | "already-present" | "conflict" | "failed";
+  hasIssuedRelease(orderId: string, mediaId: string, buyerPubkey: string): boolean;
 }
 /** BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- `PrivateMediaReleasePayload`'s structural mirror (discriminated union: released | denied). */
 type CommercePrivateMediaReleasePayloadLike =
@@ -2224,6 +2245,7 @@ async function loadRootModules(): Promise<RootModules> {
     evaluateInboundMediaReleaseResponseAuthorization: RootModules["Commerce"]["evaluateInboundMediaReleaseResponseAuthorization"];
     evaluateDigitalContentDeliveryInvariantForOrderCompletion: RootModules["Commerce"]["evaluateDigitalContentDeliveryInvariantForOrderCompletion"];
     DurableMediaReleaseContentCache: RootModules["Commerce"]["DurableMediaReleaseContentCache"];
+    DurableMediaReleaseIssuanceLog: RootModules["Commerce"]["DurableMediaReleaseIssuanceLog"];
     encodeCommerceReceiptProofToQrText: RootModules["Commerce"]["encodeCommerceReceiptProofToQrText"];
     decodeCommerceReceiptProofFromQrText: RootModules["Commerce"]["decodeCommerceReceiptProofFromQrText"];
     issueSignedProductShareProof: RootModules["Commerce"]["issueSignedProductShareProof"];
@@ -2460,6 +2482,7 @@ async function loadRootModules(): Promise<RootModules> {
       evaluateInboundMediaReleaseResponseAuthorization: commerce.evaluateInboundMediaReleaseResponseAuthorization,
       evaluateDigitalContentDeliveryInvariantForOrderCompletion: commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion,
       DurableMediaReleaseContentCache: commerce.DurableMediaReleaseContentCache,
+      DurableMediaReleaseIssuanceLog: commerce.DurableMediaReleaseIssuanceLog,
       computeCommerceBuyerActivitySummary: commerce.computeCommerceBuyerActivitySummary,
       computeCommerceSellerActivitySummary: commerce.computeCommerceSellerActivitySummary,
     },
@@ -2624,6 +2647,8 @@ let commerceMediaGrantPersistence: CommerceMediaAccessGrantPersistenceLike | nul
 let commerceMediaGrantSigningKeyStore: unknown = null;
 /** BUYER DISCOVERY + DIGITAL CONTENT DELIVERY mega-arc (Agent A) -- buyer-side durable, restart-surviving cache for verified `MediaAccessGrant` releases. */
 let commerceMediaReleaseContentCache: CommerceMediaReleaseContentCacheLike | null = null;
+/** CROSS-PROCESS COMPLETION SYNC mega-arc (Coordinator) -- SELLER-side durable, restart-surviving record of genuinely-issued releases. See `durable_media_release_issuance_log.ts`'s own header. */
+let commerceMediaReleaseIssuanceLog: CommerceMediaReleaseIssuanceLogLike | null = null;
 
 function commerceReceiptState(): CommerceReceiptStoreLike {
   const m = requireModules();
@@ -2682,6 +2707,16 @@ function commerceMediaReleaseContentCacheState(): CommerceMediaReleaseContentCac
     commerceMediaReleaseContentCache = new m.Commerce.DurableMediaReleaseContentCache(commerceDurableFilePath("media_release_content"));
   }
   return commerceMediaReleaseContentCache;
+}
+
+/** CROSS-PROCESS COMPLETION SYNC mega-arc (Coordinator) -- lazily constructs (once) the seller-side durable release-issuance log. Same lazy-construction-on-first-use discipline as every other Commerce state in this file. Deliberately a SEPARATE file/durable log from `commerceMediaReleaseContentCacheState()` above -- see `durable_media_release_issuance_log.ts`'s own header for why. */
+function commerceMediaReleaseIssuanceLogState(): CommerceMediaReleaseIssuanceLogLike {
+  const m = requireModules();
+  if (commerceMediaReleaseIssuanceLog === null) {
+    fs.mkdirSync(path.dirname(commerceDurableFilePath("media_release_issuance")), { recursive: true });
+    commerceMediaReleaseIssuanceLog = new m.Commerce.DurableMediaReleaseIssuanceLog(commerceDurableFilePath("media_release_issuance"));
+  }
+  return commerceMediaReleaseIssuanceLog;
 }
 
 /**
@@ -3869,12 +3904,50 @@ async function applyInboundPrivateOrderSyncNonFatal(envelope: {
   // this event to the dedup set -- treated the same as `"retry-later"`,
   // since this process's own delivery-evidence state (not the remote
   // claim) may genuinely catch up on a later refresh.
+  //
+  // CROSS-PROCESS COMPLETION SYNC mega-arc (Coordinator) -- FIXED a
+  // role-blindness bug in `hasReleasedContent` here (see
+  // `docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md`, Finding
+  // 1). The evidence predicate below is now ROLE-AWARE, using ONLY local
+  // evidence the RECEIVING process itself already independently produced
+  // and verified -- never a claim borrowed from the other party's private
+  // storage, never a blind trust of the sync event itself:
+  //   - this process IS the order's buyer -> unchanged: its own
+  //     `DurableMediaReleaseContentCache` (real, digest-verified content it
+  //     itself received).
+  //   - this process IS the order's seller -> its own NEW
+  //     `DurableMediaReleaseIssuanceLog` (real, verified evidence it itself
+  //     already built and sent a genuine release for this exact triple --
+  //     see that file's own header for the full four-gate trust basis).
+  //   - neither (should not normally occur -- an inbound sync only ever
+  //     reaches this point once the sender-identity check already confirmed
+  //     the sender IS this order's buyer or seller) -> fails closed
+  //     (`false`), never a vacuous pass.
+  // An earlier alternative -- skipping this re-check entirely for a
+  // non-buyer receiver, trusting the already-signature-verified sync event
+  // -- was considered and REJECTED (Coordinator security review, same
+  // arc): a compromised/modified BUYER CLIENT could publish a genuinely
+  // signed `"completed"` event without ever having run its own local
+  // invariant check first, and the sender-identity check alone cannot
+  // catch that, since the signature genuinely is the real buyer's. This
+  // fix introduces NO new cross-party trust claim -- each role checks only
+  // data it produced and verified itself.
   if (result.outcome === "applied" && existingOrder?.status !== "completed" && result.order.status === "completed") {
     const { productMedia: productMediaForInvariant, productMediaKnowledge } = await resolveProductMediaForCompletionInvariantWithSync(result.order.productId, result.order.sellerPubkey);
+    const isReceivingProcessTheBuyer = activeLocalIdentity !== null && activeLocalIdentity.accountPublicIdentifier === result.order.buyerPubkey;
+    const isReceivingProcessTheSeller = activeLocalIdentity !== null && activeLocalIdentity.accountPublicIdentifier === result.order.sellerPubkey;
     const deliveryInvariant = m.Commerce.evaluateDigitalContentDeliveryInvariantForOrderCompletion({
       productId: result.order.productId,
       productMedia: productMediaForInvariant,
-      hasReleasedContent: (mediaId) => commerceMediaReleaseContentCacheState().hasRelease(result.order.id, mediaId, result.order.buyerPubkey),
+      hasReleasedContent: (mediaId) => {
+        if (isReceivingProcessTheBuyer) {
+          return commerceMediaReleaseContentCacheState().hasRelease(result.order.id, mediaId, result.order.buyerPubkey);
+        }
+        if (isReceivingProcessTheSeller) {
+          return commerceMediaReleaseIssuanceLogState().hasIssuedRelease(result.order.id, mediaId, result.order.buyerPubkey);
+        }
+        return false;
+      },
       productMediaKnowledge,
     });
     if (!deliveryInvariant.satisfied) {
@@ -4687,6 +4760,31 @@ async function applyInboundPrivateMediaReleaseRequestNonFatal(envelope: {
       getStoredCiphertextChecksum: (storageRef) => commerceMediaStoreFor().metadata(storageRef)?.checksum ?? null,
       getProtectedContent: (storageRef) => commerceMediaStoreFor().getProtected(storageRef),
     });
+
+    // CROSS-PROCESS COMPLETION SYNC mega-arc (Coordinator) -- durably record
+    // that THIS process (the seller) genuinely built a verified release for
+    // this exact (orderId, mediaId, buyerPubkey) triple, BEFORE attempting
+    // to send it -- `response.outcome === "released"` is only ever reached
+    // after `buildOutboundPrivateMediaReleaseResponse()` has already
+    // independently verified authorization, the grant, the content-identity
+    // checksum, and a genuine decrypt+re-wrap (see that function's own
+    // header, steps 1-4). This is closing Finding 1 -- see
+    // `applyInboundPrivateOrderSyncNonFatal()`'s own comment for how this
+    // record is later consulted. Recorded regardless of whether the send
+    // itself succeeds: the seller genuinely DID build a real release either
+    // way, and a transient send failure is already independently retried by
+    // the buyer's own next request (a fresh request, a fresh event id).
+    if (response.outcome === "released") {
+      commerceMediaReleaseIssuanceLogState().recordIssuance({
+        orderId: response.orderId,
+        mediaId: response.mediaId,
+        buyerPubkey: response.buyerPubkey,
+        sellerPubkey: response.sellerPubkey,
+        grantVersion: response.grantVersion,
+        contentDigest: response.contentDigest,
+        issuedAt: now,
+      });
+    }
 
     commercePrivateMediaReleaseRequestAppliedEventIds.add(envelope.eventId);
     await sendPrivateMediaReleaseResponseNonFatal(response, payload.buyerPubkey);
@@ -7755,6 +7853,33 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
   if (order.buyerPubkey !== body.actorPubkey) {
     return { outcome: "rejected", reason: "buyer-mismatch" };
   }
+  const actorPubkey = body.actorPubkey;
+  const cache = commerceMediaReleaseContentCacheState();
+
+  // CROSS-PROCESS COMPLETION SYNC + BUYER RESTART CONTENT RE-ACCESS mega-arc
+  // (Coordinator) -- Finding 2 fix. Check the buyer's OWN already-durable
+  // release cache FIRST, directly by (orderId, buyerPubkey), BEFORE ever
+  // consulting this process's own ProductMedia knowledge. Closes the
+  // buyer-restart gap: a genuinely already-verified, already-cached release
+  // must never be shadowed by a momentarily "unsynced" ProductMedia view
+  // right after a fresh process start (see
+  // docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md, Finding 2 --
+  // the ProductMedia gate below used to run BEFORE this cache check, so an
+  // early "availability-unknown" return meant an already-cached release was
+  // never even reached, even though it was sitting durably on disk the
+  // whole time). Uses ONLY data already durably held on THIS buyer's own
+  // device -- no new sync, no new protocol, no cross-process code touched
+  // -- and does not weaken the ProductMedia gate below, which remains fully
+  // intact as the fallback for a genuinely-first-time redeem.
+  const alreadyCachedRelease = cache.listReleasesForOrder(order.id, actorPubkey)[0];
+  if (alreadyCachedRelease !== undefined) {
+    return {
+      outcome: "ok",
+      contentBase64: alreadyCachedRelease.contentBase64,
+      contentType: commerceSafePurchasedContentType(alreadyCachedRelease.contentType),
+      source: "cache",
+    };
+  }
 
   // Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) --
   // was: "local-only `commerceProductMediaState()`", which made this
@@ -7774,8 +7899,6 @@ async function handleCommerceMediaGrantRedeem(payload: unknown) {
   const media = protectedMedia[0];
   if (media === undefined) return { outcome: "not-found", reason: "this product has no protected content" };
 
-  const actorPubkey = body.actorPubkey;
-  const cache = commerceMediaReleaseContentCacheState();
   const cached = cache.getRelease(order.id, media.id, actorPubkey);
   if (cached !== undefined) {
     return { outcome: "ok", contentBase64: cached.contentBase64, contentType: commerceSafePurchasedContentType(cached.contentType), source: "cache" };

@@ -136,6 +136,22 @@ export interface MediaReleaseContentCache {
   putRelease(record: MediaReleaseContentRecord): MediaReleaseContentCacheWriteResult;
   getRelease(orderId: string, mediaId: string, buyerPubkey: string): MediaReleaseContentRecord | undefined;
   hasRelease(orderId: string, mediaId: string, buyerPubkey: string): boolean;
+  /**
+   * Buyer Restart Content Re-access closure (Coordinator, CROSS-PROCESS
+   * COMPLETION SYNC mega-arc) -- returns every already-durably-verified
+   * release this buyer holds for `orderId`, regardless of `mediaId`. Exists
+   * so a caller (`handleCommerceMediaGrantRedeem()`) can serve
+   * already-cached, already-verified content back to its own buyer WITHOUT
+   * first needing a trustworthy `ProductMedia` list to even know which
+   * `mediaId` to look up -- closing the restart gap where a buyer's
+   * process's own `ProductMedia` view of a product it did not itself list
+   * is momentarily `"unsynced"` right after a fresh process start, even
+   * though the release itself has been sitting durably on disk the whole
+   * time. Read-only; adds no new persistence, no new write path, no new
+   * trust claim -- purely an additive query surface over data this cache
+   * already durably holds.
+   */
+  listReleasesForOrder(orderId: string, buyerPubkey: string): readonly MediaReleaseContentRecord[];
 }
 
 export class DurableMediaReleaseContentCache implements MediaReleaseContentCache {
@@ -167,5 +183,9 @@ export class DurableMediaReleaseContentCache implements MediaReleaseContentCache
 
   hasRelease(orderId: string, mediaId: string, buyerPubkey: string): boolean {
     return this.getRelease(orderId, mediaId, buyerPubkey) !== undefined;
+  }
+
+  listReleasesForOrder(orderId: string, buyerPubkey: string): readonly MediaReleaseContentRecord[] {
+    return replayLog(this.#filePath).filter((r) => r.orderId === orderId && r.buyerPubkey === buyerPubkey);
   }
 }

@@ -111,4 +111,49 @@ describe("DurableMediaReleaseContentCache", () => {
     appendFileSync(filePath, "not-json-at-all\n", "utf8");
     expect(() => cache.getRelease("order-1", "media-1", "b".repeat(64))).toThrow();
   });
+
+  // CROSS-PROCESS COMPLETION SYNC + BUYER RESTART CONTENT RE-ACCESS mega-arc
+  // (Coordinator) -- `listReleasesForOrder()`, the additive accessor closing
+  // Finding 2 (`docs/commerce/SELLER-SIDE-COMPLETION-SYNC-INVARIANT-GAP.md`):
+  // `handleCommerceMediaGrantRedeem()` needs to find an already-cached
+  // release by `(orderId, buyerPubkey)` alone, WITHOUT first needing a
+  // trustworthy `ProductMedia` list to even know which `mediaId` to look up.
+  describe("listReleasesForOrder", () => {
+    it("returns the one release for a (orderId, buyerPubkey) pair with exactly one media item", () => {
+      const cache = new DurableMediaReleaseContentCache(freshFile());
+      cache.putRelease(record());
+      expect(cache.listReleasesForOrder("order-1", "b".repeat(64))).toEqual([record()]);
+    });
+
+    it("returns an empty array for an order/buyer pair with no releases -- never throws, never a false hit", () => {
+      const cache = new DurableMediaReleaseContentCache(freshFile());
+      expect(cache.listReleasesForOrder("order-x", "b".repeat(64))).toEqual([]);
+    });
+
+    it("RESTART SURVIVAL: a fresh instance over the SAME file still lists a release written by an earlier instance", () => {
+      const filePath = freshFile();
+      const first = new DurableMediaReleaseContentCache(filePath);
+      first.putRelease(record());
+
+      const second = new DurableMediaReleaseContentCache(filePath);
+      expect(second.listReleasesForOrder("order-1", "b".repeat(64))).toEqual([record()]);
+    });
+
+    it("multiple protected media items on the same order all appear", () => {
+      const cache = new DurableMediaReleaseContentCache(freshFile());
+      cache.putRelease(record({ mediaId: "media-1" }));
+      cache.putRelease(record({ mediaId: "media-2" }));
+      const listed = cache.listReleasesForOrder("order-1", "b".repeat(64));
+      expect(listed).toHaveLength(2);
+      expect(listed.map((r) => r.mediaId).sort()).toEqual(["media-1", "media-2"]);
+    });
+
+    it("WRONG-BINDING: never returns a release belonging to a different order or a different buyer for the same media", () => {
+      const cache = new DurableMediaReleaseContentCache(freshFile());
+      cache.putRelease(record({ orderId: "order-1", buyerPubkey: "b".repeat(64) }));
+      cache.putRelease(record({ orderId: "order-2", buyerPubkey: "b".repeat(64) }));
+      cache.putRelease(record({ orderId: "order-1", buyerPubkey: "f".repeat(64) }));
+      expect(cache.listReleasesForOrder("order-1", "b".repeat(64))).toEqual([record({ orderId: "order-1", buyerPubkey: "b".repeat(64) })]);
+    });
+  });
 });

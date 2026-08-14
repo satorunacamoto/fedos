@@ -314,6 +314,17 @@ export {
   type MediaReleaseContentCache,
   type MediaReleaseContentCacheWriteResult,
 } from "./media_grant/persistence/durable_media_release_content_cache.js";
+// CROSS-PROCESS COMPLETION SYNC + BUYER RESTART CONTENT RE-ACCESS +
+// TRUTHFUL REPUTATION FINAL CLOSURE mega-arc (Coordinator) -- the SELLER's
+// own, independently-verified counterpart to the buyer cache above. See
+// that file's own header for why this is deliberately a SEPARATE file/
+// schema, never merged with the buyer's.
+export {
+  DurableMediaReleaseIssuanceLog,
+  type MediaReleaseIssuanceRecord,
+  type MediaReleaseIssuanceLog,
+  type MediaReleaseIssuanceLogWriteResult,
+} from "./media_grant/persistence/durable_media_release_issuance_log.js";
 
 // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent C) --
 // role-aware, honest UI-state derivation for digital content delivery (arc
