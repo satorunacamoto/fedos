@@ -553,6 +553,14 @@ interface FedosAppBridge {
     conversationId: string,
     counterpartyAccountRef?: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null } | null,
   ) => Promise<FedosAppCommandResult>;
+  /** FedOS Peer Device Discovery Arc -- publishes a real, signed announcement of this local device's own protocol-scoped identity to `recipientAccountRef`. */
+  readonly peerDeviceAnnounce: (
+    recipientAccountRef: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null },
+    conversationId: string,
+    epoch: number,
+  ) => Promise<FedosAppCommandResult>;
+  /** FedOS Peer Device Discovery Arc -- every peer device this local Device has ever observed an announcement from, with a LIVE Device Registry trust-state lookup. */
+  readonly peerDeviceAnnouncementListObserved: () => Promise<FedosAppCommandResult>;
   readonly settingsLoad: () => Promise<FedosAppCommandResult>;
   readonly relayStatus: () => Promise<FedosAppCommandResult>;
   /** Commerce Reachable Catalog + Product Surface Phase 1 — read-only. */

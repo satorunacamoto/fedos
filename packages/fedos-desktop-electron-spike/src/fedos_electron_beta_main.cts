@@ -793,6 +793,9 @@ interface ShellDiagnosticLike {
   /** Secure Runtime Alpha 8041-8120 — narrows `peerCapabilityListObserved()`/`identityTransitionStatus()`, used ONLY to reconcile an Identity Transition inbox item's own `transitionId` back to the `(peerAccountRef, peerDeviceRef)` pair `identityTransitionOpen()`/`Accept()`/`Reject()`/`Defer()` require as input — the Shell/Controller layer has no listing call that returns that pair directly (see this Arc's own Phase A reconciliation report); this main-process-only cross-reference invents no new identity-transition business rule, it only composes two already-public read-only calls, mirroring `FedosSafetyCenterController`'s own established cross-domain reconciliation style. */
   peerCapabilityListObserved(): { readonly outcome: string; readonly [key: string]: unknown };
   identityTransitionStatus(peerAccountRef: unknown, peerDeviceRef: string, transitionId: string): { readonly outcome: string; readonly [key: string]: unknown };
+  /** FedOS Peer Device Discovery Arc — narrows `FedosDesktopApplicationShell.peerDeviceAnnounce()`/`.peerDeviceAnnouncementListObserved()` (unmodified this call); no new business logic. */
+  peerDeviceAnnounce(recipientAccountRef: unknown, conversationId: string, epoch: number): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
+  peerDeviceAnnouncementListObserved(): { readonly outcome: string; readonly [key: string]: unknown };
   /** Commerce Product-Media Sync + Truthful Completion mega-arc (Wave B) — narrows `FedosDesktopApplicationShell.identityTransitionRatchetImpact()`, additive this Arc; see that method's own doc comment. */
   identityTransitionRatchetImpact(oldAccountIdentity: unknown): { readonly outcome: string; readonly [key: string]: unknown };
   /**
@@ -5114,6 +5117,16 @@ function secureRuntimeBundleConfig(m: RootModules, signer: unknown): Record<stri
     directRatchetMessageDeliveryRemoteDeviceRef: messageDeliveryRemoteDeviceRef !== undefined && messageDeliveryRemoteDeviceRef.length > 0 ? messageDeliveryRemoteDeviceRef : undefined,
     peerCapabilityEnabled: true,
     peerCapabilityLocallySupportedCapabilities: [{ kind: "private-message-route", route: "nostr-nip17-v1" }],
+    // FedOS Peer Device Discovery Arc -- mirrors peerCapabilityEnabled's
+    // own activation condition exactly (same relay-configured gate). The
+    // durable identity file path itself is sourced from `paths` inside
+    // `FedosProfileInitializationCoordinator#buildRuntimeConfig()`
+    // (mirrors `peerCapabilityObservationLogPath`'s own identical
+    // "path threaded from `paths`, not from this function" convention)
+    // -- this local device's own announced identity is stable across
+    // restarts.
+    peerDeviceAnnouncementEnabled: true,
+    peerDeviceAnnouncementLocallySupportedCapabilities: [],
     identityTransitionEnabled: true,
     identityTransitionLocalPolicy: { autoAcceptOldKeyContinuity: false },
     deletionRequestEnabled: true,
@@ -8147,6 +8160,42 @@ async function handleAppConversationSecurityState(payload: unknown) {
   return { outcome: "ok", value: boundary.securityState.getSecurityState(body.conversationId, counterpartyAccountRef, Date.now()) };
 }
 
+/**
+ * FedOS Peer Device Discovery Arc — publishes a real, signed announcement
+ * of this local device's own protocol-scoped identity to `recipientAccountRef`
+ * over `conversationId`'s already-established transport. `epoch` is
+ * renderer/caller-supplied (defaults to `0`, safe for a genuinely first
+ * announcement to a given recipient) — this handler invents no policy of
+ * its own beyond input validation; delegates entirely to
+ * `shell.peerDeviceAnnounce()`.
+ */
+async function handleAppPeerDeviceAnnounce(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const body = payload as { conversationId?: unknown; recipientAccountRef?: unknown; epoch?: unknown } | null;
+  if (!isBoundedString(body?.conversationId, MAX_ID_LENGTH)) return { outcome: "invalid-input", reason: "malformed conversationId" };
+  const rawRef = body.recipientAccountRef;
+  if (typeof rawRef !== "object" || rawRef === null) return { outcome: "invalid-input", reason: "malformed recipientAccountRef" };
+  const r = rawRef as Record<string, unknown>;
+  if (typeof r.authority !== "string" || !isBoundedString(r.publicIdentifier, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed recipientAccountRef" };
+  }
+  const recipientAccountRef = { authority: r.authority, publicIdentifier: r.publicIdentifier, identityId: typeof r.identityId === "string" ? r.identityId : null };
+  const epoch = typeof body.epoch === "number" && Number.isInteger(body.epoch) && body.epoch >= 0 ? body.epoch : 0;
+  // `shell.peerDeviceAnnounce()` already returns a `FedosDesktopShellResult`-
+  // shaped `{outcome, value}` -- returned directly, never re-wrapped
+  // (mirrors `handleAcceptanceCreateDirectConversation()`'s own
+  // `return shell.createDirectConversation({...})` convention exactly).
+  return await shell.peerDeviceAnnounce(recipientAccountRef, body.conversationId, epoch);
+}
+
+/** FedOS Peer Device Discovery Arc — every peer device this local Device has ever observed an announcement from, with a LIVE Device Registry trust-state lookup. Delegates entirely to `shell.peerDeviceAnnouncementListObserved()`, returned directly (already `FedosDesktopShellResult`-shaped). */
+function handleAppPeerDeviceAnnouncementListObserved() {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  return shell.peerDeviceAnnouncementListObserved();
+}
+
 // Commerce Product-Media Sync + Truthful Completion mega-arc (Agent I /
 // Wave B) — Signed Deletion sender-side. The recipient side (approve/
 // reject, below) already exists; this supplies the missing send half. See
@@ -8419,6 +8468,9 @@ function registerIpcHandlers(): void {
   // Phase K -- reuse the SAME handler `fedos-acceptance:safety-center-overview` already dispatches to.
   ipcCommands.registerHandle(ipcMain, "fedos-app:safety-center-overview", async () => handleAppSafetyCenterOverview(), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-app:conversation-security-state", (payload: unknown) => handleAppConversationSecurityState(payload), { allowConcurrentSelf: true });
+  // FedOS Peer Device Discovery Arc.
+  ipcCommands.registerHandle(ipcMain, "fedos-app:peer-device-announce", (payload: unknown) => handleAppPeerDeviceAnnounce(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:peer-device-announcement-list-observed", async () => handleAppPeerDeviceAnnouncementListObserved(), { allowConcurrentSelf: true });
   // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
   ipcCommands.registerHandle(ipcMain, "fedos-app:settings-load", async () => handleAppSettingsLoad(), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-app:relay-status", async () => handleAppRelayStatus(), { allowConcurrentSelf: true });
@@ -8619,6 +8671,9 @@ app.whenReady().then(async () => {
         "acceptance-create-conversation-invitation": (payload) => handleAcceptanceCreateConversationInvitation(payload),
         "acceptance-search": (payload) => handleAcceptanceSearch(payload),
         "acceptance-archive": (payload) => handleAcceptanceArchive(payload),
+        // FedOS Peer Device Discovery Arc -- the SAME real handler functions `registerIpcHandlers()` also registers for a real renderer to call.
+        "acceptance-peer-device-announce": (payload) => handleAppPeerDeviceAnnounce(payload),
+        "acceptance-peer-device-announcement-list-observed": () => Promise.resolve(handleAppPeerDeviceAnnouncementListObserved()),
         // Secure Runtime Alpha 8041-8120 -- non-DOM regression coverage for
         // the SAME `fedos-app:*` handler functions the real page's own
         // `window.fedosApp` bridge calls; useful both as a lower-level
@@ -8635,6 +8690,8 @@ app.whenReady().then(async () => {
         "app-deletion-request-list-received": () => handleAppDeletionRequestListReceived(),
         "app-safety-center-overview": () => handleAppSafetyCenterOverview(),
         "app-conversation-security-state": (payload) => handleAppConversationSecurityState(payload),
+        "app-peer-device-announce": (payload) => handleAppPeerDeviceAnnounce(payload),
+        "app-peer-device-announcement-list-observed": async () => handleAppPeerDeviceAnnouncementListObserved(),
         "app-settings-load": () => handleAppSettingsLoad(),
         "app-relay-status": () => handleAppRelayStatus(),
         "acceptance-safety-center-overview": () => handleAcceptanceSafetyCenterOverview(),
@@ -8658,12 +8715,34 @@ app.whenReady().then(async () => {
           if (step.command === "wait") {
             const ms = (step.payload as { ms?: unknown } | null)?.ms;
             await new Promise((resolve) => setTimeout(resolve, typeof ms === "number" && ms > 0 && ms <= 30000 ? ms : 0));
-            console.log(`FEDOS_ELECTRON_BETA_ACCEPTANCE_STEP:${i}:${step.command}:${JSON.stringify({ outcome: "ok" })}`);
+            const waitLine = `FEDOS_ELECTRON_BETA_ACCEPTANCE_STEP:${i}:${step.command}:${JSON.stringify({ outcome: "ok" })}`;
+            console.log(waitLine);
+            if (UI_STEP_LOG_FILE.length > 0) {
+              // FedOS Peer Device Discovery Arc -- reuses the SAME
+              // best-effort disk mirror the ui-script mode already
+              // established (see that mode's own comment above), so an
+              // acceptance script can ALSO be driven against the real
+              // packaged binary (stdio:"ignore", stdout unobservable),
+              // never a second logging mechanism.
+              try {
+                fs.appendFileSync(UI_STEP_LOG_FILE, waitLine + "\n");
+              } catch (fileErr) {
+                console.error("fedos-beta: acceptance step log file write failed", fileErr instanceof Error ? fileErr.message : String(fileErr));
+              }
+            }
             continue;
           }
           const fn = commands[step.command];
           const result = fn === undefined ? { outcome: "unavailable", reason: "unknown-acceptance-script-command" } : await fn(step.payload);
-          console.log(`FEDOS_ELECTRON_BETA_ACCEPTANCE_STEP:${i}:${step.command}:${JSON.stringify(result)}`);
+          const stepLine = `FEDOS_ELECTRON_BETA_ACCEPTANCE_STEP:${i}:${step.command}:${JSON.stringify(result)}`;
+          console.log(stepLine);
+          if (UI_STEP_LOG_FILE.length > 0) {
+            try {
+              fs.appendFileSync(UI_STEP_LOG_FILE, stepLine + "\n");
+            } catch (fileErr) {
+              console.error("fedos-beta: acceptance step log file write failed", fileErr instanceof Error ? fileErr.message : String(fileErr));
+            }
+          }
         }
       } catch (err) {
         console.error("fedos-beta: acceptance script error", err instanceof Error ? err.message : String(err));

@@ -216,6 +216,10 @@ export interface FedosProfileInitializationDependencies {
   readonly peerCapabilityEnabled?: boolean;
   /** REQUIRED when `peerCapabilityEnabled` is `true` — this Runtime advertises no capability of its own by default. */
   readonly peerCapabilityLocallySupportedCapabilities?: readonly FedosRatchetPeerCapabilityEntry[];
+  /** FedOS Peer Device Discovery Arc — mirrors `peerCapabilityEnabled`'s own established "optional capability toggle" pattern exactly. */
+  readonly peerDeviceAnnouncementEnabled?: boolean;
+  /** REQUIRED when `peerDeviceAnnouncementEnabled` is `true` — this Runtime advertises no capability of its own by default. */
+  readonly peerDeviceAnnouncementLocallySupportedCapabilities?: readonly FedosRatchetPeerCapabilityEntry[];
   /** Secure Runtime Alpha 7081-7160 — pass-through to `FedosDesktopRuntimeConfig.conversationInvitationEnabled`'s own doc comment. */
   readonly conversationInvitationEnabled?: boolean;
   readonly identityTransitionEnabled?: boolean;
@@ -804,6 +808,9 @@ export class FedosProfileInitializationCoordinator {
       peerCapabilityEnabled: this.#deps.peerCapabilityEnabled === true,
       peerCapabilityLocallySupportedCapabilities: this.#deps.peerCapabilityEnabled === true ? this.#deps.peerCapabilityLocallySupportedCapabilities : undefined,
       peerCapabilityObservationLogPath: this.#deps.peerCapabilityEnabled === true ? paths.peerCapabilityObservationLogFile : undefined,
+      peerDeviceAnnouncementEnabled: this.#deps.peerDeviceAnnouncementEnabled === true,
+      peerDeviceAnnouncementLocallySupportedCapabilities: this.#deps.peerDeviceAnnouncementEnabled === true ? this.#deps.peerDeviceAnnouncementLocallySupportedCapabilities : undefined,
+      peerDeviceAnnouncementIdentityLogPath: this.#deps.peerDeviceAnnouncementEnabled === true ? paths.peerDeviceAnnouncementIdentityLogFile : undefined,
       conversationInvitationEnabled: this.#deps.conversationInvitationEnabled === true,
       conversationInvitationReceivedLogPath: this.#deps.conversationInvitationEnabled === true ? paths.conversationInvitationReceivedLogFile : undefined,
       identityTransitionEnabled: this.#deps.identityTransitionEnabled === true,

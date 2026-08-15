@@ -253,6 +253,10 @@ const fedosApp: FedosAppBridge = Object.freeze({
   // guessing.
   conversationSecurityState: (conversationId: string, counterpartyAccountRef?: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null } | null) =>
     ipcRenderer.invoke("fedos-app:conversation-security-state", { conversationId: boundedString(conversationId, MAX_ID_CHARS), counterpartyAccountRef: counterpartyAccountRef ?? null }),
+  // FedOS Peer Device Discovery Arc -- same bounded-string discipline as every method above.
+  peerDeviceAnnounce: (recipientAccountRef: { readonly authority: string; readonly publicIdentifier: string; readonly identityId: string | null }, conversationId: string, epoch: number) =>
+    ipcRenderer.invoke("fedos-app:peer-device-announce", { recipientAccountRef, conversationId: boundedString(conversationId, MAX_ID_CHARS), epoch }),
+  peerDeviceAnnouncementListObserved: () => ipcRenderer.invoke("fedos-app:peer-device-announcement-list-observed"),
   settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
   relayStatus: () => ipcRenderer.invoke("fedos-app:relay-status"),
   // Commerce Reachable Catalog + Product Surface Phase 1 -- read-only,

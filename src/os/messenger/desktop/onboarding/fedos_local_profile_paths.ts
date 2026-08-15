@@ -87,6 +87,8 @@ export interface FedosLocalProfilePaths {
   readonly directRatchetImportRecordLogFile: string;
   /** Ratchet Peer Capability observation append-only log. */
   readonly peerCapabilityObservationLogFile: string;
+  /** FedOS Peer Device Discovery Arc — this local device's own small, durable, non-secret identity file (deviceId + devicePublicKeyHex only, never a private key). */
+  readonly peerDeviceAnnouncementIdentityLogFile: string;
   /** Secure Runtime Alpha 7081-7160 — Conversation Invitation received-invitation append-only log. */
   readonly conversationInvitationReceivedLogFile: string;
   /**
@@ -196,6 +198,7 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     directRatchetResetRecordLogFile: join(root, "direct-ratchet-reset-record.ndjson"),
     directRatchetImportRecordLogFile: join(root, "direct-ratchet-import-record.ndjson"),
     peerCapabilityObservationLogFile: join(root, "peer-capability-observation.ndjson"),
+    peerDeviceAnnouncementIdentityLogFile: join(root, "peer-device-announcement-identity.json"),
     conversationInvitationReceivedLogFile: join(root, "conversation-invitation-received.ndjson"),
     conversationDraftLogFile: join(root, "conversation-draft.ndjson"),
     identityTransitionObservationLogFile: join(root, "identity-transition-observation.ndjson"),
