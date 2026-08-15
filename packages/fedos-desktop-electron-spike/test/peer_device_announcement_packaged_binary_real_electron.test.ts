@@ -361,6 +361,8 @@ realSuite("Peer Device Discovery -- REAL packaged/installed binary, two independ
     300000,
   );
 
+  let bobDeviceId = "";
+
   it(
     "STEP 4 (SCENARIO F, offline-then-reconnect, true by construction: Bob's process has already exited): Alice's OWN NEXT, fully independent process launch receives the durably-stored announcement and records Bob's device as cryptographically trusted",
     async () => {
@@ -370,12 +372,73 @@ realSuite("Peer Device Discovery -- REAL packaged/installed binary, two independ
         { command: "acceptance-peer-device-announcement-list-observed" },
       ]);
       stepAt(alice2, 0, "profile-unlock");
-      const listResult = stepAt(alice2, 2, "acceptance-peer-device-announcement-list-observed") as { outcome: string; value?: readonly { peerAccountRef: { publicIdentifier: string }; trustState: string }[] };
+      const listResult = stepAt(alice2, 2, "acceptance-peer-device-announcement-list-observed") as { outcome: string; value?: readonly { peerAccountRef: { publicIdentifier: string }; deviceId: string; trustState: string }[] };
       expect(listResult.outcome, JSON.stringify(listResult)).toBe("ok");
       const bobEntry = listResult.value?.find((d) => d.peerAccountRef.publicIdentifier === bobPubkey);
       expect(bobEntry, `Alice's real installed process must have received Bob's real signed announcement over the real NIP-17 mailbox transport, even though Bob's own process already exited before this launch started (genuine offline-then-reconnect). Observed: ${JSON.stringify(listResult)}`).toBeDefined();
       expect(bobEntry!.trustState).toBe("trusted");
+      bobDeviceId = bobEntry!.deviceId;
       record(`STEP 4 PASS (REQUIRED, mutual authenticated device learning) -- Alice's independent installed process durably recorded Bob's device as cryptographically trusted, entirely through the real NIP-17 mailbox transport: ${JSON.stringify(bobEntry)}`);
+    },
+    240000,
+  );
+
+  it(
+    "STEP 4b (Direct Ratchet bootstrap from authenticated peer-device facts): Alice establishes a real Direct Ratchet session with Bob's newly-discovered, trusted device -- proving the Registry write this protocol produces is genuinely consumable by the EXISTING, unmodified Direct Ratchet resolver with zero ratchet-side code changes. Uses a conversation Alice herself creates and owns (mirrors Bob's own successful STEP 3 pattern exactly -- the creator's own local view is immediately routable) rather than Bob's own invitation-created conversation, which Alice's own local view does not independently discover/join within this suite's bounded run (the SAME pre-existing, disclosed, out-of-scope conversation-discovery-timing characteristic Agent P's Phase A investigation already named).",
+    async () => {
+      const aliceOwnInvite = await runPackagedAcceptance("ALICE_3_OWN_INVITE", launchExePath, aliceDataDir, [
+        { command: "profile-unlock", payload: { secret: ALICE_PASSPHRASE } },
+        { command: "wait", payload: { ms: 500 } },
+        { command: "acceptance-create-conversation-invitation", payload: { invitee: { authority: "nostr", publicIdentifier: bobPubkey } } },
+        { command: "wait", payload: { ms: 300 } },
+      ]);
+      stepAt(aliceOwnInvite, 0, "profile-unlock");
+      const aliceInviteResult = stepAt(aliceOwnInvite, 2, "acceptance-create-conversation-invitation") as { outcome: string; value?: { outcome?: string; conversationId?: string } };
+      expect(aliceInviteResult.outcome, JSON.stringify(aliceInviteResult)).toBe("ok");
+      expect(aliceInviteResult.value?.outcome, JSON.stringify(aliceInviteResult)).toBe("sent");
+      const ratchetConversationId = aliceInviteResult.value!.conversationId!;
+      record(`STEP 4b: Alice created her own real, already-activated Direct Conversation with Bob: ${ratchetConversationId}`);
+
+      const alice4 = await runPackagedAcceptance("ALICE_4_RATCHET_ESTABLISH", launchExePath, aliceDataDir, [
+        { command: "profile-unlock", payload: { secret: ALICE_PASSPHRASE } },
+        { command: "wait", payload: { ms: 500 } },
+        // A freshly-started Runtime must re-activate a Direct conversation
+        // (real, per-Runtime-lifetime encryption-readiness resolution)
+        // before Ratchet session establishment succeeds -- confirmed live
+        // this arc: the first attempt without this step returned a real,
+        // honest "not-direct" outcome.
+        { command: "acceptance-activate-direct-conversation", payload: { conversationId: ratchetConversationId } },
+        { command: "wait", payload: { ms: 300 } },
+        { command: "acceptance-establish-direct-ratchet-session", payload: { conversationId: ratchetConversationId, remoteDeviceRef: bobDeviceId } },
+        { command: "wait", payload: { ms: 500 } },
+        { command: "acceptance-direct-ratchet-status", payload: { conversationId: ratchetConversationId, remoteDeviceRef: bobDeviceId } },
+      ]);
+      const activateResult = stepAt(alice4, 2, "acceptance-activate-direct-conversation");
+      record(`STEP 4b activate result: ${JSON.stringify(activateResult)}`);
+      const establishResult = stepAt(alice4, 4, "acceptance-establish-direct-ratchet-session") as { outcome: string; value?: { outcome?: string; sessionId?: string } };
+      record(`STEP 4b establish result: ${JSON.stringify(establishResult)}`);
+
+      // "initiated" is the CORRECT, honest outcome for Alice's own
+      // unilateral establish call -- Direct Ratchet's real X3DH-style
+      // handshake is two-step (Alice initiates, Bob's own process would
+      // need to independently receive and respond for the session to
+      // reach "active"); this arc's own scope is proving the
+      // AUTHENTICATED BOOTSTRAP succeeds from this protocol's own
+      // Registry write, not re-testing the pre-existing, already-proven
+      // Ratchet handshake machinery itself (Agent R's own Phase A finding,
+      // 03_DIRECT_RATCHET_INTEGRATION_POINTS.md: "100% a Registry/trust-
+      // gate wiring problem... no concrete incompatibility... none is
+      // being claimed").
+      expect(establishResult.outcome, JSON.stringify(establishResult)).toBe("ok");
+      expect(["initiated", "already-active", "established"], JSON.stringify(establishResult)).toContain(establishResult.value?.outcome);
+      expect(establishResult.value?.sessionId, "a real session id must be present -- proves a genuine crypto session object was constructed, not a stub").toMatch(/^direct-ratchet-v1##/);
+      // The session id itself must embed the EXACT deviceId this protocol
+      // discovered and trusted -- proves the Ratchet resolver consumed
+      // THIS protocol's own Registry write, not a coincidence.
+      expect(establishResult.value!.sessionId).toContain(bobDeviceId);
+
+      const statusResult = stepAt(alice4, 6, "acceptance-direct-ratchet-status");
+      record(`STEP 4b PASS (REQUIRED, Direct Ratchet authenticated bootstrap) -- a real Direct Ratchet session was genuinely initiated using this protocol's own authenticated Registry write, with zero Ratchet-side code changes: sessionId=${String(establishResult.value?.sessionId)}; status=${JSON.stringify(statusResult)}`);
     },
     240000,
   );
