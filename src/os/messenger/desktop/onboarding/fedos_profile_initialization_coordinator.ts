@@ -28,7 +28,12 @@
  * NOT delete the sealed file or descriptor it already wrote — a partial
  * profile is left in place so the next launch DETECTS it (as
  * `recovery-required`) rather than silently overwriting it. Nothing is
- * silently deleted after failure.
+ * silently deleted after failure. FedOS Peer Device Discovery Arc P0
+ * Closure (Agent F) adds exactly ONE explicit, user-confirmed exception —
+ * `resetInterruptedProfile()`, below — which deletes that same leftover
+ * material, but ONLY after re-confirming `"ready"` was never durably
+ * reached, and ONLY on an explicit caller request (never automatically,
+ * never silently).
  *
  * HARD GUARDRAILS:
  *   - The unlock secret is only ever a `FedosProfileUnlockSecret`, consumed
@@ -102,6 +107,12 @@ export type FedosProfileCoordinatorOutcome =
   | "device-bootstrap-incomplete"
   | "runtime-start-failed"
   | "not-ready"
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F) — the ONE typed
+  // refusal `resetInterruptedProfile()` returns whenever its guard is not
+  // satisfied (state is not exactly `recovery-required`, or the
+  // descriptor already durably reached `ready`). A no-op refusal, never a
+  // partial/best-effort deletion.
+  | "reset-refused"
   | "failed";
 
 export type FedosProfileCoordinatorResult<T> =
@@ -121,6 +132,27 @@ function fail<T>(
 /** The coarse durable presence of a profile, without any secret. */
 export type FedosProfilePresence = "absent" | "locked" | "recovery-required" | "in-progress";
 
+/**
+ * FedOS Installed Startup Root-Cause Arc — WHY a `"recovery-required"`
+ * presence was reached, distinguishing the two structurally different
+ * shapes so a caller (main process / renderer) can offer the RIGHT reset
+ * path instead of a dead end:
+ *   - `"interrupted"` — no descriptor ever durably reached `"ready"` (a
+ *     corrupt/missing descriptor, leftover sealed material with no
+ *     descriptor, or a descriptor still `"initializing"`/`"failed"`/
+ *     already-marked `"recovery-required"`). `resetInterruptedProfile()`'s
+ *     existing guard already accepts exactly this shape.
+ *   - `"corrupt"` — the descriptor itself DID durably reach `"ready"`, but
+ *     the sealed Master Seed envelope next to it is verifiably,
+ *     STRUCTURALLY missing or unparseable (never a passphrase-dependent
+ *     judgment — see `detectProfileState()`'s own doc comment). A live
+ *     unlock can never succeed again; `resetCorruptReadyProfile()` is the
+ *     ONLY method that will ever reset this shape (`resetInterruptedProfile()`
+ *     explicitly, permanently refuses any `"ready"` descriptor).
+ *   - `null` — not currently `"recovery-required"`.
+ */
+export type FedosProfileRecoveryReason = "interrupted" | "corrupt" | null;
+
 export interface FedosProfileStatusView {
   readonly lifecycleState: FedosProfileLifecycleState;
   readonly presence: FedosProfilePresence;
@@ -128,6 +160,8 @@ export interface FedosProfileStatusView {
   readonly accountPublicIdentifier: string | null;
   readonly localDeviceId: string | null;
   readonly runtimeRunning: boolean;
+  /** FedOS Installed Startup Root-Cause Arc — see `FedosProfileRecoveryReason`'s own doc comment. Always `null` unless `presence === "recovery-required"`. */
+  readonly recoveryReason: FedosProfileRecoveryReason;
 }
 
 /** The safe, secret-free result of a completed create/unlock. */
@@ -290,6 +324,8 @@ export class FedosProfileInitializationCoordinator {
   #deviceKeypair: FedosDeviceSigningKeypair | null = null;
   #descriptor: FedosLocalProfileDescriptorV1 | null = null;
   #stopped = false;
+  /** FedOS Installed Startup Root-Cause Arc — see `FedosProfileRecoveryReason`'s own doc comment. Re-derived on every `detectProfileState()` call; never trusted stale by any reset guard (each reset method re-derives its own guard independently). */
+  #recoveryReason: FedosProfileRecoveryReason = null;
 
   constructor(deps: FedosProfileInitializationDependencies) {
     this.#deps = deps;
@@ -325,6 +361,7 @@ export class FedosProfileInitializationCoordinator {
       if (error instanceof FedosLocalProfileCorruptError) {
         this.#state = "absent";
         this.#transition("corruption-detected");
+        this.#recoveryReason = "interrupted";
         return ok(this.#statusView("recovery-required"));
       }
       return fail("failed", "profile read failed");
@@ -339,32 +376,68 @@ export class FedosProfileInitializationCoordinator {
         // A corrupt sealed file with no descriptor -> recovery-required.
         this.#state = "absent";
         this.#transition("corruption-detected");
+        this.#recoveryReason = "interrupted";
         return ok(this.#statusView("recovery-required"));
       }
       if (sealedPresent) {
         this.#state = "absent";
         this.#transition("corruption-detected");
+        this.#recoveryReason = "interrupted";
         return ok(this.#statusView("recovery-required"));
       }
       this.#state = "absent";
+      this.#recoveryReason = null;
       return ok(this.#statusView("absent"));
     }
 
     this.#descriptor = descriptor;
     if (descriptor.initializationState === "ready") {
+      // FedOS Installed Startup Root-Cause Arc — a `"ready"` descriptor
+      // alone is NOT proof the profile is actually unlockable: verify the
+      // sealed Master Seed envelope is at least structurally present and
+      // well-formed BEFORE routing to `"locked"`. This is a cheap
+      // existence/parseability check ONLY — `sealedSeedPersistence.read()`
+      // performs no cryptography, accepts no passphrase, and never
+      // attempts a real decrypt (see that port's own header) — so it can
+      // NEVER distinguish a genuine wrong passphrase from a right one. An
+      // ordinary wrong-passphrase retry leaves the sealed file itself
+      // completely untouched and structurally intact, so this check keeps
+      // passing and `status()` keeps reporting `"locked"` exactly as
+      // before (see the real "wrong passphrase" acceptance tests, Phase
+      // F). It exists ONLY to catch the sealed file itself going
+      // missing/corrupt out from under an intact `"ready"` descriptor —
+      // previously undetectable without first attempting (and failing) a
+      // live unlock, and not detectable again on a fresh relaunch at all.
+      // Mirrors `unlockProfile()`'s own `"corrupt"` outcome for the
+      // live-attempt discovery path this now precedes.
+      let sealedStructurallyOk: boolean;
+      try {
+        sealedStructurallyOk = this.#deps.sealedSeedPersistence.read() !== null;
+      } catch {
+        sealedStructurallyOk = false;
+      }
+      if (!sealedStructurallyOk) {
+        this.#state = "absent";
+        this.#transition("corruption-detected");
+        this.#recoveryReason = "corrupt";
+        return ok(this.#statusView("recovery-required"));
+      }
       this.#state = "absent";
       this.#transition("profile-detected-locked");
+      this.#recoveryReason = null;
       return ok(this.#statusView("locked"));
     }
     if (descriptor.initializationState === "recovery-required") {
       this.#state = "absent";
       this.#transition("corruption-detected");
+      this.#recoveryReason = "interrupted";
       return ok(this.#statusView("recovery-required"));
     }
     // "initializing" or "failed" -> an interrupted init. Recovery-required
     // (never a false ready, never a silent overwrite).
     this.#state = "absent";
     this.#transition("corruption-detected");
+    this.#recoveryReason = "interrupted";
     return ok(this.#statusView("recovery-required"));
   }
 
@@ -518,6 +591,17 @@ export class FedosProfileInitializationCoordinator {
     }
     if (detect.value.presence === "recovery-required") {
       unlockSecret.clear();
+      // FedOS Installed Startup Root-Cause Arc — preserve the SAME
+      // distinct "corrupt" outcome this method has always produced for a
+      // ready-but-corrupt-seal profile, even though `detectProfileState()`
+      // (called just above, via `detect`) now ALSO catches this shape
+      // itself before this method ever reaches its own direct sealed-file
+      // read further below. Never a passphrase-dependent judgment -- this
+      // reads `#recoveryReason`, which `detectProfileState()` only ever
+      // sets to `"corrupt"` from its own structural-only check.
+      if (this.#recoveryReason === "corrupt") {
+        return fail("corrupt", "sealed Master Seed material is missing or corrupt");
+      }
       return fail("recovery-required", "profile requires recovery; unlock is not possible");
     }
 
@@ -527,7 +611,10 @@ export class FedosProfileInitializationCoordinator {
       return fail("failed", "profile descriptor unavailable");
     }
 
-    // Read the sealed material (fail-closed on corruption).
+    // Read the sealed material (fail-closed on corruption). Defense in
+    // depth against a TOCTOU race with `detectProfileState()`'s own
+    // structural check above (this method's own real detection path if
+    // that race ever occurs).
     let sealed;
     try {
       sealed = this.#deps.sealedSeedPersistence.read();
@@ -535,12 +622,14 @@ export class FedosProfileInitializationCoordinator {
       unlockSecret.clear();
       this.#transition("begin-unlock");
       this.#transition("corruption-detected");
+      this.#recoveryReason = "corrupt";
       return fail("corrupt", "sealed Master Seed material is corrupt");
     }
     if (sealed === null) {
       unlockSecret.clear();
       this.#transition("begin-unlock");
       this.#transition("corruption-detected");
+      this.#recoveryReason = "corrupt";
       return fail("corrupt", "sealed Master Seed material is missing");
     }
 
@@ -625,6 +714,167 @@ export class FedosProfileInitializationCoordinator {
       this.#transition("lock"); // ready -> stopped
     }
     return ok({ lifecycleState: this.#state });
+  }
+
+  // ------------------------------------------------------------------
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F) -- Flow R: reset
+  // an interrupted, never-ready profile.
+  // ------------------------------------------------------------------
+
+  /**
+   * Narrowly-guarded reset for a profile that was interrupted BEFORE
+   * `"ready"` was ever durably reached — see the frozen decision doc,
+   * `docs/reviews/fedos-peer-device-discovery-current/10_P0_CLOSURE_COORDINATOR_FREEZE.md`
+   * §2 ("First-run Create-Profile interruption recovery").
+   *
+   * (a) Re-reads durable state fresh via `detectProfileState()` — never
+   *     trusts stale in-memory state.
+   * (b) Refuses (typed `"reset-refused"`, a complete no-op — nothing is
+   *     read again or touched) unless BOTH:
+   *       - the freshly-detected lifecycle state is exactly
+   *         `"recovery-required"`, AND
+   *       - the descriptor (if any) does NOT have
+   *         `initializationState === "ready"`.
+   *     The second check is defense in depth: `detectProfileState()`
+   *     itself already routes any descriptor with
+   *     `initializationState === "ready"` to `"locked"`, never
+   *     `"recovery-required"` — so a `"ready"` profile can never reach
+   *     this method's success path by construction. This method never
+   *     relies on that alone; it re-checks explicitly.
+   * (c) On success, deletes ONLY the two files THIS profile's own
+   *     `paths`/persistence ports point at — the sealed Master Seed
+   *     envelope and the profile descriptor — via the narrowly-scoped
+   *     `delete()` methods on `sealedSeedPersistence`/`profilePersistence`
+   *     (added by this same Arc; reachable ONLY from here). Never touches
+   *     any other file, directory, or profile.
+   * (d) Returns the coordinator to `"absent"` so a fresh `createProfile()`
+   *     call runs clean.
+   */
+  async resetInterruptedProfile(): Promise<
+    FedosProfileCoordinatorResult<{ readonly lifecycleState: "absent" }>
+  > {
+    const detect = this.detectProfileState();
+    if (detect.outcome !== "ok") {
+      return fail("failed", "profile detection failed");
+    }
+    if (this.#state !== "recovery-required") {
+      return fail("reset-refused", "reset is only permitted while a profile is recovery-required");
+    }
+    const descriptor = this.#descriptor;
+    if (descriptor !== null && descriptor.initializationState === "ready") {
+      // Unreachable via detectProfileState()'s own routing (see this
+      // method's own header) -- kept as an explicit, never-bypassable
+      // guard, per the frozen spec's own "ready must never be reset"
+      // requirement.
+      return fail("reset-refused", "a profile that reached ready is never reset by this path");
+    }
+
+    const descriptorDelete = this.#deps.profilePersistence.delete();
+    if (descriptorDelete === "failed") {
+      return fail("failed", "could not delete the profile descriptor");
+    }
+    const sealedDelete = this.#deps.sealedSeedPersistence.delete();
+    if (sealedDelete === "failed") {
+      return fail("failed", "could not delete the sealed Master Seed envelope");
+    }
+
+    this.#descriptor = null;
+    this.#recoveryReason = null;
+    this.#transition("reset-interrupted-profile");
+    return ok({ lifecycleState: "absent" });
+  }
+
+  // ------------------------------------------------------------------
+  // FedOS Installed Startup Root-Cause Arc -- Flow R2: reset a profile
+  // whose descriptor DURABLY reached "ready" but whose sealed Master Seed
+  // envelope is verifiably, STRUCTURALLY missing or corrupt.
+  // ------------------------------------------------------------------
+
+  /**
+   * The deliberate SIBLING to `resetInterruptedProfile()` above, not a
+   * relaxation of its guard: that method explicitly, permanently refuses
+   * to touch a `"ready"` descriptor (by design -- a `"ready"` profile that
+   * still unlocks fine must never be reset). This profile's descriptor is
+   * ALSO `"ready"`, but its sealed Master Seed envelope is gone/unreadable
+   * next to it, so a live unlock can NEVER succeed again regardless of
+   * passphrase -- Start Over is the only real recovery available, and it
+   * is offered ONLY after independently re-proving the corruption is
+   * structural, never a wrong passphrase.
+   *
+   * (a) Re-reads durable state fresh via `detectProfileState()` (never
+   *     trusts stale in-memory state) -- this is also what (re-)tags
+   *     `#recoveryReason` as `"corrupt"` when this exact shape is found.
+   * (b) Refuses (`"reset-refused"`, a complete no-op -- nothing is deleted)
+   *     unless ALL of:
+   *       - the freshly-detected lifecycle state is exactly
+   *         `"recovery-required"`;
+   *       - the descriptor exists AND has `initializationState === "ready"`
+   *         -- the OPPOSITE of `resetInterruptedProfile()`'s own guard
+   *         (that method is for everything BEFORE ready; this one is for
+   *         AFTER; a descriptor can never satisfy both guards at once);
+   *       - an INDEPENDENT, fresh, structural-only re-read of the sealed
+   *         seed file (`sealedSeedPersistence.read()` -- no cryptography,
+   *         no passphrase, no decrypt attempt; see that port's own header)
+   *         proves it is genuinely missing or unparseable RIGHT NOW. A
+   *         present, well-formed sealed file -- even one that would fail a
+   *         REAL passphrase-based decrypt -- refuses here unconditionally,
+   *         never trusting `#recoveryReason` alone. This is the hard
+   *         safety boundary that keeps an ordinary wrong-passphrase typo
+   *         from EVER reaching a delete: a wrong passphrase never touches
+   *         the sealed file, so it always reads back structurally fine and
+   *         this guard always refuses for it.
+   * (c) On success, deletes ONLY the two files this profile's own
+   *     `paths`/persistence ports point at -- the SAME narrow `delete()`
+   *     methods `resetInterruptedProfile()` already uses.
+   * (d) Returns the coordinator to `"absent"` so a fresh `createProfile()`
+   *     call runs clean.
+   */
+  async resetCorruptReadyProfile(): Promise<
+    FedosProfileCoordinatorResult<{ readonly lifecycleState: "absent" }>
+  > {
+    const detect = this.detectProfileState();
+    if (detect.outcome !== "ok") {
+      return fail("failed", "profile detection failed");
+    }
+    if (this.#state !== "recovery-required") {
+      return fail("reset-refused", "reset is only permitted while a profile is recovery-required");
+    }
+    const descriptor = this.#descriptor;
+    if (descriptor === null || descriptor.initializationState !== "ready") {
+      return fail(
+        "reset-refused",
+        "this reset path is only for a profile descriptor that already reached ready; use resetInterruptedProfile() for an interrupted create",
+      );
+    }
+    // Independent, fresh, structural-only re-check -- never a decrypt,
+    // never trusts `#recoveryReason` alone. Only a genuinely missing or
+    // unparseable sealed file may proceed past this point.
+    let sealedStructurallyPresent: boolean;
+    try {
+      sealedStructurallyPresent = this.#deps.sealedSeedPersistence.read() !== null;
+    } catch {
+      sealedStructurallyPresent = false;
+    }
+    if (sealedStructurallyPresent) {
+      return fail(
+        "reset-refused",
+        "the sealed Master Seed material is present and structurally well-formed; this is not a corrupt-seal case",
+      );
+    }
+
+    const descriptorDelete = this.#deps.profilePersistence.delete();
+    if (descriptorDelete === "failed") {
+      return fail("failed", "could not delete the profile descriptor");
+    }
+    const sealedDelete = this.#deps.sealedSeedPersistence.delete();
+    if (sealedDelete === "failed") {
+      return fail("failed", "could not delete the sealed Master Seed envelope");
+    }
+
+    this.#descriptor = null;
+    this.#recoveryReason = null;
+    this.#transition("reset-corrupt-ready-profile");
+    return ok({ lifecycleState: "absent" });
   }
 
   /** The running Runtime handle, or `null` if not `ready`. For the Shell/host to reach conversation/device commands after unlock. Never exposes a secret. */
@@ -889,6 +1139,7 @@ export class FedosProfileInitializationCoordinator {
       accountPublicIdentifier: descriptor?.accountPublicIdentity.publicKeyHex ?? null,
       localDeviceId: descriptor?.localDeviceId ?? null,
       runtimeRunning: runtimeRunning && this.#runtime !== null && !this.#stopped,
+      recoveryReason: presence === "recovery-required" ? this.#recoveryReason : null,
     });
   }
 

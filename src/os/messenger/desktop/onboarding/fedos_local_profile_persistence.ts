@@ -24,10 +24,18 @@
  * HARD GUARDRAILS:
  *   - No secret byte ever reaches this port — it moves only the non-secret
  *     descriptor JSON (`encode`/`decode`, `./fedos_local_profile_descriptor.ts`).
- *   - No delete method. A profile is never silently erased by this layer.
+ *   - No GENERAL-PURPOSE delete method. FedOS Peer Device Discovery Arc P0
+ *     Closure (Agent F) adds exactly ONE narrowly-scoped `delete()` — it
+ *     removes only the ONE file this port was itself constructed against,
+ *     nothing else, and is reachable ONLY through
+ *     `FedosProfileInitializationCoordinator#resetInterruptedProfile()`'s
+ *     own guarded reset path (never called directly by a renderer/IPC
+ *     handler, never offered as a standalone "delete my profile" command).
+ *     A profile is still never silently erased — see that method's own
+ *     header for the guard and the required user confirmation step.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import {
   decodeFedosLocalProfileDescriptorV1,
@@ -38,6 +46,8 @@ import {
 
 export type FedosLocalProfileWriteResult = "written" | "already-exists" | "failed";
 export type FedosLocalProfileUpdateResult = "updated" | "not-found" | "failed";
+/** FedOS Peer Device Discovery Arc P0 Closure (Agent F) — `"deleted"` whether or not a descriptor existed (idempotent), `"failed"` only on a real filesystem error. */
+export type FedosLocalProfileDeleteResult = "deleted" | "failed";
 
 /** Thrown by `read()` when a descriptor file exists but is not a well-formed descriptor — fail closed (Phase B corruption rule). */
 export class FedosLocalProfileCorruptError extends Error {
@@ -54,6 +64,8 @@ export interface FedosLocalProfilePersistence {
   writeIfAbsent(descriptor: FedosLocalProfileDescriptorV1): FedosLocalProfileWriteResult;
   /** Replaces an EXISTING descriptor (state advancement only). `"not-found"` if nothing was ever written. Never creates a new profile. */
   update(descriptor: FedosLocalProfileDescriptorV1): FedosLocalProfileUpdateResult;
+  /** FedOS Peer Device Discovery Arc P0 Closure (Agent F) — deletes ONLY this port's own single descriptor. See this file's own header for the narrow reachability guarantee. Idempotent; never throws. */
+  delete(): FedosLocalProfileDeleteResult;
 }
 
 /** In-memory backend — for tests and the transient first-run detection path. Holds one canonical encoded string; decodes on read so corruption semantics match the file backend exactly. */
@@ -94,6 +106,12 @@ export class InMemoryFedosLocalProfilePersistence implements FedosLocalProfilePe
   plantCorruptForTest(raw: string): void {
     this.#corruptRaw = raw;
     this.#encoded = null;
+  }
+
+  delete(): FedosLocalProfileDeleteResult {
+    this.#encoded = null;
+    this.#corruptRaw = null;
+    return "deleted";
   }
 }
 
@@ -136,6 +154,18 @@ export class FileFedosLocalProfilePersistence implements FedosLocalProfilePersis
       return "failed";
     }
     return "updated";
+  }
+
+  /** FedOS Peer Device Discovery Arc P0 Closure (Agent F) — deletes ONLY `this.#filePath` (the ONE file this instance was constructed against). Idempotent: a missing file is `"deleted"`, not `"failed"`. */
+  delete(): FedosLocalProfileDeleteResult {
+    try {
+      if (existsSync(this.#filePath)) {
+        unlinkSync(this.#filePath);
+      }
+      return "deleted";
+    } catch {
+      return "failed";
+    }
   }
 }
 

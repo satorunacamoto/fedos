@@ -103,6 +103,29 @@ function legacy(reason: FedosForwardSecrecyUnavailableReason): FedosDirectConver
  * one DISTINCT remote Device, fail closed with `"ambiguous-remote-device"`
  * rather than guess — picking arbitrarily is how a message ends up encrypted
  * to the wrong peer's Device.
+ *
+ * Bounded truthfulness hardening (Direct Ratchet identity-space audit) — a
+ * candidate session record's own `lifecycleState` (`fedos_direct_ratchet_session_lifecycle.js`)
+ * MUST be `"active"` to count. Before this check, a `"revoked"`/
+ * `"reset-required"`/`"expired"`/`"corrupt"` session record still passed
+ * `resolveFedosDirectRatchetRoute()`'s own `sessionPersistence.listSessions()`-
+ * derived candidate set here unfiltered by lifecycle state at all (only the
+ * separate live Device-Registry binding trust was checked below) — a real,
+ * if currently DORMANT (see this file's own header: `ratchetConfigured` is
+ * `false` on every ordinary packaged launch, which already short-circuits
+ * above), gap where a session this Runtime would refuse to actually use for
+ * sending (`FedosDirectRatchetStateRuntime.readiness()`/`updateCounters()`
+ * both require exactly `"active"`) could still be reported here as
+ * `route: "ratchet"` / `forwardSecrecy: true`. This filter cannot make this
+ * function report `"ratchet"` in any case it did not already; it can only
+ * ever narrow an existing `"ratchet"` answer to the honest `"legacy"` one.
+ * Still NOT a full guarantee the Ratchet route will actually succeed — only
+ * the LIVE cryptographic session (`FedosDirectRatchetCryptographicSession.isReadyToSend()`,
+ * checked separately, at send time, inside `FedosDirectRatchetOutboundIntegration.sendMessage()`)
+ * knows that; this module has no access to that live, in-memory state and
+ * intentionally does not gain any here (out of this fix's own bounded,
+ * non-architectural scope) — see this file's own "WHAT THIS MODULE DOES
+ * NOT DO" header section.
  */
 export function selectFedosDirectConversationForwardSecrecyRoute(
   request: FedosDirectConversationForwardSecrecyRouteRequest,
@@ -115,6 +138,7 @@ export function selectFedosDirectConversationForwardSecrecyRoute(
     if (b.conversationId !== request.conversationId) continue;
     if (!accountRefsEqual(b.localAccountRef, request.localAccountRef)) continue;
     if (b.localDeviceRef !== request.localDeviceRef) continue;
+    if (record.lifecycleState !== "active") continue;
     candidates.push(record);
   }
   if (candidates.length === 0) return legacy("no-session-for-conversation");

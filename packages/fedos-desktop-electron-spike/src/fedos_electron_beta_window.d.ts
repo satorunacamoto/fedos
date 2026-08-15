@@ -14,6 +14,18 @@ interface FedosProfileStatusResult {
   readonly accountPublicIdentifier: string | null;
   readonly localDeviceId: string | null;
   readonly runtimeRunning: boolean;
+  /**
+   * FedOS Installed Startup Root-Cause Arc — WHY `presence === "recovery-required"`
+   * was reached, when it is: `"interrupted"` (no descriptor ever durably
+   * reached `"ready"` — `resetInterrupted` is the correct recovery action)
+   * vs `"corrupt"` (the descriptor DID reach `"ready"`, but the sealed
+   * Master Seed material next to it is structurally missing/corrupt —
+   * `resetCorruptReady` is the correct recovery action; `resetInterrupted`
+   * will always refuse this shape). `null` otherwise. Mirrors
+   * `FedosProfileInitializationCoordinator`'s own
+   * `FedosProfileRecoveryReason` (root `src/`).
+   */
+  readonly recoveryReason: string | null;
 }
 
 interface FedosProfileCommandResult {
@@ -33,6 +45,40 @@ interface FedosProfileBridge {
   readonly unlock: (passphrase: string) => Promise<FedosProfileCommandResult>;
   readonly lock: () => Promise<FedosProfileCommandResult>;
   readonly quit: () => Promise<{ readonly ok: boolean }>;
+  /**
+   * FedOS Peer Device Discovery Arc P0 Closure (Agent F) — "Start Over" on
+   * the recovery screen. Erases ONLY an interrupted, never-`ready` local
+   * profile; the main-process Coordinator's own `resetInterruptedProfile()`
+   * guard is the sole authority on whether this succeeds
+   * (`{outcome:"reset-refused",...}` otherwise). See that method's own
+   * header, root `src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.ts`.
+   *
+   * OPTIONAL on this shared global `FedosProfileBridge` interface (this
+   * file's own header notes the interface is declaration-merged with
+   * `fedos_electron_unlock_window.d.ts`'s identical-shape interface, both
+   * pulled into the same TS program by `tsconfig.browser-scripts.json`) —
+   * `fedos_electron_beta_preload.cts` always provides it;
+   * `fedos_electron_unlock_preload.cts` (a separate, older entry point,
+   * out of this Arc's scope) does not, so this stays optional rather than
+   * forcing an unrelated package to grow a matching handler it has no
+   * recovery-screen caller for.
+   */
+  readonly resetInterrupted?: () => Promise<FedosProfileCommandResult>;
+  /**
+   * FedOS Installed Startup Root-Cause Arc — the SIBLING "Start Over" on
+   * the recovery screen, for the OPPOSITE shape from `resetInterrupted`
+   * above: erases ONLY a profile whose descriptor DID durably reach
+   * `"ready"` but whose sealed Master Seed material is verifiably,
+   * structurally missing/corrupt (never a passphrase-dependent judgment).
+   * The main-process Coordinator's own `resetCorruptReadyProfile()` guard
+   * is the sole authority on whether this succeeds
+   * (`{outcome:"reset-refused",...}` otherwise — including, always, for a
+   * profile whose sealed material is actually present and well-formed).
+   * See that method's own header, root
+   * `src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.ts`.
+   * OPTIONAL for the same reason `resetInterrupted` is above.
+   */
+  readonly resetCorruptReady?: () => Promise<FedosProfileCommandResult>;
 }
 
 /** The Phase H Beta Home status surface — real, non-secret facts only (see `fedos_desktop_beta_*` value objects, `src/desktop/beta/`). */

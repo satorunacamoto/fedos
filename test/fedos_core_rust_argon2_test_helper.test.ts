@@ -227,14 +227,15 @@ describe("FedOS Rust crate — test-only Argon2id helper", () => {
     expect(runtimeSource).not.toMatch(/\.\s*load\s*\(/);
   });
 
-  it("9. no .wasm / target / Cargo.lock artifact is committed to the package", () => {
+  it("9. no .wasm / target artifact is committed to the package (Cargo.lock is deliberately tracked -- see docs/secure_runtime_p0_closure_cargo_lock_policy_supersession.md)", () => {
     const paths = fedosCoreRustGitTrackedPaths();
+    expect(
+      paths.some((path) => path.endsWith("/Cargo.lock")),
+      "Cargo.lock must be a tracked file for packages/fedos-core-rust (deliberate policy reversal, see docs/secure_runtime_p0_closure_cargo_lock_policy_supersession.md)",
+    ).toBe(true);
     for (const path of paths) {
       expect(/\.wasm$/i.test(path), `unexpected WASM binary: ${path}`).toBe(false);
       expect(/\/(target|build)\//i.test(path), `unexpected build dir artifact: ${path}`).toBe(
-        false,
-      );
-      expect(/\/Cargo\.lock$/i.test(path), `unexpected committed Cargo.lock: ${path}`).toBe(
         false,
       );
       expect(

@@ -583,6 +583,8 @@ interface StatusView {
   readonly accountPublicIdentifier: string | null;
   readonly localDeviceId: string | null;
   readonly runtimeRunning: boolean;
+  /** FedOS Installed Startup Root-Cause Arc — see `FedosProfileRecoveryReason`'s own doc comment (root `src/`). Always `null` unless `presence === "recovery-required"`. */
+  readonly recoveryReason: string | null;
 }
 type CoordResult<T> = { readonly outcome: "ok"; readonly value: T } | { readonly outcome: string; readonly reason: string };
 /**
@@ -613,6 +615,10 @@ interface CoordinatorLike {
   lock(): Promise<CoordResult<{ readonly lifecycleState: string }>>;
   status(): StatusView;
   runningRuntime(): RunningRuntimeLike | null;
+  /** FedOS Peer Device Discovery Arc P0 Closure (Agent F) — see `FedosProfileInitializationCoordinator#resetInterruptedProfile()`'s own header (root `src/`) for the full guard/contract. */
+  resetInterruptedProfile(): Promise<CoordResult<{ readonly lifecycleState: string }>>;
+  /** FedOS Installed Startup Root-Cause Arc — see `FedosProfileInitializationCoordinator#resetCorruptReadyProfile()`'s own header (root `src/`) for the full guard/contract. */
+  resetCorruptReadyProfile(): Promise<CoordResult<{ readonly lifecycleState: string }>>;
 }
 interface MasterSeedAuthorityLike {
   clear(): Promise<void>;
@@ -5242,7 +5248,7 @@ async function handleStatus(): Promise<StatusView> {
 }
 
 function absentStatus(): StatusView {
-  return { lifecycleState: "absent", presence: "absent", displayLabel: null, accountPublicIdentifier: null, localDeviceId: null, runtimeRunning: false };
+  return { lifecycleState: "absent", presence: "absent", displayLabel: null, accountPublicIdentifier: null, localDeviceId: null, runtimeRunning: false, recoveryReason: null };
 }
 
 function sanitizeStatus(view: StatusView): StatusView {
@@ -5253,6 +5259,7 @@ function sanitizeStatus(view: StatusView): StatusView {
     accountPublicIdentifier: view.accountPublicIdentifier,
     localDeviceId: view.localDeviceId,
     runtimeRunning: view.runtimeRunning,
+    recoveryReason: view.recoveryReason ?? null,
   };
 }
 
@@ -5405,6 +5412,78 @@ async function handleLock() {
     }
     refreshTrayMenu();
     return { outcome: "ok" };
+  } finally {
+    // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
+  }
+}
+
+/**
+ * FedOS Peer Device Discovery Arc P0 Closure (Agent F) — "Start Over" on
+ * the recovery screen. Refuses (`{outcome:"reset-refused",...}`) whenever a
+ * profile is currently unlocked (`activeCoordinator !== null` — there is
+ * nothing to reset while genuinely `ready`; this mirrors `handleCreate()`/
+ * `handleUnlock()`'s own identical guard). Otherwise builds a fresh,
+ * throwaway Coordinator (the SAME real activation `handleStatus()` already
+ * uses for a pre-unlock read) purely to call its own guarded
+ * `resetInterruptedProfile()` — that method is itself the sole authority on
+ * whether the reset is safe (never trusted to this handler). No assembly
+ * is ever started here, so `activeCoordinator`/`activeAssembly` are never
+ * touched and no generation bump is needed.
+ */
+async function handleResetInterruptedProfile() {
+  // The "profile-lifecycle" group guard on this channel's registerHandle()
+  // registration already serializes create/unlock/lock/reset against each
+  // other -- see fedos_electron_ipc_command_registry.ts.
+  if (activeCoordinator !== null) return { outcome: "reset-refused", reason: "a profile is currently unlocked" };
+  try {
+    const built = await buildFreshCoordinator();
+    if (built === null) {
+      return { outcome: "seed-unavailable", reason: "production crypto unavailable" };
+    }
+    try {
+      built.coordinator.detectProfileState();
+      const result = await built.coordinator.resetInterruptedProfile();
+      if (result.outcome === "ok") return { outcome: "ok" };
+      return { outcome: result.outcome, reason: "reset did not complete" };
+    } finally {
+      await built.masterSeedAuthority.clear();
+    }
+  } finally {
+    // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
+  }
+}
+
+/**
+ * FedOS Installed Startup Root-Cause Arc — the SIBLING "Start Over" on the
+ * recovery screen, for the OPPOSITE shape from `handleResetInterruptedProfile()`
+ * above: a descriptor that DID durably reach `"ready"`, but whose sealed
+ * Master Seed envelope is verifiably, structurally missing/corrupt (never
+ * reachable by an ordinary wrong-passphrase retry — see
+ * `FedosProfileInitializationCoordinator#resetCorruptReadyProfile()`'s own
+ * header, root `src/`, for the full guard). Mirrors
+ * `handleResetInterruptedProfile()`'s own structure exactly: refuses while
+ * a profile is currently unlocked, builds a fresh throwaway Coordinator
+ * purely to call its own guarded reset method (the sole authority on
+ * safety), and never touches `activeCoordinator`/`activeAssembly`.
+ */
+async function handleResetCorruptReadyProfile() {
+  // The "profile-lifecycle" group guard on this channel's registerHandle()
+  // registration already serializes create/unlock/lock/reset against each
+  // other -- see fedos_electron_ipc_command_registry.ts.
+  if (activeCoordinator !== null) return { outcome: "reset-refused", reason: "a profile is currently unlocked" };
+  try {
+    const built = await buildFreshCoordinator();
+    if (built === null) {
+      return { outcome: "seed-unavailable", reason: "production crypto unavailable" };
+    }
+    try {
+      built.coordinator.detectProfileState();
+      const result = await built.coordinator.resetCorruptReadyProfile();
+      if (result.outcome === "ok") return { outcome: "ok" };
+      return { outcome: result.outcome, reason: "reset did not complete" };
+    } finally {
+      await built.masterSeedAuthority.clear();
+    }
   } finally {
     // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
   }
@@ -8352,6 +8431,18 @@ function registerIpcHandlers(): void {
   ipcCommands.registerHandle(ipcMain, "fedos-profile:create", (payload: unknown) => handleCreate(payload), { group: "profile-lifecycle", bumpsOwnGeneration: true });
   ipcCommands.registerHandle(ipcMain, "fedos-profile:unlock", (payload: unknown) => handleUnlock(payload), { group: "profile-lifecycle", bumpsOwnGeneration: true });
   ipcCommands.registerHandle(ipcMain, "fedos-profile:lock", async () => handleLock(), { group: "profile-lifecycle", bumpsOwnGeneration: true });
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F) -- "Start Over" on
+  // the recovery screen. Same "profile-lifecycle" serialization group as
+  // create/unlock/lock; no `bumpsOwnGeneration` since this handler never
+  // touches `activeCoordinator`/`activeAssembly` (see `handleResetInterruptedProfile()`'s
+  // own header).
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:reset-interrupted", async () => handleResetInterruptedProfile(), { group: "profile-lifecycle" });
+  // FedOS Installed Startup Root-Cause Arc -- the SIBLING "Start Over" for
+  // a "ready" descriptor with a structurally corrupt/missing sealed seed.
+  // Same "profile-lifecycle" serialization group, same no-`bumpsOwnGeneration`
+  // reasoning as `fedos-profile:reset-interrupted` above (see
+  // `handleResetCorruptReadyProfile()`'s own header).
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:reset-corrupt-ready", async () => handleResetCorruptReadyProfile(), { group: "profile-lifecycle" });
   ipcMain.handle("fedos-profile:quit", async () => {
     void performCleanShutdown();
     return { ok: true };

@@ -1,9 +1,12 @@
-# Rust build artifacts — never committed (Stage 69 ships the crate SKELETON only:
-# no compiled output, no lockfile, no WASM). A real build/lockfile/manifest lands
-# only in a future, explicitly-reviewed stage.
+# Rust build artifacts — never committed. `Cargo.lock` is the one exception:
+# this crate now ships real, embedded, cryptographic WASM in every release
+# artifact, and "document a pin instead of tracking it" (see
+# docs/secure_runtime_alpha_8121_8200_cargo_lock_policy_decision.md,
+# superseded by docs/secure_runtime_p0_closure_cargo_lock_policy_supersession.md)
+# already measurably drifted once. `Cargo.lock` is tracked in version control
+# — see the supersession doc above; do not re-add it here.
 /target/
 /build/
-Cargo.lock
 *.wasm
 *.rlib
 

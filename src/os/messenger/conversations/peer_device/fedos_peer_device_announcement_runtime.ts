@@ -24,6 +24,7 @@ import { FedosPeerDeviceAnnouncementInboundCoordinator, type FedosPeerDeviceAnno
 import type { FedosPeerDeviceAnnouncementObservationPersistence } from "./persistence/fedos_peer_device_announcement_observation_persistence.js";
 import type { FedosPeerDeviceAnnouncementObservationV1 } from "./fedos_peer_device_announcement_observation.js";
 import { isFedosPeerDeviceAnnouncementAccepted } from "./fedos_peer_device_announcement_acceptance_outcome.js";
+import { readOrCreateFedosLocalPeerDeviceAnnouncementIdentity, recordFedosLocalPeerDeviceAnnouncementEpochSent } from "./fedos_local_peer_device_announcement_identity.js";
 
 export interface FedosPeerDeviceAnnouncementRuntimeDependencies {
   readonly deviceRegistry: FedosDeviceRegistryPersistence;
@@ -33,6 +34,8 @@ export interface FedosPeerDeviceAnnouncementRuntimeDependencies {
   readonly localDeviceRef: string;
   readonly localAnnouncedDeviceId: string;
   readonly localAnnouncedDevicePublicKeyHex: string;
+  /** Peer-Device UX entry point closure (`10_P0_CLOSURE_COORDINATOR_FREEZE.md` §4) — see this interface's own re-export site (`FedosConversationPeerDeviceAnnouncementIntegrationDependencies.localIdentityFilePath`) for the full rationale. */
+  readonly localIdentityFilePath: string;
   readonly clock: () => number;
   readonly sendMailboxNip17Control: (controlId: string, conversationId: FedosConversationId, plaintext: Uint8Array, createdAt: number) => Promise<FedosPeerDeviceAnnouncementSendResult | { readonly outcome: string }>;
   readonly observationPersistence: FedosPeerDeviceAnnouncementObservationPersistence;
@@ -70,6 +73,20 @@ export class FedosPeerDeviceAnnouncementRuntime {
     this.#outbound.stop();
   }
 
+  /**
+   * Peer-Device UX entry point closure (`10_P0_CLOSURE_COORDINATOR_FREEZE.md`
+   * §4) — `params.epoch` is accepted for call-shape compatibility with
+   * every existing caller (`FedosDesktopApplicationShell.peerDeviceAnnounce()`,
+   * the packaged-binary acceptance-command driver) but is NOT used: the
+   * actual epoch sent is always this local device's own authoritative,
+   * durably-persisted `nextEpoch` (`readOrCreateFedosLocalPeerDeviceAnnouncementIdentity()`),
+   * so it is correct regardless of what any caller supplies — never
+   * wall-clock, never shared/derived, and strictly monotonic even across a
+   * repeated call using a stale/default value. On a `"published"` outcome
+   * (the announcement was actually sent), `nextEpoch` is advanced and
+   * persisted before returning; any other outcome leaves it untouched so a
+   * genuinely failed/unsent attempt never burns an epoch.
+   */
   async announceLocalDevice(params: {
     readonly recipientAccountRef: FedosDeviceBindingAccountRef;
     readonly conversationId: FedosConversationId;
@@ -77,7 +94,13 @@ export class FedosPeerDeviceAnnouncementRuntime {
     readonly supersedesAnnouncementId?: string;
     readonly deviceSigningKeypair?: FedosDeviceSigningKeypair;
   }): Promise<FedosPeerDeviceAnnouncementOutboundOutcome> {
-    return this.#outbound.announceLocalDevice(params);
+    const identity = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(this.#deps.localIdentityFilePath);
+    const epoch = identity.nextEpoch;
+    const outcome = await this.#outbound.announceLocalDevice({ ...params, epoch });
+    if (outcome.outcome === "published") {
+      recordFedosLocalPeerDeviceAnnouncementEpochSent(this.#deps.localIdentityFilePath, epoch);
+    }
+    return outcome;
   }
 
   /** `content` is the already-unwrapped Rumor's own `content: string` — the ONE inbound dispatch point. */

@@ -21,6 +21,17 @@
  * consistent identity to every peer it announces itself to — see
  * `fedos_peer_device_announcement_nonce.ts`'s own header on why stability
  * matters.
+ *
+ * `nextEpoch` (added by the Peer-Device UX entry point closure,
+ * `docs/reviews/fedos-peer-device-discovery-current/10_P0_CLOSURE_COORDINATOR_FREEZE.md`
+ * §4) is this local device's own strictly-monotonic, never-wall-clock
+ * announcement epoch counter — `0` on first creation, advanced to
+ * `sentEpoch + 1` via `recordFedosLocalPeerDeviceAnnouncementEpochSent()`
+ * each time an announcement is actually sent. This bumps `schemaVersion`
+ * to `2`: an old `schemaVersion: 1` file fails closed exactly like any
+ * other schema-invalid file (see this module's own header above) rather
+ * than being silently migrated, mirroring this file's own
+ * never-silently-regenerate discipline.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -28,21 +39,28 @@ import { generateFedosDeviceSigningKeypair } from "../../device/crypto/fedos_dev
 import { generateFedosPeerDeviceAnnouncementDeviceId, isWellFormedFedosPeerDeviceAnnouncementDeviceId } from "./fedos_peer_device_announcement_nonce.js";
 
 export interface FedosLocalPeerDeviceAnnouncementIdentityV1 {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly deviceId: string;
   readonly devicePublicKeyHex: string;
+  /** Strictly-monotonic, local-only, never-wall-clock announcement epoch counter — the next epoch this local device will use the next time it actually sends an announcement. */
+  readonly nextEpoch: number;
 }
 
 const DEVICE_PUBLIC_KEY_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+function isWellFormedNextEpoch(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
 
 function isWellFormed(candidate: unknown): candidate is FedosLocalPeerDeviceAnnouncementIdentityV1 {
   if (typeof candidate !== "object" || candidate === null) return false;
   const r = candidate as Record<string, unknown>;
   const keys = Object.keys(r);
-  if (keys.length !== 3 || !keys.includes("schemaVersion") || !keys.includes("deviceId") || !keys.includes("devicePublicKeyHex")) return false;
-  if (r.schemaVersion !== 1) return false;
+  if (keys.length !== 4 || !keys.includes("schemaVersion") || !keys.includes("deviceId") || !keys.includes("devicePublicKeyHex") || !keys.includes("nextEpoch")) return false;
+  if (r.schemaVersion !== 2) return false;
   if (!isWellFormedFedosPeerDeviceAnnouncementDeviceId(r.deviceId)) return false;
-  return typeof r.devicePublicKeyHex === "string" && DEVICE_PUBLIC_KEY_HEX_PATTERN.test(r.devicePublicKeyHex);
+  if (typeof r.devicePublicKeyHex !== "string" || !DEVICE_PUBLIC_KEY_HEX_PATTERN.test(r.devicePublicKeyHex)) return false;
+  return isWellFormedNextEpoch(r.nextEpoch);
 }
 
 function isEnoent(err: unknown): boolean {
@@ -82,11 +100,52 @@ export function readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(filePath: s
 
   const keypair = generateFedosDeviceSigningKeypair();
   const identity: FedosLocalPeerDeviceAnnouncementIdentityV1 = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     deviceId: generateFedosPeerDeviceAnnouncementDeviceId(),
     devicePublicKeyHex: keypair.publicKeyHex,
+    nextEpoch: 0,
   };
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, JSON.stringify(identity), "utf8");
   return identity;
+}
+
+/**
+ * Called once an announcement carrying `sentEpoch` has actually been sent
+ * (never merely attempted/queued-and-abandoned) — persists `sentEpoch + 1`
+ * back as the new `nextEpoch`, durably across restarts. Reads-then-writes
+ * the SAME file `readOrCreateFedosLocalPeerDeviceAnnouncementIdentity()`
+ * manages, preserving `deviceId`/`devicePublicKeyHex` unchanged — never a
+ * second, divergent identity write path. Takes `Math.max()` against
+ * whatever `nextEpoch` is already on disk rather than blindly overwriting,
+ * so this is safe to call even if `sentEpoch` is stale relative to a
+ * concurrent/later advance — it can only ever move `nextEpoch` forward,
+ * never backward (this file's own monotonic-only contract).
+ *
+ * Throws (fail-closed, same discipline as
+ * `readOrCreateFedosLocalPeerDeviceAnnouncementIdentity()`) if the file is
+ * missing or schema-invalid at this point — a real send can only have
+ * happened after a successful `readOrCreate...()` call already established
+ * a well-formed file, so a missing/corrupt file here indicates a genuine
+ * inconsistency, never a case to silently paper over.
+ */
+export function recordFedosLocalPeerDeviceAnnouncementEpochSent(filePath: string, sentEpoch: number): FedosLocalPeerDeviceAnnouncementIdentityV1 {
+  let existingRaw: string;
+  try {
+    existingRaw = readFileSync(filePath, "utf8");
+  } catch (err) {
+    throw new Error(`recordFedosLocalPeerDeviceAnnouncementEpochSent: no existing identity file at ${filePath} (expected readOrCreateFedosLocalPeerDeviceAnnouncementIdentity() to have already run). ${isEnoent(err) ? "" : String(err)}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(existingRaw);
+  } catch {
+    throw new Error(`recordFedosLocalPeerDeviceAnnouncementEpochSent: corrupt (invalid JSON) identity file at ${filePath}.`);
+  }
+  if (!isWellFormed(parsed)) {
+    throw new Error(`recordFedosLocalPeerDeviceAnnouncementEpochSent: schema-invalid identity file at ${filePath}.`);
+  }
+  const updated: FedosLocalPeerDeviceAnnouncementIdentityV1 = { ...parsed, nextEpoch: Math.max(parsed.nextEpoch, sentEpoch + 1) };
+  writeFileSync(filePath, JSON.stringify(updated), "utf8");
+  return updated;
 }

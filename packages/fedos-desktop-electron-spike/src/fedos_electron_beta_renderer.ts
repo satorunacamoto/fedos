@@ -689,6 +689,22 @@ let currentConversationId: string | null = null;
 let conversationsCache: readonly { readonly conversationId: string; readonly [key: string]: unknown }[] = [];
 let currentIdentityTransitionSelection: { readonly peerAccountRef: unknown; readonly peerDeviceRef: string; readonly transitionId: string } | null = null;
 let currentDeletionRequestId: string | null = null;
+/**
+ * FedOS Peer Device Discovery Arc -- Peer-Device UX entry point closure
+ * (`10_P0_CLOSURE_COORDINATOR_FREEZE.md` §4). A real, honest, never-
+ * wall-clock, strictly-incrementing counter for this call site's own
+ * `epoch` argument -- session-scoped (resets on relaunch like every other
+ * state in this block), mirroring the SAME "local monotonic, never wall-
+ * clock" contract as the durable identity file's own `nextEpoch`
+ * (`fedos_local_peer_device_announcement_identity.ts`). The ACTUAL epoch
+ * a real announcement is signed and sent with is always sourced
+ * authoritatively from that durable file inside the Runtime
+ * (`FedosPeerDeviceAnnouncementRuntime.announceLocalDevice()`), which
+ * stays correct across restarts regardless of this renderer-local value --
+ * this counter only needs to be real and non-wall-clock at THIS call site,
+ * never the sole source of truth.
+ */
+let peerDeviceAnnouncementLocalEpochCounter = 0;
 
 /**
  * Real Digital Delivery mega-arc (Agent U) -- Signed Deletion SENDER-side
@@ -1157,6 +1173,26 @@ async function openConversation(conversationId: string): Promise<void> {
   await window.fedosApp.conversationActivate(conversationId);
   await loadChatMessages();
   await refreshChatSecurityState(conversationId, counterpartyAccountRef);
+  // FedOS Peer Device Discovery Arc -- Peer-Device UX entry point closure
+  // (10_P0_CLOSURE_COORDINATOR_FREEZE.md §4): the FIRST real call site for
+  // this already-fully-wired `window.fedosApp.peerDeviceAnnounce()` IPC
+  // method. Reuses the SAME already-resolved `conversationId`/
+  // `counterpartyAccountRef` this function just used for
+  // `refreshChatSecurityState()` above -- never a second resolution path.
+  // Fires exactly once per `openConversation()` call (never on every
+  // render) -- a stale/duplicate re-announce at the same epoch is already
+  // handled safely by the receiving side's own acceptance policy (rejected
+  // as stale), so a best-effort failure here is bounded and safe; it must
+  // never block the chat screen from opening.
+  if (counterpartyAccountRef !== null) {
+    const epoch = peerDeviceAnnouncementLocalEpochCounter;
+    peerDeviceAnnouncementLocalEpochCounter += 1;
+    try {
+      await window.fedosApp.peerDeviceAnnounce(counterpartyAccountRef, conversationId, epoch);
+    } catch {
+      /* best-effort -- never blocks the chat screen; a genuine failure to send is safely retried on the next conversation-open */
+    }
+  }
   startChatPolling();
 }
 
@@ -4645,7 +4681,16 @@ function routeByStatus(status: FedosProfileStatusResult): void {
     return;
   }
   if (status.presence === "recovery-required") {
-    renderRecoveryScreen("recovery-required");
+    // FedOS Installed Startup Root-Cause Arc -- reachable on a FRESH
+    // LAUNCH now too (not only after a failed live unlock attempt): a
+    // "ready" descriptor with a structurally corrupt/missing sealed seed
+    // is detected by the main process's own `detectProfileState()` before
+    // this screen is ever shown, and carries `recoveryReason === "corrupt"`
+    // straight through here so the SAME honest "corrupt" diagnostic +
+    // Start Over action `onUnlockSubmit()` already uses for a live-attempt
+    // discovery is shown either way -- never the generic
+    // "recovery-required" copy/action for this shape.
+    renderRecoveryScreen(status.recoveryReason === "corrupt" ? "corrupt" : "recovery-required");
     return;
   }
   byId("unlock-label").textContent = status.displayLabel ?? "(existing profile)";
@@ -4729,7 +4774,16 @@ async function onUnlockSubmit(): Promise<void> {
 
   if (result.outcome === "ok") {
     renderReady(result.ready);
-  } else if (result.outcome === "recovery-required") {
+  } else if (result.outcome === "recovery-required" || result.outcome === "corrupt") {
+    // Secure Runtime Alpha (Installed Startup Root-Cause Arc) -- `"corrupt"`
+    // is a DISTINCT outcome from an ordinary wrong passphrase (see
+    // `FedosProfileInitializationCoordinator#unlockProfile()`'s own header,
+    // root `src/`): the sealed Master Seed material itself is
+    // structurally missing/corrupt, so no passphrase will ever unlock it
+    // again. Routing it here (not the generic wrong-passphrase branch
+    // below) shows the honest "corrupt" diagnostic/copy and the real
+    // corrupt-profile Start Over action instead of a dead-end "the
+    // passphrase did not match" message.
     renderRecoveryScreen(coarseErrorCode(result));
   } else {
     byId("unlock-failed-reason").textContent = "The profile remains locked.";
@@ -4772,6 +4826,16 @@ const RECOVERY_EXPLANATIONS: Readonly<Record<string, string>> = {
 function renderRecoveryScreen(outcomeCode: string): void {
   byId("recovery-reason").textContent = outcomeCode;
   byId("recovery-explain").textContent = RECOVERY_EXPLANATIONS[outcomeCode] ?? "This profile could not be unlocked. You can retry, copy the diagnostic code for support, or quit.";
+  // FedOS Installed Startup Root-Cause Arc -- `"corrupt"` (a "ready"
+  // descriptor with a structurally corrupt/missing sealed seed) is a
+  // DIFFERENT shape from every other recovery-required diagnostic code
+  // (an interrupted, never-finished setup): the OLD "Start Over" action
+  // (`resetInterrupted`) is guaranteed to refuse it, so it must never be
+  // offered here -- the NEW corrupt-profile action block is shown
+  // instead, with copy honest about data loss rather than a typo.
+  const isCorruptReadySeal = outcomeCode === "corrupt";
+  byId("recovery-actions").hidden = isCorruptReadySeal;
+  byId("recovery-actions-corrupt").hidden = !isCorruptReadySeal;
   showScreen("recovery");
 }
 
@@ -4786,6 +4850,86 @@ async function onRecoveryCopyDiagnostic(): Promise<void> {
     byId("recovery-copy-feedback").textContent = "Copied.";
   } catch {
     byId("recovery-copy-feedback").textContent = "Could not copy automatically — the code is shown above.";
+  }
+}
+
+/**
+ * FedOS Peer Device Discovery Arc P0 Closure (Agent F) — "Start Over" on
+ * the recovery screen. Requires an explicit confirmation step first
+ * (irreversible for the interrupted attempt, though by construction it
+ * never held recoverable user data — a profile that ever reached "ready"
+ * is refused automatically by the main-process Coordinator's own guard,
+ * never by this renderer's own judgment). On success, re-derives the
+ * screen from a fresh status read (the same `refreshFromStatus()` every
+ * other lifecycle transition in this file already uses) rather than
+ * assuming "absent" — honest even if the underlying state ever surprises
+ * this renderer.
+ */
+async function onRecoveryStartOver(): Promise<void> {
+  const resetInterrupted = window.fedosProfile.resetInterrupted;
+  if (resetInterrupted === undefined) {
+    byId("recovery-start-over-feedback").textContent = "Start Over is not available in this build.";
+    return;
+  }
+  const confirmed = await confirmInPage(
+    "Start over?",
+    "This permanently erases the interrupted local profile data on this device. It never finished being set up, so it never held recoverable messages. This cannot be undone. If this profile ever finished setup, Start Over is refused automatically and nothing is changed.",
+    "Yes, start over",
+  );
+  if (!confirmed) return;
+  byId("recovery-start-over-feedback").textContent = "";
+  setBusy(true, "recovery-start-over-btn");
+  let result: FedosProfileCommandResult;
+  try {
+    result = await resetInterrupted();
+  } finally {
+    setBusy(false, "recovery-start-over-btn");
+  }
+  if (result.outcome === "ok") {
+    clearAllRendererContentState();
+    await refreshFromStatus();
+  } else {
+    byId("recovery-start-over-feedback").textContent = `Could not start over (${coarseErrorCode(result)}). The profile was not changed.`;
+  }
+}
+
+/**
+ * FedOS Installed Startup Root-Cause Arc — the SIBLING "Start Over" for the
+ * OPPOSITE shape from `onRecoveryStartOver()` above: a profile whose
+ * descriptor DID finish setup (`"ready"`), but whose locally stored key
+ * material is verifiably, structurally missing/corrupt — never a
+ * passphrase-dependent judgment, and never reachable by an ordinary
+ * wrong-passphrase retry (see `FedosProfileInitializationCoordinator#resetCorruptReadyProfile()`'s
+ * own header, root `src/`). The confirmation copy is honest about data
+ * loss, not a typo — this profile can never be unlocked again regardless
+ * of passphrase. On success, re-derives the screen from a fresh status
+ * read, same discipline as `onRecoveryStartOver()`.
+ */
+async function onRecoveryStartOverCorrupt(): Promise<void> {
+  const resetCorruptReady = window.fedosProfile.resetCorruptReady;
+  if (resetCorruptReady === undefined) {
+    byId("recovery-start-over-corrupt-feedback").textContent = "Start Over is not available in this build.";
+    return;
+  }
+  const confirmed = await confirmInPage(
+    "Start over?",
+    "This profile finished setup, but the locally stored key material it needs to unlock is missing or corrupted, and no passphrase will ever unlock it again. This permanently erases the remaining local profile data on this device so you can set up a new one. This cannot be undone, and any conversation history not covered by a prior Archive export is not recoverable. If the key material is actually intact, Start Over is refused automatically and nothing is changed.",
+    "Yes, start over",
+  );
+  if (!confirmed) return;
+  byId("recovery-start-over-corrupt-feedback").textContent = "";
+  setBusy(true, "recovery-start-over-corrupt-btn");
+  let result: FedosProfileCommandResult;
+  try {
+    result = await resetCorruptReady();
+  } finally {
+    setBusy(false, "recovery-start-over-corrupt-btn");
+  }
+  if (result.outcome === "ok") {
+    clearAllRendererContentState();
+    await refreshFromStatus();
+  } else {
+    byId("recovery-start-over-corrupt-feedback").textContent = `Could not start over (${coarseErrorCode(result)}). The profile was not changed.`;
   }
 }
 
@@ -4877,6 +5021,7 @@ function clearAllRendererContentState(): void {
     "safety-error",
     "invite-error",
     "recovery-copy-feedback",
+    "recovery-start-over-feedback",
     "settings-report",
     "settings-relay-error",
     "settings-relay-list",
@@ -4989,6 +5134,12 @@ byId<HTMLButtonElement>("recovery-retry-btn").addEventListener("click", () => {
 });
 byId<HTMLButtonElement>("recovery-copy-btn").addEventListener("click", () => {
   void onRecoveryCopyDiagnostic();
+});
+byId<HTMLButtonElement>("recovery-start-over-btn").addEventListener("click", () => {
+  void onRecoveryStartOver();
+});
+byId<HTMLButtonElement>("recovery-start-over-corrupt-btn").addEventListener("click", () => {
+  void onRecoveryStartOverCorrupt();
 });
 
 // Phase M — Enter submits the focused form's primary action.

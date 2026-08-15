@@ -83,6 +83,17 @@ const fedosProfile: FedosProfileBridge = Object.freeze({
     ipcRenderer.invoke("fedos-profile:unlock", { secret: boundedString(passphrase, MAX_PASSPHRASE_CHARS) }),
   lock: () => ipcRenderer.invoke("fedos-profile:lock"),
   quit: () => ipcRenderer.invoke("fedos-profile:quit"),
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F) -- "Start Over" on
+  // the recovery screen. No arguments -- the main-process Coordinator's own
+  // `resetInterruptedProfile()` guard decides safety, never a renderer-
+  // supplied flag.
+  resetInterrupted: () => ipcRenderer.invoke("fedos-profile:reset-interrupted"),
+  // FedOS Installed Startup Root-Cause Arc -- the SIBLING "Start Over" for
+  // a "ready" descriptor with a structurally corrupt/missing sealed seed.
+  // No arguments -- the main-process Coordinator's own
+  // `resetCorruptReadyProfile()` guard decides safety, never a renderer-
+  // supplied flag.
+  resetCorruptReady: () => ipcRenderer.invoke("fedos-profile:reset-corrupt-ready"),
 });
 
 const fedosBeta: FedosBetaBridge = Object.freeze({

@@ -197,9 +197,18 @@
 
     <section id="screen-recovery">
       <p>This profile could not be unlocked normally.</p>
-      <p class="warn">There is no built-in repair path beyond retrying below. If you have a prior Archive export for your conversations, keep it — it is currently the only way to recover conversation history if this profile cannot be unlocked. Restoring an Archive does not recover this profile itself.</p>
+      <p class="warn">If you have a prior Archive export for your conversations, keep it — it is currently the only way to recover conversation history if this profile cannot be unlocked. Restoring an Archive does not recover this profile itself.</p>
       <p class="muted">Diagnostic code: <span id="recovery-reason" class="field"></span></p>
-      <div id="recovery-actions"></div>
+      <div id="recovery-actions">
+        <p class="muted">If this profile never finished being set up (it was interrupted before completing first-time setup), you can start over below. This is refused automatically if this profile ever finished setup.</p>
+        <button id="recovery-start-over-btn" type="button">Start over</button>
+        <p id="recovery-start-over-feedback" role="status" aria-live="polite" class="muted"></p>
+      </div>
+      <div id="recovery-actions-corrupt" hidden>
+        <p class="warn">This profile finished setup, but the locally stored key material it needs to unlock is missing or corrupted — this is data loss, not a mistyped passphrase, and no passphrase will ever unlock it again. If you have a prior Archive export for your conversations, it is currently the only way to recover any conversation history. Otherwise, you can start over below to set up a new profile on this device. This is refused automatically if the key material is actually intact.</p>
+        <button id="recovery-start-over-corrupt-btn" type="button">Start over</button>
+        <p id="recovery-start-over-corrupt-feedback" role="status" aria-live="polite" class="muted"></p>
+      </div>
       <p class="muted" id="recovery-explain"></p>
       <button id="recovery-retry-btn" type="button">Retry unlock</button>
       <button id="recovery-copy-btn" type="button">Copy diagnostic code</button>

@@ -14,10 +14,10 @@ Two artifacts — you need only one:
 
 | Artifact | Use it if |
 | --- | --- |
-| `FedOS-Setup-<version>.exe` (NSIS installer) | You want a normal install with a Start-menu entry |
-| `FedOS-<version>-win-x64.zip` (portable) | You want no installer, or you want to run it from a folder you control |
+| `FedOS-Desktop-Beta-Setup-<version>.exe` (NSIS installer) | You want a normal install with a Start-menu entry |
+| `FedOS Desktop Beta-<version>-win.zip` (portable) | You want no installer, or you want to run it from a folder you control |
 
-Plus a **`SHA256SUMS` file** listing the expected checksums.
+Plus a **`SHA256SUMS.txt` file** listing the expected checksums.
 
 **Both artifacts are unsigned.** See step 2.
 
@@ -29,15 +29,15 @@ because the artifacts are unsigned.
 PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\FedOS-Setup-<version>.exe
+Get-FileHash -Algorithm SHA256 .\FedOS-Desktop-Beta-Setup-<version>.exe
 ```
 
-Compare the result against the `SHA256SUMS` file, character by
+Compare the result against the `SHA256SUMS.txt` file, character by
 character — or let the shell compare it:
 
 ```powershell
 $expected = "<paste the expected hash here>"
-$actual = (Get-FileHash -Algorithm SHA256 .\FedOS-Setup-<version>.exe).Hash
+$actual = (Get-FileHash -Algorithm SHA256 .\FedOS-Desktop-Beta-Setup-<version>.exe).Hash
 if ($actual -eq $expected) { "MATCH" } else { "MISMATCH - DO NOT RUN" }
 ```
 
@@ -74,7 +74,7 @@ a completely reasonable choice.
 have a reason not to.
 
 **Portable ZIP:** extract to a folder you control — for example
-`C:\FedOS` — and run `FedOS.exe` from inside it.
+`C:\FedOS` — and run `FedOS Desktop Beta.exe` from inside it.
 
 > Avoid extracting to a **OneDrive-synced folder**. OneDrive's sync
 > agent and a running application can conflict over file locks, and the

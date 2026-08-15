@@ -497,6 +497,8 @@ export interface FedosConversationPeerDeviceAnnouncementIntegrationDependencies 
   readonly locallySupportedCapabilities: readonly FedosRatchetPeerCapabilityEntry[];
   /** Optional — default in-memory. */
   readonly observationPersistence?: FedosPeerDeviceAnnouncementObservationPersistence;
+  /** Peer-Device UX entry point closure (`10_P0_CLOSURE_COORDINATOR_FREEZE.md` §4) — the SAME durable identity file path `readOrCreateFedosLocalPeerDeviceAnnouncementIdentity()` was already read from once at composition time to derive `localAnnouncedDeviceId`/`localAnnouncedDevicePublicKeyHex` above. `FedosPeerDeviceAnnouncementRuntime` re-reads it per `announceLocalDevice()` call to source this local device's own authoritative, strictly-monotonic next epoch — the single source of truth regardless of whatever epoch value any caller supplies. */
+  readonly localIdentityFilePath: string;
   readonly sendMailboxNip17Control: (
     controlId: string,
     conversationId: FedosConversationId,
@@ -815,6 +817,7 @@ export class FedosConversationRuntime {
             localDeviceRef: deps.peerDeviceAnnouncement.localDeviceRef,
             localAnnouncedDeviceId: deps.peerDeviceAnnouncement.localAnnouncedDeviceId,
             localAnnouncedDevicePublicKeyHex: deps.peerDeviceAnnouncement.localAnnouncedDevicePublicKeyHex,
+            localIdentityFilePath: deps.peerDeviceAnnouncement.localIdentityFilePath,
             clock: deps.clock,
             sendMailboxNip17Control: deps.peerDeviceAnnouncement.sendMailboxNip17Control,
             observationPersistence: deps.peerDeviceAnnouncement.observationPersistence ?? new InMemoryFedosPeerDeviceAnnouncementObservationPersistence(),

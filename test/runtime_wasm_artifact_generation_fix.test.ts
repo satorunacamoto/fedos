@@ -84,10 +84,10 @@ describe("FedOS WASM artifact generation fix, both original causes resolved, fai
     );
     expect(pubFnNames.length).toBe(69);  });
 
-  it("6. packages/fedos-core-rust/.gitignore still ignores /pkg/, /target/, and Cargo.lock", () => {
+  it("6. packages/fedos-core-rust/.gitignore still ignores /pkg/ and /target/; Cargo.lock is deliberately NOT ignored (tracked policy, see docs/secure_runtime_p0_closure_cargo_lock_policy_supersession.md)", () => {
     expect(cargoGitignoreSource).toMatch(/(^|\n)\/pkg\/(\n|$)/);
     expect(cargoGitignoreSource).toMatch(/(^|\n)\/target\/(\n|$)/);
-    expect(cargoGitignoreSource).toMatch(/(^|\n)Cargo\.lock(\n|$)/);
+    expect(cargoGitignoreSource).not.toMatch(/(^|\n)Cargo\.lock(\n|$)/);
   });
 
   it("7. a locally-generated .wasm/.rlib/JS-glue/pkg/ artifact is ALLOWED to exist on disk, but must NEVER be tracked by git", () => {

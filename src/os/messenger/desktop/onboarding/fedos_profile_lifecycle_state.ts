@@ -16,7 +16,22 @@
  *   - `ready`             — Master Seed restored, Runtime started, usable.
  *   - `failed`            — an initialization step failed; NO false ready marker.
  *   - `recovery-required` — corruption/identity-mismatch detected; MUST NOT
- *                           silently become a new profile.
+ *                           silently become a new profile. FedOS Peer Device
+ *                           Discovery Arc P0 Closure (Agent F): the first
+ *                           explicit, user-confirmed exception is
+ *                           `"reset-interrupted-profile"` below — never
+ *                           silent, and structurally unreachable for a
+ *                           profile that ever durably reached `ready` (see
+ *                           `FedosProfileInitializationCoordinator#resetInterruptedProfile()`'s
+ *                           own guard). FedOS Installed Startup Root-Cause
+ *                           Arc adds the SIBLING exception,
+ *                           `"reset-corrupt-ready-profile"` below, for the
+ *                           opposite shape: a descriptor that DID durably
+ *                           reach `ready` but whose sealed Master Seed
+ *                           envelope is structurally missing/corrupt (see
+ *                           `FedosProfileInitializationCoordinator#resetCorruptReadyProfile()`'s
+ *                           own guard). Every other `ready` profile remains
+ *                           structurally unreachable by either exception.
  *   - `stopped`           — Runtime deliberately stopped/locked; durable state
  *                           intact, returns to `locked` on next launch.
  *
@@ -66,7 +81,28 @@ export type FedosProfileLifecycleEvent =
   | "identity-mismatch" // unlocking -> recovery-required
   | "runtime-start-failed" // unlocking|initializing -> failed
   | "lock" // ready -> stopped
-  | "relaunch"; // stopped -> locked (durable state intact)
+  | "relaunch" // stopped -> locked (durable state intact)
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F) — the ONE
+  // narrowly-scoped escape from `recovery-required`, emitted ONLY by
+  // `FedosProfileInitializationCoordinator#resetInterruptedProfile()`
+  // after that method's own guard has already confirmed `"ready"` was
+  // NEVER durably reached (see that method's own header, and the frozen
+  // decision doc `docs/reviews/fedos-peer-device-discovery-current/10_P0_CLOSURE_COORDINATOR_FREEZE.md`
+  // §2). A `"ready"` profile can never legally be in `recovery-required`
+  // to begin with (only `"locked"` — see the `TRANSITIONS` table below),
+  // so this event structurally can never touch one.
+  | "reset-interrupted-profile" // recovery-required -> absent
+  // FedOS Installed Startup Root-Cause Arc — the SIBLING escape from
+  // `recovery-required`, emitted ONLY by
+  // `FedosProfileInitializationCoordinator#resetCorruptReadyProfile()`
+  // after that method's own guard has confirmed the OPPOSITE shape from
+  // `"reset-interrupted-profile"` above: the descriptor DID durably reach
+  // `"ready"`, but its sealed Master Seed envelope is verifiably,
+  // structurally missing/corrupt (see that method's own header). Kept as
+  // a distinct event (rather than reusing `"reset-interrupted-profile"`)
+  // so the transition log itself records which of the two structurally
+  // different guards actually authorized the reset.
+  | "reset-corrupt-ready-profile"; // recovery-required -> absent
 
 /** The explicit, exhaustive transition table. A `(state, event)` pair absent here is an ILLEGAL transition. */
 const TRANSITIONS: ReadonlyMap<string, FedosProfileLifecycleState> = new Map([
@@ -94,6 +130,16 @@ const TRANSITIONS: ReadonlyMap<string, FedosProfileLifecycleState> = new Map([
   ["stopped|begin-unlock", "unlocking"],
 
   ["failed|corruption-detected", "recovery-required"],
+
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F) -- see
+  // `FedosProfileLifecycleEvent`'s own doc comment on `"reset-interrupted-profile"`
+  // above for why this is a legal exit from `recovery-required`.
+  ["recovery-required|reset-interrupted-profile", "absent"],
+  // FedOS Installed Startup Root-Cause Arc -- see
+  // `FedosProfileLifecycleEvent`'s own doc comment on
+  // `"reset-corrupt-ready-profile"` above for why this is the SIBLING
+  // legal exit from `recovery-required`.
+  ["recovery-required|reset-corrupt-ready-profile", "absent"],
 ] as const);
 
 /** Returns the next state for a legal `(state, event)` pair, or `null` if the transition is illegal. Pure; total; never throws. */

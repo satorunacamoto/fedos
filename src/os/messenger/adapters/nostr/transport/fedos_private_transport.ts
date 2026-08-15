@@ -357,6 +357,19 @@ export class FedosPrivateTransport {
     const write = this.#outboxPersistence.putIntent(record);
     if (write === "failed" || write === "conflict") return { outcome: "persistence-failed" };
 
+    // P0 Closure (conversation-discovery timing root cause): the periodic
+    // Scheduler timer alone can leave a freshly-enqueued intent waiting up
+    // to a full interval (`start()` arms via `setInterval`, no t=0 firing)
+    // before its first real publish attempt. Fire an immediate best-effort
+    // flush now — `tick()` is single-flight, so this is safe to race
+    // against the periodic timer (a second call while one is in flight
+    // just returns the same in-flight Promise, never double-publishes).
+    // Deliberately NOT awaited: the enqueue is already durable via
+    // `putIntent()` above, so this must not change this method's existing
+    // return timing/contract for any caller. The periodic tick remains the
+    // unmodified durable retry backstop if this attempt fails.
+    void this.tick().catch(() => {});
+
     return { outcome: "queued", envelopeId };
   }
 
@@ -428,6 +441,13 @@ export class FedosPrivateTransport {
     });
     const write = this.#outboxPersistence.putIntent(record);
     if (write === "failed" || write === "conflict") return { outcome: "persistence-failed" };
+
+    // P0 Closure (conversation-discovery timing root cause) — see the
+    // matching comment in `sendMailboxNip17()` above: immediate,
+    // non-awaited, single-flight-safe best-effort flush so Direct Ratchet
+    // control payloads (Phase D session-establishment, Phase F ratchet
+    // messages) don't sit idle for a full Scheduler interval.
+    void this.tick().catch(() => {});
 
     return { outcome: "queued", envelopeId: controlId };
   }

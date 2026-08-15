@@ -36,6 +36,8 @@ function sessionRecord(overrides: {
   readonly localAccountRef?: FedosDeviceBindingAccountRef;
   readonly remoteDeviceRef?: string;
   readonly generation?: number;
+  /** Defaults to `"active"` -- the ONLY lifecycle state `FedosDirectRatchetStateRuntime.readiness()`/`updateCounters()` will actually let this Runtime send through (see `fedos_direct_ratchet_session_lifecycle.ts`). Override to a non-`"active"` state to prove such a session is correctly EXCLUDED as a forward-secrecy candidate (bounded truthfulness hardening, Direct Ratchet identity-space audit). */
+  readonly lifecycleState?: string;
 }): FedosDirectRatchetSessionRecordV1 {
   return {
     binding: {
@@ -46,6 +48,7 @@ function sessionRecord(overrides: {
       conversationId: overrides.conversationId ?? CONVERSATION,
       generation: overrides.generation ?? 0,
     },
+    lifecycleState: overrides.lifecycleState ?? "active",
   } as unknown as FedosDirectRatchetSessionRecordV1;
 }
 
@@ -180,6 +183,46 @@ describe("FedOS Conversation Forward Secrecy route selection", () => {
       expect(route.route).toBe("ratchet");
       if (route.route !== "ratchet") return;
       expect(route.remoteDeviceRef).toBe(REMOTE_DEVICE);
+    });
+
+    // Bounded truthfulness hardening (Direct Ratchet identity-space audit) --
+    // a session record that exists but is not in the ONE lifecycle state this
+    // Runtime will actually send through (`"active"` -- see
+    // `fedos_direct_ratchet_session_lifecycle.ts` and
+    // `FedosDirectRatchetStateRuntime.readiness()`/`updateCounters()`) must
+    // never be reported as conferring forward secrecy, even though the
+    // underlying remote Device binding itself is still trusted. Before this
+    // fix, `selectFedosDirectConversationForwardSecrecyRoute()` never
+    // inspected `lifecycleState` at all.
+    it("17. revoked -- a REVOKED session record never counts, even with a still-trusted Device binding", () => {
+      expect(legacyReason(select({ records: [sessionRecord({ lifecycleState: "revoked" })] }))).toBe(
+        "no-session-for-conversation",
+      );
+    });
+
+    it("18. reset-required -- a session flagged for reset never counts either", () => {
+      expect(legacyReason(select({ records: [sessionRecord({ lifecycleState: "reset-required" })] }))).toBe(
+        "no-session-for-conversation",
+      );
+    });
+
+    it("19. corrupt/expired -- neither counts; a genuinely usable HIGHER generation still wins over them", () => {
+      const route = select({
+        records: [
+          sessionRecord({ generation: 4, lifecycleState: "corrupt" }),
+          sessionRecord({ generation: 3, lifecycleState: "expired" }),
+          sessionRecord({ generation: 1, lifecycleState: "active" }),
+        ],
+      });
+      expect(route.route).toBe("ratchet");
+      if (route.route !== "ratchet") return;
+      expect(route.generation).toBe(1);
+    });
+
+    it("20. initialized -- a receiver-role session that has not yet completed its first live DH step also never counts (this module has no access to the live cryptographic isReadyToSend() check; 'initialized' is conservatively treated the same as 'not usable', never optimistically as 'usable')", () => {
+      expect(legacyReason(select({ records: [sessionRecord({ lifecycleState: "initialized" })] }))).toBe(
+        "no-session-for-conversation",
+      );
     });
   });
 

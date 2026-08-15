@@ -27,12 +27,15 @@ import {
 import { evaluateFedosPeerDeviceAnnouncementAcceptance } from "../src/os/messenger/conversations/peer_device/fedos_peer_device_announcement_acceptance_policy.js";
 import { generateFedosPeerDeviceAnnouncementDeviceId, generateFedosPeerDeviceAnnouncementNonce, isWellFormedFedosPeerDeviceAnnouncementDeviceId } from "../src/os/messenger/conversations/peer_device/fedos_peer_device_announcement_nonce.js";
 import { encodeFedosPeerDeviceAnnouncementControlPayload, decodeFedosPeerDeviceAnnouncementControlPayloadFromContent } from "../src/os/messenger/conversations/peer_device/fedos_peer_device_announcement_control_payload.js";
-import { readOrCreateFedosLocalPeerDeviceAnnouncementIdentity } from "../src/os/messenger/conversations/peer_device/fedos_local_peer_device_announcement_identity.js";
+import { readOrCreateFedosLocalPeerDeviceAnnouncementIdentity, recordFedosLocalPeerDeviceAnnouncementEpochSent } from "../src/os/messenger/conversations/peer_device/fedos_local_peer_device_announcement_identity.js";
 import { InMemoryFedosPeerDeviceAnnouncementObservationPersistence } from "../src/os/messenger/conversations/peer_device/persistence/in_memory_fedos_peer_device_announcement_observation_persistence.js";
 import { FedosPeerDeviceAnnouncementInboundCoordinator } from "../src/os/messenger/conversations/peer_device/fedos_peer_device_announcement_inbound_coordinator.js";
+import { FedosPeerDeviceAnnouncementRuntime } from "../src/os/messenger/conversations/peer_device/fedos_peer_device_announcement_runtime.js";
 import { AppendOnlyFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/append_only_fedos_device_registry_persistence.js";
+import { InMemoryFedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/in_memory_fedos_device_registry_persistence.js";
 import type { FedosDeviceRegistryPersistence } from "../src/os/messenger/device/persistence/fedos_device_registry_persistence.js";
 import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
+import type { FedosConversationId } from "../src/os/messenger/conversations/fedos_conversation_id.js";
 import { RealFedosNostrSigningAuthority, createStandaloneSchnorrSigner } from "./support/real_fedos_nostr_signing_authority.js";
 
 const ALICE_ACCOUNT_INDEX = 0;
@@ -426,6 +429,176 @@ describe("readOrCreateFedosLocalPeerDeviceAnnouncementIdentity -- durable local 
       // Corrupt it.
       writeFileSync(path, "not json", "utf8");
       expect(() => readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(path)).toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Peer-Device UX entry point closure (10_P0_CLOSURE_COORDINATOR_FREEZE.md
+  // §4) -- `nextEpoch`: a fresh identity starts at 0, and
+  // `recordFedosLocalPeerDeviceAnnouncementEpochSent()` durably advances it,
+  // never regresses it, and never touches `deviceId`/`devicePublicKeyHex`.
+  // -------------------------------------------------------------------------
+
+  it("a freshly-created identity has nextEpoch 0 (schemaVersion 2)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-local-peer-device-identity-epoch-fresh-"));
+    try {
+      const path = join(dir, "identity.json");
+      const identity = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(path);
+      expect(identity.schemaVersion).toBe(2);
+      expect(identity.nextEpoch).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("recordFedosLocalPeerDeviceAnnouncementEpochSent(path, 0) durably advances nextEpoch to 1, preserving deviceId/devicePublicKeyHex, and a later readOrCreate() call sees it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-local-peer-device-identity-epoch-advance-"));
+    try {
+      const path = join(dir, "identity.json");
+      const original = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(path);
+      expect(original.nextEpoch).toBe(0);
+
+      const afterFirstSend = recordFedosLocalPeerDeviceAnnouncementEpochSent(path, 0);
+      expect(afterFirstSend.nextEpoch).toBe(1);
+      expect(afterFirstSend.deviceId).toBe(original.deviceId);
+      expect(afterFirstSend.devicePublicKeyHex).toBe(original.devicePublicKeyHex);
+
+      // A restart -- a fresh readOrCreate() call over the SAME file -- sees
+      // the durably-advanced value, never resets to 0.
+      const rehydrated = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(path);
+      expect(rehydrated.nextEpoch).toBe(1);
+
+      const afterSecondSend = recordFedosLocalPeerDeviceAnnouncementEpochSent(path, 1);
+      expect(afterSecondSend.nextEpoch).toBe(2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("recordFedosLocalPeerDeviceAnnouncementEpochSent() never regresses nextEpoch even if called with a stale sentEpoch", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-local-peer-device-identity-epoch-monotonic-"));
+    try {
+      const path = join(dir, "identity.json");
+      readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(path);
+      recordFedosLocalPeerDeviceAnnouncementEpochSent(path, 5); // nextEpoch -> 6
+      const afterStaleCall = recordFedosLocalPeerDeviceAnnouncementEpochSent(path, 0); // stale -- must NOT regress
+      expect(afterStaleCall.nextEpoch).toBe(6);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Peer-Device UX entry point closure (10_P0_CLOSURE_COORDINATOR_FREEZE.md
+// §4) -- FedosPeerDeviceAnnouncementRuntime.announceLocalDevice() sources
+// its actual epoch authoritatively from the durable local identity file,
+// never from whatever the caller supplies -- proven end-to-end here against
+// a REAL Runtime facade (real signing, real Registry, real acceptance
+// policy already exercised above), with only the relay transport faked.
+// ---------------------------------------------------------------------------
+
+describe("FedosPeerDeviceAnnouncementRuntime.announceLocalDevice() -- authoritative, durable, monotonic epoch source", () => {
+  function makeRuntime(identityFilePath: string, party: Party): FedosPeerDeviceAnnouncementRuntime {
+    const localIdentity = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(identityFilePath);
+    return new FedosPeerDeviceAnnouncementRuntime({
+      deviceRegistry: new InMemoryFedosDeviceRegistryPersistence(),
+      signingAuthority: party.signingAuthority,
+      accountIndex: 0,
+      localAccountRef: party.accountRef,
+      localDeviceRef: "local-device-ref",
+      localAnnouncedDeviceId: localIdentity.deviceId,
+      localAnnouncedDevicePublicKeyHex: localIdentity.devicePublicKeyHex,
+      localIdentityFilePath: identityFilePath,
+      clock: () => 1_700_000_000_000,
+      sendMailboxNip17Control: async () => ({ outcome: "queued" }),
+      observationPersistence: new InMemoryFedosPeerDeviceAnnouncementObservationPersistence(),
+      locallySupportedCapabilities: [],
+    });
+  }
+
+  it("a genuinely first announce (fresh identity file) is sent at epoch 0, EVEN IF the caller supplies a different value", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-pda-runtime-epoch-first-"));
+    try {
+      const path = join(dir, "identity.json");
+      const bob = await makeParty();
+      const alice = await makeParty();
+      const runtime = makeRuntime(path, bob);
+      // Caller passes a nonsense/stale value (9999) -- the Runtime must
+      // ignore it and use its own durable nextEpoch (0) instead.
+      const outcome = await runtime.announceLocalDevice({ recipientAccountRef: alice.accountRef, conversationId: "conv-1" as FedosConversationId, epoch: 9999 });
+      expect(outcome.outcome).toBe("published");
+      expect((outcome as { announcement: FedosPeerDeviceAnnouncementV1 }).announcement.epoch).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("REQUIRED: a repeated conversation-open (a fresh Runtime instance over the SAME durable identity file, mirroring a real restart) sends a strictly higher epoch than the prior successful send -- never regresses/reuses a stale already-accepted epoch, even when the caller supplies the SAME epoch value both times", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-pda-runtime-epoch-repeat-open-"));
+    try {
+      const path = join(dir, "identity.json");
+      const bob = await makeParty();
+      const alice = await makeParty();
+
+      // "openConversation()" call #1 -- a fresh Runtime, exactly as a real
+      // process start would construct one.
+      const runtime1 = makeRuntime(path, bob);
+      const outcome1 = await runtime1.announceLocalDevice({ recipientAccountRef: alice.accountRef, conversationId: "conv-1" as FedosConversationId, epoch: 0 });
+      expect(outcome1.outcome).toBe("published");
+      const epoch1 = (outcome1 as { announcement: FedosPeerDeviceAnnouncementV1 }).announcement.epoch;
+      expect(epoch1).toBe(0);
+
+      // "openConversation()" call #2 -- a SECOND, independent Runtime
+      // instance over the exact SAME identity file (the real shape of a
+      // repeated conversation-open, including across a genuine app
+      // restart), with the caller supplying the SAME naive epoch (0) again
+      // -- the durable file, not the caller, must be what actually governs.
+      const runtime2 = makeRuntime(path, bob);
+      const outcome2 = await runtime2.announceLocalDevice({ recipientAccountRef: alice.accountRef, conversationId: "conv-1" as FedosConversationId, epoch: 0 });
+      expect(outcome2.outcome).toBe("published");
+      const epoch2 = (outcome2 as { announcement: FedosPeerDeviceAnnouncementV1 }).announcement.epoch;
+      expect(epoch2).toBeGreaterThan(epoch1);
+      expect(epoch2).toBe(1);
+
+      // The real receiving-side acceptance policy must treat epoch2 as a
+      // genuine, non-stale supersession of epoch1 for the same subject.
+      const outcomeAtEpoch1 = evaluateFedosPeerDeviceAnnouncementAcceptance({
+        epoch: epoch1,
+        devicePublicKeyHex: (outcome1 as { announcement: FedosPeerDeviceAnnouncementV1 }).announcement.devicePublicKeyHex,
+        priorAccepted: null,
+        conflictingDuplicateAtSameEpoch: false,
+      });
+      expect(outcomeAtEpoch1).toBe("accepted-new-device");
+      const outcomeAtEpoch2 = evaluateFedosPeerDeviceAnnouncementAcceptance({
+        epoch: epoch2,
+        devicePublicKeyHex: (outcome2 as { announcement: FedosPeerDeviceAnnouncementV1 }).announcement.devicePublicKeyHex,
+        priorAccepted: { epoch: epoch1, devicePublicKeyHex: (outcome1 as { announcement: FedosPeerDeviceAnnouncementV1 }).announcement.devicePublicKeyHex },
+        conflictingDuplicateAtSameEpoch: false,
+      });
+      expect(outcomeAtEpoch2).toBe("accepted-superseding");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("a never-wall-clock guard: 50 successive real sends over the same identity file produce the exact sequence 0..49, never a Date.now()-shaped value", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-pda-runtime-epoch-sequence-"));
+    try {
+      const path = join(dir, "identity.json");
+      const bob = await makeParty();
+      const alice = await makeParty();
+      const epochs: number[] = [];
+      for (let i = 0; i < 50; i += 1) {
+        const runtime = makeRuntime(path, bob);
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await runtime.announceLocalDevice({ recipientAccountRef: alice.accountRef, conversationId: "conv-1" as FedosConversationId, epoch: 0 });
+        expect(outcome.outcome).toBe("published");
+        epochs.push((outcome as { announcement: FedosPeerDeviceAnnouncementV1 }).announcement.epoch);
+      }
+      expect(epochs).toEqual(Array.from({ length: 50 }, (_, i) => i));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

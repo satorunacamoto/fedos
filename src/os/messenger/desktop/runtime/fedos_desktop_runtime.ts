@@ -1113,6 +1113,12 @@ export async function startFedosDesktopRuntime(
             localDeviceRef: config.localDeviceId!,
             localAnnouncedDeviceId: localIdentity.deviceId,
             localAnnouncedDevicePublicKeyHex: localIdentity.devicePublicKeyHex,
+            // Peer-Device UX entry point closure (`10_P0_CLOSURE_COORDINATOR_FREEZE.md`
+            // §4) -- the SAME path just read above; `FedosPeerDeviceAnnouncementRuntime`
+            // re-reads it per `announceLocalDevice()` call to source this
+            // local device's own authoritative, strictly-monotonic next
+            // epoch.
+            localIdentityFilePath: config.peerDeviceAnnouncementIdentityLogPath!,
             locallySupportedCapabilities: config.peerDeviceAnnouncementLocallySupportedCapabilities!,
             observationPersistence:
               config.peerDeviceAnnouncementObservationLogPath !== undefined ? new AppendOnlyFedosPeerDeviceAnnouncementObservationPersistence(config.peerDeviceAnnouncementObservationLogPath) : undefined,

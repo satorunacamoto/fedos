@@ -226,16 +226,19 @@ describe("FedOS core package has no real cryptography", () => {
     // filesystem presence -- a locally-built, gitignored artifact must
     // never flip this test merely by existing on disk. Stage 69 allows a
     // Rust crate SKELETON (Cargo.toml + src/lib.rs); what must stay absent
-    // is any COMMITTED compiled artifact.
+    // is any COMMITTED compiled artifact. `Cargo.lock` is the one deliberate
+    // exception -- see docs/secure_runtime_p0_closure_cargo_lock_policy_supersession.md.
     const paths = fedosCoreRustGitTrackedPaths();
     // Sanity: the check actually found the package's committed files.
     expect(paths.some((p) => p.endsWith("/src/index.ts"))).toBe(true);
+    // Cargo.lock is deliberately tracked (policy reversal, see
+    // docs/secure_runtime_p0_closure_cargo_lock_policy_supersession.md) --
+    // prove it positively, not merely by omitting it from the forbidden set.
+    expect(paths.some((p) => p.endsWith("/Cargo.lock"))).toBe(true);
     const forbidden = /\.(wasm|rlib|so|dll|dylib|node|a|o)$/i;
-    const forbiddenName = /\/Cargo\.lock$/i;
     const forbiddenDir = /\/(target|build)\//i;
     for (const path of paths) {
       expect(forbidden.test(path), `unexpected compiled binary: ${path}`).toBe(false);
-      expect(forbiddenName.test(path), `unexpected Cargo.lock: ${path}`).toBe(false);
       expect(forbiddenDir.test(path), `unexpected build dir artifact: ${path}`).toBe(false);
     }
   });

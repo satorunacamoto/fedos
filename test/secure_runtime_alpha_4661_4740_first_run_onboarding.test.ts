@@ -211,6 +211,48 @@ describe("Phase B — profile persistence", () => {
       "conflicting-duplicate",
     );
   });
+
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F) -- the ONE
+  // narrowly-scoped delete() this Arc adds; reachable in production only
+  // through the guarded coordinator method (see the Phase R suite below).
+  it("delete() is idempotent and scoped to only this port's own single file", () => {
+    const p = new InMemoryFedosLocalProfilePersistence();
+    expect(p.delete()).toBe("deleted"); // nothing to delete yet -- still "deleted", never "failed"
+    expect(p.writeIfAbsent(sampleDescriptor())).toBe("written");
+    expect(p.delete()).toBe("deleted");
+    expect(p.read()).toBeNull();
+    expect(p.delete()).toBe("deleted"); // idempotent second call
+
+    const root = makeTmpRoot();
+    const fileA = join(root, "a.json");
+    const fileB = join(root, "b.json");
+    const pa = new FileFedosLocalProfilePersistence(fileA);
+    const pb = new FileFedosLocalProfilePersistence(fileB);
+    expect(pa.writeIfAbsent(sampleDescriptor())).toBe("written");
+    expect(pb.writeIfAbsent(sampleDescriptor())).toBe("written");
+    expect(pa.delete()).toBe("deleted");
+    expect(existsSync(fileA)).toBe(false);
+    expect(existsSync(fileB)).toBe(true); // the OTHER file is untouched
+    expect(pa.delete()).toBe("deleted"); // idempotent -- file already gone
+  });
+});
+
+describe("Phase B (sealed Master Seed envelope port) -- narrowly-scoped delete()", () => {
+  it("delete() is idempotent and scoped to only this port's own single file", () => {
+    const root = makeTmpRoot();
+    const fileA = join(root, "seed-a.sealed.json");
+    const fileB = join(root, "seed-b.sealed.json");
+    const pa = new FileFedosSealedMasterSeedEnvelopePersistence(fileA);
+    const pb = new FileFedosSealedMasterSeedEnvelopePersistence(fileB);
+    expect(pa.delete()).toBe("deleted"); // nothing to delete yet -- still "deleted"
+    writeFileSync(fileA, '{"v":1,"kdf":"argon2id","dev":true,"salt":"aa","verifier":"bb"}', "utf8");
+    writeFileSync(fileB, '{"v":1,"kdf":"argon2id","dev":true,"salt":"cc","verifier":"dd"}', "utf8");
+    expect(pa.delete()).toBe("deleted");
+    expect(existsSync(fileA)).toBe(false);
+    expect(existsSync(fileB)).toBe(true); // the OTHER file is untouched
+    expect(pb.read()).not.toBeNull();
+    expect(pa.delete()).toBe("deleted"); // idempotent -- file already gone
+  });
 });
 
 // ---------------------------------------------------------------------
@@ -244,6 +286,16 @@ describe("Phase C — profile lifecycle state machine", () => {
     expect(canFedosProfileLifecycleTransition("ready", "begin-create")).toBe(false);
     expect(applyFedosProfileLifecycleTransition("ready", "begin-create")).toBe("ready");
     expect(fedosProfileLifecycleNextState("absent", "unlock-succeeded")).toBeNull();
+  });
+
+  // FedOS Peer Device Discovery Arc P0 Closure (Agent F).
+  it("reset-interrupted-profile is the ONE legal exit from recovery-required, and only from there", () => {
+    expect(canFedosProfileLifecycleTransition("recovery-required", "reset-interrupted-profile")).toBe(true);
+    expect(applyFedosProfileLifecycleTransition("recovery-required", "reset-interrupted-profile")).toBe("absent");
+    for (const state of ["absent", "initializing", "locked", "unlocking", "ready", "failed", "stopped"] as const) {
+      expect(canFedosProfileLifecycleTransition(state, "reset-interrupted-profile")).toBe(false);
+      expect(applyFedosProfileLifecycleTransition(state, "reset-interrupted-profile")).toBe(state);
+    }
   });
 });
 
@@ -674,6 +726,486 @@ describe("Phase O — independent profiles isolated + command dispatch end-to-en
       const view = fedosOnboardingReadyView(createResponse.ready);
       expect(view.screen).toBe("profile-ready");
       expect(JSON.stringify(view)).not.toContain("command-path-secret");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------
+// FedOS Peer Device Discovery Arc P0 Closure (Agent F) — Flow R:
+// `resetInterruptedProfile()`. See the frozen decision doc,
+// `docs/reviews/fedos-peer-device-discovery-current/10_P0_CLOSURE_COORDINATOR_FREEZE.md`
+// §2, for the exact contract this suite proves.
+// ---------------------------------------------------------------------
+
+describe("Phase R — resetInterruptedProfile() (Agent F)", () => {
+  it("a no-op refusal on a fresh root (nothing to reset, absent stays absent)", async () => {
+    const root = makeTmpRoot();
+    const coordinator = makeCoordinator(root);
+    coordinator.detectProfileState();
+    const reset = await coordinator.resetInterruptedProfile();
+    expect(reset.outcome).toBe("reset-refused");
+    expect(coordinator.lifecycleState).toBe("absent");
+  });
+
+  it("REFUSES and does NOT touch a genuinely ready profile (must never reset ready)", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    const created = await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Never touch me" },
+      fedosProfileUnlockSecretFromUtf8("do-not-reset-this-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+
+    // A brand-new coordinator over the SAME durable paths, as a fresh
+    // launch would construct (the profile is "locked", NOT "recovery-required").
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    const detect = relaunch.detectProfileState();
+    expect(detect.outcome === "ok" && detect.value.presence).toBe("locked");
+
+    const reset = await relaunch.resetInterruptedProfile();
+    expect(reset.outcome).toBe("reset-refused");
+    expect(relaunch.lifecycleState).toBe("locked");
+    // Nothing was deleted.
+    expect(existsSync(paths.profileDescriptorFile)).toBe(true);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(true);
+    const descriptor = decodeFedosLocalProfileDescriptorV1(readFileSync(paths.profileDescriptorFile, "utf8") as string)!;
+    expect(descriptor.initializationState).toBe("ready");
+
+    // The still-real profile can still be unlocked afterward -- the refusal
+    // left it completely intact.
+    const unlocked = await relaunch.unlockProfile(fedosProfileUnlockSecretFromUtf8("do-not-reset-this-secret"));
+    expect(unlocked.outcome).toBe("ok");
+    await relaunch.lock();
+  });
+
+  it("REFUSES even when called directly against a real ready profile without ever detecting recovery-required (defense in depth)", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Guarded" },
+      fedosProfileUnlockSecretFromUtf8("guarded-secret-value"),
+    );
+    // A fresh coordinator that unlocks (reaching real "ready"), then a
+    // caller mistakenly invokes resetInterruptedProfile() anyway.
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    relaunch.detectProfileState();
+    const unlocked = await relaunch.unlockProfile(fedosProfileUnlockSecretFromUtf8("guarded-secret-value"));
+    expect(unlocked.outcome).toBe("ok");
+    expect(relaunch.lifecycleState).toBe("ready");
+
+    const reset = await relaunch.resetInterruptedProfile();
+    expect(reset.outcome).toBe("reset-refused");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(true);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(true);
+    await relaunch.lock();
+  });
+
+  it("checkpoint: descriptor stuck in 'initializing' -> reset succeeds, clears both files, returns absent, and a fresh createProfile() then succeeds", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    ensureFedosLocalProfileDirectories(paths);
+    const draft = createFedosLocalProfileDescriptorV1({
+      profileId: "f".repeat(32),
+      displayLabel: "Interrupted (initializing)",
+      accountPublicIdentity: { authority: "nostr", publicKeyHex: "1".repeat(64) },
+      localDeviceId: "device-init",
+      createdAt: 1_700_000_000_000,
+      sealedMasterSeedRef: paths.sealedMasterSeedFile,
+      dataDirectoryRoot: root,
+      initializationState: "initializing",
+    })!;
+    new FileFedosLocalProfilePersistence(paths.profileDescriptorFile).writeIfAbsent(draft);
+    writeFileSync(paths.sealedMasterSeedFile, '{"v":1,"kdf":"argon2id","dev":true,"salt":"aa","verifier":"bb"}', "utf8");
+
+    const coordinator = makeCoordinator(root);
+    const detect = coordinator.detectProfileState();
+    expect(detect.outcome === "ok" && detect.value.presence).toBe("recovery-required");
+
+    const reset = await coordinator.resetInterruptedProfile();
+    expect(reset.outcome).toBe("ok");
+    if (reset.outcome === "ok") expect(reset.value.lifecycleState).toBe("absent");
+    expect(coordinator.lifecycleState).toBe("absent");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(false);
+
+    // A fresh createProfile() now runs clean.
+    const created = await coordinator.createProfile(
+      { displayLabel: "Fresh after reset" },
+      fedosProfileUnlockSecretFromUtf8("fresh-after-reset-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+    if (created.outcome === "ok") expect(created.value.lifecycleState).toBe("ready");
+    await coordinator.lock();
+  });
+
+  it("checkpoint: descriptor left as 'failed' -> reset succeeds, clears both files, then a fresh createProfile() succeeds", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    ensureFedosLocalProfileDirectories(paths);
+    const draft = createFedosLocalProfileDescriptorV1({
+      profileId: "9".repeat(32),
+      displayLabel: "Interrupted (failed)",
+      accountPublicIdentity: { authority: "nostr", publicKeyHex: "2".repeat(64) },
+      localDeviceId: "device-failed",
+      createdAt: 1_700_000_000_000,
+      sealedMasterSeedRef: paths.sealedMasterSeedFile,
+      dataDirectoryRoot: root,
+      initializationState: "failed",
+    })!;
+    new FileFedosLocalProfilePersistence(paths.profileDescriptorFile).writeIfAbsent(draft);
+    writeFileSync(paths.sealedMasterSeedFile, '{"v":1,"kdf":"argon2id","dev":true,"salt":"cc","verifier":"dd"}', "utf8");
+
+    const coordinator = makeCoordinator(root);
+    coordinator.detectProfileState();
+    expect(coordinator.lifecycleState).toBe("recovery-required");
+
+    const reset = await coordinator.resetInterruptedProfile();
+    expect(reset.outcome).toBe("ok");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(false);
+
+    const created = await coordinator.createProfile(
+      { displayLabel: "Fresh after failed reset" },
+      fedosProfileUnlockSecretFromUtf8("fresh-after-failed-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+    await coordinator.lock();
+  });
+
+  it("checkpoint: sealed material present but NO descriptor (interrupted after sealing) -> reset succeeds, then createProfile() succeeds", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    ensureFedosLocalProfileDirectories(paths);
+    writeFileSync(paths.sealedMasterSeedFile, '{"v":1,"kdf":"argon2id","dev":true,"salt":"ee","verifier":"ff"}', "utf8");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+
+    const coordinator = makeCoordinator(root);
+    coordinator.detectProfileState();
+    expect(coordinator.lifecycleState).toBe("recovery-required");
+
+    const reset = await coordinator.resetInterruptedProfile();
+    expect(reset.outcome).toBe("ok");
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(false);
+    expect(coordinator.lifecycleState).toBe("absent");
+
+    const created = await coordinator.createProfile(
+      { displayLabel: "Fresh after sealed-only reset" },
+      fedosProfileUnlockSecretFromUtf8("fresh-after-sealed-only-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+    await coordinator.lock();
+  });
+
+  it("checkpoint: a corrupt descriptor file -> reset succeeds and clears it, then createProfile() succeeds", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    ensureFedosLocalProfileDirectories(paths);
+    writeFileSync(paths.profileDescriptorFile, "{ corrupt json", "utf8");
+
+    const coordinator = makeCoordinator(root);
+    coordinator.detectProfileState();
+    expect(coordinator.lifecycleState).toBe("recovery-required");
+
+    const reset = await coordinator.resetInterruptedProfile();
+    expect(reset.outcome).toBe("ok");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+
+    const created = await coordinator.createProfile(
+      { displayLabel: "Fresh after corrupt-descriptor reset" },
+      fedosProfileUnlockSecretFromUtf8("fresh-after-corrupt-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+    await coordinator.lock();
+  });
+
+  it("idempotent no-op: calling reset twice in a row the second time is refused (already absent, nothing to reset)", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    ensureFedosLocalProfileDirectories(paths);
+    writeFileSync(paths.sealedMasterSeedFile, '{"v":1,"kdf":"argon2id","dev":true,"salt":"11","verifier":"22"}', "utf8");
+    const coordinator = makeCoordinator(root);
+    coordinator.detectProfileState();
+    const first = await coordinator.resetInterruptedProfile();
+    expect(first.outcome).toBe("ok");
+    const second = await coordinator.resetInterruptedProfile();
+    expect(second.outcome).toBe("reset-refused");
+  });
+});
+
+// ---------------------------------------------------------------------
+// FedOS Installed Startup Root-Cause Arc — a "ready" descriptor whose
+// sealed Master Seed envelope is verifiably, STRUCTURALLY missing/corrupt.
+// Previously undetectable without a live (failing) unlock attempt, and NOT
+// detectable again on a fresh relaunch at all — this suite proves both the
+// new `detectProfileState()`/`status()` structural check and its own
+// SIBLING reset path, `resetCorruptReadyProfile()`.
+// ---------------------------------------------------------------------
+
+describe("Phase S — ready descriptor + structurally corrupt/missing sealed seed", () => {
+  it("detected via a FRESH status() call (not just a live unlock attempt) when the sealed file is MISSING next to a ready descriptor", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    const created = await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Will lose its seed" },
+      fedosProfileUnlockSecretFromUtf8("about-to-be-corrupted-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+
+    // Simulate the sealed file going missing out from under an intact,
+    // "ready" descriptor -- e.g. a disk error/partial write elsewhere on
+    // the device, NOT anything this Coordinator did.
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(false);
+    expect(existsSync(paths.profileDescriptorFile)).toBe(true);
+
+    // A brand-new coordinator, as a fresh relaunch would construct --
+    // status()/detectProfileState() alone (no unlockProfile() call at all)
+    // must already report the honest, distinct shape.
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    const detect = relaunch.detectProfileState();
+    expect(detect.outcome === "ok" && detect.value.presence).toBe("recovery-required");
+    expect(detect.outcome === "ok" && detect.value.recoveryReason).toBe("corrupt");
+    expect(relaunch.lifecycleState).toBe("recovery-required");
+
+    const status = relaunch.status();
+    expect(status.presence).toBe("recovery-required");
+    expect(status.recoveryReason).toBe("corrupt");
+  });
+
+  it("detected via a FRESH status() call when the sealed file is structurally UNPARSEABLE (not merely missing) next to a ready descriptor", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    const created = await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Will get corrupted bytes" },
+      fedosProfileUnlockSecretFromUtf8("about-to-be-mangled-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+
+    // Overwrite the sealed file's bytes with structurally invalid JSON --
+    // never a decrypt attempt, purely a parse/shape failure.
+    writeFileSync(paths.sealedMasterSeedFile, "{ not even close to well-formed", "utf8");
+
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    const status = relaunch.status();
+    // status() alone (no detectProfileState()/unlockProfile() call) must
+    // already be honest, mirroring the "real production caller never calls
+    // detectProfileState() separately" shape (`fedos_electron_beta_main.cts`'s
+    // own `handleStatus()` does call `detectProfileState()` first when no
+    // coordinator is active, exactly like this).
+    relaunch.detectProfileState();
+    expect(relaunch.status().presence).toBe("recovery-required");
+    expect(relaunch.status().recoveryReason).toBe("corrupt");
+  });
+
+  it("does NOT trigger for a genuinely intact sealed file with merely a WRONG passphrase -- status() keeps reporting locked, unlock keeps reporting unlock-failed", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Never actually corrupt" },
+      fedosProfileUnlockSecretFromUtf8("the-real-secret-value"),
+    );
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(true);
+
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    const detect = relaunch.detectProfileState();
+    expect(detect.outcome === "ok" && detect.value.presence).toBe("locked");
+    expect(detect.outcome === "ok" && detect.value.recoveryReason).toBe(null);
+
+    const wrong = await relaunch.unlockProfile(fedosProfileUnlockSecretFromUtf8("a-completely-wrong-secret"));
+    expect(wrong.outcome).toBe("unlock-failed");
+    expect(relaunch.lifecycleState).toBe("locked");
+
+    // A fresh status() read after the wrong-passphrase attempt is STILL
+    // honestly "locked", never "recovery-required" -- the sealed file was
+    // never touched by the wrong attempt, so the structural check keeps
+    // passing.
+    const status = relaunch.status();
+    expect(status.presence).toBe("locked");
+    expect(status.recoveryReason).toBe(null);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(true);
+
+    // The retry-with-correct-passphrase path still works -- completely
+    // unaffected by this Arc's structural check.
+    const right = await relaunch.unlockProfile(fedosProfileUnlockSecretFromUtf8("the-real-secret-value"));
+    expect(right.outcome).toBe("ok");
+    await relaunch.lock();
+  });
+
+  it("unlockProfile() still returns the distinct 'corrupt' outcome for this shape (regression: detectProfileState() now catches it FIRST, but the outcome string is preserved)", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Corrupt then unlock" },
+      fedosProfileUnlockSecretFromUtf8("will-be-deleted-secret"),
+    );
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    relaunch.detectProfileState();
+    const unlocked = await relaunch.unlockProfile(fedosProfileUnlockSecretFromUtf8("any-passphrase-at-all"));
+    expect(unlocked.outcome).toBe("corrupt");
+    expect(relaunch.runningRuntime()).toBeNull();
+  });
+
+  it("resetCorruptReadyProfile(): a no-op refusal on a fresh root (nothing to reset, absent stays absent)", async () => {
+    const root = makeTmpRoot();
+    const coordinator = makeCoordinator(root);
+    coordinator.detectProfileState();
+    const reset = await coordinator.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("reset-refused");
+    expect(coordinator.lifecycleState).toBe("absent");
+  });
+
+  it("resetCorruptReadyProfile(): REFUSES a genuinely ready profile with an INTACT sealed seed (hard safety boundary -- must never turn a wrong-passphrase typo into data loss)", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Do not ever reset me" },
+      fedosProfileUnlockSecretFromUtf8("intact-secret-value"),
+    );
+
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    const detect = relaunch.detectProfileState();
+    expect(detect.outcome === "ok" && detect.value.presence).toBe("locked");
+
+    const reset = await relaunch.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("reset-refused");
+    expect(relaunch.lifecycleState).toBe("locked");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(true);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(true);
+
+    // The still-real, still-intact profile unlocks fine afterward -- the
+    // refusal left it completely untouched.
+    const unlocked = await relaunch.unlockProfile(fedosProfileUnlockSecretFromUtf8("intact-secret-value"));
+    expect(unlocked.outcome).toBe("ok");
+    await relaunch.lock();
+  });
+
+  it("resetCorruptReadyProfile(): REFUSES an interrupted (never-ready) profile -- that shape belongs to resetInterruptedProfile(), not this method", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    ensureFedosLocalProfileDirectories(paths);
+    const draft = createFedosLocalProfileDescriptorV1({
+      profileId: "3".repeat(32),
+      displayLabel: "Interrupted, not corrupt-ready",
+      accountPublicIdentity: { authority: "nostr", publicKeyHex: "4".repeat(64) },
+      localDeviceId: "device-interrupted",
+      createdAt: 1_700_000_000_000,
+      sealedMasterSeedRef: paths.sealedMasterSeedFile,
+      dataDirectoryRoot: root,
+      initializationState: "initializing",
+    })!;
+    new FileFedosLocalProfilePersistence(paths.profileDescriptorFile).writeIfAbsent(draft);
+
+    const coordinator = makeCoordinator(root);
+    coordinator.detectProfileState();
+    expect(coordinator.lifecycleState).toBe("recovery-required");
+
+    const reset = await coordinator.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("reset-refused");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(true);
+
+    // The SIBLING method still correctly handles this shape.
+    const siblingReset = await coordinator.resetInterruptedProfile();
+    expect(siblingReset.outcome).toBe("ok");
+  });
+
+  it("resetCorruptReadyProfile(): succeeds ONLY for the genuinely corrupt case (missing sealed file), clears both files, returns absent, and a fresh createProfile() then succeeds cleanly", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Genuinely corrupt" },
+      fedosProfileUnlockSecretFromUtf8("genuinely-corrupt-secret"),
+    );
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    const detect = relaunch.detectProfileState();
+    expect(detect.outcome === "ok" && detect.value.presence).toBe("recovery-required");
+    expect(detect.outcome === "ok" && detect.value.recoveryReason).toBe("corrupt");
+
+    // resetInterruptedProfile() correctly refuses this shape (the
+    // descriptor DID reach ready -- that method's own guard explicitly,
+    // permanently protects it).
+    const wrongSiblingAttempt = await relaunch.resetInterruptedProfile();
+    expect(wrongSiblingAttempt.outcome).toBe("reset-refused");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(true); // untouched
+
+    const reset = await relaunch.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("ok");
+    if (reset.outcome === "ok") expect(reset.value.lifecycleState).toBe("absent");
+    expect(relaunch.lifecycleState).toBe("absent");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(false);
+
+    // A fresh createProfile() now runs clean, on the SAME coordinator
+    // instance.
+    const created = await relaunch.createProfile(
+      { displayLabel: "Fresh after corrupt-ready reset" },
+      fedosProfileUnlockSecretFromUtf8("fresh-after-corrupt-ready-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+    if (created.outcome === "ok") expect(created.value.lifecycleState).toBe("ready");
+    await relaunch.lock();
+  });
+
+  it("resetCorruptReadyProfile(): succeeds for a structurally unparseable (not merely missing) sealed file too", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Mangled bytes" },
+      fedosProfileUnlockSecretFromUtf8("mangled-bytes-secret"),
+    );
+    writeFileSync(paths.sealedMasterSeedFile, "{ still not well-formed", "utf8");
+
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    relaunch.detectProfileState();
+    const reset = await relaunch.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("ok");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(false);
+
+    const created = await relaunch.createProfile(
+      { displayLabel: "Fresh after mangled-bytes reset" },
+      fedosProfileUnlockSecretFromUtf8("fresh-after-mangled-secret"),
+    );
+    expect(created.outcome).toBe("ok");
+    await relaunch.lock();
+  });
+
+  it("idempotent no-op: calling resetCorruptReadyProfile() twice in a row -- the second time is refused (already absent)", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Reset twice" },
+      fedosProfileUnlockSecretFromUtf8("reset-twice-secret"),
+    );
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    relaunch.detectProfileState();
+    const first = await relaunch.resetCorruptReadyProfile();
+    expect(first.outcome).toBe("ok");
+    const second = await relaunch.resetCorruptReadyProfile();
+    expect(second.outcome).toBe("reset-refused");
+  });
+
+  it("the lifecycle FSM: 'reset-corrupt-ready-profile' is a legal exit from recovery-required, distinct from 'reset-interrupted-profile'", () => {
+    expect(canFedosProfileLifecycleTransition("recovery-required", "reset-corrupt-ready-profile")).toBe(true);
+    expect(applyFedosProfileLifecycleTransition("recovery-required", "reset-corrupt-ready-profile")).toBe("absent");
+    // Every other (state, event) pair involving this new event is illegal.
+    for (const state of ["absent", "initializing", "locked", "unlocking", "ready", "failed", "stopped"] as const) {
+      expect(canFedosProfileLifecycleTransition(state, "reset-corrupt-ready-profile")).toBe(false);
     }
   });
 });

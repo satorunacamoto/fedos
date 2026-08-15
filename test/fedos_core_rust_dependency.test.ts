@@ -390,17 +390,22 @@ describe("FedOS Rust crate — chacha20poly1305 + hkdf + zeroize/secrecy/subtle 
     }
   });
 
-  it("20. no target/ or build artifacts (including Cargo.lock) are committed", () => {
+  it("20. no target/ or build artifacts are committed (Cargo.lock is the one deliberate exception)", () => {
     const paths = fedosCoreRustGitTrackedPaths();
+    // Positive proof of the stated exception: Cargo.lock IS tracked.
+    expect(paths.some((path) => path.endsWith("/Cargo.lock"))).toBe(true);
     const forbiddenCompiled = /\.(rlib|so|dll|dylib|node|a|o)$/i;
     const forbiddenDir = /\/(target|build)\//i;
-    const forbiddenLock = /\/Cargo\.lock$/i;
     for (const path of paths) {
       expect(forbiddenCompiled.test(path), `unexpected compiled artifact: ${path}`).toBe(false);
       expect(forbiddenDir.test(path), `unexpected build dir artifact: ${path}`).toBe(false);
-      // Cargo.lock stays uncommitted (library crate; reproducibility via a
-      // lockfile digest is deferred to the future build-manifest stage).
-      expect(forbiddenLock.test(path), `unexpected committed Cargo.lock: ${path}`).toBe(false);
+      // Cargo.lock is now DELIBERATELY tracked (policy reversal, frozen by
+      // docs/reviews/fedos-peer-device-discovery-current/10_P0_CLOSURE_COORDINATOR_FREEZE.md
+      // §3, executed via docs/secure_runtime_p0_closure_cargo_lock_policy_supersession.md):
+      // this crate ships real, embedded, cryptographic WASM in every release
+      // artifact, so a pinned, committed lockfile is required for
+      // reproducible builds. It is intentionally excluded from the
+      // forbidden-artifact checks above.
     }
   });
 

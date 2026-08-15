@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:current": "vitest run --config vitest.current.config.ts",
     "test:watch": "vitest",
-    "build:wasm": "cargo build --manifest-path packages/fedos-core-rust/Cargo.toml --target wasm32-unknown-unknown --release && wasm-bindgen --target web --out-dir packages/fedos-core-rust/pkg packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm",
+    "build:wasm": "cargo build --manifest-path packages/fedos-core-rust/Cargo.toml --target wasm32-unknown-unknown --release --locked && wasm-bindgen --target web --out-dir packages/fedos-core-rust/pkg packages/fedos-core-rust/target/wasm32-unknown-unknown/release/fedos_core_rust.wasm",
     "build:wasm:manifest": "node scripts/generate_wasm_artifact_manifest.mjs",
     "build:production-wasm": "node scripts/build_production_wasm_artifact.mjs",
     "build:runtime": "tsc -p tsconfig.runtime.json",

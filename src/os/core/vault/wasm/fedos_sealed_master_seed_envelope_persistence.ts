@@ -39,7 +39,15 @@
  * HARD GUARDRAILS:
  *   - No plaintext seed byte, no passphrase, no derived key ever appears
  *     in, or is derivable from, this file.
- *   - No delete/overwrite/compaction method.
+ *   - No overwrite/compaction method. FedOS Peer Device Discovery Arc P0
+ *     Closure (Agent F) adds exactly ONE narrowly-scoped `delete()` — it
+ *     removes only the ONE sealed-envelope file this port was itself
+ *     constructed against, nothing else, and is reachable ONLY through
+ *     `FedosProfileInitializationCoordinator#resetInterruptedProfile()`'s
+ *     own guarded reset path (never called directly by a renderer/IPC
+ *     handler). That guard refuses unless the profile never durably
+ *     reached `"ready"`, so this method never deletes a real, ever-used
+ *     seed's sealed material.
  *   - Synchronous, matching every other filesystem-backed port in this
  *     codebase (`AppendOnlyFedosConversationPersistence`, etc.).
  *
@@ -52,7 +60,7 @@
  * `docs/architecture/CORE-SECRETS-OWNERSHIP-PLAN.md`.
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import {
   isWellFormedSealedMasterSeedEnvelopeV1Json,
   toSealedMasterSeedEnvelopeV1,
@@ -60,12 +68,16 @@ import {
 } from "./fedos_sealed_master_seed_envelope.js";
 
 export type FedosSealedMasterSeedEnvelopePersistenceWriteResult = "written" | "already-exists" | "failed";
+/** FedOS Peer Device Discovery Arc P0 Closure (Agent F) — `"deleted"` whether or not a sealed envelope existed (idempotent), `"failed"` only on a real filesystem error. */
+export type FedosSealedMasterSeedEnvelopePersistenceDeleteResult = "deleted" | "failed";
 
 export interface FedosSealedMasterSeedEnvelopePersistence {
   /** `null` when no seed has ever been sealed at this path (an ordinary first-run state). THROWS if the file exists but is not structurally well-formed. */
   read(): FedosSealedMasterSeedEnvelopeV1 | null;
   /** NEVER overwrites an existing file — `"already-exists"` for a second attempt against the same path (Alpha 1268). */
   writeIfAbsent(envelope: FedosSealedMasterSeedEnvelopeV1): FedosSealedMasterSeedEnvelopePersistenceWriteResult;
+  /** FedOS Peer Device Discovery Arc P0 Closure (Agent F) — deletes ONLY this port's own single sealed envelope file. See this file's own header for the narrow reachability guarantee. Idempotent; never throws. */
+  delete(): FedosSealedMasterSeedEnvelopePersistenceDeleteResult;
 }
 
 export class FileFedosSealedMasterSeedEnvelopePersistence implements FedosSealedMasterSeedEnvelopePersistence {
@@ -98,5 +110,17 @@ export class FileFedosSealedMasterSeedEnvelopePersistence implements FedosSealed
       return "failed";
     }
     return "written";
+  }
+
+  /** FedOS Peer Device Discovery Arc P0 Closure (Agent F) — deletes ONLY `this.#filePath` (the ONE file this instance was constructed against). Idempotent: a missing file is `"deleted"`, not `"failed"`. */
+  delete(): FedosSealedMasterSeedEnvelopePersistenceDeleteResult {
+    try {
+      if (existsSync(this.#filePath)) {
+        unlinkSync(this.#filePath);
+      }
+      return "deleted";
+    } catch {
+      return "failed";
+    }
   }
 }

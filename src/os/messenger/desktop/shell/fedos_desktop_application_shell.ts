@@ -1152,9 +1152,14 @@ export class FedosDesktopApplicationShell {
    * of this local device's own protocol-scoped identity to `recipientAccountRef`
    * over the named Direct Conversation's already-established transport.
    * `epoch` must be strictly greater than any prior epoch this local device
-   * has ever announced to the SAME recipient for the SAME `deviceId` (the
-   * caller's own responsibility — see `06_PROTOCOL_CONTRACT_FREEZE.md` §4);
-   * `0` is always safe for a genuinely first announcement.
+   * has ever announced to the SAME recipient for the SAME `deviceId` (see
+   * `06_PROTOCOL_CONTRACT_FREEZE.md` §4); `0` is always safe for a
+   * genuinely first announcement. Peer-Device UX entry point closure
+   * (`10_P0_CLOSURE_COORDINATOR_FREEZE.md` §4): this parameter's value is
+   * accepted for call-shape compatibility only — `FedosPeerDeviceAnnouncementRuntime.announceLocalDevice()`
+   * ignores it and sources the actual epoch authoritatively from this
+   * local device's own durable identity file, so the monotonicity
+   * invariant holds regardless of what any caller supplies here.
    */
   async peerDeviceAnnounce(recipientAccountRef: FedosDeviceBindingAccountRef, conversationId: string, epoch: number): Promise<FedosDesktopShellResult<FedosPeerDeviceAnnouncementOutboundOutcome>> {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
