@@ -1114,6 +1114,12 @@ async function revealMessage(messageId: string): Promise<void> {
   renderChatMessages((result.value as readonly never[]) ?? [], localIds);
 }
 
+interface ChatCounterpartyAccountRef {
+  readonly authority: string;
+  readonly publicIdentifier: string;
+  readonly identityId: string | null;
+}
+
 async function openConversation(conversationId: string): Promise<void> {
   if (currentConversationId !== conversationId) revealedMessagePlaintext.clear();
   currentConversationId = conversationId;
@@ -1122,10 +1128,27 @@ async function openConversation(conversationId: string): Promise<void> {
   byId("chat-title").textContent = "Conversation";
   byId("chat-meta").textContent = conversationId;
   const detail = await window.fedosApp.conversationOpen(conversationId);
+  let counterpartyAccountRef: ChatCounterpartyAccountRef | null = null;
   if (detail.outcome === "ok") {
-    const view = detail.value as { readonly mode: string; readonly lifecycleState: string; readonly activationStatus: string };
+    const view = detail.value as {
+      readonly mode: string;
+      readonly lifecycleState: string;
+      readonly activationStatus: string;
+      readonly memberships?: readonly { readonly participant: ChatCounterpartyAccountRef; readonly state: string }[];
+    };
     byId("chat-title").textContent = `${view.mode} conversation`;
     byId("chat-meta").textContent = `${conversationId} – ${view.lifecycleState} – ${view.activationStatus}`;
+    // FedOS Peer Device Discovery Arc (fix for a P0 the Messenger/Security
+    // release-readiness reassessment found this arc: the Security Details
+    // panel's own Encryption/Forward-secrecy/Device-knowledge axes were
+    // structurally dead in the shipped UI because this call site always
+    // passed `null` for counterpartyAccountRef, despite `conversationOpen()`
+    // already returning exactly the membership data needed -- it was just
+    // discarded. Resolve the ONE non-local, currently-active member (a
+    // Direct conversation has exactly one) -- never a guess, never the
+    // local account itself.
+    const counterpartyMembership = view.memberships?.find((m) => m.state === "active" && m.participant.publicIdentifier !== localAccountPublicIdentifier);
+    counterpartyAccountRef = counterpartyMembership?.participant ?? null;
   }
   // A freshly-started Runtime must re-activate a Direct conversation before
   // it can send/receive -- a real, per-Runtime-lifetime precondition, not a
@@ -1133,7 +1156,7 @@ async function openConversation(conversationId: string): Promise<void> {
   // still lets the user see messages, only sending will then fail closed.
   await window.fedosApp.conversationActivate(conversationId);
   await loadChatMessages();
-  await refreshChatSecurityState(conversationId);
+  await refreshChatSecurityState(conversationId, counterpartyAccountRef);
   startChatPolling();
 }
 
@@ -1206,11 +1229,11 @@ function chatSecurityReasonText(reasonCode: string): string {
   return CHAT_SECURITY_REASON_TEXT[reasonCode] ?? (reasonCode.startsWith("evidence-rejected-") ? "A recent security event for this contact could not be verified and was rejected." : reasonCode);
 }
 
-async function refreshChatSecurityState(conversationId: string): Promise<void> {
+async function refreshChatSecurityState(conversationId: string, counterpartyAccountRef: ChatCounterpartyAccountRef | null): Promise<void> {
   const indicatorText = byId("chat-security-indicator-text");
   const axesList = byId("chat-security-axes");
   indicatorText.textContent = "checking…";
-  const result = await window.fedosApp.conversationSecurityState(conversationId, null);
+  const result = await window.fedosApp.conversationSecurityState(conversationId, counterpartyAccountRef);
   if (result.outcome !== "ok") {
     indicatorText.textContent = "unavailable";
     axesList.textContent = "";
