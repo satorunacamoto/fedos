@@ -206,6 +206,10 @@ import type { FedosRatchetPeerCapabilityEntry } from "../ratchet/peer_capability
 import type { FedosRatchetPeerCapabilityObservationPersistence } from "../ratchet/peer_capability/persistence/fedos_ratchet_peer_capability_observation_persistence.js";
 import { InMemoryFedosRatchetPeerCapabilityObservationPersistence } from "../ratchet/peer_capability/persistence/in_memory_fedos_ratchet_peer_capability_observation_persistence.js";
 import { FedosRatchetPeerCapabilityRuntime } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
+import { InMemoryFedosPeerDeviceAnnouncementObservationPersistence } from "../peer_device/persistence/in_memory_fedos_peer_device_announcement_observation_persistence.js";
+import { FedosPeerDeviceAnnouncementRuntime } from "../peer_device/fedos_peer_device_announcement_runtime.js";
+import type { FedosPeerDeviceAnnouncementObservationPersistence } from "../peer_device/persistence/fedos_peer_device_announcement_observation_persistence.js";
+import type { FedosPeerDeviceAnnouncementInboundOutcome } from "../peer_device/fedos_peer_device_announcement_inbound_coordinator.js";
 import type { FedosRatchetPeerCapabilityInboundOutcome } from "../ratchet/peer_capability/fedos_ratchet_peer_capability_inbound_coordinator.js";
 import type { FedosConversationInvitationReceivedPersistence } from "../invitation_bootstrap/persistence/fedos_conversation_invitation_received_persistence.js";
 import { InMemoryFedosConversationInvitationReceivedPersistence } from "../invitation_bootstrap/persistence/in_memory_fedos_conversation_invitation_received_persistence.js";
@@ -372,6 +376,14 @@ export type FedosConversationRuntimeDependencies = FedosPrivateConversationConst
    */
   readonly peerCapability?: FedosConversationPeerCapabilityIntegrationDependencies;
   /**
+   * FedOS Peer Device Discovery Arc — OPTIONAL; omitted,
+   * `peerDeviceAnnouncement()` returns `null` and `receiveNip17Rumor()`
+   * remains byte-for-byte unchanged for this attempt. Independent of every
+   * other optional integration above — a caller may supply any
+   * combination.
+   */
+  readonly peerDeviceAnnouncement?: FedosConversationPeerDeviceAnnouncementIntegrationDependencies;
+  /**
    * Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
    * Shared Conversation Foundation Arc) — OPTIONAL; omitted,
    * `conversationInvitation()` returns `null` and `receiveNip17Rumor()`
@@ -474,6 +486,25 @@ export interface FedosConversationPeerCapabilityIntegrationDependencies {
   ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
 }
 
+/** See `FedosConversationRuntimeDependencies.peerDeviceAnnouncement`'s own doc comment. */
+export interface FedosConversationPeerDeviceAnnouncementIntegrationDependencies {
+  readonly deviceRegistry: FedosDeviceRegistryPersistence;
+  readonly signingAuthority: FedosNostrSigningAuthority;
+  readonly localAccountRef: FedosDeviceBindingAccountRef;
+  readonly localDeviceRef: string;
+  readonly localAnnouncedDeviceId: string;
+  readonly localAnnouncedDevicePublicKeyHex: string;
+  readonly locallySupportedCapabilities: readonly FedosRatchetPeerCapabilityEntry[];
+  /** Optional — default in-memory. */
+  readonly observationPersistence?: FedosPeerDeviceAnnouncementObservationPersistence;
+  readonly sendMailboxNip17Control: (
+    controlId: string,
+    conversationId: FedosConversationId,
+    plaintext: Uint8Array,
+    createdAt: number,
+  ) => Promise<FedosPrivateWireDeliveryQueueOutcome>;
+}
+
 /** See `FedosConversationRuntimeDependencies.conversationInvitation`'s own doc comment. */
 export interface FedosConversationInvitationIntegrationDependencies {
   readonly signingAuthority: FedosNostrSigningAuthority;
@@ -561,6 +592,8 @@ export class FedosConversationRuntime {
   readonly #directRatchetRuntime: FedosDirectRatchetConversationRuntime | null;
   /** Secure Runtime Alpha 5721–5800 — `null` when `deps.peerCapability` was not supplied. See this class's own constructor comment. */
   readonly #peerCapabilityRuntime: FedosRatchetPeerCapabilityRuntime | null;
+  /** FedOS Peer Device Discovery Arc — `null` when `deps.peerDeviceAnnouncement` was not supplied. See this class's own constructor comment. */
+  readonly #peerDeviceAnnouncementRuntime: FedosPeerDeviceAnnouncementRuntime | null;
   /** Secure Runtime Alpha 7081-7160 — `null` when `deps.conversationInvitation` was not supplied. See this class's own constructor comment. */
   readonly #invitationRuntime: FedosConversationInvitationRuntime | null;
   /** Secure Runtime Alpha 5881-5960 — `null` when `deps.deletionRequest` was not supplied. See this class's own constructor comment. */
@@ -763,6 +796,29 @@ export class FedosConversationRuntime {
             sendMailboxNip17Control: deps.peerCapability.sendMailboxNip17Control,
             observationPersistence: deps.peerCapability.observationPersistence ?? new InMemoryFedosRatchetPeerCapabilityObservationPersistence(),
             locallySupportedCapabilities: deps.peerCapability.locallySupportedCapabilities,
+          });
+
+    // FedOS Peer Device Discovery Arc — `null` when `deps.peerDeviceAnnouncement`
+    // was not supplied. Entirely independent of `#peerCapabilityRuntime`
+    // above (a caller may supply either, both, or neither) -- this Runtime
+    // WRITES to the shared Device Registry on an accepted announcement
+    // (06_PROTOCOL_CONTRACT_FREEZE.md §7), the one deliberate difference
+    // from peer_capability's own read-only-Registry discipline.
+    this.#peerDeviceAnnouncementRuntime =
+      deps.peerDeviceAnnouncement === undefined
+        ? null
+        : new FedosPeerDeviceAnnouncementRuntime({
+            deviceRegistry: deps.peerDeviceAnnouncement.deviceRegistry,
+            signingAuthority: deps.peerDeviceAnnouncement.signingAuthority,
+            accountIndex: accountIndexAuthority.localAccountIndex(),
+            localAccountRef: deps.peerDeviceAnnouncement.localAccountRef,
+            localDeviceRef: deps.peerDeviceAnnouncement.localDeviceRef,
+            localAnnouncedDeviceId: deps.peerDeviceAnnouncement.localAnnouncedDeviceId,
+            localAnnouncedDevicePublicKeyHex: deps.peerDeviceAnnouncement.localAnnouncedDevicePublicKeyHex,
+            clock: deps.clock,
+            sendMailboxNip17Control: deps.peerDeviceAnnouncement.sendMailboxNip17Control,
+            observationPersistence: deps.peerDeviceAnnouncement.observationPersistence ?? new InMemoryFedosPeerDeviceAnnouncementObservationPersistence(),
+            locallySupportedCapabilities: deps.peerDeviceAnnouncement.locallySupportedCapabilities,
           });
 
     // Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
@@ -1475,6 +1531,7 @@ export class FedosConversationRuntime {
     | FedosDeletionAcknowledgementInboundOutcome
     | FedosIdentityTransitionInboundOutcome
     | FedosConversationInvitationInboundOutcome
+    | FedosPeerDeviceAnnouncementInboundOutcome
   > {
     // Secure Runtime Alpha 5561–5640 Phase G — tried FIRST, exactly like
     // the payload codec's own header requires: a ratchet payload must
@@ -1541,6 +1598,18 @@ export class FedosConversationRuntime {
       const invitationResult = await this.#invitationRuntime.importInvitationPayload(rumor.content);
       if (invitationResult.outcome !== "not-invitation-payload") return invitationResult;
     }
+    // FedOS Peer Device Discovery Arc — tried SIXTH, before the legacy chat
+    // fallback: a peer-device-announcement control payload must never be
+    // imported as an ordinary chat message either, mirroring every control-
+    // payload attempt above. `"not-peer-device-announcement-payload"` (the
+    // ONLY outcome possible when `#peerDeviceAnnouncementRuntime` is
+    // `null`, or when a real, non-peer-device-announcement Rumor arrives)
+    // falls through to the EXISTING, UNCHANGED legacy coordinator below —
+    // never the reverse.
+    if (this.#peerDeviceAnnouncementRuntime !== null) {
+      const peerDeviceAnnouncementResult = await this.#peerDeviceAnnouncementRuntime.importPeerDeviceAnnouncementPayload(rumor.content);
+      if (peerDeviceAnnouncementResult.outcome !== "not-peer-device-announcement-payload") return peerDeviceAnnouncementResult;
+    }
     return this.#nip17InboundImportCoordinator.receiveRumor(rumor, relaySource);
   }
 
@@ -1564,6 +1633,16 @@ export class FedosConversationRuntime {
    */
   peerCapability(): FedosRatchetPeerCapabilityRuntime | null {
     return this.#peerCapabilityRuntime;
+  }
+
+  /**
+   * FedOS Peer Device Discovery Arc — the additive peer-device-announcement
+   * facade. `null` when `deps.peerDeviceAnnouncement` was not supplied at
+   * construction (mirrors `peerCapability()`'s own "null when not
+   * assembled" precedent).
+   */
+  peerDeviceAnnouncement(): FedosPeerDeviceAnnouncementRuntime | null {
+    return this.#peerDeviceAnnouncementRuntime;
   }
 
   /**

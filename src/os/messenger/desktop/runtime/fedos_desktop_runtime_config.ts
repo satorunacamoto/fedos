@@ -86,6 +86,7 @@ import type {
   FedosConversationPeerCapabilityIntegrationDependencies,
   FedosConversationIdentityTransitionIntegrationDependencies,
   FedosConversationInvitationIntegrationDependencies,
+  FedosConversationPeerDeviceAnnouncementIntegrationDependencies,
 } from "../../conversations/runtime/fedos_conversation_runtime.js";
 import type { FedosRatchetPeerCapabilityEntry } from "../../conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_vocabulary.js";
 import type { FedosIdentityTransitionLocalPolicy } from "../../conversations/identity_transition/fedos_identity_transition_evidence_evaluation.js";
@@ -608,6 +609,27 @@ export interface FedosDesktopRuntimeConfig {
   readonly peerCapabilityObservationLogPath?: string;
   /** Manual override — see `conversationDirectRatchet`'s own doc comment for the exact same convention. */
   readonly conversationPeerCapability?: FedosConversationPeerCapabilityIntegrationDependencies;
+
+  /**
+   * FedOS Peer Device Discovery Arc — OPTIONAL. Auto-constructs
+   * `FedosConversationPeerDeviceAnnouncementIntegrationDependencies` when
+   * `conversationPeerDeviceAnnouncement` was not manually supplied. See
+   * `docs/reviews/fedos-peer-device-discovery-current/06_PROTOCOL_CONTRACT_FREEZE.md`.
+   */
+  readonly peerDeviceAnnouncementEnabled?: boolean;
+  /** REQUIRED when `peerDeviceAnnouncementEnabled` is `true` and `conversationPeerDeviceAnnouncement` was not supplied — mirrors `peerCapabilityLocallySupportedCapabilities`'s own "never a fabricated list" discipline. */
+  readonly peerDeviceAnnouncementLocallySupportedCapabilities?: readonly FedosRatchetPeerCapabilityEntry[];
+  readonly peerDeviceAnnouncementObservationLogPath?: string;
+  /**
+   * REQUIRED when `peerDeviceAnnouncementEnabled` is `true` and
+   * `conversationPeerDeviceAnnouncement` was not supplied — path to this
+   * local device's own small, durable, non-secret identity file (see
+   * `../../conversations/peer_device/fedos_local_peer_device_announcement_identity.ts`).
+   * Idempotent: generated once, reused forever after.
+   */
+  readonly peerDeviceAnnouncementIdentityLogPath?: string;
+  /** Manual override — see `conversationDirectRatchet`'s own doc comment for the exact same convention. */
+  readonly conversationPeerDeviceAnnouncement?: FedosConversationPeerDeviceAnnouncementIntegrationDependencies;
 
   /**
    * Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and

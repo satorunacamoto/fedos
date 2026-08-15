@@ -20,7 +20,7 @@ function baseFacts(overrides: Partial<FedosConversationSecurityStateFacts> = {})
     identityContinuity: { hasRecord: false, acceptanceState: null, silentlyAutoAcceptedWithoutAsking: false, recordedAt: null, hasEverExchangedMessages: false },
     encryption: { ratchetStatus: null, asOf: null },
     forwardSecrecy: { forwardSecrecy: null, reason: null, asOf: null },
-    deviceKnowledge: { observedPeerDeviceStatuses: [], asOf: null },
+    deviceKnowledge: { observedPeerDeviceTrustStates: [], asOf: null },
     evidenceIntegrity: { lastRejectionReasonCode: null, asOf: NOW },
     metadataExposure: { connectedRelayCount: null },
     ...overrides,
@@ -54,7 +54,7 @@ describe("deriveConversationSecurityState -- false-green negative matrix (mandat
         identityContinuity: { hasRecord: false, acceptanceState: null, silentlyAutoAcceptedWithoutAsking: false, recordedAt: null, hasEverExchangedMessages: true },
         encryption: { ratchetStatus: "active", asOf: NOW },
         forwardSecrecy: { forwardSecrecy: true, reason: null, asOf: NOW },
-        deviceKnowledge: { observedPeerDeviceStatuses: ["compatible"], asOf: NOW },
+        deviceKnowledge: { observedPeerDeviceTrustStates: ["trusted"], asOf: NOW },
       }),
     );
     expect(state.identityContinuity.state).toBe("good");
@@ -128,41 +128,40 @@ describe("deriveConversationSecurityState -- false-green negative matrix (mandat
   });
 
   it("10. missing peer device knowledge -- UNKNOWN, distinct from ATTENTION (nothing known vs something known-but-degraded)", () => {
-    const state = deriveConversationSecurityState(baseFacts({ deviceKnowledge: { observedPeerDeviceStatuses: [], asOf: null } }));
+    const state = deriveConversationSecurityState(baseFacts({ deviceKnowledge: { observedPeerDeviceTrustStates: [], asOf: null } }));
     expect(state.deviceKnowledge.state).toBe("unknown");
   });
 
-  it("11. stale device knowledge -- ATTENTION with source:'cached', never rendered identically to fresh GOOD/live knowledge", () => {
-    const fresh = deriveConversationSecurityState(baseFacts({ deviceKnowledge: { observedPeerDeviceStatuses: ["compatible"], asOf: NOW } }));
-    const stale = deriveConversationSecurityState(baseFacts({ deviceKnowledge: { observedPeerDeviceStatuses: ["stale"], asOf: NOW - 999_999 } }));
-    expect(fresh.deviceKnowledge.state).toBe("good");
-    expect(stale.deviceKnowledge.state).toBe("attention");
-    expect(stale.deviceKnowledge.source).toBe("cached");
-    expect(stale.deviceKnowledge).not.toEqual(fresh.deviceKnowledge);
+  it("11. revoked device knowledge -- ATTENTION, never rendered identically to a fresh GOOD/trusted device (FedOS Peer Device Discovery Arc -- observedPeerDeviceTrustStates is now a LIVE Device Registry trust-state lookup, so a genuinely-degraded case is 'revoked'/'unavailable', not the retired 'stale' capability-only concept)", () => {
+    const trusted = deriveConversationSecurityState(baseFacts({ deviceKnowledge: { observedPeerDeviceTrustStates: ["trusted"], asOf: NOW } }));
+    const revoked = deriveConversationSecurityState(baseFacts({ deviceKnowledge: { observedPeerDeviceTrustStates: ["revoked"], asOf: NOW } }));
+    expect(trusted.deviceKnowledge.state).toBe("good");
+    expect(revoked.deviceKnowledge.state).toBe("attention");
+    expect(revoked.deviceKnowledge).not.toEqual(trusted.deviceKnowledge);
   });
 
-  it("12. restart -- every axis reads source 'cached'/'unavailable', never 'live', for facts the adapter marks as not-just-reconfirmed", () => {
+  it("12. restart -- identityContinuity reads source 'cached', never 'live', for facts the adapter marks as not-just-reconfirmed; deviceKnowledge is a LIVE Registry read every call (a genuinely more honest 'live' reading, not a stale cache), so a 'pending' trust state reads UNKNOWN rather than a false GOOD", () => {
     const state = deriveConversationSecurityState(
       baseFacts({
         identityContinuity: { hasRecord: true, acceptanceState: "accepted", silentlyAutoAcceptedWithoutAsking: false, recordedAt: NOW - 1000, hasEverExchangedMessages: true },
-        deviceKnowledge: { observedPeerDeviceStatuses: ["stale"], asOf: NOW - 1000 },
+        deviceKnowledge: { observedPeerDeviceTrustStates: ["pending"], asOf: NOW - 1000 },
       }),
     );
     expect(state.identityContinuity.source).toBe("cached");
-    expect(state.deviceKnowledge.source).toBe("cached");
     // A restart never fabricates a "live" claim for data the adapter marked cached.
     expect(state.identityContinuity.source).not.toBe("live");
+    expect(state.deviceKnowledge.state).toBe("unknown");
   });
 
-  it("13. offline -- deviceKnowledge and identityContinuity stay honestly 'cached', never silently claim current-ness while genuinely disconnected", () => {
+  it("13. offline -- identityContinuity stays honestly 'cached', never silently claims current-ness while genuinely disconnected; an unresolved ('unknown') device trust state never silently reads GOOD", () => {
     const state = deriveConversationSecurityState(
       baseFacts({
         identityContinuity: { hasRecord: true, acceptanceState: "accepted", silentlyAutoAcceptedWithoutAsking: false, recordedAt: NOW - 5000, hasEverExchangedMessages: true },
-        deviceKnowledge: { observedPeerDeviceStatuses: ["stale"], asOf: NOW - 5000 },
+        deviceKnowledge: { observedPeerDeviceTrustStates: ["unknown"], asOf: NOW - 5000 },
       }),
     );
     expect(state.identityContinuity.source).toBe("cached");
-    expect(state.deviceKnowledge.source).toBe("cached");
+    expect(state.deviceKnowledge.state).toBe("unknown");
   });
 
   it("14. replayed old security event (rejected) -- EVIDENCE_INTEGRITY surfaces the rejection; a rejected event has zero side effect on other axes", () => {
@@ -231,7 +230,7 @@ describe("deriveConversationSecurityState -- output never contains secret materi
         identityContinuity: { hasRecord: true, acceptanceState: "accepted", silentlyAutoAcceptedWithoutAsking: false, recordedAt: NOW, hasEverExchangedMessages: true },
         encryption: { ratchetStatus: "active", asOf: NOW },
         forwardSecrecy: { forwardSecrecy: true, reason: null, asOf: NOW },
-        deviceKnowledge: { observedPeerDeviceStatuses: ["compatible"], asOf: NOW },
+        deviceKnowledge: { observedPeerDeviceTrustStates: ["trusted"], asOf: NOW },
         evidenceIntegrity: { lastRejectionReasonCode: null, asOf: NOW },
         metadataExposure: { connectedRelayCount: 1 },
       }),

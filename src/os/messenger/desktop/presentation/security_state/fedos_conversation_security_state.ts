@@ -184,46 +184,48 @@ function evaluateForwardSecrecy(facts: FedosConversationSecurityStateForwardSecr
 
 // ---------------------------------------------------------------------------
 // Axis 4: DEVICE_KNOWLEDGE
-// Fact source: `Shell.peerCapabilityListObserved()`'s own
-// `FedosRatchetPeerCapabilitySafeStatus` (`../../conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js`)
-// -- a real, already-closed, already-honest 10-value vocabulary that
-// natively distinguishes `"stale"` from a fresh `"compatible"` observation,
-// filtered to devices actually observed for THIS conversation's
-// counterparty account. Bounded, honest: "devices we've directly
-// observed", never a claim of a complete peer-device directory (no
-// cross-account peer-Device discovery protocol exists -- see
-// `04_DEVICE_TRUST_VISIBILITY.md`).
+// FedOS Peer Device Discovery Arc — REDESIGNED fact source. Previously
+// consumed `Shell.peerCapabilityListObserved()`'s own capability-
+// compatibility signal (a real, honest, but narrower fact: "do we speak a
+// compatible ratchet suite/route", never "is this device cryptographically
+// trusted as belonging to this account"). Now consumes
+// `Shell.peerDeviceAnnouncementListObserved()`'s own LIVE Device Registry
+// trust-state lookup (`FedosDeviceTrustState`,
+// `../../../device/fedos_device_binding.js` — the SAME real, already-safe,
+// already-shipped vocabulary used everywhere else in this codebase for
+// Device trust) per peer device this conversation's counterparty account
+// has been cryptographically observed announcing. This is a strictly
+// STRONGER, more honest fact than the prior capability-only signal: `GOOD`
+// here now means a real, dual-context-verified (account signature, per
+// `06_PROTOCOL_CONTRACT_FREEZE.md` §3), durably-registered `"trusted"`
+// binding exists — never merged with ENCRYPTION/FORWARD_SECRECY (mandate
+// §24's own explicit prohibition; a trusted device binding does not by
+// itself mean a ratchet session is active or in use).
 // ---------------------------------------------------------------------------
 
-export type FedosRatchetPeerCapabilitySafeStatusFact = "unknown" | "observed" | "compatible" | "initialization-required" | "reset-required" | "stale" | "conflicting" | "revoked" | "unsupported" | "unavailable";
+export type FedosDeviceTrustStateFact = "pending" | "trusted" | "revoked" | "unavailable" | "unknown";
 
 export interface FedosConversationSecurityStateDeviceKnowledgeFacts {
-  /** Safe statuses of every peer device this conversation's counterparty account has actually been observed to advertise a capability from. Empty = never observed any. */
-  readonly observedPeerDeviceStatuses: readonly FedosRatchetPeerCapabilitySafeStatusFact[];
+  /** Live Registry trust states of every peer device this conversation's counterparty account has actually been cryptographically observed announcing. Empty = never observed any. */
+  readonly observedPeerDeviceTrustStates: readonly FedosDeviceTrustStateFact[];
   readonly asOf: number | null;
 }
 
 function evaluateDeviceKnowledge(facts: FedosConversationSecurityStateDeviceKnowledgeFacts): FedosSecurityAxisResult {
-  if (facts.observedPeerDeviceStatuses.length === 0) {
+  if (facts.observedPeerDeviceTrustStates.length === 0) {
     return { state: "unknown", reasonCode: "no-device-observed", asOf: null, source: "unavailable" };
   }
   // Most-degraded-first, mirrors the historical precedent's own "device" axis reasoning exactly.
-  if (facts.observedPeerDeviceStatuses.includes("revoked")) {
+  if (facts.observedPeerDeviceTrustStates.includes("revoked")) {
     return { state: "attention", reasonCode: "observed-device-revoked", asOf: facts.asOf, source: "live" };
   }
-  if (facts.observedPeerDeviceStatuses.includes("conflicting")) {
-    return { state: "attention", reasonCode: "observed-device-conflicting", asOf: facts.asOf, source: "live" };
+  if (facts.observedPeerDeviceTrustStates.includes("unavailable")) {
+    return { state: "attention", reasonCode: "observed-device-registration-unavailable", asOf: facts.asOf, source: "live" };
   }
-  if (facts.observedPeerDeviceStatuses.includes("stale")) {
-    return { state: "attention", reasonCode: "observed-device-knowledge-stale", asOf: facts.asOf, source: "cached" };
+  if (facts.observedPeerDeviceTrustStates.some((s) => s === "pending" || s === "unknown")) {
+    return { state: "unknown", reasonCode: "observed-device-not-yet-trusted", asOf: facts.asOf, source: "live" };
   }
-  if (facts.observedPeerDeviceStatuses.some((s) => s === "reset-required" || s === "unsupported" || s === "unavailable")) {
-    return { state: "attention", reasonCode: "observed-device-not-usable", asOf: facts.asOf, source: "live" };
-  }
-  if (facts.observedPeerDeviceStatuses.some((s) => s === "unknown" || s === "observed" || s === "initialization-required")) {
-    return { state: "unknown", reasonCode: "observed-device-not-yet-compatible", asOf: facts.asOf, source: "live" };
-  }
-  return { state: "good", reasonCode: "observed-devices-compatible", asOf: facts.asOf, source: "live" };
+  return { state: "good", reasonCode: "observed-devices-trusted", asOf: facts.asOf, source: "live" };
 }
 
 // ---------------------------------------------------------------------------

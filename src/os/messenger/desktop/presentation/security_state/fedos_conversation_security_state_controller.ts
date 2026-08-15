@@ -54,7 +54,7 @@ export class FedosConversationSecurityStateController {
   /**
    * Synchronous — every fact source this method calls is itself
    * synchronous (`directRatchetStatus`/`conversationIdentityContinuity`/
-   * `peerCapabilityListObserved`/`identityTransitionStatus` are all
+   * `peerDeviceAnnouncementListObserved`/`identityTransitionStatus` are all
    * synchronous reads over already-durable local state, no network I/O
    * inside this call). `now` is caller-supplied (never `Date.now()` read
    * here), matching this codebase's own established "no hidden clock
@@ -78,18 +78,27 @@ export class FedosConversationSecurityStateController {
     }
 
     // --- Axis 4: DEVICE_KNOWLEDGE (also feeds the remoteDeviceRef used by axes 2/3) ---
-    const peerCapabilityResult = this.#shell.peerCapabilityListObserved();
+    // FedOS Peer Device Discovery Arc -- REDESIGNED: this controller now
+    // sources its device facts from `peerDeviceAnnouncementListObserved()`
+    // (a LIVE Device Registry trust-state lookup, per real cross-account
+    // signed announcements) instead of `peerCapabilityListObserved()`
+    // (a capability-compatibility signal, never a trust claim -- see
+    // `fedos_conversation_security_state.ts`'s own Axis 4 header for the
+    // full justification). This is the single, strictly stronger fact
+    // source for device selection across every axis below -- never two
+    // divergent device lists feeding different axes.
+    const peerDeviceAnnouncementResult = this.#shell.peerDeviceAnnouncementListObserved();
     const observedForCounterparty =
-      peerCapabilityResult.outcome === "ok" && counterpartyAccountRef !== null
-        ? peerCapabilityResult.value.filter((p) => accountRefsEqual(p.peerAccountRef, counterpartyAccountRef))
+      peerDeviceAnnouncementResult.outcome === "ok" && counterpartyAccountRef !== null
+        ? peerDeviceAnnouncementResult.value.filter((d) => accountRefsEqual(d.peerAccountRef, counterpartyAccountRef))
         : [];
-    // Prefer a device whose own status is already usable for a real Ratchet
-    // check; fall back to the first observed device either way -- honest
-    // either way, never fabricated.
-    const chosenDevice = observedForCounterparty.find((p) => p.safeStatus === "compatible") ?? observedForCounterparty[0];
+    // Prefer an already-trusted device for the real Ratchet check; fall
+    // back to the first observed device either way -- honest either way,
+    // never fabricated.
+    const chosenDevice = observedForCounterparty.find((d) => d.trustState === "trusted") ?? observedForCounterparty[0];
 
     // --- Axis 2: ENCRYPTION ---
-    const ratchetStatusResult = chosenDevice !== undefined ? this.#shell.directRatchetStatus(conversationId, chosenDevice.peerDeviceRef) : null;
+    const ratchetStatusResult = chosenDevice !== undefined ? this.#shell.directRatchetStatus(conversationId, chosenDevice.deviceId) : null;
     const ratchetStatus = ratchetStatusResult !== null && ratchetStatusResult.outcome === "ok" ? ratchetStatusResult.value : null;
 
     // --- Axis 3: FORWARD_SECRECY --- see `fedos_conversation_security_state.ts`'s
@@ -102,7 +111,7 @@ export class FedosConversationSecurityStateController {
     // `fedos_conversation_direct_messaging_coordinator.ts`) must be set to
     // THIS exact device. Never inferred from session existence alone.
     const forwardSecrecyConfigured =
-      this.#messageDeliveryRemoteDeviceRef !== null && chosenDevice !== undefined && this.#messageDeliveryRemoteDeviceRef === chosenDevice.peerDeviceRef;
+      this.#messageDeliveryRemoteDeviceRef !== null && chosenDevice !== undefined && this.#messageDeliveryRemoteDeviceRef === chosenDevice.deviceId;
     const forwardSecrecy = ratchetStatus === null ? null : ratchetStatus === "active" && forwardSecrecyConfigured;
     const forwardSecrecyReason = forwardSecrecy === false ? (forwardSecrecyConfigured ? null : "ratchet-not-configured") : null;
 
@@ -128,7 +137,7 @@ export class FedosConversationSecurityStateController {
       },
       encryption: { ratchetStatus, asOf: now },
       forwardSecrecy: { forwardSecrecy, reason: forwardSecrecyReason, asOf: now },
-      deviceKnowledge: { observedPeerDeviceStatuses: observedForCounterparty.map((p) => p.safeStatus), asOf: now },
+      deviceKnowledge: { observedPeerDeviceTrustStates: observedForCounterparty.map((d) => d.trustState), asOf: now },
       evidenceIntegrity,
       metadataExposure,
     };

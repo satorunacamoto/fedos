@@ -181,6 +181,7 @@ const CURRENT_SUPPORTED_TEST_FILES = [
   "test/fedos_core_rust_skeleton.test.ts",
   "test/fedos_conversation_security_state.test.ts",
   "test/fedos_conversation_security_state_controller.test.ts",
+  "test/fedos_peer_device_announcement.test.ts",
   "test/fedos_core_wasm_loader.test.ts",
   "test/fedos_direct_conversation_forward_secrecy_route.test.ts",
   "test/fedos_electron_beta_main_artifact_dir_wiring_structural_guard.test.ts",

@@ -125,6 +125,7 @@ import {
   type FedosConversationRuntime,
   type FedosConversationDirectRatchetIntegrationDependencies,
   type FedosConversationPeerCapabilityIntegrationDependencies,
+  type FedosConversationPeerDeviceAnnouncementIntegrationDependencies,
   type FedosConversationInvitationIntegrationDependencies,
   type FedosConversationIdentityTransitionIntegrationDependencies,
   type FedosConversationDeletionRequestIntegrationDependencies,
@@ -292,6 +293,8 @@ import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../../conve
 import { AppendOnlyFedosDirectRatchetSessionResetRecordPersistence } from "../../conversations/ratchet/persistence/append_only_fedos_direct_ratchet_session_reset_record_persistence.js";
 import { AppendOnlyFedosPrivateNostrImportRecordPersistence } from "../../adapters/nostr/conversation_delivery/append_only_fedos_private_nostr_import_record_persistence.js";
 import { AppendOnlyFedosRatchetPeerCapabilityObservationPersistence } from "../../conversations/ratchet/peer_capability/persistence/append_only_fedos_ratchet_peer_capability_observation_persistence.js";
+import { AppendOnlyFedosPeerDeviceAnnouncementObservationPersistence } from "../../conversations/peer_device/persistence/append_only_fedos_peer_device_announcement_observation_persistence.js";
+import { readOrCreateFedosLocalPeerDeviceAnnouncementIdentity } from "../../conversations/peer_device/fedos_local_peer_device_announcement_identity.js";
 import { AppendOnlyFedosConversationInvitationReceivedPersistence } from "../../conversations/invitation_bootstrap/persistence/append_only_fedos_conversation_invitation_received_persistence.js";
 import { FedosSecureRandomConversationInvitationIdGenerator } from "../../conversations/invitation_bootstrap/fedos_secure_random_conversation_invitation_id_generator.js";
 import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../../conversations/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
@@ -668,6 +671,7 @@ export async function startFedosDesktopRuntime(
   for (const [flag, name] of [
     [config.directRatchetEnabled, "directRatchetEnabled"],
     [config.peerCapabilityEnabled, "peerCapabilityEnabled"],
+    [config.peerDeviceAnnouncementEnabled, "peerDeviceAnnouncementEnabled"],
     [config.identityTransitionEnabled, "identityTransitionEnabled"],
     [config.deletionRequestEnabled, "deletionRequestEnabled"],
   ] as const) {
@@ -683,6 +687,18 @@ export async function startFedosDesktopRuntime(
     throw new Error(
       "startFedosDesktopRuntime: peerCapabilityEnabled is true but no peerCapabilityLocallySupportedCapabilities was supplied -- this runtime advertises no capability of its own by default, never a fabricated list.",
     );
+  }
+  if (config.peerDeviceAnnouncementEnabled && config.conversationPeerDeviceAnnouncement === undefined) {
+    if (config.peerDeviceAnnouncementLocallySupportedCapabilities === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: peerDeviceAnnouncementEnabled is true but no peerDeviceAnnouncementLocallySupportedCapabilities was supplied -- this runtime advertises no capability of its own by default, never a fabricated list.",
+      );
+    }
+    if (config.peerDeviceAnnouncementIdentityLogPath === undefined) {
+      throw new Error(
+        "startFedosDesktopRuntime: peerDeviceAnnouncementEnabled is true but no peerDeviceAnnouncementIdentityLogPath was supplied -- this runtime needs a durable path to read-or-create this local device's own stable, protocol-scoped identity.",
+      );
+    }
   }
   if (config.deletionRequestEnabled && config.conversationDeletionRequest === undefined && config.deletionRequestResolveLocalPolicy === undefined) {
     throw new Error(
@@ -1077,6 +1093,34 @@ export async function startFedosDesktopRuntime(
         }
       : undefined);
 
+  // FedOS Peer Device Discovery Arc -- mirrors `conversationPeerCapabilityDeps`'s
+  // own auto-construction exactly, reusing the SAME `sendMailboxNip17Control`
+  // closure and the SAME real production `FedosNostrSigningAuthority` --
+  // never a second, divergent signing/transport path. The local device's
+  // own stable, protocol-scoped identity is read-or-created ONCE here (see
+  // that file's own header on why this is a SEPARATE, minimal file rather
+  // than a new field on the profile descriptor's own fragile state
+  // machine).
+  const conversationPeerDeviceAnnouncementDeps: FedosConversationPeerDeviceAnnouncementIntegrationDependencies | undefined =
+    config.conversationPeerDeviceAnnouncement ??
+    (config.peerDeviceAnnouncementEnabled
+      ? (() => {
+          const localIdentity = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(config.peerDeviceAnnouncementIdentityLogPath!);
+          return {
+            deviceRegistry: deviceRegistryPersistence!,
+            signingAuthority: config.conversationTransportSigningAuthority!,
+            localAccountRef: config.localAccountRef!,
+            localDeviceRef: config.localDeviceId!,
+            localAnnouncedDeviceId: localIdentity.deviceId,
+            localAnnouncedDevicePublicKeyHex: localIdentity.devicePublicKeyHex,
+            locallySupportedCapabilities: config.peerDeviceAnnouncementLocallySupportedCapabilities!,
+            observationPersistence:
+              config.peerDeviceAnnouncementObservationLogPath !== undefined ? new AppendOnlyFedosPeerDeviceAnnouncementObservationPersistence(config.peerDeviceAnnouncementObservationLogPath) : undefined,
+            sendMailboxNip17Control,
+          };
+        })()
+      : undefined);
+
   // Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and
   // Shared Conversation Foundation Arc) -- mirrors `conversationPeerCapabilityDeps`'s
   // own auto-construction exactly, reusing the SAME `sendMailboxNip17Control`
@@ -1279,6 +1323,7 @@ export async function startFedosDesktopRuntime(
     // was never set, byte-for-byte the same as before this Arc.
     directRatchet: conversationDirectRatchetDeps,
     peerCapability: conversationPeerCapabilityDeps,
+    peerDeviceAnnouncement: conversationPeerDeviceAnnouncementDeps,
     conversationInvitation: conversationInvitationDeps,
     identityTransition: conversationIdentityTransitionDeps,
     deletionRequest: conversationDeletionRequestDeps,

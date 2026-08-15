@@ -116,6 +116,8 @@ import type { FedosDirectRatchetEstablishOptions, FedosDirectRatchetEstablishOut
 import type { FedosConversationInvitationOutboundOutcome } from "../../conversations/invitation_bootstrap/fedos_conversation_invitation_outbound_coordinator.js";
 import type { FedosRatchetPeerCapabilitySafeStatus } from "../../conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_safe_status.js";
 import type { FedosRatchetPeerCapabilityPeerDeviceStatus } from "../../conversations/ratchet/peer_capability/fedos_ratchet_peer_capability_runtime.js";
+import type { FedosPeerDeviceAnnouncementPeerDeviceStatus } from "../../conversations/peer_device/fedos_peer_device_announcement_runtime.js";
+import type { FedosPeerDeviceAnnouncementOutboundOutcome } from "../../conversations/peer_device/fedos_peer_device_announcement_outbound_coordinator.js";
 // Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
 // Durable Sync Journal Arc) -- every import/addition below this comment is
 // ADDITIVE ONLY, mirroring the Alpha 3801-3880 boundary above.
@@ -1143,6 +1145,31 @@ export class FedosDesktopApplicationShell {
     const pc = this.#runtime.conversationRuntime().peerCapability();
     if (pc === null) return fedosDesktopShellFailure("unavailable", "peer capability Runtime is not configured");
     return fedosDesktopShellOk(pc.getPeerDeviceCapabilityStatus(peerAccountRef, peerDeviceRef));
+  }
+
+  /**
+   * FedOS Peer Device Discovery Arc — publishes a real, signed announcement
+   * of this local device's own protocol-scoped identity to `recipientAccountRef`
+   * over the named Direct Conversation's already-established transport.
+   * `epoch` must be strictly greater than any prior epoch this local device
+   * has ever announced to the SAME recipient for the SAME `deviceId` (the
+   * caller's own responsibility — see `06_PROTOCOL_CONTRACT_FREEZE.md` §4);
+   * `0` is always safe for a genuinely first announcement.
+   */
+  async peerDeviceAnnounce(recipientAccountRef: FedosDeviceBindingAccountRef, conversationId: string, epoch: number): Promise<FedosDesktopShellResult<FedosPeerDeviceAnnouncementOutboundOutcome>> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const pda = this.#runtime.conversationRuntime().peerDeviceAnnouncement();
+    if (pda === null) return fedosDesktopShellFailure("unavailable", "peer device announcement Runtime is not configured");
+    const outcome = await pda.announceLocalDevice({ recipientAccountRef, conversationId: conversationId as FedosConversationId, epoch });
+    return fedosDesktopShellOk(outcome);
+  }
+
+  /** Every peer device this local Device has ever observed an announcement from, with a LIVE Device Registry trust-state lookup per device — never a cached/stale trust flag. */
+  peerDeviceAnnouncementListObserved(): FedosDesktopShellResult<readonly FedosPeerDeviceAnnouncementPeerDeviceStatus[]> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const pda = this.#runtime.conversationRuntime().peerDeviceAnnouncement();
+    if (pda === null) return fedosDesktopShellFailure("unavailable", "peer device announcement Runtime is not configured");
+    return fedosDesktopShellOk(pda.listObservedPeerDevices());
   }
 
   #toSummaryView(conversationId: string): FedosConversationSummaryView | null {
