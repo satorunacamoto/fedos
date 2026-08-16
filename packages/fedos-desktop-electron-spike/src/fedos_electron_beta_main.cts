@@ -785,6 +785,8 @@ interface ShellDiagnosticLike {
   listMessages(conversationId: string): { readonly outcome: string; readonly [key: string]: unknown };
   readMessage(conversationId: string, messageId: string): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
   directRatchetStatus(conversationId: string, remoteDeviceRef: string): { readonly outcome: string; readonly [key: string]: unknown };
+  /** Direct Ratchet Live-State Durability arc — narrows `FedosDesktopApplicationShell.directRatchetLiveVerification()`; synchronous, mirrors `directRatchetStatus()` immediately above. */
+  directRatchetLiveVerification(conversationId: string, remoteDeviceRef: string): { readonly outcome: string; readonly [key: string]: unknown };
   /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.createConversationInvitation()` (Alpha 7081-7160, unmodified); no new business logic. */
   createConversationInvitation(invitee: unknown, expiresInMs?: number): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
   /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.search()` (Alpha 3081-3160, unmodified); synchronous, never a promise. */
@@ -5800,6 +5802,28 @@ async function handleAcceptanceDirectRatchetStatus(payload: unknown) {
 }
 
 /**
+ * Direct Ratchet Live-State Durability arc -- acceptance-mode-only mirror
+ * of `handleAcceptanceDirectRatchetStatus()` immediately above, exposing
+ * `FedosDesktopApplicationShell.directRatchetLiveVerification()` (the
+ * arc's own additive truthfulness fact: `lifecycleState === "active"`
+ * durable metadata alone is never sufficient to claim a genuinely
+ * confirmed live session -- see `fedos_direct_ratchet_conversation_runtime.ts`'s
+ * own header) so a live installed-binary acceptance script can prove, with
+ * real evidence, that this fact reads honestly across a real process
+ * restart -- never inferred from the unit-level proof alone.
+ */
+async function handleAcceptanceDirectRatchetLiveVerification(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const remoteDeviceRef = (payload as { remoteDeviceRef?: unknown } | null)?.remoteDeviceRef;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || !isBoundedString(remoteDeviceRef, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed live-verification request" };
+  }
+  return { outcome: "ok", value: shell.directRatchetLiveVerification(conversationId, remoteDeviceRef) };
+}
+
+/**
  * Direct Ratchet Identity-Space Unification arc -- acceptance-mode-only
  * (`ACCEPTANCE_MODE_ENABLED` gate, same as every other `fedos-acceptance:*`
  * handler) real poll-until-condition-or-timeout status check. Genuine
@@ -8559,6 +8583,7 @@ function registerIpcHandlers(): void {
     ipcCommands.registerHandle(ipcMain, "fedos-acceptance:list-messages", (payload: unknown) => handleAcceptanceListMessages(payload), { allowConcurrentSelf: true });
     ipcCommands.registerHandle(ipcMain, "fedos-acceptance:read-message", (payload: unknown) => handleAcceptanceReadMessage(payload));
     ipcCommands.registerHandle(ipcMain, "fedos-acceptance:direct-ratchet-status", (payload: unknown) => handleAcceptanceDirectRatchetStatus(payload), { allowConcurrentSelf: true });
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:direct-ratchet-live-verification", (payload: unknown) => handleAcceptanceDirectRatchetLiveVerification(payload), { allowConcurrentSelf: true });
     // Secure Runtime Alpha 7321-7400 -- these four channels close Release
     // Readiness Review B-2/B-7; Secure Runtime Alpha 8121-8200 narrows
     // "reachable whenever a real profile is unlocked, in ANY mode" (the
@@ -8837,6 +8862,7 @@ app.whenReady().then(async () => {
         "acceptance-read-message": (payload) => handleAcceptanceReadMessage(payload),
         "acceptance-direct-ratchet-status": (payload) => handleAcceptanceDirectRatchetStatus(payload),
         "acceptance-direct-ratchet-status-poll-until-active": (payload) => handleAcceptanceDirectRatchetStatusPollUntilActive(payload),
+        "acceptance-direct-ratchet-live-verification": (payload) => handleAcceptanceDirectRatchetLiveVerification(payload),
         "acceptance-list-messages-poll-until-count": (payload) => handleAcceptanceListMessagesPollUntilCount(payload),
         "acceptance-create-conversation-invitation": (payload) => handleAcceptanceCreateConversationInvitation(payload),
         "acceptance-search": (payload) => handleAcceptanceSearch(payload),

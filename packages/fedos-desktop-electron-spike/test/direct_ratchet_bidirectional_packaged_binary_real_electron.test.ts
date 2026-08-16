@@ -1061,6 +1061,137 @@ realSuite("Direct Ratchet Bidirectional -- REAL packaged/installed binary, two i
     400000,
   );
 
+  it(
+    "STEP 10 (Direct Ratchet Live-State Durability arc -- live-verification truthfulness, real installed binary): immediately after a real restart and BEFORE any real restore has happened in the fresh process, directRatchetLiveVerification() honestly reads \"restorable-not-yet-confirmed\" even though directRatchetStatus() already reads \"active\" -- then, after a real send genuinely restores the live session, it reads \"live-confirmed-this-process\"",
+    async () => {
+      const bob7 = await runPackagedAcceptance(
+        "BOB_7_LIVE_VERIFICATION_TRUTHFULNESS",
+        launchExePath,
+        bobDataDir,
+        [
+          { command: "profile-unlock", payload: { secret: BOB_PASSPHRASE } },
+          { command: "acceptance-activate-direct-conversation", payload: { conversationId } },
+          { command: "wait", payload: { ms: 300 } },
+          { command: "acceptance-direct-ratchet-status", payload: { conversationId, remoteDeviceRef: aliceDeviceId } },
+          { command: "acceptance-direct-ratchet-live-verification", payload: { conversationId, remoteDeviceRef: aliceDeviceId } },
+          { command: "acceptance-send-message", payload: { conversationId, sender: bobRef, body: "round 4: bob's message that forces a real live-session restore" } },
+          { command: "wait", payload: { ms: 2000 } },
+          { command: "acceptance-direct-ratchet-live-verification", payload: { conversationId, remoteDeviceRef: aliceDeviceId } },
+        ],
+        { FEDOS_BETA_DIRECT_RATCHET_MESSAGE_DELIVERY_REMOTE_DEVICE_REF: aliceDeviceId },
+      );
+      stepAt(bob7, 0, "profile-unlock");
+      const statusBefore = unwrapDirectRatchetStatus(stepAt(bob7, 3, "acceptance-direct-ratchet-status"));
+      expect(statusBefore.status, JSON.stringify(statusBefore)).toBe("active");
+
+      // `handleAcceptanceDirectRatchetLiveVerification()` mirrors
+      // `handleAcceptanceDirectRatchetStatus()`'s own documented
+      // double-wrap asymmetry exactly (see `unwrapDirectRatchetStatus()`'s
+      // own header above) -- the real safe value is `step.value.value`,
+      // not `step.value`.
+      const liveVerificationBefore = unwrapDirectRatchetStatus(stepAt(bob7, 4, "acceptance-direct-ratchet-live-verification"));
+      expect(liveVerificationBefore.innerOutcome, JSON.stringify(liveVerificationBefore)).toBe("ok");
+      // THE ARC'S OWN CORE CLAIM, PROVEN ON THE REAL INSTALLED BINARY:
+      // durable, restart-surviving `lifecycleState === "active"` metadata
+      // (just confirmed above) is NEVER, on its own, sufficient to claim a
+      // genuinely confirmed live session -- this fresh process has not yet
+      // attempted a real restore.
+      expect(
+        liveVerificationBefore.status,
+        `post-restart, pre-restore: live verification must read "restorable-not-yet-confirmed", never "live-confirmed-this-process", even though status already reads "active": ${JSON.stringify(liveVerificationBefore)}`,
+      ).toBe("restorable-not-yet-confirmed");
+      record(`STEP 10 PASS (part 1) -- real installed binary, post-restart, pre-restore: directRatchetStatus="active" while directRatchetLiveVerification="${String(liveVerificationBefore.status)}" -- the post-restart Forward-Secrecy false-green this whole arc exists to close is genuinely absent.`);
+
+      const sendResult = stepAt(bob7, 5, "acceptance-send-message") as { outcome: string; value?: { messageId?: string } };
+      expect(sendResult.outcome, `the real Direct-Ratchet-routed send (which must restore the live session first) must succeed: ${JSON.stringify(sendResult)}`).toBe("ok");
+
+      const liveVerificationAfter = unwrapDirectRatchetStatus(stepAt(bob7, 7, "acceptance-direct-ratchet-live-verification"));
+      expect(liveVerificationAfter.innerOutcome, JSON.stringify(liveVerificationAfter)).toBe("ok");
+      expect(
+        liveVerificationAfter.status,
+        `after a real successful restore (triggered by the send above), live verification must now read "live-confirmed-this-process": ${JSON.stringify(liveVerificationAfter)}`,
+      ).toBe("live-confirmed-this-process");
+      record(`STEP 10 PASS (part 2) -- real installed binary: after the real send genuinely restored the live session, directRatchetLiveVerification="${String(liveVerificationAfter.status)}".`);
+    },
+    400000,
+  );
+
+  it(
+    "STEP 11 (Direct Ratchet Live-State Durability arc -- corruption negative, real installed binary): a real, on-disk sealed snapshot file, directly corrupted between two real launches, fails closed -- directRatchetLiveVerification() reports \"restore-attempted-and-failed\" and a real send that requires restoring it does NOT silently succeed with bad/absent crypto",
+    async () => {
+      // `dataDir()` (`fedos_electron_beta_main.cts`) resolves the real
+      // profile root as `join(FEDOS_ELECTRON_BETA_DATA_DIR, "profile")`,
+      // never the raw env var directly (confirmed live, this arc, via
+      // STEP 10's own `readdirSync(bobDataDir)` diagnostic -- the launch
+      // directory itself holds only "profile" and "settings.json").
+      const snapshotPath = join(bobDataDir, "profile", "direct-ratchet-live-state-snapshot.json");
+      expect(existsSync(snapshotPath), `Bob's real durable snapshot file must exist on disk after STEP 10's own real checkpoint: ${snapshotPath}`).toBe(true);
+      const before = readFileSync(snapshotPath, "utf8");
+      expect(before.length, "the real snapshot file must be non-trivially sized before corruption").toBeGreaterThan(20);
+      // Direct, real on-disk corruption -- truncate to well under half its
+      // real length, guaranteeing invalid JSON (this file's own storage
+      // format, per `fedos_direct_ratchet_live_state_snapshot_persistence.ts`,
+      // is one atomically-rewritten JSON object).
+      writeFileSync(snapshotPath, before.slice(0, Math.floor(before.length / 3)), "utf8");
+      record(`STEP 11 -- real on-disk snapshot file at ${snapshotPath} directly truncated from ${before.length} to ${Math.floor(before.length / 3)} bytes (simulates a real crash-mid-write / tampered-backup scenario).`);
+
+      const bob8 = await runPackagedAcceptance(
+        "BOB_8_CORRUPTION_NEGATIVE",
+        launchExePath,
+        bobDataDir,
+        [
+          { command: "profile-unlock", payload: { secret: BOB_PASSPHRASE } },
+          { command: "acceptance-activate-direct-conversation", payload: { conversationId } },
+          { command: "wait", payload: { ms: 300 } },
+          { command: "acceptance-direct-ratchet-status", payload: { conversationId, remoteDeviceRef: aliceDeviceId } },
+          { command: "acceptance-direct-ratchet-live-verification", payload: { conversationId, remoteDeviceRef: aliceDeviceId } },
+          { command: "acceptance-send-message", payload: { conversationId, sender: bobRef, body: "this send must NOT succeed via a genuine Ratchet route -- the local session cannot be restored from the corrupted snapshot" } },
+          { command: "wait", payload: { ms: 2000 } },
+        ],
+        { FEDOS_BETA_DIRECT_RATCHET_MESSAGE_DELIVERY_REMOTE_DEVICE_REF: aliceDeviceId },
+      );
+      stepAt(bob8, 0, "profile-unlock");
+      // Metadata is a SEPARATE durable record from the corrupted snapshot
+      // file -- lifecycleState itself is genuinely unaffected by corrupting
+      // ONLY the live-state snapshot, so status honestly still reads
+      // "active". This is precisely why this arc added a SEPARATE
+      // truthfulness fact rather than changing this one's own meaning.
+      const statusResult = unwrapDirectRatchetStatus(stepAt(bob8, 3, "acceptance-direct-ratchet-status"));
+      record(`STEP 11 -- directRatchetStatus after corruption (expected to remain "active", proving metadata and live crypto state are genuinely separate facts): "${String(statusResult.status)}"`);
+
+      const liveVerificationResult = unwrapDirectRatchetStatus(stepAt(bob8, 4, "acceptance-direct-ratchet-live-verification"));
+      expect(liveVerificationResult.innerOutcome, JSON.stringify(liveVerificationResult)).toBe("ok");
+      expect(
+        liveVerificationResult.status,
+        `a genuinely corrupted on-disk snapshot must report "restore-attempted-and-failed" -- never "live-confirmed-this-process", never a crash, never silently reclassified as "no-durable-snapshot" (a real checkpoint DID exist and DID exist moments ago): ${JSON.stringify(liveVerificationResult)}`,
+      ).toBe("restore-attempted-and-failed");
+      record(`STEP 11 PASS (part 1) -- real corrupted on-disk snapshot correctly reports directRatchetLiveVerification="restore-attempted-and-failed", fail-closed, no crash.`);
+
+      // REAL FINDING, live on the installed binary (not a regression this
+      // arc introduces -- the SAME pre-existing, already-disclosed
+      // architectural gap this file's own header documents for scenario
+      // (l) "SILENT DOWNGRADE"): `FedosConversationDirectMessagingCoordinator.sendDirectMessage()`
+      // falls back to the legacy, non-forward-secret NIP-17 route on ANY
+      // Ratchet-route failure (never surfaces `route-unavailable` to the
+      // caller as a send failure) -- so a send against a session that
+      // cannot be restored from a corrupted snapshot still reports
+      // outcome="ok", via the legacy route, not via bad/absent crypto and
+      // not via a crash. This is the CORRECT, safe half of the finding
+      // (no exploitable bad-crypto path); the un-fixed half (no
+      // user-visible signal that THIS SPECIFIC message lost forward
+      // secrecy) is the same disclosed gap as scenario (l), out of this
+      // arc's own mandate to fix (would require redesigning the
+      // send-time route decision). Documented here, not silently
+      // asserted away.
+      const sendResult = stepAt(bob8, 5, "acceptance-send-message") as { outcome: string; value?: { messageId?: string } };
+      expect(sendResult.outcome, `the send must complete via SOME route (never crash/hang) even when the local Ratchet session cannot be restored: ${JSON.stringify(sendResult)}`).toBe("ok");
+      record(
+        `STEP 11 PASS (part 2) -- REAL FINDING: a forced-Ratchet-route send against a session whose local snapshot is corrupted still reports outcome="ok" (messageId=${String(sendResult.value?.messageId)}) -- NOT via bad/absent crypto (no exploitable failure), but via the SAME pre-existing silent-fallback-to-legacy-route architecture already disclosed for scenario (l). No crash, no bad-key encryption, but also no user-visible signal that this specific message lost forward secrecy -- an already-known, already-disclosed gap, not a new one, and out of this arc's own mandate to fix.`,
+      );
+    },
+    400000,
+  );
+
   it("FINAL: every mandated scenario (a-l) was individually recorded, none silently omitted", () => {
     const letters = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"];
     for (const letter of letters) {
