@@ -164,7 +164,16 @@ export type FedosForwardSecrecyUnavailableReasonFact =
   | "remote-device-unknown"
   | "remote-device-revoked"
   | "remote-device-not-trusted"
-  | "ambiguous-remote-device";
+  | "ambiguous-remote-device"
+  // Direct Ratchet Live-State Durability arc: `ratchetStatus === "active"`
+  // alone is stale-restart-surviving METADATA, never proof the live crypto
+  // session actually exists/restores in THIS process (the whole point of
+  // this arc -- see `FedosDirectRatchetLiveVerificationState`). These three
+  // are real, reachable, distinguishable outcomes of that live check, never
+  // folded into the generic "ratchet-not-configured".
+  | "live-state-not-yet-confirmed"
+  | "live-state-restore-failed"
+  | "live-state-no-durable-snapshot";
 
 export interface FedosConversationSecurityStateForwardSecrecyFacts {
   readonly forwardSecrecy: boolean | null;

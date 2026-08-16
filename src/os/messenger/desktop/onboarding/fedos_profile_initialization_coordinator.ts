@@ -1031,6 +1031,12 @@ export class FedosProfileInitializationCoordinator {
       directRatchetSealedSecretLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetSealedSecretLogFile : undefined,
       directRatchetResetRecordLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetResetRecordLogFile : undefined,
       directRatchetImportRecordLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetImportRecordLogFile : undefined,
+      // Direct Ratchet Live-State Durability arc -- mirrors every sibling
+      // Direct Ratchet log path immediately above exactly: real profiles
+      // get durable live-state persistence automatically, not just test
+      // configs that supply these paths by hand.
+      directRatchetRemotePublicKeyLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetRemotePublicKeyLogFile : undefined,
+      directRatchetLiveStateSnapshotLogPath: this.#deps.directRatchetEnabled === true ? paths.directRatchetLiveStateSnapshotLogFile : undefined,
       // Secure Runtime Alpha 6841-6920 -- mirrors `conversationArchiveMasterSeedAuthority`'s
       // own established line immediately above (in file order at Alpha 1691-1760)
       // exactly: reuses `this.#deps.masterSeedAuthority` directly, never a second,

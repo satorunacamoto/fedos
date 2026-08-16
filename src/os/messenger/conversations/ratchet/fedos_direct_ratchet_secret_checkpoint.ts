@@ -44,8 +44,13 @@ import {
   FEDOS_DIRECT_RATCHET_SECRET_KINDS,
 } from "./fedos_sealed_direct_ratchet_secret_record.js";
 import type { FedosSealedDirectRatchetSecretPersistence } from "./persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
-import type { FedosDirectRatchetLiveStateSnapshotPersistence } from "./persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
+import {
+  checkFedosDirectRatchetLiveStateSnapshotFreshness,
+  readFedosDirectRatchetLiveStateSnapshotSafe,
+  type FedosDirectRatchetLiveStateSnapshotPersistence,
+} from "./persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
 import type { FedosDirectRatchetSessionId, FedosDirectRatchetSuite } from "./fedos_direct_ratchet_session_id.js";
+import type { FedosDirectRatchetCounters } from "./fedos_direct_ratchet_counters.js";
 import type {
   FedosDirectRatchetSealedSkippedKey,
   FedosDirectRatchetSealedState,
@@ -82,12 +87,25 @@ export function checkpointFedosDirectRatchetSecretsV1(
   generation: number,
   sealedState: FedosDirectRatchetSealedState,
   createdAt: number,
+  /**
+   * Direct Ratchet Live-State Durability arc — the SAME LIVE session's own
+   * counters at the moment this checkpoint is taken (callers already read
+   * these fresh from `stateRuntime` immediately before/after
+   * `commitCounters()` for their own send/receive bookkeeping; never
+   * re-derive them here). Embedded into the snapshot record so a later
+   * restore attempt can prove freshness against the separately-durable
+   * session record, per `fedos_direct_ratchet_live_state_snapshot_persistence.ts`'s
+   * own header.
+   */
+  counters: FedosDirectRatchetCounters,
 ): void {
   snapshotPersistence.putSnapshot(sessionId as unknown as string, {
+    schemaVersion: 1,
     sealedRootKey: sealedState.sealedRootKey,
     sealedSendingChainKey: sealedState.sealedSendingChainKey,
     sealedReceivingChainKey: sealedState.sealedReceivingChainKey,
     sealedLocalRatchetPrivateKey: sealedState.sealedLocalRatchetPrivateKey,
+    counters,
   });
 
   for (const entry of sealedState.sealedSkippedKeys) {
@@ -113,15 +131,28 @@ export function checkpointFedosDirectRatchetSecretsV1(
  * checkpointed for this session (a session that was created but never
  * had `sealState()` called on it — should not happen in practice, this
  * Arc's own outbound/inbound integrations always checkpoint immediately
- * after creation and after every encrypt/decrypt).
+ * after creation and after every encrypt/decrypt) — OR, Direct Ratchet
+ * Live-State Durability arc — if a snapshot exists but is STALE relative
+ * to `durableCounters` (the caller's own already-durable
+ * `FedosDirectRatchetSessionRecordV1.counters`, the real "ratchet
+ * position ceiling" this function itself cannot forge). "Decrypts
+ * successfully" is never treated as sufficient proof of freshness on its
+ * own — see `checkFedosDirectRatchetLiveStateSnapshotFreshness()`'s own
+ * header. A `null` return here is intentionally indistinguishable to the
+ * caller from "never checkpointed" — both correctly route to the same
+ * fail-closed, reset-required path; this function never partially trusts
+ * a stale snapshot.
  */
 export function restoreFedosDirectRatchetSealedStateV1(
   sealedSecretPersistence: FedosSealedDirectRatchetSecretPersistence,
   snapshotPersistence: FedosDirectRatchetLiveStateSnapshotPersistence,
   sessionId: FedosDirectRatchetSessionId,
   generation: number,
+  durableCounters: FedosDirectRatchetCounters,
 ): FedosDirectRatchetSealedState | null {
-  const snapshot = snapshotPersistence.getSnapshot(sessionId as unknown as string);
+  const { snapshot, corrupt } = readFedosDirectRatchetLiveStateSnapshotSafe(snapshotPersistence, sessionId as unknown as string);
+  if (corrupt) return null;
+  if (checkFedosDirectRatchetLiveStateSnapshotFreshness(snapshot, durableCounters) !== "fresh") return null;
   if (snapshot === null) return null;
 
   const sealedSkippedKeys: FedosDirectRatchetSealedSkippedKey[] = [];

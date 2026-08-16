@@ -58,6 +58,7 @@ import {
   checkpointFedosDirectRatchetSecretsV1,
   restoreFedosDirectRatchetSealedStateV1,
 } from "./fedos_direct_ratchet_secret_checkpoint.js";
+import { FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS } from "./fedos_direct_ratchet_counters.js";
 import {
   encodeFedosDirectRatchetNip17PayloadToPlaintext,
   wireMessageBytesToBase64,
@@ -241,6 +242,11 @@ export class FedosDirectRatchetOutboundIntegration {
         generation,
         sealedState,
         this.#deps.now(),
+        // Direct Ratchet Live-State Durability arc -- a genuinely fresh
+        // session (just created above), so the durable "ratchet position
+        // ceiling" this checkpoint embeds is the real initial counters,
+        // never a locally-assumed value.
+        FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS,
       );
     }
 
@@ -373,6 +379,11 @@ export class FedosDirectRatchetOutboundIntegration {
         sessionMetadata.binding.generation,
         sealedStateAfterEncrypt,
         this.#deps.now(),
+        // Direct Ratchet Live-State Durability arc -- the SAME
+        // just-committed durable counters (`counterUpdate.record.counters`
+        // above), never re-derived -- this is the exact "ratchet position
+        // ceiling" a later restore must be able to prove freshness against.
+        counterUpdate.record.counters,
       );
     }
 
@@ -409,6 +420,10 @@ export class FedosDirectRatchetOutboundIntegration {
       this.#deps.snapshotPersistence,
       sessionId,
       sessionMetadata.binding.generation,
+      // Direct Ratchet Live-State Durability arc -- the real, separately-
+      // durable "ratchet position ceiling"; a snapshot behind this in any
+      // dimension is rejected, regardless of whether it decrypts.
+      sessionMetadata.counters,
     );
     if (sealedState === null) return null;
     const remoteRatchetPublicKeyHex = this.#deps.remotePublicKeyPersistence.getRemoteRatchetPublicKeyHex(sessionId as unknown as string);

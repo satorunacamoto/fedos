@@ -582,6 +582,12 @@ suite("Alpha 7401-7480 -- real Ratchet-route same-peer two-Conversation isolatio
         expect(aliceRuntime.listDirectMessages(conversationB), "Conversation B must remain at its own prior message count, untouched by A's reset+resend").toHaveLength(2);
         expect(aliceRuntime.directRatchet()!.getDirectRatchetStatus(conversationB, bobDeviceRef)).toBe("active");
 
+        // Direct Ratchet Live-State Durability arc -- BEFORE restart, both
+        // Conversations' sessions are genuinely live in this process (real
+        // messages were just sent/received on both above).
+        expect(aliceRuntime.directRatchet()!.getDirectRatchetLiveVerification(conversationA, bobDeviceRef)).toBe("live-confirmed-this-process");
+        expect(aliceRuntime.directRatchet()!.getDirectRatchetLiveVerification(conversationB, bobDeviceRef)).toBe("live-confirmed-this-process");
+
         // --- Restart both sides: both Conversations' Ratchet sessions survive independently ---
         await aliceTransport!.stop();
         await bobTransport!.stop();
@@ -595,10 +601,33 @@ suite("Alpha 7401-7480 -- real Ratchet-route same-peer two-Conversation isolatio
 
         expect(aliceRuntime.directRatchet()!.getDirectRatchetStatus(conversationA, bobDeviceRef)).toBe("active");
         expect(aliceRuntime.directRatchet()!.getDirectRatchetStatus(conversationB, bobDeviceRef)).toBe("active");
+        // THE CORE FIX THIS ARC EXISTS FOR: immediately after a fresh
+        // process restart, and BEFORE any real restore has been attempted,
+        // `lifecycleState === "active"` metadata alone (just asserted
+        // above via `getDirectRatchetStatus`) must NEVER read as a
+        // confirmed live session -- that is exactly the post-restart
+        // Forward-Secrecy false-green this whole arc closes. A fresh,
+        // never-stale durable snapshot genuinely exists from the pre-
+        // restart checkpoints above, so the honest reading is
+        // "restorable-not-yet-confirmed", never "live-confirmed-this-process".
+        expect(
+          aliceRuntime.directRatchet()!.getDirectRatchetLiveVerification(conversationA, bobDeviceRef),
+          "restart must never silently present stale-restart-surviving metadata as a confirmed live session",
+        ).toBe("restorable-not-yet-confirmed");
+        expect(aliceRuntime.directRatchet()!.getDirectRatchetLiveVerification(conversationB, bobDeviceRef)).toBe("restorable-not-yet-confirmed");
+
         const postRestartA = await aliceRuntime.sendDirectMessage({ conversationId: conversationA, body: "post-restart-in-A", replyToEnvelopeId: null });
         expect(postRestartA.outcome).toBe("sent-locally");
+        // A genuine restore was just attempted (and succeeded) as part of
+        // that send -- NOW, and only now, live verification may honestly
+        // read confirmed for Conversation A. Conversation B's own session
+        // is untouched so far and must still read as merely restorable.
+        expect(aliceRuntime.directRatchet()!.getDirectRatchetLiveVerification(conversationA, bobDeviceRef)).toBe("live-confirmed-this-process");
+        expect(aliceRuntime.directRatchet()!.getDirectRatchetLiveVerification(conversationB, bobDeviceRef)).toBe("restorable-not-yet-confirmed");
+
         const postRestartB = await aliceRuntime.sendDirectMessage({ conversationId: conversationB, body: "post-restart-in-B", replyToEnvelopeId: null });
         expect(postRestartB.outcome).toBe("sent-locally");
+        expect(aliceRuntime.directRatchet()!.getDirectRatchetLiveVerification(conversationB, bobDeviceRef)).toBe("live-confirmed-this-process");
         await aliceTransport!.tick();
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(bobRuntime.listDirectMessages(conversationA)).toHaveLength(4);

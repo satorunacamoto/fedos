@@ -110,10 +110,37 @@ export class FedosConversationSecurityStateController {
     // real gate `sendDirectMessage()` itself checks -- see
     // `fedos_conversation_direct_messaging_coordinator.ts`) must be set to
     // THIS exact device. Never inferred from session existence alone.
+    //
+    // Direct Ratchet Live-State Durability arc: `ratchetStatus === "active"`
+    // is durable, restart-surviving METADATA -- it says nothing about
+    // whether the live crypto session actually exists/restores in THIS
+    // process. Also require `directRatchetLiveVerification()`'s own,
+    // separate, genuinely-live confirmation (`"live-confirmed-this-process"`)
+    // before Forward Secrecy may ever read GOOD -- this is the exact fix for
+    // this arc's own core finding ("post-restart Forward-Secrecy
+    // false-green"). A session that is merely `"restorable-not-yet-
+    // confirmed"` is real progress over stale metadata but is still NOT a
+    // confirmed live session -- reported as its own honest, distinct
+    // ATTENTION reason, never silently upgraded to GOOD.
+    const liveVerificationResult = chosenDevice !== undefined ? this.#shell.directRatchetLiveVerification(conversationId, chosenDevice.deviceId) : null;
+    const liveVerification = liveVerificationResult !== null && liveVerificationResult.outcome === "ok" ? liveVerificationResult.value : null;
+
     const forwardSecrecyConfigured =
       this.#messageDeliveryRemoteDeviceRef !== null && chosenDevice !== undefined && this.#messageDeliveryRemoteDeviceRef === chosenDevice.deviceId;
-    const forwardSecrecy = ratchetStatus === null ? null : ratchetStatus === "active" && forwardSecrecyConfigured;
-    const forwardSecrecyReason = forwardSecrecy === false ? (forwardSecrecyConfigured ? null : "ratchet-not-configured") : null;
+    const forwardSecrecyLiveConfirmed = liveVerification === "live-confirmed-this-process";
+    const forwardSecrecy = ratchetStatus === null ? null : ratchetStatus === "active" && forwardSecrecyConfigured && forwardSecrecyLiveConfirmed;
+    const forwardSecrecyReason =
+      forwardSecrecy === false
+        ? !forwardSecrecyConfigured
+          ? "ratchet-not-configured"
+          : ratchetStatus === "active"
+            ? liveVerification === "restore-attempted-and-failed"
+              ? "live-state-restore-failed"
+              : liveVerification === "no-durable-snapshot"
+                ? "live-state-no-durable-snapshot"
+                : "live-state-not-yet-confirmed"
+            : null
+        : null;
 
     // --- Axis 5: EVIDENCE_INTEGRITY --- no dedicated Shell query exists for
     // "most recent rejected security evidence for this conversation" today

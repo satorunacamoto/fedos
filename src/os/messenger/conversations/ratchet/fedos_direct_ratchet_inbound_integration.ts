@@ -95,6 +95,7 @@ import {
   checkpointFedosDirectRatchetSecretsV1,
   restoreFedosDirectRatchetSealedStateV1,
 } from "./fedos_direct_ratchet_secret_checkpoint.js";
+import { FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS } from "./fedos_direct_ratchet_counters.js";
 
 export type FedosDirectRatchetInboundReceiveResult =
   | { readonly outcome: "not-ratchet-payload" }
@@ -413,6 +414,12 @@ export class FedosDirectRatchetInboundIntegration {
         payload.generation,
         sealedState,
         this.#deps.clock(),
+        // Direct Ratchet Live-State Durability arc -- `session` above is
+        // ALWAYS a freshly-constructed `createAsReceiver()` object at this
+        // point (both the "created" and "already-exists" branches), so its
+        // own real counters are genuinely the initial ones, never a
+        // locally-assumed value.
+        FEDOS_DIRECT_RATCHET_INITIAL_COUNTERS,
       );
     }
 
@@ -475,11 +482,15 @@ export class FedosDirectRatchetInboundIntegration {
     const sendCounterAfter = await session.sendCounter();
     const receiveCounterAfter = await session.receiveCounter();
     const previousChainCounterAfter = await session.previousSendingChainLength();
-    this.#deps.stateRuntime.commitCounters(sessionId, {
+    // Direct Ratchet Live-State Durability arc -- named locally so the
+    // checkpoint call below can embed the EXACT same values just
+    // (attempted to be) committed durably, never re-derived.
+    const countersAfter = {
       sendCounter: sendCounterAfter ?? sessionMetadata.counters.sendCounter,
       receiveCounter: receiveCounterAfter ?? sessionMetadata.counters.receiveCounter + 1,
       previousChainCounter: previousChainCounterAfter ?? sessionMetadata.counters.previousChainCounter,
-    });
+    };
+    this.#deps.stateRuntime.commitCounters(sessionId, countersAfter);
     const remoteRatchetPublicKeyHexAfter = await session.remoteRatchetPublicKeyHex();
     if (remoteRatchetPublicKeyHexAfter !== null) {
       this.#deps.remotePublicKeyPersistence.putRemoteRatchetPublicKeyHex(sessionId as unknown as string, remoteRatchetPublicKeyHexAfter);
@@ -498,6 +509,7 @@ export class FedosDirectRatchetInboundIntegration {
         sessionMetadata.binding.generation,
         sealedState,
         now,
+        countersAfter,
       );
     }
 
@@ -567,6 +579,10 @@ export class FedosDirectRatchetInboundIntegration {
       this.#deps.snapshotPersistence,
       sessionId,
       sessionMetadata.binding.generation,
+      // Direct Ratchet Live-State Durability arc -- the real, separately-
+      // durable "ratchet position ceiling"; a snapshot behind this in any
+      // dimension is rejected, regardless of whether it decrypts.
+      sessionMetadata.counters,
     );
     if (sealedState === null) return null;
     const remoteRatchetPublicKeyHex = this.#deps.remotePublicKeyPersistence.getRemoteRatchetPublicKeyHex(sessionId as unknown as string);

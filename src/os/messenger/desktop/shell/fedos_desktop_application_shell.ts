@@ -109,7 +109,7 @@ import type { FedosIdentityTransitionConversationContinuityRecordV1 } from "../.
 import type { FedosDeviceSyncConflictResolutionAction } from "../../device/sync_scheduler/persistence/fedos_device_sync_conflict_persistence.js";
 // Secure Runtime Alpha 6201-6280 (FedOS Desktop Beta Privacy Controls and Safety Center Arc) -- narrow additive accessors the Safety Center needs, none of which existed on this Shell before.
 import type { FedosConversationProductionCryptoCapabilityOutcome } from "../../conversations/encryption/production/fedos_conversation_production_crypto_capability_result.js";
-import type { FedosDirectRatchetSafeStatus } from "../../conversations/ratchet/fedos_direct_ratchet_conversation_runtime.js";
+import type { FedosDirectRatchetSafeStatus, FedosDirectRatchetLiveVerificationState } from "../../conversations/ratchet/fedos_direct_ratchet_conversation_runtime.js";
 // Secure Runtime Alpha 7001-7080 -- narrow, additive, real wrappers only; no new activation/establishment logic.
 import type { FedosConversationDirectActivationResult } from "../../conversations/activation/fedos_conversation_direct_activation_result.js";
 import type { FedosDirectRatchetEstablishOptions, FedosDirectRatchetEstablishOutcome } from "../../conversations/ratchet/fedos_direct_ratchet_outbound_integration.js";
@@ -1109,6 +1109,14 @@ export class FedosDesktopApplicationShell {
     const dr = this.#runtime.conversationRuntime().directRatchet();
     if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
     return fedosDesktopShellOk(dr.getDirectRatchetStatus(conversationId, remoteDeviceRef));
+  }
+
+  /** Direct Ratchet Live-State Durability arc -- mirrors `directRatchetStatus()` immediately above exactly, for the additive `FedosDirectRatchetLiveVerificationState` fact. */
+  directRatchetLiveVerification(conversationId: string, remoteDeviceRef: string): FedosDesktopShellResult<FedosDirectRatchetLiveVerificationState> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    const dr = this.#runtime.conversationRuntime().directRatchet();
+    if (dr === null) return fedosDesktopShellFailure("unavailable", "direct ratchet Runtime is not configured");
+    return fedosDesktopShellOk(dr.getDirectRatchetLiveVerification(conversationId, remoteDeviceRef));
   }
 
   /**

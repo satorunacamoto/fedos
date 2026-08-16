@@ -556,19 +556,31 @@ export interface FedosDesktopRuntimeConfig {
 
   /**
    * OPTIONAL. Auto-constructs `FedosConversationDirectRatchetIntegrationDependencies`
-   * when `conversationDirectRatchet` was not manually supplied. NOTE: no
-   * append-only backend exists anywhere in this codebase for
-   * `FedosDirectRatchetRemotePublicKeyPersistence`/
-   * `FedosDirectRatchetLiveStateSnapshotPersistence` — this Arc does not
-   * fabricate durability for either; both remain in-memory-only even when
-   * this subsystem is enabled (a genuine, disclosed, narrower boundary —
-   * see the completion declaration).
+   * when `conversationDirectRatchet` was not manually supplied.
+   *
+   * Direct Ratchet Live-State Durability arc — the prior note here
+   * ("no append-only backend exists anywhere in this codebase for
+   * FedosDirectRatchetRemotePublicKeyPersistence/
+   * FedosDirectRatchetLiveStateSnapshotPersistence") was stale: real,
+   * file-backed, restart-proven implementations of both
+   * (`FileFedosDirectRatchetRemotePublicKeyPersistence`,
+   * `FileFedosDirectRatchetLiveStateSnapshotPersistence`) already existed
+   * in this codebase but were never constructed here — this arc wires
+   * them in via `directRatchetRemotePublicKeyLogPath`/
+   * `directRatchetLiveStateSnapshotLogPath` below, mirroring every
+   * sibling `*LogPath` field's own established pattern. The snapshot
+   * persistence's own storage shape was corrected from append-forever to
+   * atomic rewrite-in-place as part of this same arc (a real
+   * forward-secrecy-at-rest gap the append-forever shape would otherwise
+   * have reintroduced — see that class's own header).
    */
   readonly directRatchetEnabled?: boolean;
   readonly directRatchetSessionLogPath?: string;
   readonly directRatchetSealedSecretLogPath?: string;
   readonly directRatchetResetRecordLogPath?: string;
   readonly directRatchetImportRecordLogPath?: string;
+  readonly directRatchetRemotePublicKeyLogPath?: string;
+  readonly directRatchetLiveStateSnapshotLogPath?: string;
   /**
    * Secure Runtime Alpha 6841-6920 — the ALREADY-ACTIVATED canonical
    * production Master Seed Authority (the SAME object profile unlock

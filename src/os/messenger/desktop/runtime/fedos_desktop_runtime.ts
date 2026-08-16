@@ -291,6 +291,12 @@ import type { FedosDirectRatchetSealingAuthority } from "../../conversations/rat
 import { AppendOnlyFedosDirectRatchetSessionPersistence } from "../../conversations/ratchet/persistence/append_only_fedos_direct_ratchet_session_persistence.js";
 import { AppendOnlyFedosSealedDirectRatchetSecretPersistence } from "../../conversations/ratchet/persistence/append_only_fedos_sealed_direct_ratchet_secret_persistence.js";
 import { AppendOnlyFedosDirectRatchetSessionResetRecordPersistence } from "../../conversations/ratchet/persistence/append_only_fedos_direct_ratchet_session_reset_record_persistence.js";
+// Direct Ratchet Live-State Durability arc -- both already existed,
+// already file-backed, already restart-proven (see each class's own
+// header) -- they were simply never constructed here. See
+// `conversationDirectRatchetDeps` below.
+import { FileFedosDirectRatchetRemotePublicKeyPersistence } from "../../conversations/ratchet/persistence/fedos_direct_ratchet_remote_public_key_persistence.js";
+import { FileFedosDirectRatchetLiveStateSnapshotPersistence } from "../../conversations/ratchet/persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
 import { AppendOnlyFedosPrivateNostrImportRecordPersistence } from "../../adapters/nostr/conversation_delivery/append_only_fedos_private_nostr_import_record_persistence.js";
 import { AppendOnlyFedosRatchetPeerCapabilityObservationPersistence } from "../../conversations/ratchet/peer_capability/persistence/append_only_fedos_ratchet_peer_capability_observation_persistence.js";
 import { AppendOnlyFedosPeerDeviceAnnouncementObservationPersistence } from "../../conversations/peer_device/persistence/append_only_fedos_peer_device_announcement_observation_persistence.js";
@@ -1237,6 +1243,11 @@ export async function startFedosDesktopRuntime(
           sealedSecretPersistence: config.directRatchetSealedSecretLogPath !== undefined ? new AppendOnlyFedosSealedDirectRatchetSecretPersistence(config.directRatchetSealedSecretLogPath) : undefined,
           resetRecordPersistence: config.directRatchetResetRecordLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionResetRecordPersistence(config.directRatchetResetRecordLogPath) : undefined,
           importRecordPersistence: config.directRatchetImportRecordLogPath !== undefined ? new AppendOnlyFedosPrivateNostrImportRecordPersistence(config.directRatchetImportRecordLogPath) : undefined,
+          // Direct Ratchet Live-State Durability arc -- see this file's own
+          // import comment; both classes are real, file-backed, and
+          // already restart-proven.
+          remotePublicKeyPersistence: config.directRatchetRemotePublicKeyLogPath !== undefined ? new FileFedosDirectRatchetRemotePublicKeyPersistence(config.directRatchetRemotePublicKeyLogPath) : undefined,
+          snapshotPersistence: config.directRatchetLiveStateSnapshotLogPath !== undefined ? new FileFedosDirectRatchetLiveStateSnapshotPersistence(config.directRatchetLiveStateSnapshotLogPath) : undefined,
           sealingAuthority: directRatchetSealingAuthority,
           masterSeedAuthority: directRatchetSealingAuthority,
           localDeviceRef: conversationPeerDeviceAnnouncementDeps!.localAnnouncedDeviceId,

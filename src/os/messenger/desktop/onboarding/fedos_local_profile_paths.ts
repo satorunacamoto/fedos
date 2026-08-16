@@ -85,6 +85,10 @@ export interface FedosLocalProfilePaths {
   readonly directRatchetResetRecordLogFile: string;
   /** Direct Ratchet inbound dedup/import-record append-only log. */
   readonly directRatchetImportRecordLogFile: string;
+  /** Direct Ratchet Live-State Durability arc — this Device's own record of each peer's current remote ratchet public key (non-secret, current-value, atomic rewrite-in-place). */
+  readonly directRatchetRemotePublicKeyLogFile: string;
+  /** Direct Ratchet Live-State Durability arc — the durable, SEALED, current-value snapshot of each session's own live cryptographic state (root/chain/private keys — always already-sealed ciphertext, atomic rewrite-in-place, never append-forever — see that persistence class's own header for why). */
+  readonly directRatchetLiveStateSnapshotLogFile: string;
   /** Ratchet Peer Capability observation append-only log. */
   readonly peerCapabilityObservationLogFile: string;
   /** FedOS Peer Device Discovery Arc — this local device's own small, durable, non-secret identity file (deviceId + devicePublicKeyHex only, never a private key). */
@@ -197,6 +201,8 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     directRatchetSealedSecretLogFile: join(root, "direct-ratchet-sealed-secret.ndjson"),
     directRatchetResetRecordLogFile: join(root, "direct-ratchet-reset-record.ndjson"),
     directRatchetImportRecordLogFile: join(root, "direct-ratchet-import-record.ndjson"),
+    directRatchetRemotePublicKeyLogFile: join(root, "direct-ratchet-remote-public-key.ndjson"),
+    directRatchetLiveStateSnapshotLogFile: join(root, "direct-ratchet-live-state-snapshot.json"),
     peerCapabilityObservationLogFile: join(root, "peer-capability-observation.ndjson"),
     peerDeviceAnnouncementIdentityLogFile: join(root, "peer-device-announcement-identity.json"),
     conversationInvitationReceivedLogFile: join(root, "conversation-invitation-received.ndjson"),

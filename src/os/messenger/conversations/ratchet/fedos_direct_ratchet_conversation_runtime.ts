@@ -38,7 +38,11 @@ import { resolveFedosConversationActiveConversation } from "../activation/fedos_
 import type { FedosDirectRatchetSessionPersistence } from "./persistence/fedos_direct_ratchet_session_persistence.js";
 import type { FedosSealedDirectRatchetSecretPersistence } from "./persistence/fedos_sealed_direct_ratchet_secret_persistence.js";
 import type { FedosDirectRatchetRemotePublicKeyPersistence } from "./persistence/fedos_direct_ratchet_remote_public_key_persistence.js";
-import type { FedosDirectRatchetLiveStateSnapshotPersistence } from "./persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
+import {
+  checkFedosDirectRatchetLiveStateSnapshotFreshness,
+  readFedosDirectRatchetLiveStateSnapshotSafe,
+  type FedosDirectRatchetLiveStateSnapshotPersistence,
+} from "./persistence/fedos_direct_ratchet_live_state_snapshot_persistence.js";
 import type { FedosDirectRatchetSealingAuthority } from "./fedos_direct_ratchet_sealing_authority.js";
 import { FedosDirectRatchetStateRuntime } from "./fedos_direct_ratchet_state_runtime.js";
 import { FedosDirectRatchetLiveSessionCache } from "./fedos_direct_ratchet_live_session_cache.js";
@@ -71,6 +75,30 @@ export type FedosDirectRatchetSafeStatus =
   | "peer-incompatible"
   | "revoked"
   | "unavailable";
+
+/**
+ * Direct Ratchet Live-State Durability arc — an ADDITIVE, orthogonal fact
+ * alongside `FedosDirectRatchetSafeStatus`, never a replacement for it.
+ * `getDirectRatchetStatus()`'s own `"active"` answer is `lifecycleState`
+ * metadata alone — durable, but NOT proof the live cryptographic session
+ * is actually usable in THIS process right now (session metadata survives
+ * a restart; live crypto state, by design, does not carry over except
+ * through a real, explicit restore). This vocabulary exists so a
+ * consumer (the Security State Controller's own Axis 2/3 fact-gathering)
+ * can distinguish "genuinely usable" from "merely durable" WITHOUT itself
+ * needing to know anything about sessions/snapshots/counters.
+ */
+export type FedosDirectRatchetLiveVerificationState =
+  /** No session applies here at all (mirrors `getDirectRatchetStatus()`'s own non-`"active"`/`"pending"` outcomes) — this fact is meaningless in this case. */
+  | "not-applicable"
+  /** A real, live `FedosDirectRatchetCryptographicSession` object is held in THIS process's own in-memory cache right now — the strongest claim, genuinely usable without any further restore step. */
+  | "live-confirmed-this-process"
+  /** No live object cached in this process, but a durable sealed snapshot exists AND passes the freshness check against this session's own durably-known counters — restoring it would very likely succeed, but that restore has not actually been attempted/confirmed in this process yet. */
+  | "restorable-not-yet-confirmed"
+  /** A durable sealed snapshot exists but is stale relative to this session's own durably-known counters (see `checkFedosDirectRatchetLiveStateSnapshotFreshness()`) — restoring it is known, deterministically, to be unsafe/would fail; never partially trusted. */
+  | "restore-attempted-and-failed"
+  /** No durable sealed snapshot exists for this session at all — the universal case for every session that existed before this arc's own durable-persistence wiring landed ("legacy metadata-only"), and any session for which a checkpoint genuinely never happened. */
+  | "no-durable-snapshot";
 
 export interface FedosDirectRatchetConversationRuntimeDependencies {
   readonly draftPersistence: FedosConversationDraftPersistence;
@@ -282,6 +310,45 @@ export class FedosDirectRatchetConversationRuntime {
   /** Alias mirroring Phase M's own named `assessDirectRatchetReadiness()` operation — identical to `getDirectRatchetStatus()`. */
   assessDirectRatchetReadiness(conversationId: string, remoteDeviceRef: string): FedosDirectRatchetSafeStatus {
     return this.getDirectRatchetStatus(conversationId, remoteDeviceRef);
+  }
+
+  /**
+   * Direct Ratchet Live-State Durability arc — the ONE place a consumer
+   * that needs to know "is this genuinely usable, not just durably
+   * `'active'`" should ask. Deliberately cheap and side-effect-free: it
+   * NEVER attempts a real restore itself (never touches Master Seed
+   * authority, never runs WASM/Rust) — it only reads facts already
+   * cheaply available (the live session cache, the snapshot's own
+   * embedded counters compared against the durable session record's
+   * counters). See `FedosDirectRatchetLiveVerificationState`'s own header
+   * for what each value means and why "decrypts successfully" is
+   * deliberately never checked here — this function answers "would a
+   * restore be SAFE to attempt," not "does the sealed ciphertext parse."
+   */
+  getDirectRatchetLiveVerification(conversationId: string, remoteDeviceRef: string): FedosDirectRatchetLiveVerificationState {
+    const counterparty = resolveCounterparty(this.#deps, conversationId as FedosConversationId);
+    if (counterparty.outcome !== "resolved") return "not-applicable";
+
+    const resolution = resolveFedosDirectRatchetDevicePair(this.#deps.deviceRegistry, this.#deps.sessionPersistence, {
+      localAccountRef: counterparty.localAccountRef,
+      localDeviceRef: this.#deps.localDeviceRef,
+      remoteAccountRef: counterparty.remoteAccountRef,
+      remoteDeviceRef,
+      conversationId: conversationId as FedosConversationId,
+    });
+    if (resolution.outcome !== "resolved") return "not-applicable";
+
+    const metadata = this.#stateRuntime.getSessionMetadata(resolution.sessionId);
+    if (metadata === null || (metadata.lifecycleState !== "active" && metadata.lifecycleState !== "initialized")) return "not-applicable";
+
+    if (this.#liveSessionCache.get(resolution.sessionId) !== null) return "live-confirmed-this-process";
+
+    const { snapshot, corrupt } = readFedosDirectRatchetLiveStateSnapshotSafe(this.#deps.snapshotPersistence, resolution.sessionId as unknown as string);
+    if (corrupt) return "restore-attempted-and-failed";
+    const freshness = checkFedosDirectRatchetLiveStateSnapshotFreshness(snapshot, metadata.counters);
+    if (freshness === "not-found") return "no-durable-snapshot";
+    if (freshness === "stale") return "restore-attempted-and-failed";
+    return "restorable-not-yet-confirmed";
   }
 
   /**
