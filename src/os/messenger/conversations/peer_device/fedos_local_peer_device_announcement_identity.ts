@@ -35,7 +35,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { generateFedosDeviceSigningKeypair } from "../../device/crypto/fedos_device_signing_keypair.js";
+import { generateFedosDeviceSigningKeypair, type FedosDeviceSigningKeypair } from "../../device/crypto/fedos_device_signing_keypair.js";
 import { generateFedosPeerDeviceAnnouncementDeviceId, isWellFormedFedosPeerDeviceAnnouncementDeviceId } from "./fedos_peer_device_announcement_nonce.js";
 
 export interface FedosLocalPeerDeviceAnnouncementIdentityV1 {
@@ -76,8 +76,32 @@ function isEnoent(err: unknown): boolean {
  * never silently regenerates over a corrupt file, which would silently
  * change this device's own identity out from under every peer that has
  * already trusted it.
+ *
+ * Direct Ratchet Identity-Space Unification arc — `onFreshlyGenerated`,
+ * when supplied, is invoked synchronously ONLY on the "generate fresh"
+ * branch below (never on a subsequent read of an already-persisted
+ * identity), with the just-generated keypair and the newly-constructed
+ * identity, deliberately BEFORE the identity file is durably written. This
+ * is the ONE moment this device's own private key for this identity exists
+ * anywhere (it is never durably stored — see this file's own header) — the
+ * callback exists so a caller can perform a real dual-signature
+ * self-registration (proof-of-possession) while the key is still
+ * available, without this function itself needing to know anything about
+ * the Device Registry. Ordering the callback before the write is
+ * deliberate crash-safety: if the callback throws (registration failed) or
+ * the process dies mid-callback, the identity file is never written, so
+ * the NEXT call regenerates a fresh identity and retries registration from
+ * scratch — an install can therefore never end up durably identified but
+ * unregistered. If the write itself then fails after a successful
+ * callback, the only cost is one harmless, never-referenced-again orphan
+ * Registry row for a deviceId that will never be used (the next call
+ * generates a different one) — never a permanently-unregistered identity.
+ * Every existing caller that omits this parameter is unaffected.
  */
-export function readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(filePath: string): FedosLocalPeerDeviceAnnouncementIdentityV1 {
+export function readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(
+  filePath: string,
+  onFreshlyGenerated?: (keypair: FedosDeviceSigningKeypair, identity: FedosLocalPeerDeviceAnnouncementIdentityV1) => void,
+): FedosLocalPeerDeviceAnnouncementIdentityV1 {
   let existingRaw: string | null;
   try {
     existingRaw = readFileSync(filePath, "utf8");
@@ -105,6 +129,7 @@ export function readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(filePath: s
     devicePublicKeyHex: keypair.publicKeyHex,
     nextEpoch: 0,
   };
+  onFreshlyGenerated?.(keypair, identity);
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, JSON.stringify(identity), "utf8");
   return identity;

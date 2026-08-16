@@ -295,6 +295,26 @@ import { AppendOnlyFedosPrivateNostrImportRecordPersistence } from "../../adapte
 import { AppendOnlyFedosRatchetPeerCapabilityObservationPersistence } from "../../conversations/ratchet/peer_capability/persistence/append_only_fedos_ratchet_peer_capability_observation_persistence.js";
 import { AppendOnlyFedosPeerDeviceAnnouncementObservationPersistence } from "../../conversations/peer_device/persistence/append_only_fedos_peer_device_announcement_observation_persistence.js";
 import { readOrCreateFedosLocalPeerDeviceAnnouncementIdentity } from "../../conversations/peer_device/fedos_local_peer_device_announcement_identity.js";
+// Direct Ratchet Identity-Space Unification arc -- self-registration of
+// this node's own Peer Device Discovery identity into the Device Registry
+// (see `selfRegisterFedosPeerDeviceAnnouncementIdentity()` below). Reuses
+// the SAME lower-level primitives `FedosDevicePairingFacade` itself
+// composes (`createFedosDeviceBindingProofOfPossession`,
+// `authorizeFedosDeviceBindingChallenge`), called DIRECTLY rather than
+// through the facade's own request/approve/complete envelope -- that
+// envelope exists solely for the cross-machine out-of-band-transfer case
+// (Joining Device and Authorizing Device are different processes); here
+// both the device keypair and the account signing authority are already
+// available in this SAME process at the SAME synchronous moment, so the
+// three-step relay has no purpose. Never a second Device Registry: the
+// boundary this file constructs for this purpose is always given the
+// SAME already-hoisted `deviceRegistryPersistence` instance every other
+// Device-Registry-touching subsystem in this file already shares.
+import { createFedosDeviceBindingProofOfPossession } from "../../device/binding_challenge/fedos_device_binding_proof_of_possession.js";
+import { authorizeFedosDeviceBindingChallenge } from "../../device/binding_challenge/fedos_device_binding_account_authorization.js";
+import type { FedosDeviceSigningKeypair } from "../../device/crypto/fedos_device_signing_keypair.js";
+import type { FedosDeviceBindingAccountRef } from "../../device/fedos_device_binding.js";
+import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import { AppendOnlyFedosConversationInvitationReceivedPersistence } from "../../conversations/invitation_bootstrap/persistence/append_only_fedos_conversation_invitation_received_persistence.js";
 import { FedosSecureRandomConversationInvitationIdGenerator } from "../../conversations/invitation_bootstrap/fedos_secure_random_conversation_invitation_id_generator.js";
 import { AppendOnlyFedosIdentityTransitionPeerObservationPersistence } from "../../conversations/identity_transition/peer_integration/persistence/append_only_fedos_identity_transition_peer_observation_persistence.js";
@@ -529,6 +549,61 @@ function isFedosProductionConversationAeadHandleSource(authority: FedosMasterSee
   return typeof candidate.encryptAead === "function";
 }
 
+/**
+ * Direct Ratchet Identity-Space Unification arc -- registers THIS node's
+ * own, just-generated Peer Device Discovery identity (`deviceId`/`keypair`)
+ * into the Device Registry as a real, dual-signature-verified `"trusted"`
+ * binding, so `resolveFedosDirectRatchetDevicePair()` can resolve it once
+ * Direct Ratchet's own `localDeviceRef` is switched to this identity space
+ * (see `conversationDirectRatchetDeps` below). Fires the account
+ * authorization and device proof of possession over the SAME minted
+ * challenge, exactly like `FedosDevicePairingFacade.createPairingRequest()`
+ * / `.approvePairingRequest()` / `.completePairing()` do together -- but
+ * directly, in one call, since (unlike that facade's own cross-machine
+ * pairing scenario) both signing capabilities already exist in this same
+ * process at this same synchronous moment; the request/approve/complete
+ * relay exists only to move a challenge across an out-of-band channel to a
+ * DIFFERENT machine, which does not apply here.
+ *
+ * Deliberately NON-FATAL (mirrors `FedosProfileInitializationCoordinator.
+ * #bootstrapLocalDevice()`'s own established "return a status, never
+ * throw" discipline for this exact same class of self-registration): a
+ * registration hiccup must never prevent the whole Runtime from starting.
+ * If registration never lands, Direct Ratchet simply, honestly reports
+ * itself unavailable later -- never a false GOOD, never a crash here.
+ */
+async function selfRegisterFedosPeerDeviceAnnouncementIdentity(
+  deps: {
+    readonly registryPersistence: FedosDeviceRegistryPersistence;
+    readonly replayLogPath: string | undefined;
+    readonly accountSigningAuthority: FedosNostrSigningAuthority | undefined;
+    readonly accountIndex: number | undefined;
+    readonly localAccountRef: FedosDeviceBindingAccountRef;
+    readonly clock: (() => number) | undefined;
+  },
+  deviceId: string,
+  keypair: FedosDeviceSigningKeypair,
+): Promise<void> {
+  if (deps.accountSigningAuthority === undefined) return;
+  try {
+    const replayPersistence: FedosDeviceBindingChallengeReplayPersistence =
+      deps.replayLogPath !== undefined ? new AppendOnlyFedosDeviceBindingChallengeReplayPersistence(deps.replayLogPath) : new InMemoryFedosDeviceBindingChallengeReplayPersistence();
+    const boundary = createFedosDeviceBindingBoundary({
+      registryPersistence: deps.registryPersistence,
+      replayPersistence,
+      now: deps.clock,
+    });
+    const challenge = boundary.mintChallenge("register-device", deviceId, keypair.publicKeyHex);
+    const deviceProof = createFedosDeviceBindingProofOfPossession(keypair, challenge);
+    if (deviceProof === null) return;
+    const accountAuthorization = await authorizeFedosDeviceBindingChallenge(deps.accountSigningAuthority, deps.accountIndex ?? 0, challenge);
+    if (accountAuthorization === null) return;
+    await boundary.registrationAuthority.registerDevice(accountAuthorization, deviceProof, (deps.clock ?? defaultFedosBoardRuntimeClock)());
+  } catch {
+    // Non-fatal by design -- see this function's own header.
+  }
+}
+
 export async function startFedosDesktopRuntime(
   config: FedosDesktopRuntimeConfig,
 ): Promise<FedosRunningDesktopRuntime> {
@@ -703,6 +778,19 @@ export async function startFedosDesktopRuntime(
   if (config.deletionRequestEnabled && config.conversationDeletionRequest === undefined && config.deletionRequestResolveLocalPolicy === undefined) {
     throw new Error(
       "startFedosDesktopRuntime: deletionRequestEnabled is true but no deletionRequestResolveLocalPolicy was supplied -- this runtime applies no default recipient policy of its own.",
+    );
+  }
+  // Direct Ratchet Identity-Space Unification arc -- Direct Ratchet's own
+  // `localDeviceRef` is now sourced from Peer Device Discovery's identity
+  // (see `conversationDirectRatchetDeps` below), so this Runtime cannot
+  // auto-construct Direct Ratchet's dependencies without PDD's own deps
+  // already resolved. Skipped when either side is a full manual override
+  // (mirrors every exemption pattern above exactly) -- a caller supplying
+  // `conversationDirectRatchet`/`conversationPeerDeviceAnnouncement`
+  // directly is responsible for its own `localDeviceRef` coherence.
+  if (config.directRatchetEnabled && config.conversationDirectRatchet === undefined && !config.peerDeviceAnnouncementEnabled && config.conversationPeerDeviceAnnouncement === undefined) {
+    throw new Error(
+      "startFedosDesktopRuntime: directRatchetEnabled is true but peerDeviceAnnouncementEnabled is not (and no conversationPeerDeviceAnnouncement override was supplied) -- Direct Ratchet's own localDeviceRef is now sourced from Peer Device Discovery's own deviceId, never Device Pairing's localDeviceId, so this runtime has no canonical device identity to construct it with.",
     );
   }
 
@@ -1048,37 +1136,6 @@ export async function startFedosDesktopRuntime(
     directRatchetMasterSeedAuthorityCandidate !== undefined && isFedosDirectRatchetSealingAuthority(directRatchetMasterSeedAuthorityCandidate)
       ? directRatchetMasterSeedAuthorityCandidate
       : null;
-  const conversationDirectRatchetDeps: FedosConversationDirectRatchetIntegrationDependencies | undefined =
-    config.conversationDirectRatchet ??
-    (config.directRatchetEnabled && directRatchetSealingAuthority !== null
-      ? {
-          deviceRegistry: deviceRegistryPersistence!,
-          sessionPersistence: config.directRatchetSessionLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionPersistence(config.directRatchetSessionLogPath) : undefined,
-          sealedSecretPersistence: config.directRatchetSealedSecretLogPath !== undefined ? new AppendOnlyFedosSealedDirectRatchetSecretPersistence(config.directRatchetSealedSecretLogPath) : undefined,
-          resetRecordPersistence: config.directRatchetResetRecordLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionResetRecordPersistence(config.directRatchetResetRecordLogPath) : undefined,
-          importRecordPersistence: config.directRatchetImportRecordLogPath !== undefined ? new AppendOnlyFedosPrivateNostrImportRecordPersistence(config.directRatchetImportRecordLogPath) : undefined,
-          sealingAuthority: directRatchetSealingAuthority,
-          masterSeedAuthority: directRatchetSealingAuthority,
-          localDeviceRef: config.localDeviceId!,
-          sendMailboxNip17Control,
-          // Secure Runtime Alpha 7001-7080 -- mirrors `directMessageDelivery.sendMailboxNip17`
-          // immediately above (Alpha 1841-1920), forward-referencing the SAME
-          // `privateTransportInstance`. Omitted (`undefined`) unless the caller
-          // opts in via `directRatchetMessageDeliveryRemoteDeviceRef` -- zero
-          // behavior change for every pre-existing caller.
-          messageDelivery:
-            config.directRatchetMessageDeliveryRemoteDeviceRef !== undefined
-              ? {
-                  remoteDeviceRef: config.directRatchetMessageDeliveryRemoteDeviceRef,
-                  sendMailboxNip17: async (envelopeId, conversationId, plaintext) => {
-                    if (privateTransportInstance === undefined) return { outcome: "route-unavailable" };
-                    return privateTransportInstance.sendMailboxNip17(envelopeId as never, conversationId as never, plaintext);
-                  },
-                }
-              : undefined,
-        }
-      : undefined);
-
   const conversationPeerCapabilityDeps: FedosConversationPeerCapabilityIntegrationDependencies | undefined =
     config.conversationPeerCapability ??
     (config.peerCapabilityEnabled
@@ -1101,11 +1158,39 @@ export async function startFedosDesktopRuntime(
   // that file's own header on why this is a SEPARATE, minimal file rather
   // than a new field on the profile descriptor's own fragile state
   // machine).
+  //
+  // Direct Ratchet Identity-Space Unification arc -- MOVED ahead of
+  // `conversationDirectRatchetDeps` (previously constructed first): Direct
+  // Ratchet's own `localDeviceRef` now reads THIS block's own
+  // `localAnnouncedDeviceId`, so this block must exist first. Also now an
+  // async IIFE (awaited) so a freshly-generated identity can be
+  // self-registered into the Device Registry (via
+  // `selfRegisterFedosPeerDeviceAnnouncementIdentity()`) while its private
+  // key is still available -- see that function's own header and
+  // `readOrCreateFedosLocalPeerDeviceAnnouncementIdentity()`'s own
+  // `onFreshlyGenerated` doc comment for the full crash-safety rationale.
   const conversationPeerDeviceAnnouncementDeps: FedosConversationPeerDeviceAnnouncementIntegrationDependencies | undefined =
     config.conversationPeerDeviceAnnouncement ??
     (config.peerDeviceAnnouncementEnabled
-      ? (() => {
-          const localIdentity = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(config.peerDeviceAnnouncementIdentityLogPath!);
+      ? await (async () => {
+          let freshlyGeneratedKeypair: FedosDeviceSigningKeypair | null = null;
+          const localIdentity = readOrCreateFedosLocalPeerDeviceAnnouncementIdentity(config.peerDeviceAnnouncementIdentityLogPath!, (keypair) => {
+            freshlyGeneratedKeypair = keypair;
+          });
+          if (freshlyGeneratedKeypair !== null) {
+            await selfRegisterFedosPeerDeviceAnnouncementIdentity(
+              {
+                registryPersistence: deviceRegistryPersistence!,
+                replayLogPath: config.deviceBindingChallengeReplayLogPath,
+                accountSigningAuthority: config.deviceBindingAccountSigningAuthority,
+                accountIndex: config.deviceBindingAccountIndex,
+                localAccountRef: config.localAccountRef!,
+                clock: config.clock,
+              },
+              localIdentity.deviceId,
+              freshlyGeneratedKeypair,
+            );
+          }
           return {
             deviceRegistry: deviceRegistryPersistence!,
             signingAuthority: config.conversationTransportSigningAuthority!,
@@ -1125,6 +1210,47 @@ export async function startFedosDesktopRuntime(
             sendMailboxNip17Control,
           };
         })()
+      : undefined);
+
+  // Direct Ratchet Identity-Space Unification arc -- `localDeviceRef` now
+  // reads Peer Device Discovery's own `deviceId` (Space B), the ONLY space
+  // a genuine cross-account peer's `remoteDeviceRef` can ever come from,
+  // instead of Device Pairing's `localDeviceId` (Space A). Guaranteed
+  // non-null whenever this branch is reached: the config-validation guard
+  // above (`directRatchetEnabled` requires `peerDeviceAnnouncementEnabled`
+  // or a `conversationPeerDeviceAnnouncement` override) ensures
+  // `conversationPeerDeviceAnnouncementDeps` is always defined by this
+  // point. See docs/reviews/fedos-direct-ratchet-identity-space-final/
+  // for the full architecture decision this implements.
+  const conversationDirectRatchetDeps: FedosConversationDirectRatchetIntegrationDependencies | undefined =
+    config.conversationDirectRatchet ??
+    (config.directRatchetEnabled && directRatchetSealingAuthority !== null
+      ? {
+          deviceRegistry: deviceRegistryPersistence!,
+          sessionPersistence: config.directRatchetSessionLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionPersistence(config.directRatchetSessionLogPath) : undefined,
+          sealedSecretPersistence: config.directRatchetSealedSecretLogPath !== undefined ? new AppendOnlyFedosSealedDirectRatchetSecretPersistence(config.directRatchetSealedSecretLogPath) : undefined,
+          resetRecordPersistence: config.directRatchetResetRecordLogPath !== undefined ? new AppendOnlyFedosDirectRatchetSessionResetRecordPersistence(config.directRatchetResetRecordLogPath) : undefined,
+          importRecordPersistence: config.directRatchetImportRecordLogPath !== undefined ? new AppendOnlyFedosPrivateNostrImportRecordPersistence(config.directRatchetImportRecordLogPath) : undefined,
+          sealingAuthority: directRatchetSealingAuthority,
+          masterSeedAuthority: directRatchetSealingAuthority,
+          localDeviceRef: conversationPeerDeviceAnnouncementDeps!.localAnnouncedDeviceId,
+          sendMailboxNip17Control,
+          // Secure Runtime Alpha 7001-7080 -- mirrors `directMessageDelivery.sendMailboxNip17`
+          // immediately above (Alpha 1841-1920), forward-referencing the SAME
+          // `privateTransportInstance`. Omitted (`undefined`) unless the caller
+          // opts in via `directRatchetMessageDeliveryRemoteDeviceRef` -- zero
+          // behavior change for every pre-existing caller.
+          messageDelivery:
+            config.directRatchetMessageDeliveryRemoteDeviceRef !== undefined
+              ? {
+                  remoteDeviceRef: config.directRatchetMessageDeliveryRemoteDeviceRef,
+                  sendMailboxNip17: async (envelopeId, conversationId, plaintext) => {
+                    if (privateTransportInstance === undefined) return { outcome: "route-unavailable" };
+                    return privateTransportInstance.sendMailboxNip17(envelopeId as never, conversationId as never, plaintext);
+                  },
+                }
+              : undefined,
+        }
       : undefined);
 
   // Secure Runtime Alpha 7081-7160 (FedOS Conversation Invitation and

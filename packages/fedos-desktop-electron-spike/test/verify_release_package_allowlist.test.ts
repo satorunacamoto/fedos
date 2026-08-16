@@ -12,12 +12,27 @@
  * genuinely dangerous shapes the original blanket check was trying to
  * catch -- never "the function exists" checks.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { verifyFedosBetaPackageAllowlist } from "../scripts/verify_release_package_allowlist.mjs";
 
-const REAL_CONFIG_PATH = join(process.cwd(), "electron_builder.beta.config.json");
+// This package's `tsconfig.json` compiles `.ts` test files as CommonJS (no
+// `"type": "module"` in `package.json`), but `verify_release_package_allowlist.mjs`
+// is a real ESM module -- TypeScript itself (TS1479) requires a dynamic
+// `import()` rather than a static `import` for exactly this cross-module-kind
+// case, mirroring `packaged_binary_dependency_closure_guard.test.ts`'s own
+// established pattern for the same situation.
+let verifyFedosBetaPackageAllowlist: typeof import("../scripts/verify_release_package_allowlist.mjs", { with: { "resolution-mode": "import" } }).verifyFedosBetaPackageAllowlist;
+beforeAll(async () => {
+  ({ verifyFedosBetaPackageAllowlist } = await import("../scripts/verify_release_package_allowlist.mjs"));
+});
+
+// `process.cwd()` is the repo root (this file is only ever run via the
+// root-level `vitest.electron-spike.config.ts`, which sets no `root`
+// override), never this package's own directory -- mirrors
+// `packaged_binary_dependency_closure_guard.test.ts`'s own
+// `repoRoot`/`packageDir` pattern for the same reason.
+const REAL_CONFIG_PATH = join(process.cwd(), "packages/fedos-desktop-electron-spike/electron_builder.beta.config.json");
 
 function baseConfig(overrides = {}) {
   return {

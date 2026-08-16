@@ -31,6 +31,14 @@ export function listCompiledFiles(dir: string, extensions?: readonly string[]): 
 
 export function deriveRuntimeDependencyClosure(dirs: { readonly repoRootDist: string; readonly packageDist: string }): DependencyClosureResult;
 
+export interface PackageLocalFileClosureResult {
+  readonly relativePaths: readonly string[];
+}
+
+export function derivePackageLocalFileClosure(args: { readonly entryFiles: readonly string[]; readonly packageDist: string }): PackageLocalFileClosureResult;
+
+export function checkLocalFileClosurePresentInAsarListing(asarEntries: readonly string[], relativePaths: readonly string[]): ClosurePresenceResult;
+
 export function checkClosurePresentInAsarListing(asarEntries: readonly string[], closureNames: readonly string[]): ClosurePresenceResult;
 
 export function checkClosurePresentOnDisk(dir: string, closureNames: readonly string[]): ClosurePresenceResult;

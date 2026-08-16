@@ -35,6 +35,34 @@ describe("Secure Runtime Alpha 6521-6600 -- failure matrix", () => {
     }
   });
 
+  it("1b. Direct Ratchet Identity-Space Unification arc -- directRatchetEnabled with deviceTrustEnabled+privateTransportEnabled but without peerDeviceAnnouncementEnabled fails closed, synchronously, before any Persistence backend is constructed", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fedos-cfg-fail-"));
+    try {
+      const signingAuthority = new RealFedosNostrSigningAuthority();
+      const identity = await signingAuthority.publicIdentityForAccount(0);
+      await expect(
+        startFedosDesktopRuntime({
+          ...baseConfig(dir),
+          deviceTrustEnabled: true,
+          localDeviceId: "device-1",
+          localAccountRef: { authority: "nostr", publicIdentifier: identity!.publicKeyHex, identityId: null },
+          deviceRegistryLogPath: join(dir, "device-registry.ndjson"),
+          deviceBindingChallengeReplayLogPath: join(dir, "device-binding-replay.ndjson"),
+          deviceBindingAccountSigningAuthority: signingAuthority,
+          deviceSyncJournalLogPath: join(dir, "sync-journal.ndjson"),
+          privateTransportEnabled: true,
+          conversationTransportRelays: [new NullRelay("wss://relay.invalid.example")],
+          conversationTransportSigningAuthority: signingAuthority,
+          conversationTransportObservationLogPath: join(dir, "transport-obs.ndjson"),
+          directRatchetEnabled: true,
+          // Deliberately NO peerDeviceAnnouncementEnabled/conversationPeerDeviceAnnouncement.
+        }),
+      ).rejects.toThrow(/peerDeviceAnnouncementEnabled/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("2. peerCapabilityEnabled with deviceTrustEnabled but without privateTransportEnabled fails closed", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fedos-cfg-fail-"));
     try {
@@ -159,6 +187,14 @@ describe("Secure Runtime Alpha 6521-6600 -- failure matrix", () => {
         conversationTransportSigningAuthority: signingAuthority,
         conversationTransportObservationLogPath: join(dir, "transport-obs.ndjson"),
         directRatchetEnabled: true,
+        // Direct Ratchet Identity-Space Unification arc -- directRatchetEnabled
+        // now requires peerDeviceAnnouncementEnabled (Direct Ratchet's own
+        // localDeviceRef is sourced from Peer Device Discovery's identity);
+        // unrelated to this test's own subject (absent production crypto),
+        // so supplied here only to keep this test on its own subject.
+        peerDeviceAnnouncementEnabled: true,
+        peerDeviceAnnouncementLocallySupportedCapabilities: [{ kind: "private-message-route", route: "nostr-nip17-v1" }],
+        peerDeviceAnnouncementIdentityLogPath: join(dir, "peer-device-identity.json"),
         // Deliberately NO conversationProductionCrypto supplied.
       });
       expect(runtime.conversationRuntime().directRatchet()).toBeNull();
