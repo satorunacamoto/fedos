@@ -1391,6 +1391,8 @@ const CHAT_SECURITY_REASON_TEXT: Record<string, string> = {
   "observed-device-registration-unavailable": "A device announcement was received for this contact, but it could not be durably registered.",
   "observed-device-not-yet-trusted": "A device was observed for this contact, but it is not yet trusted.",
   "observed-devices-trusted": "The device(s) this conversation has used are cryptographically trusted and known.",
+  "observed-devices-trusted-first-seen-only": "The device this conversation has used is cryptographically valid, but FedOS has only seen it once — this is not the same as independently verifying it.",
+  "observed-device-conflicting-rekey-rejected": "A device claiming to replace one already known for this contact was rejected — FedOS kept trusting the earlier device. Confirm with this contact out of band if they say they changed devices.",
   "no-rejected-security-evidence": "No recent security evidence for this conversation was rejected.",
   "relay-connected-metadata-exposed": "Relays can see that this conversation is happening. Encryption does not hide that.",
   "no-relay-connected-metadata-still-exposed-when-connected": "No relay is currently connected. When one is, it can see that this conversation is happening.",
