@@ -137,7 +137,11 @@ export class FedosConversationSecurityStateController {
       },
       encryption: { ratchetStatus, asOf: now },
       forwardSecrecy: { forwardSecrecy, reason: forwardSecrecyReason, asOf: now },
-      deviceKnowledge: { observedPeerDeviceTrustStates: observedForCounterparty.map((d) => d.trustState), asOf: now },
+      deviceKnowledge: {
+        observedPeerDeviceTrustStates: observedForCounterparty.map((d) => d.trustState),
+        observedPeerDeviceKnowledgeStates: observedForCounterparty.map((d) => d.knowledgeState),
+        asOf: now,
+      },
       evidenceIntegrity,
       metadataExposure,
     };

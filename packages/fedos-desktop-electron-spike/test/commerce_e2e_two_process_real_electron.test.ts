@@ -651,14 +651,15 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
         { action: "fill", selector: "#create-label", value: BOB_LABEL }, // 1
         { action: "fill", selector: "#create-pass", value: BOB_PASSPHRASE }, // 2
         { action: "fill", selector: "#create-pass-confirm", value: BOB_PASSPHRASE }, // 3
-        { action: "click", selector: "#create-submit" }, // 4
-        { action: "wait", ms: 2500 }, // 5 -- real Argon2 unlock + real WASM Master Seed generation
-        { action: "read", selector: "#current-screen" }, // 6 -- expect "ready"
-        { action: "read", selector: "#commerce-merchant-acting-as option:first-child", as: "value" }, // 7 -- Bob's real pubkey
-        { action: "screenshot", value: "bob-01-ready" }, // 8
+        { action: "click", selector: "#create-pass-ack" }, // 4
+        { action: "click", selector: "#create-submit" }, // 5
+        { action: "wait", ms: 2500 }, // 6 -- real Argon2 unlock + real WASM Master Seed generation
+        { action: "read", selector: "#current-screen" }, // 7 -- expect "ready"
+        { action: "read", selector: "#commerce-merchant-acting-as option:first-child", as: "value" }, // 8 -- Bob's real pubkey
+        { action: "screenshot", value: "bob-01-ready" }, // 9
       ], true);
-      expect(readAt(bob1, 6)).toBe("ready");
-      bobPubkey = readAt(bob1, 7);
+      expect(readAt(bob1, 7)).toBe("ready");
+      bobPubkey = readAt(bob1, 8);
       expect(bobPubkey.length).toBe(64);
       expect(bobPubkey).not.toBe("a".repeat(64));
       expect(bobPubkey).not.toBe("b".repeat(64));
@@ -715,14 +716,15 @@ realSuite("FedOS Commerce End-to-End -- REAL two independent Electron processes 
         { action: "fill", selector: "#create-label", value: ALICE_LABEL }, // 1
         { action: "fill", selector: "#create-pass", value: ALICE_PASSPHRASE }, // 2
         { action: "fill", selector: "#create-pass-confirm", value: ALICE_PASSPHRASE }, // 3
-        { action: "click", selector: "#create-submit" }, // 4
-        { action: "wait", ms: 2500 }, // 5
-        { action: "read", selector: "#current-screen" }, // 6 -- expect "ready"
-        { action: "read", selector: "#commerce-acting-as option:first-child", as: "value" }, // 7 -- Alice's real pubkey
-        { action: "screenshot", value: "alice-01-ready" }, // 8
+        { action: "click", selector: "#create-pass-ack" }, // 4
+        { action: "click", selector: "#create-submit" }, // 5
+        { action: "wait", ms: 2500 }, // 6
+        { action: "read", selector: "#current-screen" }, // 7 -- expect "ready"
+        { action: "read", selector: "#commerce-acting-as option:first-child", as: "value" }, // 8 -- Alice's real pubkey
+        { action: "screenshot", value: "alice-01-ready" }, // 9
       ], true);
-      expect(readAt(alice1, 6)).toBe("ready");
-      alicePubkey = readAt(alice1, 7);
+      expect(readAt(alice1, 7)).toBe("ready");
+      alicePubkey = readAt(alice1, 8);
       expect(alicePubkey.length).toBe(64);
       expect(alicePubkey).not.toBe(bobPubkey);
       expect(alicePubkey).not.toBe("a".repeat(64));

@@ -172,8 +172,10 @@
       <input id="create-pass" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" />
       <label for="create-pass-confirm">Confirm passphrase</label>
       <input id="create-pass-confirm" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" />
+      <button id="create-pass-show-hide" type="button" aria-pressed="false">Show passphrase</button>
+      <label id="create-pass-ack-label"><input id="create-pass-ack" type="checkbox" /> I understand this cannot be recovered if I lose it.</label>
       <div id="create-error" class="error" role="alert"></div>
-      <button id="create-submit" type="button">Create profile</button>
+      <button id="create-submit" type="button" disabled>Create profile</button>
     </section>
 
     <section id="screen-unlock">
@@ -181,6 +183,7 @@
       <p class="muted">Profile: <span id="unlock-label" class="field"></span></p>
       <label for="unlock-pass">Passphrase</label>
       <input id="unlock-pass" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" />
+      <button id="unlock-pass-show-hide" type="button" aria-pressed="false">Show passphrase</button>
       <div id="unlock-error" class="error" role="alert"></div>
       <button id="unlock-submit" type="button">Unlock</button>
     </section>
@@ -294,6 +297,13 @@
           <button id="chat-back" type="button">&larr; Back to Conversations</button>
           <h2 id="chat-title">Conversation</h2>
           <p class="muted" id="chat-meta"></p>
+          <!-- Direct Ratchet P1 arc -- raw conversationId moved out of the primary
+               label (mirrors Commerce's own established "friendly label primary,
+               raw hex id in a collapsed <details>" pattern, `#commerce-order-technical-details`). -->
+          <details id="chat-technical-details">
+            <summary>Technical details (conversation id)</summary>
+            <p class="muted" id="chat-conversation-id"></p>
+          </details>
           <!-- Verified Secure Session UI mega-arc (Coordinator) -- compact,
                non-color-only indicator + expandable Security Details panel.
                Never a single collapsed "Secure" claim -- each axis keeps
@@ -302,6 +312,8 @@
           <div id="chat-security-details" hidden>
             <ul class="plain-list" id="chat-security-axes"></ul>
             <p class="muted" id="chat-security-standing-limits">FedOS has no safety number. There is no code you and your contact can compare. This app does not know about, list, or verify all of a contact's devices — only devices it has directly observed.</p>
+            <button id="chat-refresh-device-announcement" type="button">Refresh device trust</button>
+            <p class="muted" id="chat-refresh-device-announcement-feedback" role="status" aria-live="polite"></p>
           </div>
           <div id="chat-error" class="error" role="alert"></div>
           <ul class="plain-list" id="chat-messages"></ul>

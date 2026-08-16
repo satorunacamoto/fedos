@@ -131,46 +131,47 @@ realSuite("Commerce Reachable Catalog Phase 1 -- REAL packaged Beta Electron pro
         { action: "fill", selector: "#create-label", value: "Commerce Phase1 Test Profile" }, // 1
         { action: "fill", selector: "#create-pass", value: "commerce phase1 vertical slice pass" }, // 2
         { action: "fill", selector: "#create-pass-confirm", value: "commerce phase1 vertical slice pass" }, // 3
-        { action: "click", selector: "#create-submit" }, // 4
-        { action: "wait", ms: 700 }, // 5
-        { action: "read", selector: "#current-screen" }, // 6 -- top-level ScreenName: "ready"
-        { action: "click", selector: "#nav-commerce" }, // 7
-        { action: "wait", ms: 400 }, // 8
-        { action: "read", selector: ".app-screen.active#app-screen-commerce" }, // 9 -- proves the Commerce screen (not some other tab) is the active one
-        { action: "read", selector: "#commerce-catalog-list" }, // 10
+        { action: "click", selector: "#create-pass-ack" }, // 4
+        { action: "click", selector: "#create-submit" }, // 5
+        { action: "wait", ms: 700 }, // 6
+        { action: "read", selector: "#current-screen" }, // 7 -- top-level ScreenName: "ready"
+        { action: "click", selector: "#nav-commerce" }, // 8
+        { action: "wait", ms: 400 }, // 9
+        { action: "read", selector: ".app-screen.active#app-screen-commerce" }, // 10 -- proves the Commerce screen (not some other tab) is the active one
+        { action: "read", selector: "#commerce-catalog-list" }, // 11
         // Open the product WITH an image (first catalog row -- aurora-study).
-        { action: "click", selector: "#commerce-catalog-list li:nth-child(1) button" }, // 11
-        { action: "wait", ms: 400 }, // 12
-        { action: "read", selector: ".app-screen.active#app-screen-commerce-detail" }, // 13
-        { action: "read", selector: "#commerce-detail-title" }, // 14
-        { action: "read", selector: "#commerce-detail-media-area img" }, // 15 -- presence check: "ok" only if a real <img> exists
-        { action: "read", selector: "#commerce-detail-price" }, // 16
-        { action: "read", selector: "#commerce-detail-merchant" }, // 17
-        { action: "read", selector: "#commerce-detail-description" }, // 18
-        { action: "read", selector: "#commerce-order-create-submit" }, // 19 -- Commerce E2E Completion arc: the real Create Order control (Phase 1's disabled pill is gone by design)
-        { action: "click", selector: "#commerce-detail-back" }, // 20
-        { action: "wait", ms: 300 }, // 21
-        { action: "read", selector: ".app-screen.active#app-screen-commerce" }, // 22 -- back on the catalog
+        { action: "click", selector: "#commerce-catalog-list li:nth-child(1) button" }, // 12
+        { action: "wait", ms: 400 }, // 13
+        { action: "read", selector: ".app-screen.active#app-screen-commerce-detail" }, // 14
+        { action: "read", selector: "#commerce-detail-title" }, // 15
+        { action: "read", selector: "#commerce-detail-media-area img" }, // 16 -- presence check: "ok" only if a real <img> exists
+        { action: "read", selector: "#commerce-detail-price" }, // 17
+        { action: "read", selector: "#commerce-detail-merchant" }, // 18
+        { action: "read", selector: "#commerce-detail-description" }, // 19
+        { action: "read", selector: "#commerce-order-create-submit" }, // 20 -- Commerce E2E Completion arc: the real Create Order control (Phase 1's disabled pill is gone by design)
+        { action: "click", selector: "#commerce-detail-back" }, // 21
+        { action: "wait", ms: 300 }, // 22
+        { action: "read", selector: ".app-screen.active#app-screen-commerce" }, // 23 -- back on the catalog
         // Open the product WITHOUT an image (second catalog row -- terra-keycaps).
-        { action: "click", selector: "#commerce-catalog-list li:nth-child(2) button" }, // 23
-        { action: "wait", ms: 400 }, // 24
-        { action: "read", selector: "#commerce-detail-title" }, // 25
-        { action: "read", selector: "#commerce-detail-media-area img" }, // 26 -- expect "not-found": no <img> for a media-less product
-        { action: "read", selector: "#commerce-detail-media-area .commerce-detail-media-fallback" }, // 27 -- expect "ok" with the initials text
-        { action: "click", selector: "#commerce-detail-back" }, // 28
-        { action: "wait", ms: 300 }, // 29
+        { action: "click", selector: "#commerce-catalog-list li:nth-child(2) button" }, // 24
+        { action: "wait", ms: 400 }, // 25
+        { action: "read", selector: "#commerce-detail-title" }, // 26
+        { action: "read", selector: "#commerce-detail-media-area img" }, // 27 -- expect "not-found": no <img> for a media-less product
+        { action: "read", selector: "#commerce-detail-media-area .commerce-detail-media-fallback" }, // 28 -- expect "ok" with the initials text
+        { action: "click", selector: "#commerce-detail-back" }, // 29
+        { action: "wait", ms: 300 }, // 30
         // Return to Messenger.
-        { action: "click", selector: "#nav-conversations" }, // 30
-        { action: "wait", ms: 300 }, // 31
-        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 32
-        { action: "read", selector: "#conversations-list" }, // 33
+        { action: "click", selector: "#nav-conversations" }, // 31
+        { action: "wait", ms: 300 }, // 32
+        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 33
+        { action: "read", selector: "#conversations-list" }, // 34
       ]);
 
-      expect(readAt(run, 6)).toBe("ready");
+      expect(readAt(run, 7)).toBe("ready");
 
       // Step 9 succeeding at all (outcome "ok") already proves the Commerce screen is active.
-      readAt(run, 9);
-      const catalogText = readAt(run, 10);
+      readAt(run, 10);
+      const catalogText = readAt(run, 11);
       expect(catalogText).toMatch(/Digital Art Print — Aurora Study/);
       expect(catalogText).toMatch(/Mechanical Keyboard Keycap Set — Terra/);
       expect(catalogText).toMatch(/Local Workshop Ticket — Intro to Woodworking/);
@@ -178,25 +179,25 @@ realSuite("Commerce Reachable Catalog Phase 1 -- REAL packaged Beta Electron pro
       expect(catalogText).toMatch(/Northlight Studio/);
       expect(catalogText).toMatch(/Riverbend Makerspace/);
 
-      readAt(run, 13); // Product Detail screen is active.
-      expect(readAt(run, 14)).toBe("Digital Art Print — Aurora Study");
+      readAt(run, 14); // Product Detail screen is active.
+      expect(readAt(run, 15)).toBe("Digital Art Print — Aurora Study");
       // A real <img> element exists for the product WITH media (step 15 finds it and returns "ok").
       const imgStep = run.steps.find((s) => s.index === 15);
       expect(imgStep, run.output).toBeDefined();
       expect(imgStep!.result.outcome, run.output).toBe("ok");
-      expect(readAt(run, 16)).toBe("18.00 USD");
-      expect(readAt(run, 17)).toBe("Sold by Northlight Studio");
-      expect(readAt(run, 18)).toMatch(/violet-to-amber gradient/);
-      expect(readAt(run, 19)).toBe("Create Order"); // the real, bounded Order control -- see this arc's header note above
+      expect(readAt(run, 17)).toBe("18.00 USD");
+      expect(readAt(run, 18)).toBe("Sold by Northlight Studio");
+      expect(readAt(run, 19)).toMatch(/violet-to-amber gradient/);
+      expect(readAt(run, 20)).toBe("Create Order"); // the real, bounded Order control -- see this arc's header note above
       // No instant-purchase/mark-as-paid control anywhere in this run's output -- Create Order is real and expected, a bare Buy/Purchase/Checkout shortcut is not.
       expect(run.output).not.toMatch(/>Buy</i);
       expect(run.output).not.toMatch(/>Purchase</i);
       expect(run.output).not.toMatch(/>Checkout</i);
       expect(run.output).not.toMatch(/>Mark as [Pp]aid</);
 
-      readAt(run, 22); // Back on the Commerce catalog.
+      readAt(run, 23); // Back on the Commerce catalog.
 
-      expect(readAt(run, 25)).toBe("Mechanical Keyboard Keycap Set — Terra");
+      expect(readAt(run, 26)).toBe("Mechanical Keyboard Keycap Set — Terra");
       // No <img> for the media-less product -- the selector genuinely finds nothing.
       const noImgStep = run.steps.find((s) => s.index === 26);
       expect(noImgStep, run.output).toBeDefined();
@@ -208,8 +209,8 @@ realSuite("Commerce Reachable Catalog Phase 1 -- REAL packaged Beta Electron pro
       expect(fallbackStep!.result.value).toBe("MK");
 
       // Messenger regression: Conversations is reachable and unaffected after visiting Commerce.
-      readAt(run, 32);
-      expect(readAt(run, 33)).toMatch(/No conversations yet/);
+      readAt(run, 33);
+      expect(readAt(run, 34)).toMatch(/No conversations yet/);
     },
     90000,
   );

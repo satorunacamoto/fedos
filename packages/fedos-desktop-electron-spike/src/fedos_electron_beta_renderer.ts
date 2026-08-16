@@ -68,6 +68,49 @@ function clearField(id: string): void {
   byId<HTMLInputElement>(id).value = "";
 }
 
+/**
+ * Direct Ratchet P1 arc -- display truncation only, never a new identity/
+ * fingerprint primitive (none exists in this codebase to reuse -- no
+ * npub/bech32 encoder is present in `src/`). Full value is always still
+ * reachable (title attribute / a `<details>` disclosure at each real call
+ * site), never lost -- only de-emphasized as the PRIMARY label on
+ * high-stakes trust surfaces and conversation rows.
+ */
+function truncateIdentifier(value: string): string {
+  return value.length <= 16 ? value : `${value.slice(0, 8)}…${value.slice(-4)}`;
+}
+
+/**
+ * Direct Ratchet P1 arc -- plain local UI behavior only: flips the
+ * `type` of one or more password inputs between `"password"`/`"text"`.
+ * No persistence, no logging, no clipboard automation; default is always
+ * hidden (set by the static HTML `type="password"`).
+ */
+function togglePasswordVisibility(toggleButtonId: string, ...inputIds: string[]): void {
+  const button = byId<HTMLButtonElement>(toggleButtonId);
+  const nowVisible = button.getAttribute("aria-pressed") !== "true";
+  for (const id of inputIds) byId<HTMLInputElement>(id).type = nowVisible ? "text" : "password";
+  button.setAttribute("aria-pressed", String(nowVisible));
+  button.textContent = nowVisible ? "Hide passphrase" : "Show passphrase";
+}
+
+function resetPasswordVisibility(toggleButtonId: string, ...inputIds: string[]): void {
+  const button = byId<HTMLButtonElement>(toggleButtonId);
+  for (const id of inputIds) byId<HTMLInputElement>(id).type = "password";
+  button.setAttribute("aria-pressed", "false");
+  button.textContent = "Show passphrase";
+}
+
+/**
+ * Direct Ratchet P1 arc -- an unrecoverable-passphrase acknowledgement is
+ * required before the profile can actually be created; reuses the exact
+ * warning copy already on screen (`screen-create`'s own `.warn` paragraph)
+ * rather than introducing new claims.
+ */
+function refreshCreateSubmitEnabled(): void {
+  byId<HTMLButtonElement>("create-submit").disabled = !byId<HTMLInputElement>("create-pass-ack").checked;
+}
+
 function setBusy(busy: boolean, ...buttonIds: string[]): void {
   for (const id of buttonIds) {
     byId<HTMLButtonElement>(id).disabled = busy;
@@ -705,6 +748,52 @@ let currentDeletionRequestId: string | null = null;
  * never the sole source of truth.
  */
 let peerDeviceAnnouncementLocalEpochCounter = 0;
+/**
+ * Direct Ratchet P1 arc -- re-announcement throttling. Session-scoped (in-
+ * memory only, mirrors this whole block's own discipline): tracks which
+ * counterparty accounts this local Device has already successfully
+ * announced to SINCE THIS PROCESS STARTED, so `openConversation()` does not
+ * re-send a Device announcement on every repeated open of the same
+ * conversation -- "first availability" (this process's first open of a
+ * given counterparty) still always announces; a later open of the SAME
+ * counterparty in the SAME process is a no-op unless the user explicitly
+ * asks for a refresh (`chat-refresh-device-announcement`). Deliberately NOT
+ * durable/persisted -- see this arc's own design note: a durable "never
+ * announce again" flag would leave a peer whose own Registry got reset
+ * unreachable without an explicit refresh action, which is exactly why an
+ * explicit refresh affordance ships alongside this throttle rather than
+ * being deferred. Never wall-clock; keyed on the account identity fields
+ * actually used for equality elsewhere in this codebase.
+ */
+const peerDeviceAnnouncementSentThisSession = new Set<string>();
+let currentChatCounterpartyAccountRef: ChatCounterpartyAccountRef | null = null;
+
+function peerDeviceAnnouncementSessionKey(accountRef: ChatCounterpartyAccountRef): string {
+  return JSON.stringify([accountRef.authority, accountRef.publicIdentifier, accountRef.identityId]);
+}
+
+/**
+ * The one real send path for a local Device announcement. `force` bypasses
+ * the per-session throttle (the explicit refresh condition mandate section
+ * 15 requires alongside any throttle); a normal `openConversation()` call
+ * never sets it. Only marks the throttle key as satisfied once the send
+ * itself did not throw -- a failed attempt is never treated as "already
+ * announced" and remains eligible to retry on the next open.
+ */
+async function announcePeerDeviceIfNeeded(counterpartyAccountRef: ChatCounterpartyAccountRef, conversationId: string, force: boolean): Promise<boolean> {
+  const key = peerDeviceAnnouncementSessionKey(counterpartyAccountRef);
+  if (!force && peerDeviceAnnouncementSentThisSession.has(key)) return false;
+  const epoch = peerDeviceAnnouncementLocalEpochCounter;
+  peerDeviceAnnouncementLocalEpochCounter += 1;
+  try {
+    await window.fedosApp.peerDeviceAnnounce(counterpartyAccountRef, conversationId, epoch);
+    peerDeviceAnnouncementSentThisSession.add(key);
+    return true;
+  } catch {
+    /* best-effort -- never blocks the chat screen; a genuine failure to send is safely retried on the next eligible attempt */
+    return false;
+  }
+}
 
 /**
  * Real Digital Delivery mega-arc (Agent U) -- Signed Deletion SENDER-side
@@ -853,7 +942,16 @@ function renderConversationsList(filterText: string): void {
     li.appendChild(title);
     const meta = document.createElement("div");
     meta.className = "muted field";
-    meta.textContent = `${c.conversationId} – ${lifecycle}`;
+    // Direct Ratchet P1 arc -- the conversations LIST view has no
+    // per-row counterparty identity available (unlike the chat header,
+    // which already resolves `counterpartyAccountRef` via
+    // `conversationOpen()`'s own membership data) without a new list-API
+    // round trip per row, which this P1 cleanup does not add. Truncating
+    // the raw id itself is the honest minimal fix here; the full id is
+    // still reachable via the `title` attribute and inside the chat
+    // header's own technical-details disclosure once opened.
+    meta.textContent = `${truncateIdentifier(c.conversationId)} – ${lifecycle}`;
+    meta.title = c.conversationId;
     li.appendChild(meta);
     const openBtn = document.createElement("button");
     openBtn.type = "button";
@@ -878,11 +976,26 @@ async function refreshConversationsList(): Promise<void> {
   renderConversationsList(byId<HTMLInputElement>("conversations-filter").value);
 }
 
+/**
+ * Direct Ratchet P1 arc -- a nostr pubkey (hex form) is exactly 32 bytes,
+ * 64 lowercase hex characters. No npub/bech32 decoder exists anywhere in
+ * this codebase (`src/`) to reuse, so npub input is genuinely deferred
+ * (would require adding a new decoding primitive, out of scope for this
+ * minimal fix) -- see mandate's own "no new fingerprint algorithm"
+ * constraint. This only tightens validation of the SAME raw-hex input
+ * already accepted; it adds no new trust semantic.
+ */
+const NOSTR_HEX_PUBKEY_PATTERN = /^[0-9a-f]{64}$/;
+
 async function onInviteSubmit(): Promise<void> {
-  const identifier = byId<HTMLInputElement>("invite-identifier").value.trim();
+  const identifier = byId<HTMLInputElement>("invite-identifier").value.trim().toLowerCase();
   clearError("invite-error");
   if (identifier.length === 0) {
     byId("invite-error").textContent = "Enter the contact's public identifier.";
+    return;
+  }
+  if (!NOSTR_HEX_PUBKEY_PATTERN.test(identifier)) {
+    byId("invite-error").textContent = "That doesn't look like a valid public identifier -- it should be 64 hex characters (0-9, a-f).";
     return;
   }
   setBusy(true, "invite-submit");
@@ -1142,7 +1255,13 @@ async function openConversation(conversationId: string): Promise<void> {
   showAppScreen("chat");
   clearError("chat-error");
   byId("chat-title").textContent = "Conversation";
-  byId("chat-meta").textContent = conversationId;
+  byId("chat-meta").textContent = "Loading…";
+  // Direct Ratchet P1 arc -- the raw conversationId is no longer the
+  // PRIMARY label (see the friendly-label assignment below); it still
+  // always populates the collapsed technical-details disclosure, moved
+  // out of the way rather than deleted (mirrors Commerce's own
+  // `#commerce-order-technical-details` precedent).
+  byId("chat-conversation-id").textContent = `Conversation ID: ${conversationId}`;
   const detail = await window.fedosApp.conversationOpen(conversationId);
   let counterpartyAccountRef: ChatCounterpartyAccountRef | null = null;
   if (detail.outcome === "ok") {
@@ -1153,7 +1272,6 @@ async function openConversation(conversationId: string): Promise<void> {
       readonly memberships?: readonly { readonly participant: ChatCounterpartyAccountRef; readonly state: string }[];
     };
     byId("chat-title").textContent = `${view.mode} conversation`;
-    byId("chat-meta").textContent = `${conversationId} – ${view.lifecycleState} – ${view.activationStatus}`;
     // FedOS Peer Device Discovery Arc (fix for a P0 the Messenger/Security
     // release-readiness reassessment found this arc: the Security Details
     // panel's own Encryption/Forward-secrecy/Device-knowledge axes were
@@ -1165,6 +1283,17 @@ async function openConversation(conversationId: string): Promise<void> {
     // local account itself.
     const counterpartyMembership = view.memberships?.find((m) => m.state === "active" && m.participant.publicIdentifier !== localAccountPublicIdentifier);
     counterpartyAccountRef = counterpartyMembership?.participant ?? null;
+    // Direct Ratchet P1 arc -- friendly identity label PRIMARY, raw hex
+    // moved to the technical-details disclosure above, matching Commerce's
+    // own already-established "friendly label primary, raw id secondary"
+    // pattern (`fedos_electron_beta_page.html`'s own `#commerce-order-parties`
+    // comment). No new fingerprint/identity primitive -- this is display
+    // truncation only, over the SAME `publicIdentifier` already used for
+    // every real trust decision.
+    const counterpartyLabel = counterpartyAccountRef === null ? "Unknown contact" : truncateIdentifier(counterpartyAccountRef.publicIdentifier);
+    byId("chat-meta").textContent = `${counterpartyLabel} – ${view.lifecycleState} – ${view.activationStatus}`;
+  } else {
+    byId("chat-meta").textContent = "Conversation unavailable";
   }
   // A freshly-started Runtime must re-activate a Direct conversation before
   // it can send/receive -- a real, per-Runtime-lifetime precondition, not a
@@ -1173,27 +1302,33 @@ async function openConversation(conversationId: string): Promise<void> {
   await window.fedosApp.conversationActivate(conversationId);
   await loadChatMessages();
   await refreshChatSecurityState(conversationId, counterpartyAccountRef);
+  currentChatCounterpartyAccountRef = counterpartyAccountRef;
   // FedOS Peer Device Discovery Arc -- Peer-Device UX entry point closure
-  // (10_P0_CLOSURE_COORDINATOR_FREEZE.md §4): the FIRST real call site for
-  // this already-fully-wired `window.fedosApp.peerDeviceAnnounce()` IPC
-  // method. Reuses the SAME already-resolved `conversationId`/
-  // `counterpartyAccountRef` this function just used for
-  // `refreshChatSecurityState()` above -- never a second resolution path.
-  // Fires exactly once per `openConversation()` call (never on every
-  // render) -- a stale/duplicate re-announce at the same epoch is already
-  // handled safely by the receiving side's own acceptance policy (rejected
-  // as stale), so a best-effort failure here is bounded and safe; it must
-  // never block the chat screen from opening.
+  // (10_P0_CLOSURE_COORDINATOR_FREEZE.md §4). Direct Ratchet P1 arc --
+  // throttled: a repeated open of the SAME conversation in the SAME
+  // process is now a no-op (`announcePeerDeviceIfNeeded()`'s own session
+  // throttle); "first availability" (this process's first open of this
+  // counterparty) still always announces, and an explicit refresh action
+  // (`chat-refresh-device-announcement`) always bypasses the throttle. A
+  // stale/duplicate re-announce is separately already handled safely by
+  // the receiving side's own acceptance policy (rejected as stale) even
+  // when it does fire, so a best-effort failure here is bounded and safe;
+  // it must never block the chat screen from opening.
   if (counterpartyAccountRef !== null) {
-    const epoch = peerDeviceAnnouncementLocalEpochCounter;
-    peerDeviceAnnouncementLocalEpochCounter += 1;
-    try {
-      await window.fedosApp.peerDeviceAnnounce(counterpartyAccountRef, conversationId, epoch);
-    } catch {
-      /* best-effort -- never blocks the chat screen; a genuine failure to send is safely retried on the next conversation-open */
-    }
+    await announcePeerDeviceIfNeeded(counterpartyAccountRef, conversationId, false);
   }
   startChatPolling();
+}
+
+async function onRefreshDeviceAnnouncementClick(): Promise<void> {
+  const feedback = byId("chat-refresh-device-announcement-feedback");
+  if (currentConversationId === null || currentChatCounterpartyAccountRef === null) {
+    feedback.textContent = "No counterparty device known yet for this conversation.";
+    return;
+  }
+  feedback.textContent = "Refreshing...";
+  const sent = await announcePeerDeviceIfNeeded(currentChatCounterpartyAccountRef, currentConversationId, true);
+  feedback.textContent = sent ? "Device announcement re-sent." : "Could not send right now -- it will be retried automatically.";
 }
 
 // ---------------------------------------------------------------------------
@@ -4737,11 +4872,15 @@ async function onCreateSubmit(): Promise<void> {
   } finally {
     clearField("create-pass");
     clearField("create-pass-confirm");
+    resetPasswordVisibility("create-pass-show-hide", "create-pass", "create-pass-confirm");
     setBusy(false, "create-submit");
+    refreshCreateSubmitEnabled();
   }
 
   if (result.outcome === "ok") {
     byId<HTMLInputElement>("create-label").value = "";
+    byId<HTMLInputElement>("create-pass-ack").checked = false;
+    refreshCreateSubmitEnabled();
     renderReady(result.ready);
   } else {
     showScreen("create");
@@ -4769,6 +4908,7 @@ async function onUnlockSubmit(): Promise<void> {
     result = await window.fedosProfile.unlock(pass);
   } finally {
     clearField("unlock-pass");
+    resetPasswordVisibility("unlock-pass-show-hide", "unlock-pass");
     setBusy(false, "unlock-submit");
   }
 
@@ -4786,7 +4926,7 @@ async function onUnlockSubmit(): Promise<void> {
     // passphrase did not match" message.
     renderRecoveryScreen(coarseErrorCode(result));
   } else {
-    byId("unlock-failed-reason").textContent = "The profile remains locked.";
+    byId("unlock-failed-reason").textContent = "Double-check your passphrase (case and spacing matter) and try again.";
     showScreen("unlock-failed");
   }
 }
@@ -5116,6 +5256,13 @@ byId<HTMLButtonElement>("create-submit").addEventListener("click", () => {
 byId<HTMLButtonElement>("unlock-submit").addEventListener("click", () => {
   void onUnlockSubmit();
 });
+byId<HTMLButtonElement>("create-pass-show-hide").addEventListener("click", () => {
+  togglePasswordVisibility("create-pass-show-hide", "create-pass", "create-pass-confirm");
+});
+byId<HTMLButtonElement>("unlock-pass-show-hide").addEventListener("click", () => {
+  togglePasswordVisibility("unlock-pass-show-hide", "unlock-pass");
+});
+byId<HTMLInputElement>("create-pass-ack").addEventListener("change", refreshCreateSubmitEnabled);
 byId<HTMLButtonElement>("retry-btn").addEventListener("click", () => {
   clearField("unlock-pass");
   showScreen("unlock");
@@ -5247,11 +5394,13 @@ byId<HTMLInputElement>("conversations-filter").addEventListener("input", () => {
 byId<HTMLButtonElement>("invite-submit").addEventListener("click", () => void onInviteSubmit());
 byId<HTMLButtonElement>("chat-back").addEventListener("click", () => {
   currentConversationId = null;
+  currentChatCounterpartyAccountRef = null;
   showAppScreen("conversations");
   void refreshConversationsList();
 });
 byId<HTMLButtonElement>("chat-send").addEventListener("click", () => void onChatSend());
 byId<HTMLButtonElement>("chat-security-indicator").addEventListener("click", onChatSecurityIndicatorClick);
+byId<HTMLButtonElement>("chat-refresh-device-announcement").addEventListener("click", () => void onRefreshDeviceAnnouncementClick());
 
 // Commerce.
 byId<HTMLButtonElement>("commerce-detail-back").addEventListener("click", () => {

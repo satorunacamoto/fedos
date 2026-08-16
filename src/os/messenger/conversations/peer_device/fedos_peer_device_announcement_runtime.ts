@@ -25,6 +25,7 @@ import type { FedosPeerDeviceAnnouncementObservationPersistence } from "./persis
 import type { FedosPeerDeviceAnnouncementObservationV1 } from "./fedos_peer_device_announcement_observation.js";
 import { isFedosPeerDeviceAnnouncementAccepted } from "./fedos_peer_device_announcement_acceptance_outcome.js";
 import { readOrCreateFedosLocalPeerDeviceAnnouncementIdentity, recordFedosLocalPeerDeviceAnnouncementEpochSent } from "./fedos_local_peer_device_announcement_identity.js";
+import { computeFedosPeerDeviceKnowledgeState, type FedosPeerDeviceKnowledgeState } from "./fedos_peer_device_announcement_knowledge_state.js";
 
 export interface FedosPeerDeviceAnnouncementRuntimeDependencies {
   readonly deviceRegistry: FedosDeviceRegistryPersistence;
@@ -49,6 +50,8 @@ export interface FedosPeerDeviceAnnouncementPeerDeviceStatus {
   readonly trustState: FedosDeviceTrustState | "unknown";
   readonly lastAcceptanceOutcome: FedosPeerDeviceAnnouncementObservationV1["acceptanceOutcome"];
   readonly lastObservedAt: number;
+  /** Never a boolean, never "trusted implies verified" — see `fedos_peer_device_announcement_knowledge_state.ts` header. */
+  readonly knowledgeState: FedosPeerDeviceKnowledgeState;
 }
 
 export class FedosPeerDeviceAnnouncementRuntime {
@@ -127,12 +130,14 @@ export class FedosPeerDeviceAnnouncementRuntime {
       const latest = this.#latestAcceptedObservation(record.peerAccountRef, record.deviceId);
       if (latest === null) continue;
       const binding = this.#deps.deviceRegistry.getBinding(record.deviceId);
+      const subjectObservations = this.#deps.observationPersistence.listObservationsForPeerDevice(this.#deps.localDeviceRef, record.peerAccountRef, record.deviceId);
       seen.set(key, {
         peerAccountRef: record.peerAccountRef,
         deviceId: record.deviceId,
         trustState: binding === null ? "unknown" : binding.trustState,
         lastAcceptanceOutcome: latest.acceptanceOutcome,
         lastObservedAt: latest.observedAt,
+        knowledgeState: computeFedosPeerDeviceKnowledgeState(subjectObservations, binding),
       });
     }
     return [...seen.values()];

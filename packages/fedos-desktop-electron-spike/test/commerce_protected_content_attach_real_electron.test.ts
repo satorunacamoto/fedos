@@ -138,55 +138,56 @@ realSuite("Protected purchased-file attach -- REAL Beta Electron process, real W
         { action: "fill", selector: "#create-label", value: "Protected Attach Regression Profile" }, // 1
         { action: "fill", selector: "#create-pass", value: "protected attach regression passphrase" }, // 2
         { action: "fill", selector: "#create-pass-confirm", value: "protected attach regression passphrase" }, // 3
-        { action: "click", selector: "#create-submit" }, // 4
-        { action: "wait", ms: 3000 }, // 5 -- real Argon2 unlock + real WASM master seed generation
-        { action: "read", selector: "#current-screen" }, // 6 -- expect "ready"
+        { action: "click", selector: "#create-pass-ack" }, // 4
+        { action: "click", selector: "#create-submit" }, // 5
+        { action: "wait", ms: 3000 }, // 6 -- real Argon2 unlock + real WASM master seed generation
+        { action: "read", selector: "#current-screen" }, // 7 -- expect "ready"
 
-        { action: "click", selector: "#nav-commerce-merchant" }, // 7
-        { action: "wait", ms: 400 }, // 8
-        { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 9
-        { action: "wait", ms: 300 }, // 10
-        { action: "fill", selector: "#commerce-merchant-create-title", value: "Protected Content Regression" }, // 11
-        { action: "fill", selector: "#commerce-merchant-create-description", value: "A product whose purchased file must genuinely attach." }, // 12
-        { action: "fill", selector: "#commerce-merchant-create-price", value: "10.00" }, // 13
-        { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 14
-        { action: "click", selector: "#commerce-merchant-create-submit" }, // 15
-        { action: "wait", ms: 700 }, // 16
+        { action: "click", selector: "#nav-commerce-merchant" }, // 8
+        { action: "wait", ms: 400 }, // 9
+        { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 10
+        { action: "wait", ms: 300 }, // 11
+        { action: "fill", selector: "#commerce-merchant-create-title", value: "Protected Content Regression" }, // 12
+        { action: "fill", selector: "#commerce-merchant-create-description", value: "A product whose purchased file must genuinely attach." }, // 13
+        { action: "fill", selector: "#commerce-merchant-create-price", value: "10.00" }, // 14
+        { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 15
+        { action: "click", selector: "#commerce-merchant-create-submit" }, // 16
+        { action: "wait", ms: 700 }, // 17
 
         // --- the real PDF attach, through the real file picker surface ---
-        { action: "fill", selector: `${ROW} .commerce-product-content-attach input[type="text"]`, value: "Full guide (PDF)" }, // 17
-        { action: "attachFile", selector: `${ROW} .commerce-product-content-attach input[type="file"]`, value: realSmallPdfBase64(), fileName: "guide.pdf", fileType: "application/pdf" }, // 18
-        { action: "click", selector: `${ROW} .commerce-product-content-attach button` }, // 19
-        { action: "wait", ms: 2500 }, // 20
-        { action: "read", selector: `${ROW} .commerce-product-content-attach .error` }, // 21 -- expect "" (the bug produced "protected content storage failed: failed" here)
-        { action: "read", selector: `${ROW} .commerce-product-media-summary` }, // 22 -- expect the file listed as buyers-only
+        { action: "fill", selector: `${ROW} .commerce-product-content-attach input[type="text"]`, value: "Full guide (PDF)" }, // 18
+        { action: "attachFile", selector: `${ROW} .commerce-product-content-attach input[type="file"]`, value: realSmallPdfBase64(), fileName: "guide.pdf", fileType: "application/pdf" }, // 19
+        { action: "click", selector: `${ROW} .commerce-product-content-attach button` }, // 20
+        { action: "wait", ms: 2500 }, // 21
+        { action: "read", selector: `${ROW} .commerce-product-content-attach .error` }, // 22 -- expect "" (the bug produced "protected content storage failed: failed" here)
+        { action: "read", selector: `${ROW} .commerce-product-media-summary` }, // 23 -- expect the file listed as buyers-only
 
         // --- a real ZIP, reported with Windows' own MIME spelling ---
-        { action: "fill", selector: `${ROW} .commerce-product-content-attach input[type="text"]`, value: "Pro pack (ZIP)" }, // 23
-        { action: "attachFile", selector: `${ROW} .commerce-product-content-attach input[type="file"]`, value: REAL_EMPTY_ZIP_BASE64, fileName: "pack.zip", fileType: "application/x-zip-compressed" }, // 24
-        { action: "click", selector: `${ROW} .commerce-product-content-attach button` }, // 25
-        { action: "wait", ms: 2500 }, // 26
-        { action: "read", selector: `${ROW} .commerce-product-content-attach .error` }, // 27 -- expect ""
-        { action: "read", selector: `${ROW} .commerce-product-media-summary` }, // 28 -- expect BOTH files
+        { action: "fill", selector: `${ROW} .commerce-product-content-attach input[type="text"]`, value: "Pro pack (ZIP)" }, // 24
+        { action: "attachFile", selector: `${ROW} .commerce-product-content-attach input[type="file"]`, value: REAL_EMPTY_ZIP_BASE64, fileName: "pack.zip", fileType: "application/x-zip-compressed" }, // 25
+        { action: "click", selector: `${ROW} .commerce-product-content-attach button` }, // 26
+        { action: "wait", ms: 2500 }, // 27
+        { action: "read", selector: `${ROW} .commerce-product-content-attach .error` }, // 28 -- expect ""
+        { action: "read", selector: `${ROW} .commerce-product-media-summary` }, // 29 -- expect BOTH files
       ]);
 
-      expect(readAt(run, 6)).toBe("ready");
+      expect(readAt(run, 7)).toBe("ready");
 
       // The real file genuinely reached the page as a real File object.
-      expect(readAt(run, 18)).toBe("1:1024:application/pdf");
+      expect(readAt(run, 19)).toBe("1:1024:application/pdf");
 
       // THE REGRESSION: this was "protected content storage failed: failed", 100% of the time.
-      expect(readAt(run, 21), run.output).toBe("");
-      const afterPdf = readAt(run, 22);
+      expect(readAt(run, 22), run.output).toBe("");
+      const afterPdf = readAt(run, 23);
       expect(afterPdf).toMatch(/Buyers only \(unlocked after purchase\)/);
       expect(afterPdf).toMatch(/Full guide \(PDF\)/);
       // Seller language only -- the summary must never leak an internal term.
       expect(afterPdf).not.toMatch(/ciphertext|classification|CID|AEAD/i);
 
       // Windows reports `.zip` as `application/x-zip-compressed`; that must not be a rejection.
-      expect(readAt(run, 24)).toBe("1:22:application/x-zip-compressed");
-      expect(readAt(run, 27), run.output).toBe("");
-      const afterZip = readAt(run, 28);
+      expect(readAt(run, 25)).toBe("1:22:application/x-zip-compressed");
+      expect(readAt(run, 28), run.output).toBe("");
+      const afterZip = readAt(run, 29);
       expect(afterZip).toMatch(/Full guide \(PDF\)/);
       expect(afterZip).toMatch(/Pro pack \(ZIP\)/);
     },

@@ -109,13 +109,14 @@ realSuite("Alpha 8121-8200 -- Security Finding 2 (6873d24f): double-submit guard
       { action: "fill", selector: "#create-label", value: "Alice" },
       { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8121 doubleclick" },
       { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8121 doubleclick" },
+      { action: "click", selector: "#create-pass-ack" },
       { action: "click", selector: "#create-submit" },
       { action: "wait", ms: 900 },
       { action: "doubleClick", selector: "#lock-btn" },
       { action: "wait", ms: 600 },
       { action: "read", selector: "#current-screen" },
     ]);
-    expect(readAt(out, 8), out).toBe("unlock");
+    expect(readAt(out, 9), out).toBe("unlock");
   });
 
   it("structural: Identity Transition decide buttons (accept/reject/defer) are disabled together while any one decision is in flight, re-enabled in a finally block -- the same mechanism just proven live above", () => {

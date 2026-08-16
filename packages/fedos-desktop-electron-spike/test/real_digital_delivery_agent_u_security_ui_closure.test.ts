@@ -233,6 +233,7 @@ realSuite("Real Digital Delivery (Agent U) — real packaged-app smoke test", ()
       { action: "fill", selector: "#create-label", value: "Alice" },
       { action: "fill", selector: "#create-pass", value: "correct horse battery staple rdd agent u" },
       { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple rdd agent u" },
+      { action: "click", selector: "#create-pass-ack" },
       { action: "click", selector: "#create-submit" },
       { action: "wait", ms: 900 },
       { action: "click", selector: "#nav-devices" },
@@ -241,11 +242,11 @@ realSuite("Real Digital Delivery (Agent U) — real packaged-app smoke test", ()
       { action: "read", selector: "#device-sync-summary" },
       { action: "read", selector: "#device-sync-conflicts-list" },
     ]);
-    expect(readAt(out, 8), out).toBe("devices");
-    const summary = readAt(out, 9);
+    expect(readAt(out, 9), out).toBe("devices");
+    const summary = readAt(out, 10);
     expect(summary.length, out).toBeGreaterThan(0);
     expect(summary).not.toMatch(/undefined|\[object Object\]|NaN/);
-    const conflicts = readAt(out, 10);
+    const conflicts = readAt(out, 11);
     expect(conflicts.length, out).toBeGreaterThan(0);
   });
 });

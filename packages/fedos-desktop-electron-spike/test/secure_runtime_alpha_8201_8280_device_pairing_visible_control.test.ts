@@ -142,11 +142,12 @@ realSuite("Alpha 8201-8280 -- Device Pairing, driven ONLY through visible DOM co
         { action: "fill", selector: "#create-label", value: "Alice" },
         { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8201 pairing" },
         { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8201 pairing" },
+        { action: "click", selector: "#create-pass-ack" },
         { action: "click", selector: "#create-submit" },
         { action: "wait", ms: 700 },
-        { action: "read", selector: "#ready-account" }, // 6
+        { action: "read", selector: "#ready-account" }, // 7
       ]);
-      const aliceAccount = readAt(create, 6);
+      const aliceAccount = readAt(create, 7);
       expect(aliceAccount.length).toBeGreaterThan(0);
 
       const pairing = await runBetaUiScript(dir, [
@@ -205,6 +206,7 @@ realSuite("Alpha 8201-8280 -- Device Pairing, driven ONLY through visible DOM co
         { action: "fill", selector: "#create-label", value: "Carol" },
         { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8201 wrongacct" },
         { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8201 wrongacct" },
+        { action: "click", selector: "#create-pass-ack" },
         { action: "click", selector: "#create-submit" },
         { action: "wait", ms: 700 },
         { action: "click", selector: "#nav-devices" },
@@ -215,7 +217,7 @@ realSuite("Alpha 8201-8280 -- Device Pairing, driven ONLY through visible DOM co
         { action: "fill", selector: "#device-pairing-create-account", value: "0000000000000000000000000000000000000000000000000000000000000000" },
         { action: "click", selector: "#device-pairing-create-submit" },
         { action: "wait", ms: 400 },
-        { action: "read", selector: "#device-pairing-create-output", as: "value" }, // 12
+        { action: "read", selector: "#device-pairing-create-output", as: "value" }, // 13
 
         // Carol's own Runtime CAN produce a technically-valid approval (approvePairingRequest() only verifies the device proof, never the joining side's own "expected" account) -- the fail-closed check lives entirely in completePairing(), proven below.
         { action: "copy", selector: "#device-pairing-create-output", targetSelector: "#device-pairing-approve-input" },
@@ -224,20 +226,20 @@ realSuite("Alpha 8201-8280 -- Device Pairing, driven ONLY through visible DOM co
         { action: "click", selector: "#device-pairing-approve-submit" }, // arms the real inline two-step confirm (never window.confirm() -- see this Arc's own header)
         { action: "click", selector: "#device-pairing-approve-confirm" },
         { action: "wait", ms: 500 },
-        { action: "read", selector: "#device-pairing-approve-output", as: "value" }, // 19
+        { action: "read", selector: "#device-pairing-approve-output", as: "value" }, // 20
 
         { action: "copy", selector: "#device-pairing-approve-output", targetSelector: "#device-pairing-complete-input" },
         { action: "click", selector: "#device-pairing-complete-submit" },
         { action: "wait", ms: 400 },
-        { action: "read", selector: "#device-pairing-complete-error" }, // 23
-        { action: "read", selector: "#device-pairing-complete-result" }, // 24
-        { action: "read", selector: "#devices-list" }, // 25
+        { action: "read", selector: "#device-pairing-complete-error" }, // 24
+        { action: "read", selector: "#device-pairing-complete-result" }, // 25
+        { action: "read", selector: "#devices-list" }, // 26
       ]);
 
-      expect(readAt(run, 12).length).toBeGreaterThan(0);
-      expect(readAt(run, 19).length).toBeGreaterThan(0); // Carol's approval was produced -- it is the JOINING side's own re-check that must refuse it
-      expect(readAt(run, 23)).toBe("This approval is from a different account than expected.");
-      expect(readAt(run, 24)).toBe(""); // completePairing() never reached a success outcome
+      expect(readAt(run, 13).length).toBeGreaterThan(0);
+      expect(readAt(run, 20).length).toBeGreaterThan(0); // Carol's approval was produced -- it is the JOINING side's own re-check that must refuse it
+      expect(readAt(run, 24)).toBe("This approval is from a different account than expected.");
+      expect(readAt(run, 25)).toBe(""); // completePairing() never reached a success outcome
       // NOTE (real, disclosed behavior -- see FedosDevicePairingFacade's own
       // "LOCAL RECIPROCAL RECORDING" header): approvePairingRequest() always
       // writes a real, independent local trust record on the APPROVING
@@ -251,7 +253,7 @@ realSuite("Alpha 8201-8280 -- Device Pairing, driven ONLY through visible DOM co
       // not a security bug -- it is why the Devices UI's own Approve-result
       // copy says "Approving here also trusts the new Device locally on
       // THIS Device right away."
-      expect(readAt(run, 25)).toContain("SomeOtherDevice");
+      expect(readAt(run, 26)).toContain("SomeOtherDevice");
     },
     120000,
   );

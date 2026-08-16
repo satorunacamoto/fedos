@@ -274,82 +274,83 @@ realSuite("FedOS Commerce sealed signing-key stores -- real-filesystem corruptio
       { action: "fill", selector: "#create-label", value: "Sealed Key Corruption Seed Profile" }, // 1
       { action: "fill", selector: "#create-pass", value: CORRUPTION_TEST_PASSWORD }, // 2
       { action: "fill", selector: "#create-pass-confirm", value: CORRUPTION_TEST_PASSWORD }, // 3
-      { action: "click", selector: "#create-submit" }, // 4
-      { action: "wait", ms: 2000 }, // 5
-      { action: "read", selector: "#current-screen" }, // 6 -- expect "ready"
+      { action: "click", selector: "#create-pass-ack" }, // 4
+      { action: "click", selector: "#create-submit" }, // 5
+      { action: "wait", ms: 2000 }, // 6
+      { action: "read", selector: "#current-screen" }, // 7 -- expect "ready"
 
-      { action: "click", selector: "#nav-commerce-merchant" }, // 7
-      { action: "wait", ms: 300 }, // 8
-      { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 9
-      { action: "wait", ms: 200 }, // 10
-      { action: "fill", selector: "#commerce-merchant-create-title", value: "Corruption Seed Mug" }, // 11
-      { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the sealed-key corruption E2E." }, // 12
+      { action: "click", selector: "#nav-commerce-merchant" }, // 8
+      { action: "wait", ms: 300 }, // 9
+      { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 10
+      { action: "wait", ms: 200 }, // 11
+      { action: "fill", selector: "#commerce-merchant-create-title", value: "Corruption Seed Mug" }, // 12
+      { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the sealed-key corruption E2E." }, // 13
       // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- price
       // field is decimal-dollars now (friction ledger row #18); Publish
       // click targets its own class since the row also has Preview/Edit.
-      { action: "fill", selector: "#commerce-merchant-create-price", value: "25.00" }, // 13
-      { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 14
-      { action: "click", selector: "#commerce-merchant-create-submit" }, // 15
-      { action: "wait", ms: 300 }, // 16
-      { action: "read", selector: "#commerce-merchant-products-list" }, // 17
-      { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 18 -- Publish
-      { action: "wait", ms: 300 }, // 19
+      { action: "fill", selector: "#commerce-merchant-create-price", value: "25.00" }, // 14
+      { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 15
+      { action: "click", selector: "#commerce-merchant-create-submit" }, // 16
+      { action: "wait", ms: 300 }, // 17
+      { action: "read", selector: "#commerce-merchant-products-list" }, // 18
+      { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 19 -- Publish
+      { action: "wait", ms: 300 }, // 20
 
-      { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 20
-      { action: "wait", ms: 200 }, // 21
-      { action: "click", selector: "#nav-commerce" }, // 22
-      { action: "wait", ms: 300 }, // 23
-      { action: "read", selector: "#commerce-catalog-list" }, // 24
-      { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 25 -- 3 seeded + 1 new
-      { action: "wait", ms: 300 }, // 26
-      { action: "read", selector: "#commerce-detail-title" }, // 27 -- expect "Corruption Seed Mug"
-      { action: "click", selector: "#commerce-order-create-submit" }, // 28
-      { action: "wait", ms: 400 }, // 29
-      { action: "read", selector: "#commerce-order-status-text" }, // 30 -- expect "created"
-      { action: "click", selector: "#commerce-order-submit-btn" }, // 31
-      { action: "wait", ms: 300 }, // 32
-      { action: "read", selector: "#commerce-order-status-text" }, // 33 -- expect "submitted"
+      { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 21
+      { action: "wait", ms: 200 }, // 22
+      { action: "click", selector: "#nav-commerce" }, // 23
+      { action: "wait", ms: 300 }, // 24
+      { action: "read", selector: "#commerce-catalog-list" }, // 25
+      { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 26 -- 3 seeded + 1 new
+      { action: "wait", ms: 300 }, // 27
+      { action: "read", selector: "#commerce-detail-title" }, // 28 -- expect "Corruption Seed Mug"
+      { action: "click", selector: "#commerce-order-create-submit" }, // 29
+      { action: "wait", ms: 400 }, // 30
+      { action: "read", selector: "#commerce-order-status-text" }, // 31 -- expect "created"
+      { action: "click", selector: "#commerce-order-submit-btn" }, // 32
+      { action: "wait", ms: 300 }, // 33
+      { action: "read", selector: "#commerce-order-status-text" }, // 34 -- expect "submitted"
 
-      { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 34
-      { action: "wait", ms: 200 }, // 35
-      { action: "click", selector: "#commerce-order-accept-btn" }, // 36
-      { action: "wait", ms: 300 }, // 37
-      { action: "read", selector: "#commerce-order-status-text" }, // 38 -- expect "accepted"
+      { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 35
+      { action: "wait", ms: 200 }, // 36
+      { action: "click", selector: "#commerce-order-accept-btn" }, // 37
+      { action: "wait", ms: 300 }, // 38
+      { action: "read", selector: "#commerce-order-status-text" }, // 39 -- expect "accepted"
 
-      { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 39
-      { action: "wait", ms: 200 }, // 40
-      { action: "click", selector: "#commerce-order-payment-request-btn" }, // 41
-      { action: "wait", ms: 400 }, // 42
-      { action: "read", selector: "#commerce-order-payment-id" }, // 43
-      { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 44
-      { action: "wait", ms: 500 }, // 45
-      { action: "read", selector: "#commerce-order-status-text" }, // 46 -- expect "paid"
+      { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 40
+      { action: "wait", ms: 200 }, // 41
+      { action: "click", selector: "#commerce-order-payment-request-btn" }, // 42
+      { action: "wait", ms: 400 }, // 43
+      { action: "read", selector: "#commerce-order-payment-id" }, // 44
+      { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 45
+      { action: "wait", ms: 500 }, // 46
+      { action: "read", selector: "#commerce-order-status-text" }, // 47 -- expect "paid"
 
-      { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 47
-      { action: "wait", ms: 200 }, // 48
-      { action: "click", selector: "#commerce-order-fulfill-btn" }, // 49
-      { action: "wait", ms: 400 }, // 50
-      { action: "read", selector: "#commerce-order-status-text" }, // 51 -- expect "fulfilling"
+      { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 48
+      { action: "wait", ms: 200 }, // 49
+      { action: "click", selector: "#commerce-order-fulfill-btn" }, // 50
+      { action: "wait", ms: 400 }, // 51
+      { action: "read", selector: "#commerce-order-status-text" }, // 52 -- expect "fulfilling"
 
-      { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 52
-      { action: "wait", ms: 200 }, // 53
-      { action: "click", selector: "#commerce-order-acknowledge-receipt-btn" }, // 54
-      { action: "wait", ms: 400 }, // 55
-      { action: "read", selector: "#commerce-order-status-text" }, // 56 -- expect "delivered"
+      { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 53
+      { action: "wait", ms: 200 }, // 54
+      { action: "click", selector: "#commerce-order-acknowledge-receipt-btn" }, // 55
+      { action: "wait", ms: 400 }, // 56
+      { action: "read", selector: "#commerce-order-status-text" }, // 57 -- expect "delivered"
 
-      { action: "click", selector: "#commerce-order-complete-btn" }, // 57
-      { action: "wait", ms: 400 }, // 58
-      { action: "read", selector: "#commerce-order-status-text" }, // 59 -- expect "completed" (mints+seals BOTH real pubkeys' Persona Epoch signing keys)
+      { action: "click", selector: "#commerce-order-complete-btn" }, // 58
+      { action: "wait", ms: 400 }, // 59
+      { action: "read", selector: "#commerce-order-status-text" }, // 60 -- expect "completed" (mints+seals BOTH real pubkeys' Persona Epoch signing keys)
 
-      { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 60 -- mints+seals the receipt-issuer signing key
-      { action: "wait", ms: 500 }, // 61
-      { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 62 -- expect "VALID"
+      { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 61 -- mints+seals the receipt-issuer signing key
+      { action: "wait", ms: 500 }, // 62
+      { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 63 -- expect "VALID"
     ]);
 
-    expect(readAt(seedRun, 6)).toBe("ready");
-    expect(readAt(seedRun, 27)).toBe("Corruption Seed Mug");
-    expect(readAt(seedRun, 59)).toBe("completed");
-    expect(readAt(seedRun, 62)).toBe("VALID");
+    expect(readAt(seedRun, 7)).toBe("ready");
+    expect(readAt(seedRun, 28)).toBe("Corruption Seed Mug");
+    expect(readAt(seedRun, 60)).toBe("completed");
+    expect(readAt(seedRun, 63)).toBe("VALID");
 
     // `dataDir()` (`fedos_electron_beta_main.cts`) appends its own `profile`
     // subdirectory under `FEDOS_ELECTRON_BETA_DATA_DIR`, and

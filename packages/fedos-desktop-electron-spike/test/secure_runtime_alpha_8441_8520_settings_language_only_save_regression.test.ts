@@ -110,6 +110,7 @@ realSuite("Alpha 8441-8520 -- Settings language-only save no longer shows a fals
         { action: "fill", selector: "#create-label", value: "Alice" },
         { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8441 lang" },
         { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8441 lang" },
+        { action: "click", selector: "#create-pass-ack" },
         { action: "click", selector: "#create-submit" },
         { action: "wait", ms: 700 },
         { action: "click", selector: "#nav-settings" },
@@ -118,12 +119,12 @@ realSuite("Alpha 8441-8520 -- Settings language-only save no longer shows a fals
         { action: "fill", selector: "#settings-language", value: "ja" },
         { action: "click", selector: "#settings-save" },
         { action: "wait", ms: 500 },
-        { action: "read", selector: "#settings-report" }, // 11
-        { action: "read", selector: "#settings-error" }, // 12
+        { action: "read", selector: "#settings-report" }, // 12
+        { action: "read", selector: "#settings-error" }, // 13
       ]);
 
-      const reportText = readAt(run, 11);
-      const errorText = readAt(run, 12);
+      const reportText = readAt(run, 12);
+      const errorText = readAt(run, 13);
       expect(errorText).toBe(""); // the old bug wrote here: "Something went wrong. Please try again."
       expect(reportText).toContain("Saved");
       expect(reportText).not.toMatch(/something went wrong/i);

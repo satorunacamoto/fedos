@@ -139,69 +139,70 @@ realSuite("Unpublish a live listing -- REAL Beta Electron process, driven only t
         { action: "fill", selector: "#create-label", value: "Unpublish Freeze Regression Profile" }, // 1
         { action: "fill", selector: "#create-pass", value: "unpublish freeze regression passphrase" }, // 2
         { action: "fill", selector: "#create-pass-confirm", value: "unpublish freeze regression passphrase" }, // 3
-        { action: "click", selector: "#create-submit" }, // 4
-        { action: "wait", ms: 3000 }, // 5 -- real Argon2 unlock + real WASM master seed generation
-        { action: "read", selector: "#current-screen" }, // 6 -- expect "ready"
+        { action: "click", selector: "#create-pass-ack" }, // 4
+        { action: "click", selector: "#create-submit" }, // 5
+        { action: "wait", ms: 3000 }, // 6 -- real Argon2 unlock + real WASM master seed generation
+        { action: "read", selector: "#current-screen" }, // 7 -- expect "ready"
 
-        { action: "click", selector: "#nav-commerce-merchant" }, // 7
-        { action: "wait", ms: 400 }, // 8
-        { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 9
-        { action: "wait", ms: 300 }, // 10
-        { action: "fill", selector: "#commerce-merchant-create-title", value: "Unpublish Freeze Regression" }, // 11
-        { action: "fill", selector: "#commerce-merchant-create-description", value: "A live listing that must be unpublishable without freezing the app." }, // 12
-        { action: "fill", selector: "#commerce-merchant-create-price", value: "9.50" }, // 13
-        { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 14
-        { action: "click", selector: "#commerce-merchant-create-submit" }, // 15
-        { action: "wait", ms: 900 }, // 16
+        { action: "click", selector: "#nav-commerce-merchant" }, // 8
+        { action: "wait", ms: 400 }, // 9
+        { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 10
+        { action: "wait", ms: 300 }, // 11
+        { action: "fill", selector: "#commerce-merchant-create-title", value: "Unpublish Freeze Regression" }, // 12
+        { action: "fill", selector: "#commerce-merchant-create-description", value: "A live listing that must be unpublishable without freezing the app." }, // 13
+        { action: "fill", selector: "#commerce-merchant-create-price", value: "9.50" }, // 14
+        { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 15
+        { action: "click", selector: "#commerce-merchant-create-submit" }, // 16
+        { action: "wait", ms: 900 }, // 17
 
-        { action: "click", selector: `${ROW} button.commerce-btn-publish` }, // 17
-        { action: "wait", ms: 1500 }, // 18
-        { action: "read", selector: ROW }, // 19 -- expect "— active"
+        { action: "click", selector: `${ROW} button.commerce-btn-publish` }, // 18
+        { action: "wait", ms: 1500 }, // 19
+        { action: "read", selector: ROW }, // 20 -- expect "— active"
 
         // ---- THE REGRESSION POINT: with window.confirm() present, this
         // click's own executeJavaScript round-trip NEVER returns and every
         // step below is simply never emitted. ----
-        { action: "click", selector: `${ROW} button.commerce-btn-unpublish` }, // 20
-        { action: "wait", ms: 700 }, // 21
-        { action: "read", selector: "#app-confirm-body" }, // 22 -- the real in-page dialog is open, and the page is still executing
-        { action: "read", selector: ROW }, // 23 -- still active: nothing commits before the user answers
+        { action: "click", selector: `${ROW} button.commerce-btn-unpublish` }, // 21
+        { action: "wait", ms: 700 }, // 22
+        { action: "read", selector: "#app-confirm-body" }, // 23 -- the real in-page dialog is open, and the page is still executing
+        { action: "read", selector: ROW }, // 24 -- still active: nothing commits before the user answers
 
-        { action: "click", selector: "#app-confirm-cancel" }, // 24
-        { action: "wait", ms: 900 }, // 25
-        { action: "read", selector: ROW }, // 26 -- STILL active: Cancel really cancels
+        { action: "click", selector: "#app-confirm-cancel" }, // 25
+        { action: "wait", ms: 900 }, // 26
+        { action: "read", selector: ROW }, // 27 -- STILL active: Cancel really cancels
 
-        { action: "click", selector: `${ROW} button.commerce-btn-unpublish` }, // 27
-        { action: "wait", ms: 500 }, // 28
-        { action: "click", selector: "#app-confirm-accept" }, // 29
-        { action: "wait", ms: 2000 }, // 30
-        { action: "read", selector: ROW }, // 31 -- expect "— archived"
-        { action: "read", selector: "#commerce-merchant-products-error" }, // 32 -- expect ""
+        { action: "click", selector: `${ROW} button.commerce-btn-unpublish` }, // 28
+        { action: "wait", ms: 500 }, // 29
+        { action: "click", selector: "#app-confirm-accept" }, // 30
+        { action: "wait", ms: 2000 }, // 31
+        { action: "read", selector: ROW }, // 32 -- expect "— archived"
+        { action: "read", selector: "#commerce-merchant-products-error" }, // 33 -- expect ""
 
-        { action: "click", selector: `${ROW} button.commerce-btn-publish` }, // 33
-        { action: "wait", ms: 1800 }, // 34
-        { action: "read", selector: ROW }, // 35 -- expect "— active" again
-        { action: "read", selector: "#current-screen" }, // 36 -- the app is still alive at the very end
+        { action: "click", selector: `${ROW} button.commerce-btn-publish` }, // 34
+        { action: "wait", ms: 1800 }, // 35
+        { action: "read", selector: ROW }, // 36 -- expect "— active" again
+        { action: "read", selector: "#current-screen" }, // 37 -- the app is still alive at the very end
       ]);
 
-      expect(readAt(run, 6)).toBe("ready");
-      expect(readAt(run, 19)).toContain("Unpublish Freeze Regression — active");
+      expect(readAt(run, 7)).toBe("ready");
+      expect(readAt(run, 20)).toContain("Unpublish Freeze Regression — active");
 
       // The confirmation really opened, in the page, with the real copy --
       // and the renderer answered the very next scripted step, which the
       // frozen build could not do at all.
-      expect(readAt(run, 22), run.output).toContain("stop appearing in the Shop catalog");
-      expect(readAt(run, 23)).toContain("— active");
+      expect(readAt(run, 23), run.output).toContain("stop appearing in the Shop catalog");
+      expect(readAt(run, 24)).toContain("— active");
 
       // Cancel is a real cancel, not a delayed unpublish.
-      expect(readAt(run, 26)).toContain("— active");
+      expect(readAt(run, 27)).toContain("— active");
 
       // Confirm really commits the unpublish.
-      expect(readAt(run, 31), run.output).toContain("Unpublish Freeze Regression — archived");
-      expect(readAt(run, 32), run.output).toBe("");
+      expect(readAt(run, 32), run.output).toContain("Unpublish Freeze Regression — archived");
+      expect(readAt(run, 33), run.output).toBe("");
 
       // ...and the seller can put it back up afterwards.
-      expect(readAt(run, 35), run.output).toContain("Unpublish Freeze Regression — active");
-      expect(readAt(run, 36)).toBe("ready");
+      expect(readAt(run, 36), run.output).toContain("Unpublish Freeze Regression — active");
+      expect(readAt(run, 37)).toBe("ready");
     },
     150000,
   );

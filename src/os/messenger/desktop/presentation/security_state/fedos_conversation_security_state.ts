@@ -38,6 +38,8 @@
  *     "default to good" fallthrough anywhere in this file.
  */
 
+import type { FedosPeerDeviceKnowledgeState } from "../../../conversations/peer_device/fedos_peer_device_announcement_knowledge_state.js";
+
 export type FedosSecurityAxisState = "good" | "attention" | "unknown" | "unavailable" | "not-applicable";
 
 export interface FedosSecurityAxisResult {
@@ -208,6 +210,16 @@ export type FedosDeviceTrustStateFact = "pending" | "trusted" | "revoked" | "una
 export interface FedosConversationSecurityStateDeviceKnowledgeFacts {
   /** Live Registry trust states of every peer device this conversation's counterparty account has actually been cryptographically observed announcing. Empty = never observed any. */
   readonly observedPeerDeviceTrustStates: readonly FedosDeviceTrustStateFact[];
+  /**
+   * TOFU knowledge state per the SAME observed devices, same order — see
+   * `../../../conversations/peer_device/fedos_peer_device_announcement_knowledge_state.js`'s
+   * own header. Does not change whether this axis reports `good`/
+   * `attention`/`unknown` on its own (a first-seen device with a valid
+   * cryptographic binding is still a real binding), but distinguishes the
+   * reasonCode so a UI consumer can choose to say "first seen" rather than
+   * implying independent/continuity verification.
+   */
+  readonly observedPeerDeviceKnowledgeStates: readonly FedosPeerDeviceKnowledgeState[];
   readonly asOf: number | null;
 }
 
@@ -224,6 +236,12 @@ function evaluateDeviceKnowledge(facts: FedosConversationSecurityStateDeviceKnow
   }
   if (facts.observedPeerDeviceTrustStates.some((s) => s === "pending" || s === "unknown")) {
     return { state: "unknown", reasonCode: "observed-device-not-yet-trusted", asOf: facts.asOf, source: "live" };
+  }
+  if (facts.observedPeerDeviceKnowledgeStates.includes("conflicting-rejected")) {
+    return { state: "attention", reasonCode: "observed-device-conflicting-rekey-rejected", asOf: facts.asOf, source: "live" };
+  }
+  if (facts.observedPeerDeviceKnowledgeStates.length > 0 && facts.observedPeerDeviceKnowledgeStates.every((s) => s === "first-seen")) {
+    return { state: "good", reasonCode: "observed-devices-trusted-first-seen-only", asOf: facts.asOf, source: "live" };
   }
   return { state: "good", reasonCode: "observed-devices-trusted", asOf: facts.asOf, source: "live" };
 }

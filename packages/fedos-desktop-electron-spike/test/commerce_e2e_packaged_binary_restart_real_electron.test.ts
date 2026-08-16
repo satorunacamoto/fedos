@@ -436,101 +436,102 @@ realSuite(
           { action: "fill", selector: "#create-label", value: "Mainline Restart E2E Profile" }, // 1
           { action: "fill", selector: "#create-pass", value: RESTART_TEST_PASSWORD }, // 2
           { action: "fill", selector: "#create-pass-confirm", value: RESTART_TEST_PASSWORD }, // 3
-          { action: "click", selector: "#create-submit" }, // 4
-          { action: "wait", ms: 2000 }, // 5
-          { action: "read", selector: "#current-screen" }, // 6 -- expect "ready"
-          { action: "screenshot", selector: "", value: "l1_01_ready" }, // 7
+          { action: "click", selector: "#create-pass-ack" }, // 4
+          { action: "click", selector: "#create-submit" }, // 5
+          { action: "wait", ms: 2000 }, // 6
+          { action: "read", selector: "#current-screen" }, // 7 -- expect "ready"
+          { action: "screenshot", selector: "", value: "l1_01_ready" }, // 8
 
           // Bob (Northlight): create + publish Product One.
-          { action: "click", selector: "#nav-commerce-merchant" }, // 8
-          { action: "wait", ms: 300 }, // 9
-          { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 10
-          { action: "wait", ms: 200 }, // 11
-          { action: "fill", selector: "#commerce-merchant-create-title", value: "Mainline Restart E2E Mug" }, // 12
-          { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the mainline packaged-binary restart E2E." }, // 13
+          { action: "click", selector: "#nav-commerce-merchant" }, // 9
+          { action: "wait", ms: 300 }, // 10
+          { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 11
+          { action: "wait", ms: 200 }, // 12
+          { action: "fill", selector: "#commerce-merchant-create-title", value: "Mainline Restart E2E Mug" }, // 13
+          { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the mainline packaged-binary restart E2E." }, // 14
           // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- price
           // field is decimal-dollars now (friction ledger row #18); Publish
           // click targets its own class since the row also has Preview/Edit.
-          { action: "fill", selector: "#commerce-merchant-create-price", value: "27.00" }, // 14
-          { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 15
-          { action: "click", selector: "#commerce-merchant-create-submit" }, // 16
-          { action: "wait", ms: 300 }, // 17
-          { action: "read", selector: "#commerce-merchant-products-list" }, // 18
-          { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 19 -- Publish
+          { action: "fill", selector: "#commerce-merchant-create-price", value: "27.00" }, // 15
+          { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 16
+          { action: "click", selector: "#commerce-merchant-create-submit" }, // 17
+          { action: "wait", ms: 300 }, // 18
+          { action: "read", selector: "#commerce-merchant-products-list" }, // 19
+          { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 20 -- Publish
 
           // Alice: discover, order, submit.
-          { action: "wait", ms: 300 }, // 20
-          { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 21
-          { action: "wait", ms: 200 }, // 22
-          { action: "click", selector: "#nav-commerce" }, // 23
-          { action: "wait", ms: 300 }, // 24
-          { action: "read", selector: "#commerce-catalog-list" }, // 25
-          { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 26 -- 3 seeded + 1 new
-          { action: "wait", ms: 300 }, // 27
-          { action: "read", selector: "#commerce-detail-title" }, // 28 -- expect "Mainline Restart E2E Mug"
-          { action: "screenshot", selector: "#commerce-detail-title", value: "l1_02_product_detail" }, // 29
-          { action: "click", selector: "#commerce-order-create-submit" }, // 30
-          { action: "wait", ms: 400 }, // 31
-          { action: "read", selector: "#commerce-order-status-text" }, // 32 -- expect "created"
-          { action: "read", selector: "#commerce-order-id" }, // 33 -- capture order id
-          { action: "click", selector: "#commerce-order-submit-btn" }, // 34
-          { action: "wait", ms: 300 }, // 35
-          { action: "read", selector: "#commerce-order-status-text" }, // 36 -- expect "submitted"
+          { action: "wait", ms: 300 }, // 21
+          { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 22
+          { action: "wait", ms: 200 }, // 23
+          { action: "click", selector: "#nav-commerce" }, // 24
+          { action: "wait", ms: 300 }, // 25
+          { action: "read", selector: "#commerce-catalog-list" }, // 26
+          { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 27 -- 3 seeded + 1 new
+          { action: "wait", ms: 300 }, // 28
+          { action: "read", selector: "#commerce-detail-title" }, // 29 -- expect "Mainline Restart E2E Mug"
+          { action: "screenshot", selector: "#commerce-detail-title", value: "l1_02_product_detail" }, // 30
+          { action: "click", selector: "#commerce-order-create-submit" }, // 31
+          { action: "wait", ms: 400 }, // 32
+          { action: "read", selector: "#commerce-order-status-text" }, // 33 -- expect "created"
+          { action: "read", selector: "#commerce-order-id" }, // 34 -- capture order id
+          { action: "click", selector: "#commerce-order-submit-btn" }, // 35
+          { action: "wait", ms: 300 }, // 36
+          { action: "read", selector: "#commerce-order-status-text" }, // 37 -- expect "submitted"
 
           // Bob: accept.
-          { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 37
-          { action: "wait", ms: 200 }, // 38
-          { action: "click", selector: "#commerce-order-accept-btn" }, // 39
-          { action: "wait", ms: 300 }, // 40
-          { action: "read", selector: "#commerce-order-status-text" }, // 41 -- expect "accepted"
+          { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 38
+          { action: "wait", ms: 200 }, // 39
+          { action: "click", selector: "#commerce-order-accept-btn" }, // 40
+          { action: "wait", ms: 300 }, // 41
+          { action: "read", selector: "#commerce-order-status-text" }, // 42 -- expect "accepted"
 
           // Alice: request + simulate (TEST/LOCAL) payment.
-          { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 42
-          { action: "wait", ms: 200 }, // 43
-          { action: "click", selector: "#commerce-order-payment-request-btn" }, // 44
-          { action: "wait", ms: 400 }, // 45
-          { action: "read", selector: "#commerce-order-payment-id" }, // 46 -- capture payment id
-          { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 47
-          { action: "wait", ms: 500 }, // 48
-          { action: "read", selector: "#commerce-order-status-text" }, // 49 -- expect "paid"
+          { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 43
+          { action: "wait", ms: 200 }, // 44
+          { action: "click", selector: "#commerce-order-payment-request-btn" }, // 45
+          { action: "wait", ms: 400 }, // 46
+          { action: "read", selector: "#commerce-order-payment-id" }, // 47 -- capture payment id
+          { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 48
+          { action: "wait", ms: 500 }, // 49
+          { action: "read", selector: "#commerce-order-status-text" }, // 50 -- expect "paid"
 
           // Bob: fulfill.
-          { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 50
-          { action: "wait", ms: 200 }, // 51
-          { action: "click", selector: "#commerce-order-fulfill-btn" }, // 52
-          { action: "wait", ms: 400 }, // 53
-          { action: "read", selector: "#commerce-order-status-text" }, // 54 -- expect "fulfilling"
-          { action: "read", selector: "#commerce-order-delivery-status" }, // 55
+          { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 51
+          { action: "wait", ms: 200 }, // 52
+          { action: "click", selector: "#commerce-order-fulfill-btn" }, // 53
+          { action: "wait", ms: 400 }, // 54
+          { action: "read", selector: "#commerce-order-status-text" }, // 55 -- expect "fulfilling"
+          { action: "read", selector: "#commerce-order-delivery-status" }, // 56
 
           // Alice: acknowledge, complete.
-          { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 56
-          { action: "wait", ms: 200 }, // 57
-          { action: "click", selector: "#commerce-order-acknowledge-receipt-btn" }, // 58
-          { action: "wait", ms: 400 }, // 59
-          { action: "read", selector: "#commerce-order-status-text" }, // 60 -- expect "delivered"
-          { action: "click", selector: "#commerce-order-complete-btn" }, // 61
-          { action: "wait", ms: 400 }, // 62
-          { action: "read", selector: "#commerce-order-status-text" }, // 63 -- expect "completed"
-          { action: "screenshot", selector: "#commerce-order-status-text", value: "l1_03_order_completed" }, // 64
+          { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 57
+          { action: "wait", ms: 200 }, // 58
+          { action: "click", selector: "#commerce-order-acknowledge-receipt-btn" }, // 59
+          { action: "wait", ms: 400 }, // 60
+          { action: "read", selector: "#commerce-order-status-text" }, // 61 -- expect "delivered"
+          { action: "click", selector: "#commerce-order-complete-btn" }, // 62
+          { action: "wait", ms: 400 }, // 63
+          { action: "read", selector: "#commerce-order-status-text" }, // 64 -- expect "completed"
+          { action: "screenshot", selector: "#commerce-order-status-text", value: "l1_03_order_completed" }, // 65
 
           // Issue + verify a REAL signed, QR-encoded Trust receipt ("Trade A").
-          { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 65
-          { action: "wait", ms: 500 }, // 66
-          { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 67 -- expect "VALID"
-          { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 68 -- Trade A qr text
-          { action: "screenshot", selector: "#commerce-order-receipt-result", value: "l1_04_receipt_issued" }, // 69
+          { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 66
+          { action: "wait", ms: 500 }, // 67
+          { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 68 -- expect "VALID"
+          { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 69 -- Trade A qr text
+          { action: "screenshot", selector: "#commerce-order-receipt-result", value: "l1_04_receipt_issued" }, // 70
 
           // Seller Reputation panel BEFORE restart (same "click the back
           // button of a currently-inactive screen" technique the sibling
           // restart-persistence test already established -- the button's
           // click handler fires regardless of which screen div is visually
           // active).
-          { action: "click", selector: "#commerce-detail-back" }, // 70
-          { action: "wait", ms: 200 }, // 71
-          { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 72
-          { action: "wait", ms: 400 }, // 73
-          { action: "read", selector: "#commerce-detail-reputation-summary" }, // 74
-          { action: "screenshot", selector: "#commerce-detail-reputation-summary", value: "l1_05_reputation_before_restart" }, // 75
+          { action: "click", selector: "#commerce-detail-back" }, // 71
+          { action: "wait", ms: 200 }, // 72
+          { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 73
+          { action: "wait", ms: 400 }, // 74
+          { action: "read", selector: "#commerce-detail-reputation-summary" }, // 75
+          { action: "screenshot", selector: "#commerce-detail-reputation-summary", value: "l1_05_reputation_before_restart" }, // 76
         ];
 
         const stepLogFile1 = join(mkdtempSync(join(tmpdir(), "fedos-mainline-restart-steps-l1-")), "steps.log");
@@ -541,23 +542,23 @@ realSuite(
         const { rawOutput: out1, steps: steps1 } = parseStepLog(stepLogFile1);
         expect(existsSync(stepLogFile1), "launch 1 must have written the disk-based step log").toBe(true);
 
-        expect(readAt(steps1, out1, 6)).toBe("ready");
-        expect(readAt(steps1, out1, 28)).toBe("Mainline Restart E2E Mug");
-        expect(readAt(steps1, out1, 32)).toBe("created");
-        const orderIdBeforeRestart = readAt(steps1, out1, 33).replace(/^Order /, "");
+        expect(readAt(steps1, out1, 7)).toBe("ready");
+        expect(readAt(steps1, out1, 29)).toBe("Mainline Restart E2E Mug");
+        expect(readAt(steps1, out1, 33)).toBe("created");
+        const orderIdBeforeRestart = readAt(steps1, out1, 34).replace(/^Order /, "");
         expect(orderIdBeforeRestart.length).toBeGreaterThan(0);
-        expect(readAt(steps1, out1, 36)).toBe("submitted");
-        expect(readAt(steps1, out1, 41)).toBe("accepted");
-        const paymentIdBeforeRestart = readAt(steps1, out1, 46);
+        expect(readAt(steps1, out1, 37)).toBe("submitted");
+        expect(readAt(steps1, out1, 42)).toBe("accepted");
+        const paymentIdBeforeRestart = readAt(steps1, out1, 47);
         expect(paymentIdBeforeRestart.length).toBeGreaterThan(0);
-        expect(readAt(steps1, out1, 49)).toBe("paid");
-        expect(readAt(steps1, out1, 54)).toBe("fulfilling");
-        expect(readAt(steps1, out1, 60)).toBe("delivered");
-        expect(readAt(steps1, out1, 63)).toBe("completed");
-        expect(readAt(steps1, out1, 67)).toBe("VALID");
-        const qrTextTradeA = readAt(steps1, out1, 68);
+        expect(readAt(steps1, out1, 50)).toBe("paid");
+        expect(readAt(steps1, out1, 55)).toBe("fulfilling");
+        expect(readAt(steps1, out1, 61)).toBe("delivered");
+        expect(readAt(steps1, out1, 64)).toBe("completed");
+        expect(readAt(steps1, out1, 68)).toBe("VALID");
+        const qrTextTradeA = readAt(steps1, out1, 69);
         expect(qrTextTradeA.length).toBeGreaterThan(0);
-        const reputationBeforeRestart = readAt(steps1, out1, 74);
+        const reputationBeforeRestart = readAt(steps1, out1, 75);
         expect(reputationBeforeRestart).not.toMatch(/no reputation history/i);
         expect(reputationBeforeRestart).toMatch(/verified trades/i);
 

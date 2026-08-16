@@ -160,6 +160,7 @@ realSuite("Task 1 -- REAL Electron DOM: Safety Center discloses the auto-accept 
       { action: "fill", selector: "#create-label", value: "SoloTask1" },
       { action: "fill", selector: "#create-pass", value: "correct horse battery staple task1 solo" },
       { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple task1 solo" },
+      { action: "click", selector: "#create-pass-ack" },
       { action: "click", selector: "#create-submit" },
       { action: "wait", ms: 700 },
       { action: "read", selector: "#current-screen" },
@@ -167,8 +168,8 @@ realSuite("Task 1 -- REAL Electron DOM: Safety Center discloses the auto-accept 
       { action: "wait", ms: 1200 },
       { action: "read", selector: "#safety-sections" },
     ]);
-    expect(readAt(run, 6)).toBe("ready");
-    const safetyText = readAt(run, 9);
+    expect(readAt(run, 7)).toBe("ready");
+    const safetyText = readAt(run, 10);
     // The section itself, honestly shown (a fresh profile has no
     // transitions, so "ready" is the truthful state).
     expect(safetyText).toMatch(/identity-replacement/);

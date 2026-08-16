@@ -251,13 +251,14 @@ realSuite("Verified Secure Session UI -- REAL two independent Electron processes
         { action: "fill", selector: "#create-label", value: BOB_LABEL },
         { action: "fill", selector: "#create-pass", value: BOB_PASSPHRASE },
         { action: "fill", selector: "#create-pass-confirm", value: BOB_PASSPHRASE },
+        { action: "click", selector: "#create-pass-ack" },
         { action: "click", selector: "#create-submit" },
         { action: "wait", ms: 2500 },
-        { action: "read", selector: "#current-screen" }, // 6
-        { action: "read", selector: "#commerce-acting-as option:first-child", as: "value" }, // 7
+        { action: "read", selector: "#current-screen" }, // 7
+        { action: "read", selector: "#commerce-acting-as option:first-child", as: "value" }, // 8
       ]);
-      expect(readAt(bob1, 6)).toBe("ready");
-      bobPubkey = readAt(bob1, 7);
+      expect(readAt(bob1, 7)).toBe("ready");
+      bobPubkey = readAt(bob1, 8);
       expect(bobPubkey.length).toBe(64);
       record(`STEP 1 PASS -- Bob's real Persona created. pubkey=${bobPubkey}`);
 
@@ -266,13 +267,14 @@ realSuite("Verified Secure Session UI -- REAL two independent Electron processes
         { action: "fill", selector: "#create-label", value: ALICE_LABEL },
         { action: "fill", selector: "#create-pass", value: ALICE_PASSPHRASE },
         { action: "fill", selector: "#create-pass-confirm", value: ALICE_PASSPHRASE },
+        { action: "click", selector: "#create-pass-ack" },
         { action: "click", selector: "#create-submit" },
         { action: "wait", ms: 2500 },
-        { action: "read", selector: "#current-screen" }, // 6
-        { action: "read", selector: "#commerce-acting-as option:first-child", as: "value" }, // 7
+        { action: "read", selector: "#current-screen" }, // 7
+        { action: "read", selector: "#commerce-acting-as option:first-child", as: "value" }, // 8
       ]);
-      expect(readAt(alice1, 6)).toBe("ready");
-      alicePubkey = readAt(alice1, 7);
+      expect(readAt(alice1, 7)).toBe("ready");
+      alicePubkey = readAt(alice1, 8);
       expect(alicePubkey.length).toBe(64);
       expect(alicePubkey).not.toBe(bobPubkey);
       record(`STEP 2 PASS -- Alice's real Persona created. pubkey=${alicePubkey}`);

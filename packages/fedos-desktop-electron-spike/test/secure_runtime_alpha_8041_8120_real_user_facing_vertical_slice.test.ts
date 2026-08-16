@@ -175,6 +175,7 @@ realSuite("Alpha 8041-8120 -- REAL user-facing packaged Beta Electron process, d
             { action: "fill", selector: "#create-label", value: "Alice" },
             { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8041 alice" },
             { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8041 alice" },
+            { action: "click", selector: "#create-pass-ack" },
             { action: "click", selector: "#create-submit" },
             { action: "wait", ms: 700 },
             { action: "read", selector: "#current-screen" },
@@ -182,8 +183,8 @@ realSuite("Alpha 8041-8120 -- REAL user-facing packaged Beta Electron process, d
           ],
           fastTick,
         );
-        expect(readAt(aliceCreate, 6)).toBe("ready");
-        const aliceIdentifier = readAt(aliceCreate, 7);
+        expect(readAt(aliceCreate, 7)).toBe("ready");
+        const aliceIdentifier = readAt(aliceCreate, 8);
         expect(aliceIdentifier.length).toBeGreaterThan(0);
 
         const bobCreate = await runBetaUiScript(
@@ -193,13 +194,14 @@ realSuite("Alpha 8041-8120 -- REAL user-facing packaged Beta Electron process, d
             { action: "fill", selector: "#create-label", value: "Bob" },
             { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8041 bob" },
             { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8041 bob" },
+            { action: "click", selector: "#create-pass-ack" },
             { action: "click", selector: "#create-submit" },
             { action: "wait", ms: 700 },
             { action: "read", selector: "#ready-account" },
           ],
           fastTick,
         );
-        const bobIdentifier = readAt(bobCreate, 6);
+        const bobIdentifier = readAt(bobCreate, 7);
         expect(bobIdentifier).not.toBe(aliceIdentifier);
 
         // ---- 3. Alice's real Settings screen: add + save a SECOND, throwaway Relay through the real UI (proves the real DOM path; the profile's actual relay list used for delivery below was seeded above, see this file's own header). ----
@@ -432,6 +434,7 @@ realSuite("Alpha 8041-8120 -- REAL user-facing packaged Beta Electron process, d
               { action: "fill", selector: "#create-label", value: "Alice" },
               { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8121 relay status" },
               { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8121 relay status" },
+              { action: "click", selector: "#create-pass-ack" },
               { action: "click", selector: "#create-submit" },
               { action: "wait", ms: 1200 },
               // ---- real connected state, right after create. ----
@@ -454,10 +457,10 @@ realSuite("Alpha 8041-8120 -- REAL user-facing packaged Beta Electron process, d
           timing,
         ]);
 
-        expect(readAt(uiRun, 6)).toBe("1/1 Relay connected");
-        expect(readAt(uiRun, 8)).toBe("0/1 Relay connected — lock and unlock again to retry");
-        expect(readAt(uiRun, 11)).toBe("unlock");
-        expect(readAt(uiRun, 15)).toBe("1/1 Relay connected");
+        expect(readAt(uiRun, 7)).toBe("1/1 Relay connected");
+        expect(readAt(uiRun, 9)).toBe("0/1 Relay connected — lock and unlock again to retry");
+        expect(readAt(uiRun, 12)).toBe("unlock");
+        expect(readAt(uiRun, 16)).toBe("1/1 Relay connected");
       } finally {
         await relay.close();
       }

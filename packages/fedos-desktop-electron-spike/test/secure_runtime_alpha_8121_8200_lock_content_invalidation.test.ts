@@ -145,13 +145,14 @@ realSuite("Alpha 8121-8200 -- Security Finding 4 (6873d24f): Renderer plaintext 
             { action: "fill", selector: "#create-label", value: "Alice" },
             { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8121 lockclear alice" },
             { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8121 lockclear alice" },
+            { action: "click", selector: "#create-pass-ack" },
             { action: "click", selector: "#create-submit" },
             { action: "wait", ms: 700 },
             { action: "read", selector: "#ready-account" },
           ],
           fastTick,
         );
-        const aliceIdentifier = readAt(aliceCreate, 6);
+        const aliceIdentifier = readAt(aliceCreate, 7);
         expect(aliceIdentifier.length).toBeGreaterThan(0);
 
         const bobCreate = await runBetaUiScript(
@@ -161,13 +162,14 @@ realSuite("Alpha 8121-8200 -- Security Finding 4 (6873d24f): Renderer plaintext 
             { action: "fill", selector: "#create-label", value: "Bob" },
             { action: "fill", selector: "#create-pass", value: "correct horse battery staple 8121 lockclear bob" },
             { action: "fill", selector: "#create-pass-confirm", value: "correct horse battery staple 8121 lockclear bob" },
+            { action: "click", selector: "#create-pass-ack" },
             { action: "click", selector: "#create-submit" },
             { action: "wait", ms: 700 },
             { action: "read", selector: "#ready-account" },
           ],
           fastTick,
         );
-        const bobIdentifier = readAt(bobCreate, 6);
+        const bobIdentifier = readAt(bobCreate, 7);
         expect(bobIdentifier).not.toBe(aliceIdentifier);
 
         const [aliceInvite, bobAutoReceive] = await Promise.all([

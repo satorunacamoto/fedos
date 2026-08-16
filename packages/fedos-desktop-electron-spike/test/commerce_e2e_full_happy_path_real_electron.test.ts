@@ -145,129 +145,130 @@ realSuite("FedOS Commerce End-to-End -- REAL packaged Beta Electron process, ful
         { action: "fill", selector: "#create-label", value: "Commerce E2E Test Profile" }, // 1
         { action: "fill", selector: "#create-pass", value: "commerce e2e full happy path pass" }, // 2
         { action: "fill", selector: "#create-pass-confirm", value: "commerce e2e full happy path pass" }, // 3
-        { action: "click", selector: "#create-submit" }, // 4
-        { action: "wait", ms: 2000 }, // 5 -- real Argon2 unlock + real WASM master seed generation
-        { action: "read", selector: "#current-screen" }, // 6 -- expect "ready"
+        { action: "click", selector: "#create-pass-ack" }, // 4
+        { action: "click", selector: "#create-submit" }, // 5
+        { action: "wait", ms: 2000 }, // 6 -- real Argon2 unlock + real WASM master seed generation
+        { action: "read", selector: "#current-screen" }, // 7 -- expect "ready"
 
         // Bob (Merchant/Northlight): create + publish a product.
-        { action: "click", selector: "#nav-commerce-merchant" }, // 7
-        { action: "wait", ms: 300 }, // 8
-        { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 9
-        { action: "wait", ms: 200 }, // 10
-        { action: "fill", selector: "#commerce-merchant-create-title", value: "Handmade Ceramic Mug" }, // 11
-        { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the E2E tabletop." }, // 12
+        { action: "click", selector: "#nav-commerce-merchant" }, // 8
+        { action: "wait", ms: 300 }, // 9
+        { action: "fill", selector: "#commerce-merchant-acting-as", value: NORTHLIGHT_MERCHANT }, // 10
+        { action: "wait", ms: 200 }, // 11
+        { action: "fill", selector: "#commerce-merchant-create-title", value: "Handmade Ceramic Mug" }, // 12
+        { action: "fill", selector: "#commerce-merchant-create-description", value: "A small fictional demo product for the E2E tabletop." }, // 13
         // Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- price
         // field is now a decimal-dollars string (friction ledger row #18;
         // "2500" would now mean $2,500.00, not $25.00), and the row now has
         // Preview/Edit/Publish buttons, so the Publish click targets its own
         // class rather than "the only button" -- same $25.00 real product
         // price as before this arc, unchanged for every downstream assertion.
-        { action: "fill", selector: "#commerce-merchant-create-price", value: "25.00" }, // 13
-        { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 14
-        { action: "click", selector: "#commerce-merchant-create-submit" }, // 15
-        { action: "wait", ms: 300 }, // 16
-        { action: "read", selector: "#commerce-merchant-products-list" }, // 17 -- proves the new draft product is real and listed
-        { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 18 -- Publish (the new product is always inserted last)
-        { action: "wait", ms: 300 }, // 19
+        { action: "fill", selector: "#commerce-merchant-create-price", value: "25.00" }, // 14
+        { action: "fill", selector: "#commerce-merchant-create-currency", value: "USD" }, // 15
+        { action: "click", selector: "#commerce-merchant-create-submit" }, // 16
+        { action: "wait", ms: 300 }, // 17
+        { action: "read", selector: "#commerce-merchant-products-list" }, // 18 -- proves the new draft product is real and listed
+        { action: "click", selector: "#commerce-merchant-products-list li:last-child button.commerce-btn-publish" }, // 19 -- Publish (the new product is always inserted last)
+        { action: "wait", ms: 300 }, // 20
 
         // Alice (Customer): discover, order, submit.
-        { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 20
-        { action: "wait", ms: 200 }, // 21
-        { action: "click", selector: "#nav-commerce" }, // 22
-        { action: "wait", ms: 300 }, // 23
-        { action: "read", selector: "#commerce-catalog-list" }, // 24 -- proves the newly published product is now in the real customer-facing catalog
-        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 25 -- the new product is the 4th (3 seeded + 1 new)
-        { action: "wait", ms: 300 }, // 26
-        { action: "read", selector: "#commerce-detail-title" }, // 27 -- expect "Handmade Ceramic Mug"
-        { action: "click", selector: "#commerce-order-create-submit" }, // 28
-        { action: "wait", ms: 400 }, // 29
-        { action: "read", selector: "#commerce-order-status-text" }, // 30 -- expect "created"
-        { action: "click", selector: "#commerce-order-submit-btn" }, // 31
-        { action: "wait", ms: 300 }, // 32
-        { action: "read", selector: "#commerce-order-status-text" }, // 33 -- expect "submitted"
+        { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 21
+        { action: "wait", ms: 200 }, // 22
+        { action: "click", selector: "#nav-commerce" }, // 23
+        { action: "wait", ms: 300 }, // 24
+        { action: "read", selector: "#commerce-catalog-list" }, // 25 -- proves the newly published product is now in the real customer-facing catalog
+        { action: "click", selector: "#commerce-catalog-list li:nth-child(4) button" }, // 26 -- the new product is the 4th (3 seeded + 1 new)
+        { action: "wait", ms: 300 }, // 27
+        { action: "read", selector: "#commerce-detail-title" }, // 28 -- expect "Handmade Ceramic Mug"
+        { action: "click", selector: "#commerce-order-create-submit" }, // 29
+        { action: "wait", ms: 400 }, // 30
+        { action: "read", selector: "#commerce-order-status-text" }, // 31 -- expect "created"
+        { action: "click", selector: "#commerce-order-submit-btn" }, // 32
+        { action: "wait", ms: 300 }, // 33
+        { action: "read", selector: "#commerce-order-status-text" }, // 34 -- expect "submitted"
 
         // Bob (Merchant): accept.
-        { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 34
-        { action: "wait", ms: 200 }, // 35
-        { action: "click", selector: "#commerce-order-accept-btn" }, // 36
-        { action: "wait", ms: 300 }, // 37
-        { action: "read", selector: "#commerce-order-status-text" }, // 38 -- expect "accepted"
+        { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 35
+        { action: "wait", ms: 200 }, // 36
+        { action: "click", selector: "#commerce-order-accept-btn" }, // 37
+        { action: "wait", ms: 300 }, // 38
+        { action: "read", selector: "#commerce-order-status-text" }, // 39 -- expect "accepted"
 
         // Alice (Customer): request + simulate (TEST/LOCAL) payment.
-        { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 39
-        { action: "wait", ms: 200 }, // 40
-        { action: "click", selector: "#commerce-order-payment-request-btn" }, // 41
-        { action: "wait", ms: 400 }, // 42
-        { action: "read", selector: "#commerce-order-payment-id" }, // 43 -- non-empty real paymentId
-        { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 44
-        { action: "wait", ms: 500 }, // 45
-        { action: "read", selector: "#commerce-order-status-text" }, // 46 -- expect "paid"
+        { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 40
+        { action: "wait", ms: 200 }, // 41
+        { action: "click", selector: "#commerce-order-payment-request-btn" }, // 42
+        { action: "wait", ms: 400 }, // 43
+        { action: "read", selector: "#commerce-order-payment-id" }, // 44 -- non-empty real paymentId
+        { action: "click", selector: "#commerce-order-payment-simulate-btn" }, // 45
+        { action: "wait", ms: 500 }, // 46
+        { action: "read", selector: "#commerce-order-status-text" }, // 47 -- expect "paid"
 
         // Bob (Merchant): fulfill (also creates+starts the real Delivery record).
-        { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 47
-        { action: "wait", ms: 200 }, // 48
-        { action: "click", selector: "#commerce-order-fulfill-btn" }, // 49
-        { action: "wait", ms: 400 }, // 50
-        { action: "read", selector: "#commerce-order-status-text" }, // 51 -- expect "fulfilling"
-        { action: "read", selector: "#commerce-order-delivery-status" }, // 52 -- expect "Delivery status: fulfilling"
+        { action: "fill", selector: "#commerce-acting-as", value: NORTHLIGHT_MERCHANT }, // 48
+        { action: "wait", ms: 200 }, // 49
+        { action: "click", selector: "#commerce-order-fulfill-btn" }, // 50
+        { action: "wait", ms: 400 }, // 51
+        { action: "read", selector: "#commerce-order-status-text" }, // 52 -- expect "fulfilling"
+        { action: "read", selector: "#commerce-order-delivery-status" }, // 53 -- expect "Delivery status: fulfilling"
 
         // Alice (Customer): acknowledge real receipt -- the ONLY thing that can mark delivered.
-        { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 53
-        { action: "wait", ms: 200 }, // 54
-        { action: "click", selector: "#commerce-order-acknowledge-receipt-btn" }, // 55
-        { action: "wait", ms: 400 }, // 56
-        { action: "read", selector: "#commerce-order-status-text" }, // 57 -- expect "delivered"
+        { action: "fill", selector: "#commerce-acting-as", value: ALICE_CUSTOMER }, // 54
+        { action: "wait", ms: 200 }, // 55
+        { action: "click", selector: "#commerce-order-acknowledge-receipt-btn" }, // 56
+        { action: "wait", ms: 400 }, // 57
+        { action: "read", selector: "#commerce-order-status-text" }, // 58 -- expect "delivered"
 
         // Either party completes the order.
-        { action: "click", selector: "#commerce-order-complete-btn" }, // 58
-        { action: "wait", ms: 400 }, // 59
-        { action: "read", selector: "#commerce-order-status-text" }, // 60 -- expect "completed"
+        { action: "click", selector: "#commerce-order-complete-btn" }, // 59
+        { action: "wait", ms: 400 }, // 60
+        { action: "read", selector: "#commerce-order-status-text" }, // 61 -- expect "completed"
 
         // Issue + verify a REAL signed, QR-encoded Trust receipt.
-        { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 61
-        { action: "wait", ms: 500 }, // 62
-        { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 63 -- expect "VALID"
-        { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 64 -- non-empty real signed envelope text
+        { action: "click", selector: "#commerce-order-receipt-issue-btn" }, // 62
+        { action: "wait", ms: 500 }, // 63
+        { action: "read", selector: "#commerce-order-receipt-verify-status" }, // 64 -- expect "VALID"
+        { action: "read", selector: "#commerce-order-receipt-qr-text", as: "value" }, // 65 -- non-empty real signed envelope text
 
         // Messenger regression: Conversations still reachable after the full flow.
-        { action: "click", selector: "#nav-conversations" }, // 65
-        { action: "wait", ms: 300 }, // 66
-        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 67
+        { action: "click", selector: "#nav-conversations" }, // 66
+        { action: "wait", ms: 300 }, // 67
+        { action: "read", selector: ".app-screen.active#app-screen-conversations" }, // 68
       ]);
 
-      expect(readAt(run, 6)).toBe("ready");
+      expect(readAt(run, 7)).toBe("ready");
 
-      readAt(run, 17); // merchant products list rendered at all
-      const publishStep = run.steps.find((s) => s.index === 18);
+      readAt(run, 18); // merchant products list rendered at all
+      const publishStep = run.steps.find((s) => s.index === 19);
       expect(publishStep, run.output).toBeDefined();
       expect(publishStep!.result.outcome, run.output).toBe("ok");
 
-      const catalogText = readAt(run, 24);
+      const catalogText = readAt(run, 25);
       expect(catalogText).toMatch(/Handmade Ceramic Mug/);
 
-      expect(readAt(run, 27)).toBe("Handmade Ceramic Mug");
-      expect(readAt(run, 30)).toBe("created");
-      expect(readAt(run, 33)).toBe("submitted");
-      expect(readAt(run, 38)).toBe("accepted");
+      expect(readAt(run, 28)).toBe("Handmade Ceramic Mug");
+      expect(readAt(run, 31)).toBe("created");
+      expect(readAt(run, 34)).toBe("submitted");
+      expect(readAt(run, 39)).toBe("accepted");
 
-      const paymentIdText = readAt(run, 43);
+      const paymentIdText = readAt(run, 44);
       expect(paymentIdText.length).toBeGreaterThan(0);
-      expect(readAt(run, 46)).toBe("paid");
+      expect(readAt(run, 47)).toBe("paid");
 
-      expect(readAt(run, 51)).toBe("fulfilling");
-      expect(readAt(run, 52)).toMatch(/Delivery status: fulfilling/);
+      expect(readAt(run, 52)).toBe("fulfilling");
+      expect(readAt(run, 53)).toMatch(/Delivery status: fulfilling/);
 
-      expect(readAt(run, 57)).toBe("delivered");
-      expect(readAt(run, 60)).toBe("completed");
+      expect(readAt(run, 58)).toBe("delivered");
+      expect(readAt(run, 61)).toBe("completed");
 
-      expect(readAt(run, 63)).toBe("VALID");
-      const qrText = readAt(run, 64);
+      expect(readAt(run, 64)).toBe("VALID");
+      const qrText = readAt(run, 65);
       expect(qrText.length).toBeGreaterThan(0);
       // The QR text carries the real signed envelope -- never plaintext order
       // contents, and never a raw "paid"/checkbox-shaped claim.
       expect(qrText).not.toMatch(/"markAsPaid"/i);
 
-      readAt(run, 67); // Conversations still reachable -- Messenger regression check.
+      readAt(run, 68); // Conversations still reachable -- Messenger regression check.
     },
     120000,
   );
