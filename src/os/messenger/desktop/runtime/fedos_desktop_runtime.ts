@@ -584,7 +584,9 @@ async function selfRegisterFedosPeerDeviceAnnouncementIdentity(
   deviceId: string,
   keypair: FedosDeviceSigningKeypair,
 ): Promise<void> {
-  if (deps.accountSigningAuthority === undefined) return;
+  if (deps.accountSigningAuthority === undefined) {
+    return;
+  }
   try {
     const replayPersistence: FedosDeviceBindingChallengeReplayPersistence =
       deps.replayLogPath !== undefined ? new AppendOnlyFedosDeviceBindingChallengeReplayPersistence(deps.replayLogPath) : new InMemoryFedosDeviceBindingChallengeReplayPersistence();
@@ -595,12 +597,16 @@ async function selfRegisterFedosPeerDeviceAnnouncementIdentity(
     });
     const challenge = boundary.mintChallenge("register-device", deviceId, keypair.publicKeyHex);
     const deviceProof = createFedosDeviceBindingProofOfPossession(keypair, challenge);
-    if (deviceProof === null) return;
+    if (deviceProof === null) {
+      return;
+    }
     const accountAuthorization = await authorizeFedosDeviceBindingChallenge(deps.accountSigningAuthority, deps.accountIndex ?? 0, challenge);
-    if (accountAuthorization === null) return;
+    if (accountAuthorization === null) {
+      return;
+    }
     await boundary.registrationAuthority.registerDevice(accountAuthorization, deviceProof, (deps.clock ?? defaultFedosBoardRuntimeClock)());
   } catch {
-    // Non-fatal by design -- see this function's own header.
+    /* best-effort, mirrors this function's own established non-fatal discipline */
   }
 }
 
@@ -1471,6 +1477,39 @@ export async function startFedosDesktopRuntime(
   // divergent indexes, regardless of whether `deletionRequestEnabled` was
   // ever set.
   sharedSearchIndexInstance = conversationRuntimeInstance.createSearchIndex();
+
+  // Direct Ratchet Identity-Space Unification arc -- closes a real,
+  // evidenced startup-ordering gap (live-instrumented, four-run
+  // reproduction): Activation state has no durable log of its own today
+  // (`conversationArchiveActivationPersistence`'s own construction
+  // comment above, unmodified by this fix) -- it exists ONLY as this
+  // process's own in-memory facts, populated so far exclusively by a
+  // LATER, separate UI-triggered `activateDirectConversation()` call
+  // (`fedos-app:conversation-activate`). But `privateTransportInstance
+  // .start()` below opens the live/historical relay subscription, which
+  // can begin dispatching an ALREADY-durably-published counterparty
+  // payload (e.g. a Direct Ratchet session-init) within milliseconds --
+  // racing ahead of that later activation call for any Direct
+  // Conversation this Runtime already durably knows about (a real draft
+  // record, written in a PRIOR session) but has not yet re-activated in
+  // THIS one. `resolveFedosDirectConversationByRouteBinding()` then
+  // correctly, deterministically rejects the inbound payload as
+  // "unknown-conversation" -- not a bug in that resolver, a genuine
+  // ordering gap in when this Runtime re-establishes activation.
+  //
+  // Fix: eagerly re-run the SAME real, idempotent, fully-revalidating
+  // `activateDirectConversation()` this Runtime already exposes to the
+  // UI, once per already-known DURABLE direct-mode draft, before the
+  // transport subscription below ever opens -- never fabricating
+  // activation for a conversation that does not durably exist (a
+  // non-existent/non-direct draft is skipped, and the coordinator's own
+  // real precondition checks -- membership, key resolution, encryption
+  // readiness -- still apply unchanged; a conversation that genuinely
+  // isn't ready yet simply stays inactive, exactly as before this fix).
+  for (const draft of conversationArchiveDraftPersistence.listDrafts()) {
+    if (draft.mode !== "direct") continue;
+    await conversationRuntimeInstance.activateDirectConversation(draft.id);
+  }
 
   // Secure Runtime Alpha 2921-3000 -- exactly one FedosDeviceTrustRuntime
   // per running runtime, constructed ONLY when config.deviceTrustEnabled

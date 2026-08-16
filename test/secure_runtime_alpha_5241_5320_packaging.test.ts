@@ -23,7 +23,6 @@ import { tmpdir } from "node:os";
 import { parseFedosReleaseChecksumFile, verifyFedosReleaseChecksums, sha256HexOf } from "../packages/fedos-desktop-electron-spike/scripts/verify_release_checksums.mjs";
 // @ts-expect-error see above.
 import { FEDOS_RELEASE_SECRET_SCAN_PATTERNS, scanFedosReleaseFileForSecrets } from "../packages/fedos-desktop-electron-spike/scripts/scan_release_artifacts_for_secrets.mjs";
-// @ts-expect-error see above.
 import { verifyFedosBetaPackageAllowlist } from "../packages/fedos-desktop-electron-spike/scripts/verify_release_package_allowlist.mjs";
 // @ts-expect-error see above.
 import { resolveFedosBetaReleaseIdentity } from "../packages/fedos-desktop-electron-spike/scripts/lib/release_identity.mjs";
@@ -31,6 +30,11 @@ import { resolveFedosBetaReleaseIdentity } from "../packages/fedos-desktop-elect
 interface FedosChecksumProblem {
   readonly kind: string;
   readonly filename: string;
+  readonly forbidden?: string;
+}
+interface FedosAllowlistProblem {
+  readonly kind: string;
+  readonly entry?: string;
   readonly forbidden?: string;
 }
 interface FedosSecretScanFinding {
@@ -217,7 +221,7 @@ describe("Phase E — package allowlist verification against the real config", (
     const config = JSON.stringify({ files: ["package.json", "!node_modules/**/*", "!src/**/*", "!test/**/*"] });
     const result = verifyFedosBetaPackageAllowlist(config);
     expect(result.ok).toBe(false);
-    expect(result.problems.some((p: FedosChecksumProblem) => p.kind === "missing-required-entry")).toBe(true);
+    expect(result.problems.some((p: FedosAllowlistProblem) => p.kind === "missing-required-entry")).toBe(true);
   });
 
   it("fails closed when a forbidden path is included (not excluded) via extraFiles", () => {
@@ -227,14 +231,14 @@ describe("Phase E — package allowlist verification against the real config", (
     });
     const result = verifyFedosBetaPackageAllowlist(config);
     expect(result.ok).toBe(false);
-    expect(result.problems.some((p: FedosChecksumProblem) => p.kind === "forbidden-path-included" && p.forbidden === "docs/reviews")).toBe(true);
+    expect(result.problems.some((p: FedosAllowlistProblem) => p.kind === "forbidden-path-included" && p.forbidden === "docs/reviews")).toBe(true);
   });
 
   it("fails closed on a bare, non-explicit allow-list glob", () => {
     const config = JSON.stringify({ files: ["**/*", "!node_modules/**/*", "!src/**/*", "!test/**/*"] });
     const result = verifyFedosBetaPackageAllowlist(config);
     expect(result.ok).toBe(false);
-    expect(result.problems.some((p: FedosChecksumProblem) => p.kind === "non-explicit-allowlist")).toBe(true);
+    expect(result.problems.some((p: FedosAllowlistProblem) => p.kind === "non-explicit-allowlist")).toBe(true);
   });
 });
 

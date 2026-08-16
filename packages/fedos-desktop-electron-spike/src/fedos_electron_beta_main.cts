@@ -5800,6 +5800,83 @@ async function handleAcceptanceDirectRatchetStatus(payload: unknown) {
 }
 
 /**
+ * Direct Ratchet Identity-Space Unification arc -- acceptance-mode-only
+ * (`ACCEPTANCE_MODE_ENABLED` gate, same as every other `fedos-acceptance:*`
+ * handler) real poll-until-condition-or-timeout status check. Genuine
+ * inbound session establishment (a real relay round-trip plus real WASM
+ * session construction) is a bounded but non-instant async pipeline --
+ * this polls the SAME real `shell.directRatchetStatus()` this file's own
+ * ordinary status handler already exposes, repeatedly, inside ONE
+ * continuously-running process (never restarting the Runtime mid-poll,
+ * which would restart the whole subscribe/resolve pipeline from scratch),
+ * stopping as soon as it observes "active" or a bounded ceiling elapses --
+ * never an unbounded wait. Reports real elapsed time and attempt count so
+ * a caller gets real latency data, not just a pass/fail.
+ */
+async function handleAcceptanceDirectRatchetStatusPollUntilActive(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const remoteDeviceRef = (payload as { remoteDeviceRef?: unknown } | null)?.remoteDeviceRef;
+  const timeoutMs = (payload as { timeoutMs?: unknown } | null)?.timeoutMs;
+  const intervalMs = (payload as { intervalMs?: unknown } | null)?.intervalMs;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || !isBoundedString(remoteDeviceRef, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed status request" };
+  }
+  const ceilingMs = typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 60000;
+  const pollEveryMs = typeof intervalMs === "number" && Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : 1500;
+  const startedAt = Date.now();
+  let attempts = 1;
+  let lastResult = shell.directRatchetStatus(conversationId, remoteDeviceRef);
+  while (lastResult.outcome === "ok" && lastResult.value !== "active" && Date.now() - startedAt < ceilingMs) {
+    await new Promise((resolve) => setTimeout(resolve, pollEveryMs));
+    lastResult = shell.directRatchetStatus(conversationId, remoteDeviceRef);
+    attempts += 1;
+  }
+  return { outcome: "ok", value: { status: lastResult, elapsedMs: Date.now() - startedAt, attempts } };
+}
+
+/**
+ * Direct Ratchet Identity-Space Unification arc -- mirrors
+ * `handleAcceptanceDirectRatchetStatusPollUntilActive()`'s own genuine
+ * poll-until-condition-or-timeout shape exactly, for the SAME real reason:
+ * a freshly-launched process's first-ever live delivery of a Rumor over
+ * the real relay (session-init OR an ordinary message) was root-caused to
+ * be a real, bounded, non-instant async pipeline (see this arc's own
+ * report) -- polling `shell.listMessages()` here, repeatedly inside ONE
+ * continuously-running process, until it observes at least `minCount`
+ * messages or a bounded ceiling elapses, is the same honest treatment for
+ * message-count assertions that were previously waiting on a fixed,
+ * guessed `wait` duration.
+ */
+async function handleAcceptanceListMessagesPollUntilCount(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+  const minCount = (payload as { minCount?: unknown } | null)?.minCount;
+  const timeoutMs = (payload as { timeoutMs?: unknown } | null)?.timeoutMs;
+  const intervalMs = (payload as { intervalMs?: unknown } | null)?.intervalMs;
+  if (!isBoundedString(conversationId, MAX_ID_LENGTH) || typeof minCount !== "number" || !Number.isInteger(minCount) || minCount < 0) {
+    return { outcome: "invalid-input", reason: "malformed list-messages-poll-until-count request" };
+  }
+  const ceilingMs = typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 60000;
+  const pollEveryMs = typeof intervalMs === "number" && Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : 1500;
+  const startedAt = Date.now();
+  let attempts = 1;
+  let lastResult = shell.listMessages(conversationId) as { readonly outcome: string; readonly value?: readonly unknown[] };
+  while (
+    lastResult.outcome === "ok" &&
+    (lastResult.value === undefined || lastResult.value.length < minCount) &&
+    Date.now() - startedAt < ceilingMs
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, pollEveryMs));
+    lastResult = shell.listMessages(conversationId) as { readonly outcome: string; readonly value?: readonly unknown[] };
+    attempts += 1;
+  }
+  return { outcome: "ok", value: { result: lastResult, elapsedMs: Date.now() - startedAt, attempts } };
+}
+
+/**
  * Secure Runtime Alpha 7321-7400 — closes Release Readiness Review B-2:
  * `createConversationInvitation()` had zero IPC/preload exposure anywhere.
  * Delegates ENTIRELY to the already-real `FedosDesktopApplicationShell.createConversationInvitation()`
@@ -8759,6 +8836,8 @@ app.whenReady().then(async () => {
         "acceptance-list-messages": (payload) => handleAcceptanceListMessages(payload),
         "acceptance-read-message": (payload) => handleAcceptanceReadMessage(payload),
         "acceptance-direct-ratchet-status": (payload) => handleAcceptanceDirectRatchetStatus(payload),
+        "acceptance-direct-ratchet-status-poll-until-active": (payload) => handleAcceptanceDirectRatchetStatusPollUntilActive(payload),
+        "acceptance-list-messages-poll-until-count": (payload) => handleAcceptanceListMessagesPollUntilCount(payload),
         "acceptance-create-conversation-invitation": (payload) => handleAcceptanceCreateConversationInvitation(payload),
         "acceptance-search": (payload) => handleAcceptanceSearch(payload),
         "acceptance-archive": (payload) => handleAcceptanceArchive(payload),
