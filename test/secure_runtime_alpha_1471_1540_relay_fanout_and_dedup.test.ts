@@ -16,6 +16,7 @@ import type {
   FedosPersistedConversationTransportOutboxRecord,
   FedosPersistedConversationTransportOutboxRecordV1,
 } from "../src/os/messenger/adapters/nostr/transport/fedos_conversation_transport_outbox_codec.js";
+import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 
 /** Mirrors `ManualRelay` (`test/secure_runtime_alpha_730_ok_listener_lifecycle.test.ts`) -- a directly-controllable `FedosRelay` double, extended with subscribe/fireEvent for Inbound Subscription tests. */
 class ManualRelay implements FedosRelay {
@@ -146,6 +147,40 @@ function fakeWireEvent(id: string): FedosNostrWireEvent {
   };
 }
 
+/**
+ * Red Team P0 closure -- `FedosConversationInboundSubscription` now runs
+ * every inbound event through `validateInboundNostrEvent()` (real Event ID
+ * + real BIP-340 signature verification) BEFORE dedup/delivery, so the
+ * Inbound Subscription tests below (unlike `fakeWireEvent()` above, which
+ * is still fine for the OK-correlated publisher tests, which never touch
+ * the validator) need a GENUINELY signed event. `signingAuthority` is a
+ * real-crypto `FedosNostrSigningAuthority` stand-in
+ * (`test/support/real_fedos_nostr_signing_authority.ts`) -- the same
+ * pattern this repository's own "real vertical slice" tests already use.
+ */
+const signingAuthority = new RealFedosNostrSigningAuthority();
+
+async function realSignedWireEvent(envelopeId: string, counterpartyPublicKeyHex: string): Promise<FedosNostrWireEvent> {
+  const request = buildFedosPrivateTransportUnsignedEventRequest({
+    envelope: {
+      id: envelopeId as never,
+      conversationId: "conversation-1" as never,
+      senderMembershipId: "m1" as never,
+      payloadId: "p1" as never,
+      encryptionSuite: "ChaCha20Poly1305",
+      keyEpoch: 0,
+      createdAt: 0,
+      replyToEnvelopeId: null,
+    },
+    ciphertext: new Uint8Array([1, 2, 3]),
+    counterpartyPublicKeyHex,
+    localAccountIndex: 0,
+  });
+  const event = await signingAuthority.signEvent(request);
+  if (event === null) throw new Error("realSignedWireEvent: signing failed unexpectedly");
+  return event;
+}
+
 describe("Secure Runtime Alpha 1471-1540 -- Multi-Relay OK-Correlated Publisher (aggregation policy)", () => {
   it("1. delivered if ANY relay accepts", async () => {
     const r1 = new ManualRelay("wss://r1");
@@ -232,14 +267,16 @@ describe("Secure Runtime Alpha 1471-1540 -- Inbound Subscription (dedup across r
   it("1. the SAME event arriving via two relays fires the envelope callback exactly once", async () => {
     const r1 = new ManualRelay("wss://r1");
     const r2 = new ManualRelay("wss://r2");
+    await r1.connect();
+    await r2.connect();
     const relaySet = new FedosConversationRelaySet([r1, r2]);
-    const localPubkey = "b".repeat(64); // matches the "p" tag fakeWireEvent() builds
+    const localPubkey = "b".repeat(64); // matches the "p" tag realSignedWireEvent() builds
     const subscription = new FedosConversationInboundSubscription(relaySet, localPubkey);
 
     const received: string[] = [];
     await subscription.start({ kinds: [1] }, (envelope) => received.push(envelope.envelopeId));
 
-    const event = fakeWireEvent("4".repeat(64));
+    const event = await realSignedWireEvent("envelope-1", localPubkey);
     r1.fireEvent(`sub-wss://r1-1`, event);
     r2.fireEvent(`sub-wss://r2-1`, event); // identical event id, delivered by a second relay
 
@@ -248,12 +285,13 @@ describe("Secure Runtime Alpha 1471-1540 -- Inbound Subscription (dedup across r
 
   it("2. ignores an event addressed to a different recipient", async () => {
     const r1 = new ManualRelay("wss://r1");
+    await r1.connect();
     const relaySet = new FedosConversationRelaySet([r1]);
     const subscription = new FedosConversationInboundSubscription(relaySet, "c".repeat(64)); // does NOT match the "p" tag
 
     const received: string[] = [];
     await subscription.start({ kinds: [1] }, (envelope) => received.push(envelope.envelopeId));
-    r1.fireEvent("sub-wss://r1-1", fakeWireEvent("5".repeat(64)));
+    r1.fireEvent("sub-wss://r1-1", await realSignedWireEvent("envelope-1", "b".repeat(64)));
 
     expect(received).toEqual([]);
   });
@@ -263,5 +301,75 @@ describe("Secure Runtime Alpha 1471-1540 -- Inbound Subscription (dedup across r
     const subscription = new FedosConversationInboundSubscription(new FedosConversationRelaySet([r1]), "b".repeat(64));
     await subscription.start({ kinds: [1] }, () => {});
     await expect(subscription.start({ kinds: [1] }, () => {})).rejects.toThrow();
+  });
+
+  // -------------------------------------------------------------------
+  // Red Team P0 closure -- inbound event validation (id + signature)
+  // -------------------------------------------------------------------
+
+  it("4. an event with a tampered id (does not match its own content hash) is rejected and never reaches onEnvelope", async () => {
+    const r1 = new ManualRelay("wss://r1");
+    await r1.connect();
+    const relaySet = new FedosConversationRelaySet([r1]);
+    const localPubkey = "b".repeat(64);
+    const subscription = new FedosConversationInboundSubscription(relaySet, localPubkey);
+
+    const received: string[] = [];
+    await subscription.start({ kinds: [1] }, (envelope) => received.push(envelope.envelopeId));
+
+    const event = await realSignedWireEvent("envelope-tampered-id", localPubkey);
+    const tamperedId = event.id.slice(0, -1) + (event.id.endsWith("9") ? "8" : "9");
+    r1.fireEvent("sub-wss://r1-1", { ...event, id: tamperedId });
+
+    expect(received, "an event whose id does not match its own content hash must never reach onEnvelope").toEqual([]);
+  });
+
+  it("5. an event with an invalid/wrong signature is rejected and never reaches onEnvelope", async () => {
+    const r1 = new ManualRelay("wss://r1");
+    await r1.connect();
+    const relaySet = new FedosConversationRelaySet([r1]);
+    const localPubkey = "b".repeat(64);
+    const subscription = new FedosConversationInboundSubscription(relaySet, localPubkey);
+
+    const received: string[] = [];
+    await subscription.start({ kinds: [1] }, (envelope) => received.push(envelope.envelopeId));
+
+    const event = await realSignedWireEvent("envelope-bad-sig", localPubkey);
+    const tamperedSig = event.sig.slice(0, -1) + (event.sig.endsWith("9") ? "8" : "9");
+    r1.fireEvent("sub-wss://r1-1", { ...event, sig: tamperedSig });
+
+    expect(received, "an event whose sig does not verify under its own pubkey must never reach onEnvelope").toEqual([]);
+  });
+
+  it("6. a genuinely duplicate valid event id (replay, e.g. via the same or a second relay) is still deduped to exactly one onEnvelope callback post-fix", async () => {
+    const r1 = new ManualRelay("wss://r1");
+    await r1.connect();
+    const relaySet = new FedosConversationRelaySet([r1]);
+    const localPubkey = "b".repeat(64);
+    const subscription = new FedosConversationInboundSubscription(relaySet, localPubkey);
+
+    const received: string[] = [];
+    await subscription.start({ kinds: [1] }, (envelope) => received.push(envelope.envelopeId));
+
+    const event = await realSignedWireEvent("envelope-replay", localPubkey);
+    r1.fireEvent("sub-wss://r1-1", event);
+    r1.fireEvent("sub-wss://r1-1", event); // identical, genuinely-valid event replayed
+
+    expect(received, "dedup-by-verified-id must still collapse a real replay to exactly one callback").toEqual(["envelope-replay"]);
+  });
+
+  it("7. a well-formed, correctly-signed event is still processed normally end-to-end -- regression guard for the validation wiring", async () => {
+    const r1 = new ManualRelay("wss://r1");
+    await r1.connect();
+    const relaySet = new FedosConversationRelaySet([r1]);
+    const localPubkey = "b".repeat(64);
+    const subscription = new FedosConversationInboundSubscription(relaySet, localPubkey);
+
+    const received: string[] = [];
+    await subscription.start({ kinds: [1] }, (envelope) => received.push(envelope.envelopeId));
+
+    r1.fireEvent("sub-wss://r1-1", await realSignedWireEvent("envelope-valid", localPubkey));
+
+    expect(received, "a real, validly-signed event from a real contact must still be delivered unchanged").toEqual(["envelope-valid"]);
   });
 });

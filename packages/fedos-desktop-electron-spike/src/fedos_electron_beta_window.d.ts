@@ -28,6 +28,34 @@ interface FedosProfileStatusResult {
   readonly recoveryReason: string | null;
 }
 
+/** Product Durability mega-arc — mirrors `FedosProfileBackupItem` (`src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.ts`). `path` is always a non-secret local file path, never a secret byte. */
+interface FedosProfileRecoveryNoticeBackupItemView {
+  readonly label: string;
+  readonly path: string;
+  readonly sensitivity: string;
+  readonly required: boolean;
+}
+
+/**
+ * Product Durability mega-arc — mirrors `FedosProfileRecoveryNotice`
+ * (`src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.ts`)
+ * at the IPC boundary. Previously computed by the coordinator's own
+ * `#readyView()` but silently dropped in `readyResult()` before it ever
+ * reached this bridge — every field here is non-secret (file paths and
+ * fixed strings only, per that file's own hard guardrails).
+ */
+interface FedosProfileRecoveryNoticeView {
+  readonly headline: string;
+  readonly backupItems: readonly FedosProfileRecoveryNoticeBackupItemView[];
+  readonly warnings: readonly string[];
+  readonly forgottenSecretIsUnrecoverable: true;
+  readonly conversationArchiveExportAvailable: boolean;
+  readonly wholeProfileDirectoryRecommendation: {
+    readonly path: string;
+    readonly text: string;
+  };
+}
+
 interface FedosProfileCommandResult {
   readonly outcome: string;
   readonly reason?: string;
@@ -36,6 +64,7 @@ interface FedosProfileCommandResult {
     readonly accountPublicIdentifier: string;
     readonly localDeviceId: string;
     readonly deviceTrustState: string;
+    readonly recoveryNotice: FedosProfileRecoveryNoticeView;
   };
 }
 

@@ -1442,6 +1442,33 @@ function onChatSecurityIndicatorClick(): void {
   button.setAttribute("aria-expanded", nowHidden ? "false" : "true");
 }
 
+/**
+ * FedOS Message Delivery Truth arc (renderer boundary closure) --
+ * `FedosContentAccessorDeliveryFact.state` (see
+ * `src/os/messenger/desktop/content_accessor/fedos_desktop_conversation_content_accessor_result.ts`'s
+ * own header): `"queued"` is the BEST outcome this architecture can ever
+ * synchronously prove -- never a relay ACK, never "the recipient received
+ * it" -- so it is deliberately never rendered as "Sent." here either, to
+ * avoid re-introducing the exact over-claim this arc exists to remove.
+ * `route`/`reason` carried on the fact are Direct-only and absent for a
+ * Group send (`fanout` covers that axis instead).
+ */
+type ChatSendDeliveryFact = { readonly route: string; readonly state: string; readonly reason?: string };
+
+/** Closed-vocabulary delivery state -> a specific, honest sentence. Never "Sent." for anything less than a real transport hand-off, and never claims delivery for a state this architecture cannot prove. */
+const CHAT_SEND_DELIVERY_STATE_TEXT: Record<string, string> = {
+  queued: "Queued for delivery…",
+  "route-unavailable": "Saved on this device — not sent yet (no delivery route available).",
+  unavailable: "Saved on this device — not sent yet (delivery unavailable).",
+  failed: "Saved on this device — delivery failed.",
+};
+
+/** `undefined` means no delivery dependency was configured for this send at all (e.g. a Group send, which reports its own outcome via `fanout` instead) -- an honest "saved, delivery unknown", never coerced into `"queued"` or "Sent." */
+function chatSendFeedbackText(delivery: ChatSendDeliveryFact | undefined): string {
+  if (delivery === undefined) return "Saved on this device.";
+  return CHAT_SEND_DELIVERY_STATE_TEXT[delivery.state] ?? "Saved on this device.";
+}
+
 async function onChatSend(): Promise<void> {
   if (currentConversationId === null) return;
   const body = byId<HTMLTextAreaElement>("chat-compose").value;
@@ -1459,7 +1486,12 @@ async function onChatSend(): Promise<void> {
       return;
     }
     byId<HTMLTextAreaElement>("chat-compose").value = "";
-    byId("chat-send-feedback").textContent = "Sent.";
+    const value = result.value as { readonly delivery?: ChatSendDeliveryFact } | undefined;
+    const delivery = value?.delivery;
+    byId("chat-send-feedback").textContent = chatSendFeedbackText(delivery);
+    if (delivery !== undefined && delivery.state !== "queued") {
+      byId("chat-error").textContent = delivery.reason ?? describeOutcome(delivery.state);
+    }
     await loadChatMessages();
   } finally {
     setBusy(false, "chat-send");
@@ -4795,12 +4827,41 @@ async function onSettingsSave(): Promise<void> {
 // Ready screen routing.
 // ---------------------------------------------------------------------
 
+/**
+ * Product Durability mega-arc -- renders the real, non-secret backup
+ * guidance `buildFedosProfileRecoveryNotice()` already computes
+ * (`src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.ts`).
+ * Previously computed end to end and then silently dropped at the
+ * `readyResult()` IPC boundary; this is the renderer half of forwarding it.
+ * Only file paths and fixed strings -- never a secret, matching that
+ * file's own hard guardrails.
+ */
+function renderReadyRecoveryNotice(notice: FedosProfileRecoveryNoticeView): void {
+  const headline = byId("ready-recovery-headline");
+  headline.textContent = notice.headline;
+  headline.hidden = false;
+
+  const items = byId("ready-recovery-backup-items");
+  items.textContent = "";
+  for (const item of notice.backupItems) {
+    const li = document.createElement("li");
+    li.textContent = `${item.label}: ${item.path}`;
+    items.appendChild(li);
+  }
+  items.hidden = notice.backupItems.length === 0;
+
+  const wholeDir = byId("ready-recovery-whole-dir");
+  wholeDir.textContent = `${notice.wholeProfileDirectoryRecommendation.text} (${notice.wholeProfileDirectoryRecommendation.path})`;
+  wholeDir.hidden = false;
+}
+
 function renderReady(ready: FedosProfileCommandResult["ready"]): void {
   if (ready === undefined) return;
   byId("ready-label").textContent = ready.displayLabel;
   byId("ready-account").textContent = ready.accountPublicIdentifier;
   byId("ready-device").textContent = ready.localDeviceId;
   byId("ready-trust").textContent = ready.deviceTrustState;
+  renderReadyRecoveryNotice(ready.recoveryNotice);
   localAccountPublicIdentifier = ready.accountPublicIdentifier;
   localDisplayLabel = ready.displayLabel;
   refreshCommerceActorOptionsForRealIdentity();

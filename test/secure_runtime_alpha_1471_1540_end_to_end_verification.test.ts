@@ -15,12 +15,9 @@ import type { FedosEventDescriptor } from "../src/os/messenger/desktop/fedos_eve
 import type { FedosRelayMessageListener, FedosSubscriptionListener } from "../src/os/messenger/desktop/fedos_relay_listeners.js";
 import type { FedosSubscription } from "../src/os/messenger/desktop/fedos_subscription.js";
 import type { FedosSubscriptionFilter } from "../src/os/messenger/desktop/fedos_subscription_filter.js";
-import type { FedosNostrSigningAuthority } from "../src/os/messenger/adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import type { FedosNostrWireEvent } from "../src/os/messenger/desktop/fedos_nostr_wire_event.js";
 import type { FedosConversationMembership } from "../src/os/messenger/conversations/membership/fedos_conversation_membership.js";
-
-const SENDER_PUBKEY = "a".repeat(64);
-const RECEIVER_PUBKEY = "b".repeat(64);
+import { RealFedosNostrSigningAuthority } from "./support/real_fedos_nostr_signing_authority.js";
 
 /**
  * `FakeRelayServer` models ONE real relay server's own broadcast/OK
@@ -104,27 +101,20 @@ class LiveRelayConnection implements FedosRelay {
   }
 }
 
-function fakeSigningAuthority(pubkeyHex: string): FedosNostrSigningAuthority {
-  let counter = 0;
-  return {
-    async signEvent(request) {
-      counter += 1;
-      return {
-        id: `event-${pubkeyHex.slice(0, 8)}-${counter}`,
-        pubkey: pubkeyHex,
-        created_at: request.createdAt,
-        kind: request.kind,
-        tags: request.tags,
-        content: request.content,
-        sig: "s".repeat(128),
-      };
-    },
-    async publicIdentityForAccount(accountIndex: number) {
-      return { accountIndex, publicKeyHex: pubkeyHex };
-    },
-  };
-}
-
+/**
+ * Red Team P0 closure -- `FedosConversationInboundSubscription` (wired
+ * INSIDE `FedosPrivateTransport`) now runs `validateInboundNostrEvent()`
+ * (real Event ID + real BIP-340 signature verification) on every inbound
+ * event, so this end-to-end test's signing authorities must be REAL
+ * (`RealFedosNostrSigningAuthority`, `test/support/`) rather than the
+ * previous `fakeSigningAuthority()` placeholder, whose fabricated
+ * `id`/`sig` would now be correctly rejected before ever reaching
+ * `onEnvelope`. A real signing authority derives its OWN pubkey from a
+ * real keypair (it cannot be handed an arbitrary caller-chosen pubkey
+ * like the old fake could), so the SENDER_PUBKEY/RECEIVER_PUBKEY used to
+ * build memberships below must be read back from the authority itself via
+ * `publicIdentityForAccount()`.
+ */
 function membership(participantHex: string): FedosConversationMembership {
   return Object.freeze({
     id: `membership-${participantHex}` as never,
@@ -137,10 +127,17 @@ function membership(participantHex: string): FedosConversationMembership {
   });
 }
 
-const SHARED_MEMBERSHIPS = [membership(SENDER_PUBKEY), membership(RECEIVER_PUBKEY)];
-
 describe("Secure Runtime Alpha 1471-1540 -- End-to-End Real Runtime Verification (two relays, sender + receiver transports)", () => {
   it("delivers a Mailbox envelope through Multiple Relay fan-out to a real Inbound Subscription, with Relay Deduplication firing the callback exactly once despite two relays delivering the identical event, and the opaque payload bytes surviving the FULL sign -> publish -> OK-correlate -> subscribe -> dedup -> parse -> base64-decode pipeline byte-for-byte", async () => {
+    const senderAuthority = new RealFedosNostrSigningAuthority();
+    const receiverAuthority = new RealFedosNostrSigningAuthority();
+    const senderIdentity = await senderAuthority.publicIdentityForAccount(0);
+    const receiverIdentity = await receiverAuthority.publicIdentityForAccount(0);
+    if (senderIdentity === null || receiverIdentity === null) throw new Error("failed to derive test identities");
+    const SENDER_PUBKEY = senderIdentity.publicKeyHex;
+    const RECEIVER_PUBKEY = receiverIdentity.publicKeyHex;
+    const SHARED_MEMBERSHIPS = [membership(SENDER_PUBKEY), membership(RECEIVER_PUBKEY)];
+
     const relayServer1 = new FakeRelayServer();
     const relayServer2 = new FakeRelayServer();
     const senderRelay1 = new LiveRelayConnection(relayServer1, "wss://relay-1.test");
@@ -178,7 +175,7 @@ describe("Secure Runtime Alpha 1471-1540 -- End-to-End Real Runtime Verification
     const senderObservationRepository = new FedosDeliveryObservationRepository(new InMemoryFedosDeliveryObservationPersistence());
     const senderTransport = new FedosPrivateTransport({
       relaySet: new FedosConversationRelaySet([senderRelay1, senderRelay2]),
-      signingAuthority: fakeSigningAuthority(SENDER_PUBKEY),
+      signingAuthority: senderAuthority,
       localAccountIndex: 0,
       envelopePersistence: senderEnvelopePersistence,
       payloadStorage: senderPayloadStorage,
@@ -193,7 +190,7 @@ describe("Secure Runtime Alpha 1471-1540 -- End-to-End Real Runtime Verification
     const receivedCiphertexts: Uint8Array[] = [];
     const receiverTransport = new FedosPrivateTransport({
       relaySet: new FedosConversationRelaySet([receiverRelay1, receiverRelay2]),
-      signingAuthority: fakeSigningAuthority(RECEIVER_PUBKEY),
+      signingAuthority: receiverAuthority,
       localAccountIndex: 0,
       envelopePersistence: new InMemoryFedosConversationMessageEnvelopePersistence(),
       payloadStorage: new InMemoryFedosConversationPayloadStorage(),

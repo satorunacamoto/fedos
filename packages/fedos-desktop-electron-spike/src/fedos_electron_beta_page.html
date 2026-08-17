@@ -233,6 +233,17 @@
         <p class="muted" id="release-info"></p>
       </details>
 
+      <!-- Product Durability mega-arc -- real backup-material guidance the
+           coordinator's own `buildFedosProfileRecoveryNotice()` already
+           computes (`recoveryNotice` on the ready-state IPC response), now
+           forwarded end to end instead of being silently dropped at the
+           IPC boundary. Only non-secret file paths and fixed strings --
+           mirrors the passphrase warning's own `.warn` styling on the
+           Create screen above. -->
+      <p class="warn" id="ready-recovery-headline" hidden></p>
+      <ul id="ready-recovery-backup-items" hidden></ul>
+      <p class="muted" id="ready-recovery-whole-dir" hidden></p>
+
       <!-- Commerce Real Two-Party UX Closure (Agent U) -- friction ledger row 8 (arc §28):
            "Commerce"/"Merchant" renamed to "Shop"/"My Store" (buyer vs. seller reads
            immediately, unlike the prior pair). NOTE FOR COORDINATOR: Agent S may ALSO

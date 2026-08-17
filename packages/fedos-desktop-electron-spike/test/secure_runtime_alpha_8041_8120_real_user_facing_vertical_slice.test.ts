@@ -302,10 +302,19 @@ realSuite("Alpha 8041-8120 -- REAL user-facing packaged Beta Electron process, d
             fastTick,
           ),
         ]);
-        expect(readAt(aliceSend, 9)).toBe("Sent.");
+        // Message Delivery Truth arc (renderer boundary closure) -- this
+        // renderer used to unconditionally show "Sent." on any `outcome:
+        // "ok"` response, regardless of whether the message actually
+        // queued for real transport delivery. It now reads the real
+        // `result.value.delivery` fact the backend already computed and
+        // reflects the genuine outcome; a successful real send queues for
+        // asynchronous relay delivery (never a synchronous relay ACK --
+        // see `FedosContentAccessorDeliveryFact`'s own header), so the
+        // honest text here is "Queued for delivery…", not "Sent.".
+        expect(readAt(aliceSend, 9)).toBe("Queued for delivery…");
         const bobChatText = readAt(bobReceiveAndReply, 6);
         expect(bobChatText, bobReceiveAndReply.output).toMatch(/Show message|really sent through the real chat composer/);
-        expect(readAt(bobReceiveAndReply, 10), bobReceiveAndReply.output).toBe("Sent.");
+        expect(readAt(bobReceiveAndReply, 10), bobReceiveAndReply.output).toBe("Queued for delivery…");
 
         // ---- 12. Alice, restarted, genuinely sees Bob's real reply -- via the real chat view, after clicking "Show message" to reveal it (never bulk-decrypted). ----
         const aliceCheck = await runBetaUiScript(

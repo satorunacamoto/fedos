@@ -430,6 +430,49 @@ describe("Secure Runtime Alpha 3161-3240 -- Real Device Registration Authority (
     expect(dup.outcome).toBe("already-revoked");
   });
 
+  it("SECURITY FIX (FedOS red-team P0 closure): a FRESH revocation calls the optional ratchetSessionQuarantine dependency with the revoked deviceId -- this closes the gap where applyDeviceRevocationToSessions() had zero production callers", async () => {
+    const now = 1_800_000_320;
+    const quarantineCalls: string[] = [];
+    const quarantinedAuthority = new FedosDeviceBindingRegistrationAuthority({
+      registryPersistence: new InMemoryFedosDeviceRegistryPersistence(),
+      replayPersistence: new InMemoryFedosDeviceBindingChallengeReplayPersistence(),
+      ratchetSessionQuarantine: {
+        applyDeviceRevocationToSessions: (deviceId: string) => {
+          quarantineCalls.push(deviceId);
+          return ["session-1", "session-2"];
+        },
+      },
+    });
+    const { challenge, accountAuthorization, deviceProof } = await registerFreshDevice(now);
+    await quarantinedAuthority.registerDevice(accountAuthorization, deviceProof, now);
+    expect(quarantineCalls).toHaveLength(0);
+
+    const revokeChallenge = { ...challenge, action: "revoke-device" as const, nonce: nonceGen.generateNonce(), issuedAt: now + 1, expiresAt: now + 301 };
+    const revokeAuth = (await authorizeFedosDeviceBindingChallenge(signingAuthority, ACCOUNT_INDEX_A, revokeChallenge))!;
+    const revocation = await quarantinedAuthority.revokeDevice(revokeAuth, now + 1);
+    expect(revocation.outcome).toBe("revoked");
+    // Called exactly once, with the revoked device's own deviceId.
+    expect(quarantineCalls).toEqual([challenge.deviceId]);
+
+    // A duplicate (idempotent-replay/"already-revoked") revocation must NOT call it again.
+    const dupChallenge = { ...challenge, action: "revoke-device" as const, nonce: nonceGen.generateNonce(), issuedAt: now + 2, expiresAt: now + 302 };
+    const dupAuth = (await authorizeFedosDeviceBindingChallenge(signingAuthority, ACCOUNT_INDEX_A, dupChallenge))!;
+    const dup = await quarantinedAuthority.revokeDevice(dupAuth, now + 2);
+    expect(dup.outcome).toBe("already-revoked");
+    expect(quarantineCalls).toEqual([challenge.deviceId]);
+  });
+
+  it("SECURITY FIX: revocation behaves EXACTLY as before when no ratchetSessionQuarantine dependency is configured (backward compatible, no forced coupling)", async () => {
+    const now = 1_800_000_321;
+    const { challenge, accountAuthorization, deviceProof } = await registerFreshDevice(now);
+    await authority.registerDevice(accountAuthorization, deviceProof, now);
+    const revokeChallenge = { ...challenge, action: "revoke-device" as const, nonce: nonceGen.generateNonce(), issuedAt: now + 1, expiresAt: now + 301 };
+    const revokeAuth = (await authorizeFedosDeviceBindingChallenge(signingAuthority, ACCOUNT_INDEX_A, revokeChallenge))!;
+    // `authority` (this describe block's own shared instance) was constructed with no ratchetSessionQuarantine -- must not throw.
+    const revocation = await authority.revokeDevice(revokeAuth, now + 1);
+    expect(revocation.outcome).toBe("revoked");
+  });
+
   it("10. expired registration request is denied", async () => {
     const now = 1_800_000_311;
     const keypair = generateFedosDeviceSigningKeypair();

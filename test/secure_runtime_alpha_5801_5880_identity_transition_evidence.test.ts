@@ -14,6 +14,7 @@ import {
   FEDOS_IDENTITY_TRANSITION_DEFAULT_LOCAL_POLICY,
   type FedosIdentityTransitionEvidenceEvaluationInput,
 } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_evidence_evaluation.js";
+import { computeFedosIdentityTransitionAcceptanceState } from "../src/os/messenger/conversations/identity_transition/fedos_identity_transition_acceptance_state.js";
 import type { FedosDeviceBindingAccountRef } from "../src/os/messenger/device/fedos_device_binding.js";
 
 function accountRef(pubkey: string): FedosDeviceBindingAccountRef {
@@ -343,8 +344,29 @@ describe("Phase I — evidence evaluation: the two hard invariants", () => {
     expect(outcome).not.toBe("locally-acceptable");
   });
 
-  it("non-compromise + old-key-only + default policy (auto-accept true) IS locally-acceptable", () => {
-    expect(evaluateFedosIdentityTransitionEvidence(baseInput)).toBe("locally-acceptable");
+  it("SECURITY FIX (red-team P0 closure): non-compromise + old-key-only + default policy (auto-accept true) is NO LONGER locally-acceptable -- caps out at continuity-old-key-only, same as the conservative policy", () => {
+    const outcome = evaluateFedosIdentityTransitionEvidence(baseInput);
+    expect(outcome).toBe("continuity-old-key-only");
+    expect(outcome).not.toBe("locally-acceptable");
+  });
+
+  it("SECURITY FIX: a locally-acceptable-shaped old-key-only observation must not silently reach acceptanceState 'accepted' -- explicit local decision required, positive explicit-accept path still works", () => {
+    const outcome = evaluateFedosIdentityTransitionEvidence(baseInput);
+    // No explicit decision yet -- must stay in a pending/awaiting-decision state, never "accepted".
+    expect(computeFedosIdentityTransitionAcceptanceState(outcome, "none")).toBe("manual-review-required");
+    expect(computeFedosIdentityTransitionAcceptanceState(outcome)).not.toBe("accepted");
+    // An EXPLICIT local decision to accept must still work correctly (positive path).
+    expect(computeFedosIdentityTransitionAcceptanceState(outcome, "accept")).toBe("accepted");
+    // An EXPLICIT local decision to reject must still work correctly too.
+    expect(computeFedosIdentityTransitionAcceptanceState(outcome, "reject")).toBe("rejected");
+  });
+
+  it("Device corroboration (a genuine second, independent evidence source) is unaffected by this fix -- non-compromise + old-key-only + Device corroboration still reaches locally-acceptable", () => {
+    const outcome = evaluateFedosIdentityTransitionEvidence({
+      ...baseInput,
+      deviceCorroborationStatuses: ["cryptographically-valid"],
+    });
+    expect(outcome).toBe("locally-acceptable");
   });
 
   it("no continuity evidence at all, but Device corroboration present (identity-lost path) still reaches device-corroborated", () => {
