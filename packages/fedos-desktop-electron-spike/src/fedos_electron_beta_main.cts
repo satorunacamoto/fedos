@@ -807,6 +807,8 @@ interface ShellDiagnosticLike {
   directRatchetStatus(conversationId: string, remoteDeviceRef: string): { readonly outcome: string; readonly [key: string]: unknown };
   /** Direct Ratchet Live-State Durability arc — narrows `FedosDesktopApplicationShell.directRatchetLiveVerification()`; synchronous, mirrors `directRatchetStatus()` immediately above. */
   directRatchetLiveVerification(conversationId: string, remoteDeviceRef: string): { readonly outcome: string; readonly [key: string]: unknown };
+  /** Outbox Flush Reliability arc — narrows `FedosDesktopApplicationShell.deliveryStatusForMessage()`; synchronous, mirrors `directRatchetStatus()` above. */
+  deliveryStatusForMessage(messageId: string): { readonly outcome: string; readonly [key: string]: unknown };
   /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.createConversationInvitation()` (Alpha 7081-7160, unmodified); no new business logic. */
   createConversationInvitation(invitee: unknown, expiresInMs?: number): Promise<{ readonly outcome: string; readonly [key: string]: unknown }>;
   /** Secure Runtime Alpha 7321-7400 — narrows `FedosDesktopApplicationShell.search()` (Alpha 3081-3160, unmodified); synchronous, never a promise. */
@@ -5833,6 +5835,31 @@ async function handleAcceptanceDirectRatchetStatus(payload: unknown) {
 }
 
 /**
+ * Outbox Flush Reliability arc -- acceptance-mode-only mirror of
+ * `handleAcceptanceDirectRatchetStatus()` immediately above, exposing
+ * `FedosDesktopApplicationShell.deliveryStatusForMessage()` (this arc's
+ * own additive truthfulness fact) so a live installed-binary acceptance
+ * script can prove, with real evidence, that a genuinely rejected send
+ * reports the honest terminal `"rejected"` status rather than staying
+ * silently invisible forever -- this arc's own root-cause finding.
+ */
+async function handleAcceptanceDeliveryStatusForMessage(payload: unknown) {
+  const shell = requireShell();
+  if (shell === null) return acceptanceGateRejection();
+  const messageId = (payload as { messageId?: unknown } | null)?.messageId;
+  if (!isBoundedString(messageId, MAX_ID_LENGTH)) {
+    return { outcome: "invalid-input", reason: "malformed delivery-status request" };
+  }
+  // Matches `handleAcceptanceDirectRatchetStatus()`/
+  // `handleAcceptanceDirectRatchetLiveVerification()`'s own established
+  // (double-wrapped -- `shell.deliveryStatusForMessage()` already returns
+  // a `FedosDesktopShellResult`) shape exactly, so an acceptance test
+  // client that already knows to unwrap those two the same way works
+  // identically here, rather than introducing a third, inconsistent shape.
+  return { outcome: "ok", value: shell.deliveryStatusForMessage(messageId) };
+}
+
+/**
  * Direct Ratchet Live-State Durability arc -- acceptance-mode-only mirror
  * of `handleAcceptanceDirectRatchetStatus()` immediately above, exposing
  * `FedosDesktopApplicationShell.directRatchetLiveVerification()` (the
@@ -8637,6 +8664,7 @@ function registerIpcHandlers(): void {
     ipcCommands.registerHandle(ipcMain, "fedos-acceptance:read-message", (payload: unknown) => handleAcceptanceReadMessage(payload));
     ipcCommands.registerHandle(ipcMain, "fedos-acceptance:direct-ratchet-status", (payload: unknown) => handleAcceptanceDirectRatchetStatus(payload), { allowConcurrentSelf: true });
     ipcCommands.registerHandle(ipcMain, "fedos-acceptance:direct-ratchet-live-verification", (payload: unknown) => handleAcceptanceDirectRatchetLiveVerification(payload), { allowConcurrentSelf: true });
+    ipcCommands.registerHandle(ipcMain, "fedos-acceptance:delivery-status-for-message", (payload: unknown) => handleAcceptanceDeliveryStatusForMessage(payload), { allowConcurrentSelf: true });
     // Secure Runtime Alpha 7321-7400 -- these four channels close Release
     // Readiness Review B-2/B-7; Secure Runtime Alpha 8121-8200 narrows
     // "reachable whenever a real profile is unlocked, in ANY mode" (the
@@ -8917,6 +8945,7 @@ app.whenReady().then(async () => {
         "acceptance-direct-ratchet-status": (payload) => handleAcceptanceDirectRatchetStatus(payload),
         "acceptance-direct-ratchet-status-poll-until-active": (payload) => handleAcceptanceDirectRatchetStatusPollUntilActive(payload),
         "acceptance-direct-ratchet-live-verification": (payload) => handleAcceptanceDirectRatchetLiveVerification(payload),
+        "acceptance-delivery-status-for-message": (payload) => handleAcceptanceDeliveryStatusForMessage(payload),
         "acceptance-tor-transport-state": () => Promise.resolve(handleAppTorTransportState()),
         "acceptance-list-messages-poll-until-count": (payload) => handleAcceptanceListMessagesPollUntilCount(payload),
         "acceptance-create-conversation-invitation": (payload) => handleAcceptanceCreateConversationInvitation(payload),
