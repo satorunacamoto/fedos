@@ -34,7 +34,7 @@
  */
 
 import { join, isAbsolute, basename } from "node:path";
-import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, existsSync } from "node:fs";
 
 /** Every named durable leaf a profile owns. Non-secret path strings only. */
 export interface FedosLocalProfilePaths {
@@ -303,22 +303,80 @@ function residualRootEntries(paths: FedosLocalProfilePaths): readonly string[] {
 }
 
 /**
+ * Every entry directly inside `logsDirectory`/`sessionStateDirectory`.
+ * Disaster Recovery Product Closure arc, Track 3 — a mini red-team pass
+ * (R2) found these directories' CONTENTS were never inspected or cleared
+ * by ANY path (the basenames are permanently whitelisted in
+ * `knownSafeRootEntryBasenames()` above, by design — they should stay
+ * ambient/never-required-empty for the freshness CHECK, since ordinary
+ * diagnostic churn is expected even on an otherwise-fresh root). That was
+ * sound when written, but `logs/commerce-diagnostics.ndjson` (added by a
+ * later, unrelated arc — `recordDiagnosticEvent()` in
+ * `fedos_electron_beta_main.cts`) now carries real fields tied to the old
+ * identity's own Commerce catalog (`productId`, `mediaId`, an `error.message`
+ * at one call site) — real residue, not merely "non-secret diagnostics" as
+ * an earlier, now-stale review doc claimed. `deleteResidualFedosProfileData()`
+ * below clears these CONTENTS (never the directories themselves, which
+ * `ensureFedosLocalProfileDirectories()` always keeps present) on every
+ * completed reset, without adding them to the refusal check — so ordinary
+ * diagnostic churn never blocks a fresh create, but a completed Start Over
+ * genuinely empties them too.
+ */
+function logsAndSessionContentEntries(paths: FedosLocalProfilePaths): readonly string[] {
+  const out: string[] = [];
+  for (const dir of [paths.logsDirectory, paths.sessionStateDirectory]) {
+    try {
+      for (const name of readdirSync(dir)) out.push(join(dir, name));
+    } catch {
+      // directory absent/unreadable -- nothing to clear
+    }
+  }
+  return out;
+}
+
+/**
  * True iff anything beyond the profile descriptor, sealed Master Seed, and
  * the 2 non-meaningful diagnostic directories still exists directly under
- * `paths.root`. `detectProfileState()` alone cannot answer this — it
- * inspects only the 2 identity files, which is exactly the narrow check
- * `createProfile()`'s overwrite guard and Recovery restore's
- * `target-not-fresh` check both trusted, and exactly the gap Start Over's
- * 2-file delete left open. Never throws.
+ * `paths.root` — OR any of `extraPaths` (absolute paths OUTSIDE
+ * `paths.root` entirely) exists. `detectProfileState()` alone cannot
+ * answer this — it inspects only the 2 identity files, which is exactly
+ * the narrow check `createProfile()`'s overwrite guard and Recovery
+ * restore's `target-not-fresh` check both trusted, and exactly the gap
+ * Start Over's 2-file delete left open. `extraPaths` exists because a mini
+ * red-team pass (R2) found this planner's own `paths.root`-scoped listing
+ * structurally cannot see state an Electron-main-process-level caller
+ * keeps as a SIBLING of `paths.root` (e.g. `navigation.log` at
+ * `<userData>/navigation.log`, read back unconditionally by
+ * `FedosDesktopConversationWindowRegistry` and surfaced through the real
+ * `fedos-beta:status` IPC channel to whichever identity is currently
+ * active — a live cross-identity metadata leak, not merely a hygiene
+ * gap). The caller (`fedos_electron_beta_main.cts`, the only place that
+ * knows these sibling paths exist) supplies them explicitly; this module
+ * has and needs no hardcoded knowledge of Commerce/navigation-specific
+ * paths. Never throws.
  */
-export function hasResidualFedosProfileData(paths: FedosLocalProfilePaths): boolean {
-  return residualRootEntries(paths).length > 0;
+export function hasResidualFedosProfileData(paths: FedosLocalProfilePaths, extraPaths: readonly string[] = []): boolean {
+  if (residualRootEntries(paths).length > 0) return true;
+  for (const extra of extraPaths) {
+    try {
+      if (existsSync(extra)) return true;
+    } catch {
+      // treated as absent for this one path; see hasResidualFedosProfileData's own doc comment
+    }
+  }
+  return false;
 }
 
 /**
  * Recursively removes every residual entry `hasResidualFedosProfileData()`
  * would flag (a plain file OR a directory tree like `commerce/` — both
- * handled uniformly via `rmSync(..., { recursive: true, force: true })`).
+ * handled uniformly via `rmSync(..., { recursive: true, force: true })`),
+ * PLUS every entry supplied via `extraPaths` (see
+ * `hasResidualFedosProfileData()`'s own doc comment for why these are
+ * needed), PLUS the CONTENTS (never the directories themselves) of
+ * `logsDirectory`/`sessionStateDirectory` (see
+ * `logsAndSessionContentEntries()`'s own doc comment).
+ *
  * Disaster Recovery Product Closure arc, Track 3 — companion to
  * `hasResidualFedosProfileData()`: the widened freshness CHECK alone
  * (refuse-only) turned out to make a legitimate Start Over permanently
@@ -336,9 +394,9 @@ export function hasResidualFedosProfileData(paths: FedosLocalProfilePaths): bool
  * Best-effort per entry (a single stray failure never aborts the rest);
  * returns `true` iff every entry that existed was successfully removed.
  */
-export function deleteResidualFedosProfileData(paths: FedosLocalProfilePaths): boolean {
+export function deleteResidualFedosProfileData(paths: FedosLocalProfilePaths, extraPaths: readonly string[] = []): boolean {
   let allSucceeded = true;
-  for (const entry of residualRootEntries(paths)) {
+  for (const entry of [...residualRootEntries(paths), ...extraPaths, ...logsAndSessionContentEntries(paths)]) {
     try {
       rmSync(entry, { recursive: true, force: true });
     } catch {

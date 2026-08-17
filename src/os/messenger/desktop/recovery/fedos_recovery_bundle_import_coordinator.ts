@@ -159,6 +159,16 @@ export interface FedosRecoveryBundleRestoreRequest {
   readonly targetCommerceRoot?: string;
   /** The TARGET's own `settings.json` path — a SIBLING of `targetPaths.root`, never nested inside it. Omit to skip settings restoration the same way. */
   readonly targetSettingsPath?: string;
+  /**
+   * Disaster Recovery Product Closure arc, Track 3 — same purpose as
+   * `FedosProfileInitializationDependencies.additionalResidualPaths`
+   * (`fedos_profile_initialization_coordinator.ts`): absolute paths
+   * `targetPaths` cannot see because they are genuine SIBLINGS of
+   * `targetPaths.root` (e.g. `navigation.log`), threaded into the
+   * `target-not-fresh` freshness check below alongside `targetPaths`.
+   * Omit for none — zero behavior change for every existing caller.
+   */
+  readonly additionalFreshnessCheckPaths?: readonly string[];
 }
 
 export type FedosRecoveryBundleRestoreResult =
@@ -269,7 +279,7 @@ export async function restoreFedosRecoveryBundle(request: FedosRecoveryBundleRes
   // own, legitimate read APIs observe the OLD identity's private data.
   // Widen the freshness check itself (never widen deletion scope -- see
   // `hasResidualFedosProfileData()`'s own doc comment for why).
-  if (hasResidualFedosProfileData(request.targetPaths)) {
+  if (hasResidualFedosProfileData(request.targetPaths, request.additionalFreshnessCheckPaths ?? [])) {
     return { outcome: "target-not-fresh" };
   }
   if (!atomicWrite(request.targetPaths.sealedMasterSeedFile, new TextEncoder().encode(bundle.sealedMasterSeedEnvelope))) {

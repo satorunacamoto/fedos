@@ -1361,4 +1361,102 @@ describe("Phase T — widened freshness check + widened reset close the Start-Ov
     expect(attempt.outcome).toBe("residual-data-present");
     expect(existsSync(paths.profileDescriptorFile)).toBe(false);
   });
+
+  it("catches (and Start Over clears) residue at a SIBLING path outside paths.root entirely -- mirrors navigation.log (mini red-team R2 finding, CONFIRMED HIGH: a real, unauthenticated-beyond-'profile active' IPC channel reads it back and serves it to whichever identity is currently active)", async () => {
+    // A dedicated parent (own tmpdir, own cleanup below) with `root` as a
+    // "profile" subdirectory and `navigation.log` as a true sibling --
+    // exactly `<userData>/profile` (= `root`) + `<userData>/navigation.log`
+    // in fedos_electron_beta_main.cts. Deliberately NOT `dirname(makeTmpRoot())`,
+    // which would resolve to the SHARED OS tmpdir and leak a stray file
+    // outside this suite's own `afterEach` cleanup.
+    const parentDir = mkdtempSync(join(tmpdir(), "fedos-navlog-sibling-"));
+    tmpDirs.push(parentDir);
+    const root = join(parentDir, "profile");
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    const navigationLog = join(parentDir, "navigation.log");
+
+    await makeCoordinator(root, { accountSigningAuthority: signing, additionalResidualPaths: [navigationLog] }).createProfile(
+      { displayLabel: "Identity A" },
+      fedosProfileUnlockSecretFromUtf8("identity-a-navlog-secret"),
+    );
+    writeFileSync(navigationLog, '{"lastOpenedConversationId":"identity-A-conversation"}\n', "utf8");
+
+    // Simulate the PRE-FIX reset shape directly (delete only the 2
+    // identity files, exactly what `resetCorruptReadyProfile()` did
+    // before this fix, leaving the sibling navigation log behind) --
+    // proves the sibling ALONE, with no other residue, is what
+    // `residual-data-present` is keying off, not the 2 identity files
+    // still being present (which would otherwise mask this check behind
+    // `already-exists`).
+    rmSync(paths.profileDescriptorFile, { force: true });
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+    const stillHasSibling = await makeCoordinator(root, { accountSigningAuthority: signing, additionalResidualPaths: [navigationLog] }).createProfile(
+      { displayLabel: "Should be refused" },
+      fedosProfileUnlockSecretFromUtf8("should-be-refused-secret"),
+    );
+    expect(stillHasSibling.outcome).toBe("residual-data-present");
+    expect(existsSync(paths.profileDescriptorFile), "must not silently create on top of the sibling residue").toBe(false);
+
+    // Clear the sibling AND paths.root entirely by hand (this is test
+    // setup, not the fix under test -- Identity A's own createProfile()
+    // durably wrote well beyond the 2 identity files during its own
+    // Device/Runtime bootstrap step, same as Track 3's own "widen reset
+    // too" discovery, so simply removing the 2 identity files above left
+    // OTHER named leaves behind too) to get back to a genuinely fresh
+    // root, then exercise the REAL reset path: Identity A re-created
+    // fresh, sibling re-written, sealed seed structurally corrupted so
+    // resetCorruptReadyProfile() has a genuine 'ready' descriptor +
+    // missing sealed seed to act on.
+    rmSync(navigationLog, { force: true });
+    rmSync(root, { recursive: true, force: true });
+    const recreated = await makeCoordinator(root, { accountSigningAuthority: signing, additionalResidualPaths: [navigationLog] }).createProfile(
+      { displayLabel: "Identity A, recreated for the real reset path" },
+      fedosProfileUnlockSecretFromUtf8("identity-a-navlog-secret-2"),
+    );
+    expect(recreated.outcome).toBe("ok");
+    writeFileSync(navigationLog, '{"lastOpenedConversationId":"identity-A-conversation-2"}\n', "utf8");
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing, additionalResidualPaths: [navigationLog] });
+    relaunch.detectProfileState();
+    const reset = await relaunch.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("ok");
+    // Start Over must clear the sibling path too -- not just paths.root's
+    // own contents.
+    expect(existsSync(navigationLog), "the sibling navigation log must not survive Start Over").toBe(false);
+
+    const attemptB = await relaunch.createProfile(
+      { displayLabel: "Identity B" },
+      fedosProfileUnlockSecretFromUtf8("identity-b-navlog-secret"),
+    );
+    expect(attemptB.outcome).toBe("ok");
+    await relaunch.lock();
+  });
+
+  it("Start Over clears the CONTENTS of logsDirectory/sessionStateDirectory (mini red-team R2 finding: logs/commerce-diagnostics.ndjson now carries real fields tied to the old identity's own Commerce catalog, not merely 'non-secret diagnostics' as an earlier review assumed) without requiring them to be empty on an ordinary fresh check", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Identity A" },
+      fedosProfileUnlockSecretFromUtf8("identity-a-logs-secret"),
+    );
+    const diagnosticsLog = join(paths.logsDirectory, "commerce-diagnostics.ndjson");
+    writeFileSync(diagnosticsLog, '{"productId":"identity-A-product","outcome":"failed","error":"identity A specific error"}\n', "utf8");
+
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    relaunch.detectProfileState();
+    const reset = await relaunch.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("ok");
+    expect(existsSync(diagnosticsLog), "logs/ contents must be cleared by a completed Start Over").toBe(false);
+    expect(existsSync(paths.logsDirectory), "the logs/ directory itself must still exist").toBe(true);
+
+    const attemptB = await relaunch.createProfile(
+      { displayLabel: "Identity B" },
+      fedosProfileUnlockSecretFromUtf8("identity-b-logs-secret"),
+    );
+    expect(attemptB.outcome).toBe("ok");
+    await relaunch.lock();
+  });
 });

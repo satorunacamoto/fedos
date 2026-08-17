@@ -195,6 +195,24 @@ export interface FedosProfileInitializationDependencies {
   /** Resolves the account public identity + signs device-binding account authorizations. In the real design this is derived from the Master Seed; here it is injected (dev: `RealFedosNostrSigningAuthority`). */
   readonly accountSigningAuthority: FedosNostrSigningAuthority;
   readonly accountIndex?: number;
+  /**
+   * Disaster Recovery Product Closure arc, Track 3 — absolute paths this
+   * Coordinator's own `paths` (rooted at `paths.root`) cannot see because
+   * they are genuine SIBLINGS of `paths.root`, not subpaths of it (e.g.
+   * `navigation.log` at `<userData>/navigation.log` — a mini red-team
+   * pass, R2, found it read back unconditionally by
+   * `FedosDesktopConversationWindowRegistry` and surfaced through the real
+   * `fedos-beta:status` IPC channel, a live cross-identity metadata leak
+   * after Start Over otherwise). Only the caller that owns the wider
+   * `userData` layout (`fedos_electron_beta_main.cts`) knows these paths
+   * exist; this Coordinator has and needs no hardcoded knowledge of them.
+   * Threaded into `hasResidualFedosProfileData()`/
+   * `deleteResidualFedosProfileData()` at every call site alongside
+   * `paths`. Omit for none (e.g. every existing test double in this
+   * codebase before this Arc) — zero behavior change for every caller
+   * that does not supply it.
+   */
+  readonly additionalResidualPaths?: readonly string[];
   readonly now?: () => number;
   readonly generateProfileId?: () => string;
   readonly generateDeviceKeypair?: () => FedosDeviceSigningKeypair;
@@ -500,7 +518,7 @@ export class FedosProfileInitializationCoordinator {
     // it observe the OLD identity's private data through its own,
     // legitimate read APIs — a real, live-reproduced leak this arc closes
     // by refusing outright rather than attempting an automatic cleanup.
-    if (hasResidualFedosProfileData(this.#deps.paths)) {
+    if (hasResidualFedosProfileData(this.#deps.paths, this.#deps.additionalResidualPaths ?? [])) {
       unlockSecret.clear();
       return fail(
         "residual-data-present",
@@ -815,7 +833,7 @@ export class FedosProfileInitializationCoordinator {
     // never causes this reset itself to fail (the 2 identity files, the
     // only thing `detectProfileState()` gates lifecycle on, are already
     // durably gone by this point regardless).
-    deleteResidualFedosProfileData(this.#deps.paths);
+    deleteResidualFedosProfileData(this.#deps.paths, this.#deps.additionalResidualPaths ?? []);
 
     this.#descriptor = null;
     this.#recoveryReason = null;
@@ -915,7 +933,7 @@ export class FedosProfileInitializationCoordinator {
     // profile being reset here durably wrote real Device/Runtime bootstrap
     // data too; without this, Start Over would leave the root permanently
     // unable to pass the widened freshness check.
-    deleteResidualFedosProfileData(this.#deps.paths);
+    deleteResidualFedosProfileData(this.#deps.paths, this.#deps.additionalResidualPaths ?? []);
 
     this.#descriptor = null;
     this.#recoveryReason = null;
