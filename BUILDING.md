@@ -195,16 +195,36 @@ via `npm run release:beta --prefix packages/fedos-desktop-electron-spike`):
    two-pass `tsc` sequence above).
 6. Run `electron-builder` (NSIS installer + portable ZIP), via the
    existing package.json-snapshot/restore-protected wrapper script.
-7. Generate the release manifest (`release-manifest.v1.json` — records
+7. Verify the packaged runtime dependency closure against the
+   just-produced `dist-package-beta/win-unpacked` (`verify_packaged_dependency_closure.mjs`
+   — catches a dependency silently missing from the shipped `app.asar`,
+   e.g. the real, disclosed `qrcode`/`@noble/curves`/`dijkstrajs`/`pngjs`
+   omission this guard now runs against every release build, not just as
+   a standalone unit-tested CLI).
+8. Generate the release manifest (`release-manifest.v1.json` — records
    git commit, WASM artifact sha256, per-artifact sha256/size, unsigned
    status, supported schema versions).
-8. Generate release checksums (`SHA256SUMS.txt`).
-9. Verify the release checksums (re-derived independently, not merely
-   re-read from step 7/8's own output).
-10. Scan the staging inputs for prohibited content (secrets, unexpected
+9. Generate release checksums (`SHA256SUMS.txt`).
+10. Verify the release checksums (re-derived independently, not merely
+    re-read from step 8/9's own output).
+11. Generate the release-staging bundle (docs + curated copy of `release/`)
+    from the now checksum-verified `release/` output.
+12. Generate the public Beta gate report and enforce its verdict
+    (`generate_public_beta_gate.mjs` — a real hard-fail gate that now
+    actually runs as part of a release build, not merely available as a
+    standalone CLI nothing invoked).
+13. Scan the staging inputs for prohibited content (secrets, unexpected
     paths) — note: this scans staging INPUTS, not the compressed NSIS/ZIP
     containers themselves; it cannot prove total secret absence inside
     the compressed artifacts.
+14. Print the final artifact summary (product/version/channel/commit/
+    unsigned status, per-artifact filename+size+sha256, total `release/`
+    size).
+
+This 14-step list is generated straight from `build_release.mjs`'s own
+`main()` — if you're ever unsure whether this document is still current,
+that file's own numbered `step(...)` calls are the actual enforced source
+of truth, not this prose.
 
 **Precondition this script does not itself check:** `packages/fedos-core-rust/pkg/`
 must already exist (built per the section above) before running this
