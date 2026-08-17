@@ -1055,9 +1055,21 @@ export class FedosProfileInitializationCoordinator {
             }
           : undefined,
       conversationDirectMessageDeliveryRoute: this.#deps.conversationDirectMessageDeliveryRoute,
+      // Public Relay Reliability + Gift-Wrap Subscription Narrowing arc --
+      // narrows the previously kind-only filter with "#p": [own pubkey],
+      // protocol-safe (see fedos_subscription_filter.ts's own header --
+      // every Gift Wrap already carries this exact tag in plaintext, so
+      // this reveals nothing new to the relay). Deliberately NO `since`
+      // bound: this is durable MAILBOX delivery (see fedos_nip59_gift_wrap.ts's
+      // own header, "the SAME durable-delivery model FedosPrivateTransport's
+      // own existing Mailbox/Outbox already assumes") -- an offline
+      // recipient must still discover an arbitrarily-old undelivered
+      // message on first connect; bounding by wall-clock time would
+      // silently drop legitimate history, which this arc's own mandate
+      // (section 9, "no missed-event optimization") forbids.
       conversationTransportInbound:
         this.#deps.conversationTransportInboundEnabled === true
-          ? { filter: { kinds: [FEDOS_GIFT_WRAP_KIND] }, onEnvelope: () => {} }
+          ? { filter: { kinds: [FEDOS_GIFT_WRAP_KIND], "#p": [accountRef.publicIdentifier] }, onEnvelope: () => {} }
           : undefined,
       conversationTransportIntervalMs: this.#deps.conversationTransportIntervalMs,
       directRatchetMessageDeliveryRemoteDeviceRef: this.#deps.directRatchetEnabled === true ? this.#deps.directRatchetMessageDeliveryRemoteDeviceRef : undefined,

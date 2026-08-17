@@ -33,6 +33,24 @@
  *     `src/nostr/publish.ts`, `src/nostr/messages.ts`,
  *     `src/nostr/crypto.ts`, `src/nostr/signature.ts`, or
  *     `src/nostr/noble_signature.ts` anywhere in this file.
+ *
+ * Public Relay Reliability + Gift-Wrap Subscription Narrowing arc — adds
+ * exactly the ADDITIVE `"#p"` field this file's own header already
+ * anticipated ("can be added later as an ADDITIVE optional field
+ * without breaking any existing caller"). Protocol-correctness note:
+ * every NIP-59 Gift Wrap (`kind:1059`) this codebase produces or
+ * accepts already carries a plaintext `["p", "<recipient pubkey>"]` tag
+ * on the OUTER (unencrypted-metadata) event — required by
+ * `openFedosNip17GiftWrap()`'s own `hasRecipientTag` validation
+ * (`fedos_nip59_gift_wrap.ts`). Server-side `"#p"` filtering therefore
+ * reveals NOTHING to a relay that the relay could not already read by
+ * inspecting the tags of every `kind:1059` event delivered under a
+ * kind-only filter — it is the standard, ecosystem-wide way NIP-17
+ * clients subscribe for their own mailbox, not a privacy-eroding
+ * addition. `buildReqMessage()` (`./subscription_messages.ts`) already
+ * spreads whatever fields a filter object carries directly into the
+ * wire REQ with no allowlist/stripping, so this is a pure type-level
+ * addition — no transport-layer change required.
  */
 
 export interface FedosSubscriptionFilter {
@@ -42,4 +60,6 @@ export interface FedosSubscriptionFilter {
   readonly since?: number;
   readonly until?: number;
   readonly limit?: number;
+  /** NIP-01 generic tag filter, `#p` only (recipient pubkey) — see this file's own header for why this is protocol-safe to add. */
+  readonly "#p"?: readonly string[];
 }
