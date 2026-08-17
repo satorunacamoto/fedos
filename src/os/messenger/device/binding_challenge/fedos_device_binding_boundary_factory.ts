@@ -27,7 +27,10 @@ import {
   type FedosDeviceBindingChallengeNonceGenerator,
   type FedosDeviceBindingChallengeV1,
 } from "./fedos_device_binding_challenge.js";
-import { FedosDeviceBindingRegistrationAuthority } from "./fedos_device_binding_registration_authority.js";
+import {
+  FedosDeviceBindingRegistrationAuthority,
+  type FedosDeviceBindingRatchetSessionQuarantine,
+} from "./fedos_device_binding_registration_authority.js";
 import type { FedosDeviceRegistryPersistence } from "../persistence/fedos_device_registry_persistence.js";
 import type { FedosDeviceBindingChallengeReplayPersistence } from "../persistence/fedos_device_binding_challenge_replay_persistence.js";
 
@@ -50,6 +53,13 @@ export interface FedosDeviceBindingBoundaryDeps {
   /** Injected nonce authority — defaults to the reviewed CSPRNG generator if omitted. Never `Math.random()`. */
   readonly nonceGenerator?: FedosDeviceBindingChallengeNonceGenerator;
   readonly limits?: FedosDeviceBindingBoundaryLimits;
+  /**
+   * SECURITY FIX (FedOS red-team P0 closure): optional, forwarded verbatim to
+   * `FedosDeviceBindingRegistrationAuthority` — see that class's own
+   * `ratchetSessionQuarantine` constructor doc for the full contract. Omitted
+   * preserves this factory's exact prior behavior.
+   */
+  readonly ratchetSessionQuarantine?: FedosDeviceBindingRatchetSessionQuarantine;
 }
 
 export interface FedosDeviceBindingBoundary {
@@ -82,6 +92,7 @@ export function createFedosDeviceBindingBoundary(deps: FedosDeviceBindingBoundar
   const registrationAuthority = new FedosDeviceBindingRegistrationAuthority({
     registryPersistence: deps.registryPersistence,
     replayPersistence: deps.replayPersistence,
+    ratchetSessionQuarantine: deps.ratchetSessionQuarantine,
   });
 
   return Object.freeze({

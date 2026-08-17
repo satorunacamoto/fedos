@@ -124,7 +124,11 @@ describe("Secure Runtime Alpha 8041-8120 -- structural guards", () => {
 
   it("7. window.fedosApp is additive on the window.d.ts surface -- fedosProfile/fedosBeta/fedosAcceptance signatures remain untouched", () => {
     const source = stripComments(read(WINDOW_DTS_PATH));
-    expect(source).toMatch(/readonly fedosProfile: FedosProfileBridge;/);
+    // FedOS red-team P0 closure: renamed FedosProfileBridge -> FedosBetaProfileBridge
+    // (un-merged from fedos_electron_unlock_window.d.ts's identically-named,
+    // narrower interface -- see fedos_electron_beta_window.d.ts's own header).
+    // The `fedosProfile` PROPERTY name is unchanged; only the TYPE name is.
+    expect(source).toMatch(/readonly fedosProfile: FedosBetaProfileBridge;/);
     expect(source).toMatch(/readonly fedosBeta: FedosBetaBridge;/);
     // Secure Runtime Alpha 8121-8200 -- Security Finding 1: genuinely
     // optional now (absent unless acceptance mode is active), not a

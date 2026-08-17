@@ -15,6 +15,9 @@
  * `fedos_nip59_gift_wrap.ts`'s own header).
  */
 import { describe, it, expect } from "vitest";
+import { schnorr } from "@noble/curves/secp256k1.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { FedosConversationRelaySet } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_relay_set.js";
 import { FedosConversationInboundSubscription } from "../src/os/messenger/adapters/nostr/transport/relay/fedos_conversation_inbound_subscription.js";
 import type { FedosRelay } from "../src/os/messenger/desktop/fedos_relay.js";
@@ -139,16 +142,39 @@ function noiseEvent(index: number, kind: number, recipientPubkey: string): Fedos
   };
 }
 
+/**
+ * Red Team P0 closure -- `FedosConversationInboundSubscription` now runs
+ * `validateInboundNostrEvent()` (real Event ID + real BIP-340 signature
+ * verification) on EVERY inbound event, including the Gift Wrap/rumor
+ * path this file exercises, so `targetGiftWrap()` below must produce a
+ * GENUINELY signed event rather than the placeholder `id`/`sig` it used
+ * to. Signs directly with `@noble/curves` (mirroring
+ * `test/commerce_inbound_event_bridge.test.ts`'s own
+ * `signCommerceDraftAsRealNostrEvent` pattern) rather than via
+ * `RealFedosNostrSigningAuthority` (`test/support/`), since that
+ * authority's own closed kind allowlist does not include
+ * `FEDOS_GIFT_WRAP_KIND` (production Gift Wrap events are signed by a
+ * wholly separate ephemeral authority, never the Master-Seed-backed
+ * Nostr Signing Authority -- see `fedos_nostr_signing_authority.ts`'s own
+ * header). The noise/backlog fixtures below (`noiseEvent`, and the
+ * various raw literal events in the server-side-filtering-only tests)
+ * deliberately keep their placeholder `id`/`sig` -- those tests assert
+ * only on `relay.deliveredCount` (server-side filter matching, which
+ * happens BEFORE this file's own client-side validation is ever reached),
+ * never on `processedCount` (the validated, delivered-to-listener count).
+ */
+const GIFT_WRAP_TEST_SECRET = new Uint8Array(32).fill(9);
+
+function signRealNostrEvent(kind: number, tags: string[][], content: string, createdAt: number): FedosNostrWireEvent {
+  const pubkey = bytesToHex(schnorr.getPublicKey(GIFT_WRAP_TEST_SECRET));
+  const preimage = JSON.stringify([0, pubkey, createdAt, kind, tags, content]);
+  const id = bytesToHex(sha256(new TextEncoder().encode(preimage)));
+  const sig = bytesToHex(schnorr.sign(hexToBytes(id), GIFT_WRAP_TEST_SECRET));
+  return Object.freeze({ id, pubkey, created_at: createdAt, kind, tags, content, sig });
+}
+
 function targetGiftWrap(recipientPubkey: string): FedosNostrWireEvent {
-  return {
-    id: "target-event",
-    pubkey: "ephemeral-target",
-    created_at: 1_700_099_999,
-    kind: FEDOS_GIFT_WRAP_KIND,
-    tags: [["p", recipientPubkey]],
-    content: "sealed-ciphertext-placeholder",
-    sig: "sig",
-  };
+  return signRealNostrEvent(FEDOS_GIFT_WRAP_KIND, [["p", recipientPubkey]], "sealed-ciphertext-placeholder", 1_700_099_999);
 }
 
 describe("Gift-wrap subscription narrowing -- busy-relay reliability (mandate section 13)", () => {

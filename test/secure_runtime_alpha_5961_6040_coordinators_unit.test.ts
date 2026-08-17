@@ -164,12 +164,18 @@ describe("Outbound + Inbound Notification Coordinators (real Schnorr crypto, fak
     // Real new-key proof AND real old-key continuity signature, both
     // independently re-verified by the receiver from the notification's
     // own embedded evidence — non-compromise reason + default local
-    // policy reaches locally-acceptable.
-    expect(inboundResult.evidenceOutcome).toBe("locally-acceptable");
+    // policy. SECURITY FIX (FedOS red-team P0 closure): old-key-only
+    // continuity, with no independent Device corroboration, now ALWAYS
+    // caps out at "continuity-old-key-only" (never "locally-acceptable")
+    // regardless of `localPolicy.autoAcceptOldKeyContinuity` — matching
+    // this coordinator's own documented contract that it "NEVER
+    // automatically accepts a replacement" (see this file's header).
+    expect(inboundResult.evidenceOutcome).toBe("continuity-old-key-only");
+    expect(inboundResult.acceptanceState).not.toBe("accepted");
 
     const observations = env.observationPersistence.listObservations();
     expect(observations).toHaveLength(1);
-    expect(observations[0]?.evidenceOutcome).toBe("locally-acceptable");
+    expect(observations[0]?.evidenceOutcome).toBe("continuity-old-key-only");
   });
 
   it("rejects a notification with a tampered account signature", async () => {

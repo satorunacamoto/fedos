@@ -590,11 +590,30 @@ function distUrl(...segments: string[]): string {
 interface UnlockSecretLike {
   clear(): void;
 }
+/** Product Durability mega-arc — structurally mirrors `FedosProfileRecoveryNotice` (`src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.ts`), same duck-typing discipline as every other `*Like`/`*View` shape in this file (never imported, the real coordinator's return value is structurally compatible). Non-secret: file paths and fixed strings only. */
+interface ReadyViewRecoveryNotice {
+  readonly headline: string;
+  readonly backupItems: readonly {
+    readonly label: string;
+    readonly path: string;
+    readonly sensitivity: string;
+    readonly required: boolean;
+  }[];
+  readonly warnings: readonly string[];
+  readonly forgottenSecretIsUnrecoverable: true;
+  readonly conversationArchiveExportAvailable: boolean;
+  readonly wholeProfileDirectoryRecommendation: {
+    readonly path: string;
+    readonly text: string;
+  };
+}
 interface ReadyView {
   readonly displayLabel: string;
   readonly accountPublicIdentifier: string;
   readonly localDeviceId: string;
   readonly deviceTrustState: string;
+  /** Product Durability mega-arc — previously computed by the coordinator's own `#readyView()` but dropped here in `readyResult()` before it ever reached the renderer. */
+  readonly recoveryNotice: ReadyViewRecoveryNotice;
 }
 interface StatusView {
   readonly lifecycleState: string;
@@ -5296,6 +5315,10 @@ function readyResult(view: ReadyView) {
       accountPublicIdentifier: view.accountPublicIdentifier,
       localDeviceId: view.localDeviceId,
       deviceTrustState: view.deviceTrustState,
+      // Product Durability mega-arc -- previously silently dropped here;
+      // the coordinator's own `#readyView()` already computes this real,
+      // non-secret backup guidance, it just never reached the renderer.
+      recoveryNotice: view.recoveryNotice,
     },
   };
 }

@@ -16,14 +16,27 @@
  * (`../fedos_conversation_transport_event.ts`) to succeed AND its own
  * `recipientPublicKeyHex` to match the caller-supplied local pubkey.
  *
- * Relay Deduplication: every inbound event, from every relay, passes
- * through ONE shared `FedosRelayEventDeduplicator`
- * (`./fedos_relay_event_deduplicator.ts`) keyed by the Nostr event's own
- * `id` — the caller's `onEnvelope` callback fires EXACTLY ONCE per
- * genuinely-new event, no matter how many relays in the set deliver the
- * identical event (this is the concrete case Multiple Relay fan-out
- * creates: the SAME counterparty event reaching two or more relays this
- * transport is also subscribed to).
+ * Inbound Validation (Red Team P0 closure): every inbound
+ * `FedosRelayEventMessage` is passed through `validateInboundNostrEvent()`
+ * (`../../../../desktop/combined_inbound_event_validator.ts` — the SAME
+ * entry point the Signed-Deletion path already uses) BEFORE dedup and
+ * BEFORE any further processing. An event whose `id` is not the real hash
+ * of its own content, or whose `sig` does not verify under its own
+ * `pubkey`, is dropped immediately. This closes a real gap: `id` is
+ * otherwise attacker/relay-controlled and unverified, so a malicious relay
+ * could flood forged-id junk to evict the (bounded, FIFO)
+ * `FedosRelayEventDeduplicator` cache below and then re-deliver a
+ * previously-seen valid ciphertext under a fresh forged id, bypassing
+ * dedup entirely.
+ *
+ * Relay Deduplication: every inbound event that PASSES validation, from
+ * every relay, then passes through ONE shared `FedosRelayEventDeduplicator`
+ * (`./fedos_relay_event_deduplicator.ts`) keyed by the now-VERIFIED `id` —
+ * the caller's `onEnvelope` callback fires EXACTLY ONCE per genuinely-new
+ * event, no matter how many relays in the set deliver the identical event
+ * (this is the concrete case Multiple Relay fan-out creates: the SAME
+ * counterparty event reaching two or more relays this transport is also
+ * subscribed to).
  *
  * HARD GUARDRAILS:
  *   - `stop()` unsubscribes from every relay it opened a subscription
@@ -59,6 +72,7 @@ import {
   type FedosPrivateTransportParsedEvent,
 } from "../fedos_conversation_transport_event.js";
 import type { FedosPrivateWireAdapter, FedosPrivateWireParsedRumor } from "../fedos_private_wire_adapter.js";
+import { validateInboundNostrEvent } from "../../../../desktop/combined_inbound_event_validator.js";
 
 export type FedosConversationInboundEnvelopeListener = (event: FedosPrivateTransportParsedEvent) => void;
 export type FedosConversationInboundRumorListener = (rumor: FedosPrivateWireParsedRumor, relaySource: string) => void;
@@ -120,9 +134,25 @@ export class FedosConversationInboundSubscription {
       const subscription = await relay.subscribe([filter]);
       relay.onSubscriptionMessage(subscription, (message) => {
         if (message.kind !== "event") return;
-        if (!this.#deduplicator.shouldProcess(message.event.id)) return;
+        // Red Team P0 closure -- an inbound event's own `id` is
+        // attacker/relay-controlled and UNVERIFIED at this point: NIP-01
+        // never proves `id` is the real hash of the event's own content,
+        // nor that `sig` was produced by `pubkey`. Deduplicating on that
+        // unverified `id` (the previous behavior here) let a malicious
+        // relay evict `FedosRelayEventDeduplicator`'s bounded FIFO cache
+        // with forged-id junk, then re-deliver a previously-seen valid
+        // ciphertext under a fresh forged id, bypassing dedup. Validation
+        // (`validateInboundNostrEvent`, the SAME entry point the
+        // Signed-Deletion path already uses) now runs FIRST, synchronously,
+        // BEFORE dedup and BEFORE delivery -- only once `id` is proven to
+        // be the event's own real content hash AND `sig` is proven to be a
+        // real signature by `pubkey` over it does dedup-by-id become a
+        // meaningful, non-bypassable check.
+        const validated = validateInboundNostrEvent(message.event);
+        if (validated === null) return;
+        if (!this.#deduplicator.shouldProcess(validated.id)) return;
 
-        const descriptor = nostrWireEventToFedosEventDescriptor(message.event);
+        const descriptor = nostrWireEventToFedosEventDescriptor(validated);
 
         const parsed = parseFedosPrivateTransportEventDescriptor(descriptor);
         if (parsed !== null) {

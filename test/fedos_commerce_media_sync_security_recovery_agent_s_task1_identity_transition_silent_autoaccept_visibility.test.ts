@@ -275,25 +275,41 @@ async function publishAndImport(
 }
 
 describe("Task 1 -- real end-to-end: old-key continuity silent auto-accept, real crypto", () => {
-  it("an old-key-only continuity claim under the DEFAULT policy is flagged, in the inbox AND the safe view, with the new warning code", async () => {
+  it("SECURITY FIX (FedOS red-team P0 closure): an old-key-only continuity claim under the DEFAULT policy no longer silently auto-accepts -- it stays pending (manual-review-required), never flagged as silently accepted because it never reaches 'accepted' without an explicit decision", async () => {
     const bobAccount = accountRef("aa".repeat(32));
-    // No localPolicy override -- exercises FEDOS_IDENTITY_TRANSITION_DEFAULT_LOCAL_POLICY (autoAcceptOldKeyContinuity: true), unchanged by this Task.
+    // No localPolicy override -- exercises FEDOS_IDENTITY_TRANSITION_DEFAULT_LOCAL_POLICY.
+    // `autoAcceptOldKeyContinuity: true` no longer has any effect on
+    // evidence evaluation (see `fedos_identity_transition_evidence_evaluation.ts`'s
+    // own SECURITY FIX comment) -- old-key-only continuity, with no
+    // Device corroboration, now ALWAYS caps out at "continuity-old-key-only",
+    // which requires an explicit local decision before it can become
+    // "accepted". This closes the exact vulnerability this Task's
+    // detector was built to surface, so the detector correctly stays
+    // quiet here now (nothing silent is happening anymore).
     const runtime = makeBobRuntime(bobAccount);
     const { aliceAccount, transitionId } = await publishAndImport(runtime, bobAccount, "task1-n1");
 
     const status = runtime.inspectPeerIdentityTransitionStatus(aliceAccount, "alice-old-desktop", transitionId);
-    expect(status?.evidenceOutcome).toBe("locally-acceptable");
-    expect(status?.acceptanceState).toBe("accepted");
-    // Never asked -- no explicit decision was ever recorded.
-    expect(status?.silentlyAutoAcceptedWithoutAsking).toBe(true);
+    expect(status?.evidenceOutcome).toBe("continuity-old-key-only");
+    expect(status?.acceptanceState).not.toBe("accepted");
+    expect(status?.acceptanceState).toBe("manual-review-required");
+    // Never asked -- no explicit decision was ever recorded, and evidence
+    // alone no longer reaches "accepted" either.
+    expect(status?.silentlyAutoAcceptedWithoutAsking).toBe(false);
 
     const safeView = runtime.getIdentityTransitionSafeView(aliceAccount, "alice-old-desktop", transitionId);
-    expect(safeView?.silentlyAutoAcceptedWithoutAsking).toBe(true);
-    expect(safeView?.warnings).toContain("identity-replacement-auto-accepted-without-asking");
+    expect(safeView?.silentlyAutoAcceptedWithoutAsking).toBe(false);
+    expect(safeView?.warnings).not.toContain("identity-replacement-auto-accepted-without-asking");
 
     const inbox = runtime.listIdentityTransitionInbox(10, 0);
     const row = inbox.find((r) => r.transitionId === transitionId);
-    expect(row?.silentlyAutoAcceptedWithoutAsking).toBe(true);
+    expect(row?.silentlyAutoAcceptedWithoutAsking).toBe(false);
+
+    // The positive path still works: an explicit local decision to accept
+    // must still succeed.
+    const afterAccept = runtime.recordIdentityTransitionDecision(aliceAccount, "alice-old-desktop", transitionId, "accept");
+    expect(afterAccept?.acceptanceState).toBe("accepted");
+    expect(afterAccept?.silentlyAutoAcceptedWithoutAsking).toBe(false);
   });
 
   it("NO false warning: the SAME old-key-only claim under the conservative policy (autoAcceptOldKeyContinuity: false), explicitly reviewed and accepted by the user, is never flagged", async () => {

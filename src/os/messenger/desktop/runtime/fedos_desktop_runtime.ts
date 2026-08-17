@@ -1622,6 +1622,17 @@ export async function startFedosDesktopRuntime(
       replayPersistence: deviceBindingReplayPersistence,
       limits: config.deviceBindingChallengeTtlSeconds !== undefined ? { challengeTtlSeconds: config.deviceBindingChallengeTtlSeconds } : undefined,
       now: config.clock,
+      // SECURITY FIX (FedOS red-team P0 closure): a device revocation must
+      // quarantine any already-established Direct Ratchet session bound to
+      // that device. `conversationRuntimeInstance` (constructed above) is the
+      // SAME instance every other production caller uses; `directRatchet()`
+      // returns `null` when the Ratchet integration wasn't assembled, which
+      // this adapter treats as "nothing to quarantine" rather than an error.
+      ratchetSessionQuarantine: {
+        applyDeviceRevocationToSessions(deviceId: string): readonly string[] {
+          return conversationRuntimeInstance.directRatchet()?.applyDeviceRevocationToSessions(deviceId) ?? [];
+        },
+      },
     });
     deviceTrustRuntimeInstance = new FedosDeviceTrustRuntime({
       localDeviceId: config.localDeviceId!,

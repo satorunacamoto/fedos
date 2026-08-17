@@ -118,6 +118,25 @@ function setBusy(busy: boolean, ...buttonIds: string[]): void {
 }
 
 // ---------------------------------------------------------------------
+// SECURITY FIX (FedOS red-team P0 closure): `window.fedosProfile` is
+// declared as a global `Window` augmentation in BOTH this window's own
+// `fedos_electron_beta_window.d.ts` (real shape here) AND the separate,
+// legacy `fedos_electron_unlock_window.d.ts` (an older shape lacking
+// `recoveryNotice`/`resetInterrupted`/`resetCorruptReady`) — both pulled
+// into the SAME `tsconfig.browser-scripts.json` program even though the
+// two windows never share a real runtime `window` object. TypeScript's
+// cross-file global merge for this one property silently resolves to
+// whichever declaration wins (empirically the older, narrower one, since
+// `skipLibCheck` skips checking `.d.ts` files against each other), so a
+// bare `window.fedosProfile` reference in THIS file cannot be trusted to
+// carry this window's own real, richer shape. This one explicit,
+// narrowly-scoped assertion (never `any`) is the fix — every other
+// reference in this file goes through it instead of `window.fedosProfile`
+// directly.
+// ---------------------------------------------------------------------
+const fedosProfile = window.fedosProfile as unknown as FedosBetaProfileBridge;
+
+// ---------------------------------------------------------------------
 // Phase N — the ONE UI translation layer for every closed backend result
 // code this renderer ever receives. Never a stack trace or raw exception
 // string; every branch here is a safe, non-secret, user-facing sentence.
@@ -1442,6 +1461,33 @@ function onChatSecurityIndicatorClick(): void {
   button.setAttribute("aria-expanded", nowHidden ? "false" : "true");
 }
 
+/**
+ * FedOS Message Delivery Truth arc (renderer boundary closure) --
+ * `FedosContentAccessorDeliveryFact.state` (see
+ * `src/os/messenger/desktop/content_accessor/fedos_desktop_conversation_content_accessor_result.ts`'s
+ * own header): `"queued"` is the BEST outcome this architecture can ever
+ * synchronously prove -- never a relay ACK, never "the recipient received
+ * it" -- so it is deliberately never rendered as "Sent." here either, to
+ * avoid re-introducing the exact over-claim this arc exists to remove.
+ * `route`/`reason` carried on the fact are Direct-only and absent for a
+ * Group send (`fanout` covers that axis instead).
+ */
+type ChatSendDeliveryFact = { readonly route: string; readonly state: string; readonly reason?: string };
+
+/** Closed-vocabulary delivery state -> a specific, honest sentence. Never "Sent." for anything less than a real transport hand-off, and never claims delivery for a state this architecture cannot prove. */
+const CHAT_SEND_DELIVERY_STATE_TEXT: Record<string, string> = {
+  queued: "Queued for delivery…",
+  "route-unavailable": "Saved on this device — not sent yet (no delivery route available).",
+  unavailable: "Saved on this device — not sent yet (delivery unavailable).",
+  failed: "Saved on this device — delivery failed.",
+};
+
+/** `undefined` means no delivery dependency was configured for this send at all (e.g. a Group send, which reports its own outcome via `fanout` instead) -- an honest "saved, delivery unknown", never coerced into `"queued"` or "Sent." */
+function chatSendFeedbackText(delivery: ChatSendDeliveryFact | undefined): string {
+  if (delivery === undefined) return "Saved on this device.";
+  return CHAT_SEND_DELIVERY_STATE_TEXT[delivery.state] ?? "Saved on this device.";
+}
+
 async function onChatSend(): Promise<void> {
   if (currentConversationId === null) return;
   const body = byId<HTMLTextAreaElement>("chat-compose").value;
@@ -1459,7 +1505,12 @@ async function onChatSend(): Promise<void> {
       return;
     }
     byId<HTMLTextAreaElement>("chat-compose").value = "";
-    byId("chat-send-feedback").textContent = "Sent.";
+    const value = result.value as { readonly delivery?: ChatSendDeliveryFact } | undefined;
+    const delivery = value?.delivery;
+    byId("chat-send-feedback").textContent = chatSendFeedbackText(delivery);
+    if (delivery !== undefined && delivery.state !== "queued") {
+      byId("chat-error").textContent = delivery.reason ?? describeOutcome(delivery.state);
+    }
     await loadChatMessages();
   } finally {
     setBusy(false, "chat-send");
@@ -1988,7 +2039,7 @@ async function renderCommerceMerchantReputation(): Promise<void> {
 // way to exercise a two-role tabletop in one process), but it is no
 // longer the ONLY identity source. `commerceActingAsOptions()` ADDITIVELY
 // appends the REAL local Persona (`localAccountPublicIdentifier` /
-// `localDisplayLabel`, the same identity `window.fedosProfile.status()`
+// `localDisplayLabel`, the same identity `fedosProfile.status()`
 // already established elsewhere in this file) as a distinct, clearly
 // non-demo "My Store" option whenever a profile is unlocked — this is
 // the real production merchant identity the brief asks for, structurally
@@ -4795,12 +4846,41 @@ async function onSettingsSave(): Promise<void> {
 // Ready screen routing.
 // ---------------------------------------------------------------------
 
-function renderReady(ready: FedosProfileCommandResult["ready"]): void {
+/**
+ * Product Durability mega-arc -- renders the real, non-secret backup
+ * guidance `buildFedosProfileRecoveryNotice()` already computes
+ * (`src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.ts`).
+ * Previously computed end to end and then silently dropped at the
+ * `readyResult()` IPC boundary; this is the renderer half of forwarding it.
+ * Only file paths and fixed strings -- never a secret, matching that
+ * file's own hard guardrails.
+ */
+function renderReadyRecoveryNotice(notice: FedosProfileRecoveryNoticeView): void {
+  const headline = byId("ready-recovery-headline");
+  headline.textContent = notice.headline;
+  headline.hidden = false;
+
+  const items = byId("ready-recovery-backup-items");
+  items.textContent = "";
+  for (const item of notice.backupItems) {
+    const li = document.createElement("li");
+    li.textContent = `${item.label}: ${item.path}`;
+    items.appendChild(li);
+  }
+  items.hidden = notice.backupItems.length === 0;
+
+  const wholeDir = byId("ready-recovery-whole-dir");
+  wholeDir.textContent = `${notice.wholeProfileDirectoryRecommendation.text} (${notice.wholeProfileDirectoryRecommendation.path})`;
+  wholeDir.hidden = false;
+}
+
+function renderReady(ready: FedosBetaProfileCommandResult["ready"]): void {
   if (ready === undefined) return;
   byId("ready-label").textContent = ready.displayLabel;
   byId("ready-account").textContent = ready.accountPublicIdentifier;
   byId("ready-device").textContent = ready.localDeviceId;
   byId("ready-trust").textContent = ready.deviceTrustState;
+  renderReadyRecoveryNotice(ready.recoveryNotice);
   localAccountPublicIdentifier = ready.accountPublicIdentifier;
   localDisplayLabel = ready.displayLabel;
   refreshCommerceActorOptionsForRealIdentity();
@@ -4830,7 +4910,7 @@ function renderReady(ready: FedosProfileCommandResult["ready"]): void {
   void refreshCommerceNetworkProfileCache();
 }
 
-function routeByStatus(status: FedosProfileStatusResult): void {
+function routeByStatus(status: FedosBetaProfileStatusResult): void {
   if (status.presence === "ready") {
     byId("ready-label").textContent = status.displayLabel ?? "";
     byId("ready-account").textContent = status.accountPublicIdentifier ?? "";
@@ -4873,7 +4953,7 @@ function routeByStatus(status: FedosProfileStatusResult): void {
 }
 
 async function refreshFromStatus(): Promise<void> {
-  const status = await window.fedosProfile.status();
+  const status = await fedosProfile.status();
   routeByStatus(status);
 }
 
@@ -4906,9 +4986,9 @@ async function onCreateSubmit(): Promise<void> {
 
   setBusy(true, "create-submit");
   showScreen("initializing");
-  let result: FedosProfileCommandResult;
+  let result: FedosBetaProfileCommandResult;
   try {
-    result = await window.fedosProfile.create(label, pass);
+    result = await fedosProfile.create(label, pass);
   } finally {
     clearField("create-pass");
     clearField("create-pass-confirm");
@@ -4943,9 +5023,9 @@ async function onUnlockSubmit(): Promise<void> {
 
   setBusy(true, "unlock-submit");
   showScreen("initializing");
-  let result: FedosProfileCommandResult;
+  let result: FedosBetaProfileCommandResult;
   try {
-    result = await window.fedosProfile.unlock(pass);
+    result = await fedosProfile.unlock(pass);
   } finally {
     clearField("unlock-pass");
     resetPasswordVisibility("unlock-pass-show-hide", "unlock-pass");
@@ -4971,11 +5051,11 @@ async function onUnlockSubmit(): Promise<void> {
   }
 }
 
-function coarseErrorCode(result: FedosProfileCommandResult): string {
+function coarseErrorCode(result: FedosBetaProfileCommandResult): string {
   return result.outcome;
 }
 
-function coarseError(result: FedosProfileCommandResult): string {
+function coarseError(result: FedosBetaProfileCommandResult): string {
   switch (result.outcome) {
     case "already-exists":
       return "A profile already exists on this device.";
@@ -5046,7 +5126,7 @@ async function onRecoveryCopyDiagnostic(): Promise<void> {
  * this renderer.
  */
 async function onRecoveryStartOver(): Promise<void> {
-  const resetInterrupted = window.fedosProfile.resetInterrupted;
+  const resetInterrupted = fedosProfile.resetInterrupted;
   if (resetInterrupted === undefined) {
     byId("recovery-start-over-feedback").textContent = "Start Over is not available in this build.";
     return;
@@ -5059,7 +5139,7 @@ async function onRecoveryStartOver(): Promise<void> {
   if (!confirmed) return;
   byId("recovery-start-over-feedback").textContent = "";
   setBusy(true, "recovery-start-over-btn");
-  let result: FedosProfileCommandResult;
+  let result: FedosBetaProfileCommandResult;
   try {
     result = await resetInterrupted();
   } finally {
@@ -5086,7 +5166,7 @@ async function onRecoveryStartOver(): Promise<void> {
  * read, same discipline as `onRecoveryStartOver()`.
  */
 async function onRecoveryStartOverCorrupt(): Promise<void> {
-  const resetCorruptReady = window.fedosProfile.resetCorruptReady;
+  const resetCorruptReady = fedosProfile.resetCorruptReady;
   if (resetCorruptReady === undefined) {
     byId("recovery-start-over-corrupt-feedback").textContent = "Start Over is not available in this build.";
     return;
@@ -5099,7 +5179,7 @@ async function onRecoveryStartOverCorrupt(): Promise<void> {
   if (!confirmed) return;
   byId("recovery-start-over-corrupt-feedback").textContent = "";
   setBusy(true, "recovery-start-over-corrupt-btn");
-  let result: FedosProfileCommandResult;
+  let result: FedosBetaProfileCommandResult;
   try {
     result = await resetCorruptReady();
   } finally {
@@ -5257,7 +5337,7 @@ async function onLock(): Promise<void> {
   stopRelayStatusPolling();
   setBusy(true, "lock-btn");
   try {
-    await window.fedosProfile.lock();
+    await fedosProfile.lock();
   } finally {
     setBusy(false, "lock-btn");
   }
@@ -5311,10 +5391,10 @@ byId<HTMLButtonElement>("lock-btn").addEventListener("click", () => {
   void onLock();
 });
 byId<HTMLButtonElement>("quit-btn").addEventListener("click", () => {
-  void window.fedosProfile.quit();
+  void fedosProfile.quit();
 });
 byId<HTMLButtonElement>("quit-btn-recovery").addEventListener("click", () => {
-  void window.fedosProfile.quit();
+  void fedosProfile.quit();
 });
 byId<HTMLButtonElement>("recovery-retry-btn").addEventListener("click", () => {
   void onRecoveryRetry();

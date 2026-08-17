@@ -196,9 +196,13 @@ describe("Phase O — real vertical slice (real Schnorr crypto throughout; estab
       expect(imported.outcome).toBe("recorded");
       if (imported.outcome !== "recorded") throw new Error("unreachable");
 
-      // 12: evaluated as locally-acceptable given real, valid evidence and a non-compromise reason.
-      expect(imported.evidenceOutcome).toBe("locally-acceptable");
-      expect(imported.acceptanceState).toBe("accepted");
+      // 12: SECURITY FIX (FedOS red-team P0 closure) -- old-key-only
+      // continuity, with no independent Device corroboration, ALWAYS caps
+      // out at "continuity-old-key-only" (never "locally-acceptable"),
+      // and must NOT silently reach acceptanceState "accepted" -- an
+      // explicit local decision (step 14 below) is required.
+      expect(imported.evidenceOutcome).toBe("continuity-old-key-only");
+      expect(imported.acceptanceState).not.toBe("accepted");
 
       // 13: no local identity/profile/contact is changed automatically — this
       // suite never imports or touches `fedos_profile_initialization_coordinator.ts`
@@ -212,7 +216,7 @@ describe("Phase O — real vertical slice (real Schnorr crypto throughout; estab
       const restartedObservationPersistence = new AppendOnlyFedosIdentityTransitionPeerObservationPersistence(filePath);
       const restartedObservations = restartedObservationPersistence.listObservations();
       expect(restartedObservations).toHaveLength(1);
-      expect(restartedObservations[0]?.evidenceOutcome).toBe("locally-acceptable");
+      expect(restartedObservations[0]?.evidenceOutcome).toBe("continuity-old-key-only");
 
       // 27: no secret appears in the durable file.
       const raw = readFileSync(filePath, "utf8") as string;
@@ -221,7 +225,7 @@ describe("Phase O — real vertical slice (real Schnorr crypto throughout; estab
       expect(raw).not.toContain("secretKey");
       expect(raw).not.toContain("privateKey");
 
-      // 14: Bob explicitly accepts (already "accepted" by default policy here — recordLocalDecision-equivalent is idempotent).
+      // 14: Bob explicitly accepts -- this is the ONLY way "continuity-old-key-only" evidence can become "accepted" (recordLocalDecision-equivalent).
       const acceptanceState = computeFedosIdentityTransitionAcceptanceState(restartedObservations[0]!.evidenceOutcome, "accept");
       expect(acceptanceState).toBe("accepted");
 

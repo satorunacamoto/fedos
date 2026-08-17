@@ -14,12 +14,25 @@
  * Two hard invariants this file enforces (Absolute Prohibitions), both
  * covered by the real vertical slice and failure matrix:
  *   1. "Do not auto-accept transitions merely because all signatures
- *      parse" — `"locally-acceptable"` is returned ONLY when local policy
- *      explicitly allows it (non-compromise + old-key-only, gated by
- *      `localPolicy.autoAcceptOldKeyContinuity`) or when a manual
- *      out-of-band verification fact is already recorded true. A
- *      cryptographically-valid proof alone, under a compromise reason,
- *      NEVER reaches `"locally-acceptable"`.
+ *      parse" — `"locally-acceptable"` is returned ONLY when INDEPENDENT
+ *      corroboration exists: a cryptographically-valid Device corroboration
+ *      proof, or an already-confirmed manual (human, out-of-band)
+ *      verification fact. A bare old-key continuity signature, with no
+ *      Device corroboration, is NEVER by itself sufficient to reach
+ *      `"locally-acceptable"` — it always caps out at
+ *      `"continuity-old-key-only"`, which requires an EXPLICIT local
+ *      decision (see `fedos_identity_transition_acceptance_state.ts`,
+ *      Phase N) before it can become `acceptanceState: "accepted"`.
+ *      (SECURITY FIX, FedOS red-team P0 closure: this used to be gated by
+ *      `localPolicy.autoAcceptOldKeyContinuity`, which — at its documented
+ *      default of `true` — let a peer's identity-replacement claim, signed
+ *      with nothing but their OLD key, reach `"accepted"` with ZERO human
+ *      interaction. That policy flag is retained on
+ *      `FedosIdentityTransitionLocalPolicy` only for config-shape
+ *      compatibility; it no longer has any effect on this function's
+ *      outcome.) A cryptographically-valid proof alone, under a compromise
+ *      reason, NEVER reaches `"locally-acceptable"` either (see invariant
+ *      2).
  *   2. "A compromise-confirmed reason must not treat the old signature as
  *      sufficient" — under `key-compromise-suspected`/`-confirmed`, old-key
  *      continuity evidence alone caps out at `"manual-verification-required"`;
@@ -72,7 +85,19 @@ export const FEDOS_IDENTITY_TRANSITION_KNOWN_EVIDENCE_OUTCOMES: readonly FedosId
 export type FedosIdentityTransitionHistoryOutcome = "none" | "rollback-detected" | "conflicting" | "superseded" | "stale";
 
 export interface FedosIdentityTransitionLocalPolicy {
-  /** Whether a non-compromise-reason old-key-only continuity signature is, by itself, treated as `"locally-acceptable"` (the review's own "old-identity-signed" baseline). `false` is the more conservative choice and still leaves the evidence recorded as `"continuity-old-key-only"`. */
+  /**
+   * FORMERLY: whether a non-compromise-reason old-key-only continuity
+   * signature is, by itself, treated as `"locally-acceptable"` (the
+   * review's own "old-identity-signed" baseline) — `true` reached
+   * `acceptanceState: "accepted"` with ZERO explicit human decision.
+   * SECURITY FIX (FedOS red-team P0 closure): old-key-only continuity
+   * evidence now ALWAYS caps out at `"continuity-old-key-only"` regardless
+   * of this flag's value; an explicit local decision is required before it
+   * can become `"accepted"`. Retained on this type only for config-shape
+   * compatibility with existing callers/persisted settings — it no longer
+   * has any effect on `evaluateFedosIdentityTransitionEvidence()`'s
+   * outcome.
+   */
   readonly autoAcceptOldKeyContinuity: boolean;
 }
 
@@ -134,7 +159,18 @@ export function evaluateFedosIdentityTransitionEvidence(
       return deviceCorroborated ? "device-corroborated" : "manual-verification-required";
     }
     if (deviceCorroborated) return "locally-acceptable";
-    return input.localPolicy.autoAcceptOldKeyContinuity ? "locally-acceptable" : "continuity-old-key-only";
+    // SECURITY FIX (FedOS red-team P0 closure): old-key-only continuity
+    // evidence, with no independent Device corroboration, must never by
+    // itself reach "locally-acceptable" -- that used to flip
+    // acceptanceState to "accepted" with ZERO explicit human decision
+    // whenever `localPolicy.autoAcceptOldKeyContinuity` was true (this
+    // repo's documented default). It now ALWAYS caps out at
+    // "continuity-old-key-only", which requires an explicit local decision
+    // (Phase N, `computeFedosIdentityTransitionAcceptanceState`) before it
+    // can become "accepted". `localPolicy.autoAcceptOldKeyContinuity` is
+    // retained on the type for compatibility but no longer has any effect
+    // here -- see this file's own header and the field's own doc comment.
+    return "continuity-old-key-only";
   }
 
   // No valid old-key continuity signature at all (e.g. reasonCategory is

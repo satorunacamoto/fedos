@@ -3,11 +3,25 @@
  * declaration only). Describes the TWO values `fedos_electron_beta_preload.cts`
  * exposes via `contextBridge.exposeInMainWorld`.
  *
- * `FedosProfileBridge` mirrors `fedos_electron_unlock_window.d.ts` exactly
- * (Phase P reuse — same shape, same channels underneath).
+ * SECURITY FIX (FedOS red-team P0 closure): `FedosBetaProfileBridge` (and
+ * the `FedosBetaProfileCommandResult` it returns) used to be named
+ * identically to `fedos_electron_unlock_window.d.ts`'s own interfaces and
+ * relied on TypeScript global declaration merging for reuse ("same shape,
+ * same channels underneath" — both files are pulled into the SAME program
+ * by `tsconfig.browser-scripts.json`). That stopped being true the moment
+ * this file's `ready` shape grew a `recoveryNotice` field the unlock
+ * window's identical-shape copy doesn't have — the merge silently
+ * resolved to the WRONG (narrower) type for `window.fedosProfile`'s real
+ * runtime shape here, and the real build (`tsconfig.json`/
+ * `tsconfig.browser-scripts.json`, not `typecheck:electron`'s
+ * `tsconfig.test.json`, which excludes this renderer file entirely) is
+ * the only thing that caught it. `fedosProfile` the PROPERTY NAME is
+ * still shared (both preload scripts really do expose a bridge under
+ * that exact name) — only the TYPE names are now beta-specific so the
+ * two files' declarations no longer merge.
  */
 
-interface FedosProfileStatusResult {
+interface FedosBetaProfileStatusResult {
   readonly presence: string;
   readonly lifecycleState: string;
   readonly displayLabel: string | null;
@@ -28,7 +42,35 @@ interface FedosProfileStatusResult {
   readonly recoveryReason: string | null;
 }
 
-interface FedosProfileCommandResult {
+/** Product Durability mega-arc — mirrors `FedosProfileBackupItem` (`src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.ts`). `path` is always a non-secret local file path, never a secret byte. */
+interface FedosProfileRecoveryNoticeBackupItemView {
+  readonly label: string;
+  readonly path: string;
+  readonly sensitivity: string;
+  readonly required: boolean;
+}
+
+/**
+ * Product Durability mega-arc — mirrors `FedosProfileRecoveryNotice`
+ * (`src/os/messenger/desktop/onboarding/fedos_profile_recovery_notice.ts`)
+ * at the IPC boundary. Previously computed by the coordinator's own
+ * `#readyView()` but silently dropped in `readyResult()` before it ever
+ * reached this bridge — every field here is non-secret (file paths and
+ * fixed strings only, per that file's own hard guardrails).
+ */
+interface FedosProfileRecoveryNoticeView {
+  readonly headline: string;
+  readonly backupItems: readonly FedosProfileRecoveryNoticeBackupItemView[];
+  readonly warnings: readonly string[];
+  readonly forgottenSecretIsUnrecoverable: true;
+  readonly conversationArchiveExportAvailable: boolean;
+  readonly wholeProfileDirectoryRecommendation: {
+    readonly path: string;
+    readonly text: string;
+  };
+}
+
+interface FedosBetaProfileCommandResult {
   readonly outcome: string;
   readonly reason?: string;
   readonly ready?: {
@@ -36,14 +78,15 @@ interface FedosProfileCommandResult {
     readonly accountPublicIdentifier: string;
     readonly localDeviceId: string;
     readonly deviceTrustState: string;
+    readonly recoveryNotice: FedosProfileRecoveryNoticeView;
   };
 }
 
-interface FedosProfileBridge {
-  readonly status: () => Promise<FedosProfileStatusResult>;
-  readonly create: (label: string, passphrase: string) => Promise<FedosProfileCommandResult>;
-  readonly unlock: (passphrase: string) => Promise<FedosProfileCommandResult>;
-  readonly lock: () => Promise<FedosProfileCommandResult>;
+interface FedosBetaProfileBridge {
+  readonly status: () => Promise<FedosBetaProfileStatusResult>;
+  readonly create: (label: string, passphrase: string) => Promise<FedosBetaProfileCommandResult>;
+  readonly unlock: (passphrase: string) => Promise<FedosBetaProfileCommandResult>;
+  readonly lock: () => Promise<FedosBetaProfileCommandResult>;
   readonly quit: () => Promise<{ readonly ok: boolean }>;
   /**
    * FedOS Peer Device Discovery Arc P0 Closure (Agent F) — "Start Over" on
@@ -53,17 +96,15 @@ interface FedosProfileBridge {
    * (`{outcome:"reset-refused",...}` otherwise). See that method's own
    * header, root `src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.ts`.
    *
-   * OPTIONAL on this shared global `FedosProfileBridge` interface (this
-   * file's own header notes the interface is declaration-merged with
-   * `fedos_electron_unlock_window.d.ts`'s identical-shape interface, both
-   * pulled into the same TS program by `tsconfig.browser-scripts.json`) —
-   * `fedos_electron_beta_preload.cts` always provides it;
+   * OPTIONAL on `FedosBetaProfileBridge` (no longer declaration-merged with
+   * `fedos_electron_unlock_window.d.ts`'s own interface — see this file's
+   * header) — `fedos_electron_beta_preload.cts` always provides it;
    * `fedos_electron_unlock_preload.cts` (a separate, older entry point,
    * out of this Arc's scope) does not, so this stays optional rather than
    * forcing an unrelated package to grow a matching handler it has no
    * recovery-screen caller for.
    */
-  readonly resetInterrupted?: () => Promise<FedosProfileCommandResult>;
+  readonly resetInterrupted?: () => Promise<FedosBetaProfileCommandResult>;
   /**
    * FedOS Installed Startup Root-Cause Arc — the SIBLING "Start Over" on
    * the recovery screen, for the OPPOSITE shape from `resetInterrupted`
@@ -78,12 +119,12 @@ interface FedosProfileBridge {
    * `src/os/messenger/desktop/onboarding/fedos_profile_initialization_coordinator.ts`.
    * OPTIONAL for the same reason `resetInterrupted` is above.
    */
-  readonly resetCorruptReady?: () => Promise<FedosProfileCommandResult>;
+  readonly resetCorruptReady?: () => Promise<FedosBetaProfileCommandResult>;
 }
 
 /** The Phase H Beta Home status surface — real, non-secret facts only (see `fedos_desktop_beta_*` value objects, `src/desktop/beta/`). */
 interface FedosBetaStatusResult {
-  readonly profile: FedosProfileStatusResult;
+  readonly profile: FedosBetaProfileStatusResult;
   readonly settingsEffectiveState: unknown;
   readonly capabilities: unknown;
   readonly release: unknown;
@@ -684,7 +725,7 @@ interface FedosAppBridge {
 }
 
 interface Window {
-  readonly fedosProfile: FedosProfileBridge;
+  readonly fedosProfile: FedosBetaProfileBridge;
   readonly fedosBeta: FedosBetaBridge;
   /** Secure Runtime Alpha 8121-8200 — genuinely optional now: only defined when explicit acceptance mode is active (Security Finding 1, `6873d24f`). Absent (not merely unused) in an ordinary packaged production launch. */
   readonly fedosAcceptance?: FedosAcceptanceBridge;

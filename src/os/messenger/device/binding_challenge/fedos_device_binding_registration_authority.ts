@@ -32,7 +32,13 @@
  * action/domain-content, and can never reinstate a Device: `revokeDevice()`
  * only ever calls `PersistedFedosDeviceTrustAuthority.revokeDevice()`,
  * whose own transition table (`../fedos_device_binding.ts`) has no
- * outgoing edge from `"revoked"`.
+ * outgoing edge from `"revoked"`. SECURITY FIX (FedOS red-team P0
+ * closure): on a FRESH revocation, `revokeDevice()` now also calls the
+ * optional `ratchetSessionQuarantine` dependency (see the constructor's
+ * own doc comment) — this is the single choke point every production
+ * revocation path in this codebase shares, so wiring the quarantine call
+ * here (rather than in any one individual caller) closes the gap for all
+ * of them at once.
  *
  * Replay (Phase F): every accepted or denied outcome is recorded, keyed by
  * the challenge's own `nonce`, via the injected
@@ -135,19 +141,59 @@ function contentFieldsMatch(
   );
 }
 
+/**
+ * SECURITY FIX (FedOS red-team P0 closure): duck-typed, minimal seam for
+ * quarantining already-established Ratchet sessions bound to a just-
+ * revoked Device. Mirrors
+ * `FedosDirectRatchetConversationRuntime.applyDeviceRevocationToSessions()`'s
+ * own signature exactly (`../../conversations/ratchet/fedos_direct_ratchet_conversation_runtime.ts`)
+ * but is intentionally NOT imported from that module here — this
+ * "device"-domain file stays structurally decoupled from the
+ * "conversations"/Ratchet domain (matching that Runtime's own documented
+ * "no cross-subsystem event bus links Device Trust and the Ratchet
+ * Runtime" boundary); a caller that owns both simply passes a real
+ * `FedosDirectRatchetConversationRuntime` instance in, which already
+ * satisfies this shape.
+ */
+export interface FedosDeviceBindingRatchetSessionQuarantine {
+  applyDeviceRevocationToSessions(deviceId: string): readonly string[];
+}
+
 export class FedosDeviceBindingRegistrationAuthority {
   readonly #trustAuthority: PersistedFedosDeviceTrustAuthority;
   readonly #replayPersistence: FedosDeviceBindingChallengeReplayPersistence;
+  readonly #ratchetSessionQuarantine: FedosDeviceBindingRatchetSessionQuarantine | null;
 
   constructor(deps: {
     registryPersistence: FedosDeviceRegistryPersistence;
     replayPersistence: FedosDeviceBindingChallengeReplayPersistence;
+    /**
+     * SECURITY FIX (FedOS red-team P0 closure): optional -- `undefined`
+     * preserves this class's exact prior behavior for every existing
+     * caller/test (no cross-subsystem coupling forced on anyone who does
+     * not need it). When supplied, `revokeDevice()` calls
+     * `applyDeviceRevocationToSessions(deviceId)` on it immediately after
+     * a device is FRESHLY revoked (never on an idempotent
+     * `"already-revoked"` replay), closing the gap where
+     * `FedosDirectRatchetConversationRuntime.applyDeviceRevocationToSessions()`
+     * existed, was unit-tested, but had ZERO production callers -- this is
+     * the single choke point EVERY production revocation path in this
+     * codebase already funnels through (`FedosDeviceSyncRuntime.revokeDevice()`,
+     * `FedosDeviceReplacementCoordinator`, and
+     * `FedosDevicePairingFacade.revokeDevice()` all call this class's own
+     * `revokeDevice()` -- see this file's own header, "the ONE orchestrator").
+     * Never destroys historical decryptability -- only quarantines
+     * (blocks further use of) sessions tied to the revoked device, per
+     * `applyDeviceRevocationToSessions()`'s own contract.
+     */
+    ratchetSessionQuarantine?: FedosDeviceBindingRatchetSessionQuarantine;
   }) {
     this.#trustAuthority = new PersistedFedosDeviceTrustAuthority({
       persistence: deps.registryPersistence,
       registrationAuthority: new AlreadyVerifiedFedosDeviceRegistrationAuthority(),
     });
     this.#replayPersistence = deps.replayPersistence;
+    this.#ratchetSessionQuarantine = deps.ratchetSessionQuarantine ?? null;
   }
 
   /**
@@ -352,6 +398,12 @@ export class FedosDeviceBindingRegistrationAuthority {
     if (revocation.outcome !== "revoked") {
       return { outcome: "failed", binding: revocation.binding };
     }
+    // SECURITY FIX (FedOS red-team P0 closure): quarantine any already-
+    // established Ratchet sessions bound to this Device -- only on a
+    // FRESH revocation (never on the "already-revoked" idempotent-replay
+    // path above, which returns before reaching here). Best-effort/no-op
+    // when no `ratchetSessionQuarantine` was configured (see constructor).
+    this.#ratchetSessionQuarantine?.applyDeviceRevocationToSessions(challenge.deviceId);
     return { outcome: "revoked", binding: revocation.binding };
   }
 }
