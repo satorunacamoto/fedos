@@ -93,18 +93,18 @@ describe("FedOS Red Team Reconciliation P0/P1 Closure -- structural guards", () 
       expect(body).toMatch(/readonly recoveryNotice: ReadyViewRecoveryNotice;/);
     });
 
-    it("the renderer-facing FedosProfileCommandResult['ready'] type declares recoveryNotice", () => {
+    it("the renderer-facing FedosBetaProfileCommandResult['ready'] type declares recoveryNotice", () => {
       const source = read(WINDOW_DTS_PATH);
-      const start = source.indexOf("interface FedosProfileCommandResult {");
+      const start = source.indexOf("interface FedosBetaProfileCommandResult {");
       expect(start).toBeGreaterThanOrEqual(0);
       expect(source.slice(start, start + 600)).toMatch(/readonly recoveryNotice: FedosProfileRecoveryNoticeView;/);
     });
 
     it("renderReady() actually renders the notice (not merely typed and forwarded, but consumed)", () => {
       const source = read(RENDERER_PATH);
-      const start = source.indexOf("function renderReady(ready: FedosProfileCommandResult");
+      const start = source.indexOf("function renderReady(ready: FedosBetaProfileCommandResult");
       expect(start).toBeGreaterThanOrEqual(0);
-      const body = source.slice(start, start + 400);
+      const body = source.slice(start, start + 500);
       expect(body).toMatch(/renderReadyRecoveryNotice\(ready\.recoveryNotice\)/);
     });
 
