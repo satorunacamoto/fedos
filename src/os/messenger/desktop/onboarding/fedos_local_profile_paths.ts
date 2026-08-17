@@ -34,7 +34,7 @@
  */
 
 import { join, isAbsolute } from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, existsSync, unlinkSync } from "node:fs";
 
 /** Every named durable leaf a profile owns. Non-secret path strings only. */
 export interface FedosLocalProfilePaths {
@@ -252,4 +252,76 @@ export function fedosLocalProfilePathsIsolated(a: FedosLocalProfilePaths, b: Fed
     if (aValues.has(value)) return false;
   }
   return true;
+}
+
+/**
+ * Every durable leaf FILE `detectProfileState()`'s own narrow 2-file check
+ * does NOT inspect (excludes `root`, the two identity files it already
+ * checks, and the two bare directories `ensureDirectories()` creates for
+ * every profile — an empty directory existing is not itself residual
+ * data). Disaster Recovery Product Closure arc, Track 3: the authoritative
+ * list backing the widened "is this location TRULY safe to create/restore
+ * a new identity into" guard — added after a CONFIRMED, live-reproduced
+ * identity-boundary leak (an old identity's board post remained readable
+ * by a newly created identity in the same profile root after Start Over,
+ * because reset deleted only the 2 files `detectProfileState()` checks).
+ */
+function residualProfileDataLeaves(paths: FedosLocalProfilePaths): readonly string[] {
+  const { root, profileDescriptorFile, sealedMasterSeedFile, logsDirectory, sessionStateDirectory, ...rest } = paths;
+  return Object.values(rest);
+}
+
+/**
+ * True iff any durable leaf beyond the profile descriptor and sealed
+ * Master Seed still exists on disk. `detectProfileState()` alone cannot
+ * answer this — it inspects only those two files, which is exactly the
+ * narrow check `createProfile()`'s overwrite guard and Recovery restore's
+ * `target-not-fresh` check both trusted, and exactly the gap Start Over's
+ * 2-file delete left open. Never throws; a filesystem error reading a
+ * given leaf is treated as "not present" for THAT leaf only (this can only
+ * weaken the guard toward a false negative on an already-degenerate
+ * filesystem — it can never cause a genuine leak to be silently allowed).
+ */
+export function hasResidualFedosProfileData(paths: FedosLocalProfilePaths): boolean {
+  for (const leaf of residualProfileDataLeaves(paths)) {
+    try {
+      if (existsSync(leaf)) return true;
+    } catch {
+      // treated as absent for this leaf; see doc comment above
+    }
+  }
+  return false;
+}
+
+/**
+ * Deletes every durable leaf `hasResidualFedosProfileData()` inspects (the
+ * same list, minus `root`/the two identity files/the two bare
+ * directories). Disaster Recovery Product Closure arc, Track 3 —
+ * companion to `hasResidualFedosProfileData()`: the widened freshness
+ * CHECK alone (refuse-only) turned out to make a legitimate Start Over
+ * permanently unable to complete a real re-creation, because a normal
+ * `createProfile()` call durably writes well beyond the 2 identity files
+ * during its own Device/Runtime bootstrap step (e.g. the local Device
+ * Registry entry) — so every post-reset retry would refuse forever with
+ * no path forward. `resetCorruptReadyProfile()`/`resetInterruptedProfile()`
+ * call this AFTER their own existing 2-file `delete()` calls succeed, so a
+ * completed reset is now genuinely, not just nominally, a fresh root — the
+ * widened freshness check in `createProfile()`/`restoreFedosRecoveryBundle()`
+ * then remains as defense in depth for any OTHER path that reaches this
+ * root without going through a reset at all (a bug in reset itself, a
+ * manual/external filesystem restore, ...), never as the only guard.
+ * Best-effort per leaf (a single stray `unlinkSync` failure never aborts
+ * the rest); returns `true` iff every leaf that existed was successfully
+ * removed.
+ */
+export function deleteResidualFedosProfileData(paths: FedosLocalProfilePaths): boolean {
+  let allSucceeded = true;
+  for (const leaf of residualProfileDataLeaves(paths)) {
+    try {
+      if (existsSync(leaf)) unlinkSync(leaf);
+    } catch {
+      allSucceeded = false;
+    }
+  }
+  return allSucceeded;
 }

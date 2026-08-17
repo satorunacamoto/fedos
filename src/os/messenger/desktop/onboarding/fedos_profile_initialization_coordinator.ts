@@ -60,7 +60,7 @@ import {
 } from "../runtime/fedos_desktop_runtime.js";
 import type { FedosDesktopRuntimeConfig } from "../runtime/fedos_desktop_runtime_config.js";
 import type { FedosLocalProfilePaths } from "./fedos_local_profile_paths.js";
-import { ensureFedosLocalProfileDirectories } from "./fedos_local_profile_paths.js";
+import { ensureFedosLocalProfileDirectories, hasResidualFedosProfileData, deleteResidualFedosProfileData } from "./fedos_local_profile_paths.js";
 import {
   FedosLocalProfileCorruptError,
   type FedosLocalProfilePersistence,
@@ -113,6 +113,18 @@ export type FedosProfileCoordinatorOutcome =
   // descriptor already durably reached `ready`). A no-op refusal, never a
   // partial/best-effort deletion.
   | "reset-refused"
+  // Disaster Recovery Product Closure arc, Track 3 — CONFIRMED,
+  // live-reproduced: `"recovery-required"`/`"already-exists"` above only
+  // ever inspect the profile descriptor + sealed Master Seed. This is the
+  // WIDENED refusal: some OTHER durable leaf (board, conversations, ...)
+  // still exists at this profile root even though those two identity
+  // files are gone — most commonly right after `resetCorruptReadyProfile()`/
+  // `resetInterruptedProfile()`, which by design deletes only those two
+  // files. A distinct, terminal outcome (never folded into
+  // `"recovery-required"`) because no automated reset resolves it — this
+  // arc's own Coordinator Decision chose refuse-and-inform over widening
+  // deletion scope.
+  | "residual-data-present"
   | "failed";
 
 export type FedosProfileCoordinatorResult<T> =
@@ -478,6 +490,24 @@ export class FedosProfileInitializationCoordinator {
       return fail("recovery-required", "a partial or corrupt profile exists; recover it, do not create over it");
     }
 
+    // Disaster Recovery Product Closure arc, Track 3 — CONFIRMED
+    // identity-boundary leak: `detect.value.presence` above only inspects
+    // the profile descriptor + sealed Master Seed. A prior identity's
+    // OTHER durable data (e.g. board posts, conversations) can still be
+    // present on disk even when both those files are gone — most commonly
+    // right after Start Over, which deletes only those two files by
+    // design. Silently creating a new identity on top of that residue lets
+    // it observe the OLD identity's private data through its own,
+    // legitimate read APIs — a real, live-reproduced leak this arc closes
+    // by refusing outright rather than attempting an automatic cleanup.
+    if (hasResidualFedosProfileData(this.#deps.paths)) {
+      unlockSecret.clear();
+      return fail(
+        "residual-data-present",
+        "prior profile data still exists at this location; it must be cleared before a new identity can be created here",
+      );
+    }
+
     this.#state = "absent";
     this.#transition("begin-create");
 
@@ -777,6 +807,15 @@ export class FedosProfileInitializationCoordinator {
     if (sealedDelete === "failed") {
       return fail("failed", "could not delete the sealed Master Seed envelope");
     }
+    // Disaster Recovery Product Closure arc, Track 3 — see
+    // `deleteResidualFedosProfileData()`'s own doc comment: without this,
+    // a legitimate Start Over that already wrote real Device/Runtime
+    // bootstrap data would leave this root permanently unable to pass the
+    // widened freshness check `createProfile()` now applies. Best-effort;
+    // never causes this reset itself to fail (the 2 identity files, the
+    // only thing `detectProfileState()` gates lifecycle on, are already
+    // durably gone by this point regardless).
+    deleteResidualFedosProfileData(this.#deps.paths);
 
     this.#descriptor = null;
     this.#recoveryReason = null;
@@ -870,6 +909,13 @@ export class FedosProfileInitializationCoordinator {
     if (sealedDelete === "failed") {
       return fail("failed", "could not delete the sealed Master Seed envelope");
     }
+    // Disaster Recovery Product Closure arc, Track 3 — see
+    // `deleteResidualFedosProfileData()`'s own doc comment: same reasoning
+    // as `resetInterruptedProfile()`'s own identical call above. A "ready"
+    // profile being reset here durably wrote real Device/Runtime bootstrap
+    // data too; without this, Start Over would leave the root permanently
+    // unable to pass the widened freshness check.
+    deleteResidualFedosProfileData(this.#deps.paths);
 
     this.#descriptor = null;
     this.#recoveryReason = null;

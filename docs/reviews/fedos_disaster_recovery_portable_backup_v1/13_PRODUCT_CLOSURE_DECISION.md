@@ -127,3 +127,32 @@ same shared install.
 
 No fork agent may commit. Coordinator reviews and commits every track's work after independent
 re-verification, per the mandate's own explicit discipline.
+
+## Addendum — Track 3 design corrected during implementation (empirical, not speculative)
+
+The decision above chose "widen the freshness check only" over "widen deletion scope" for
+safety. Implementing it exactly as written and testing it against this codebase's own existing
+Phase S regression suite (`resetCorruptReadyProfile()` → fresh `createProfile()` at the same
+root) proved that choice **incomplete**: a real `createProfile()` call durably writes well beyond
+the 2 identity files during its own Device/Runtime bootstrap step (a local Device Registry entry,
+at minimum). Reset-only-deletes-2-files + create-refuses-on-any-residue meant every legitimate
+Start Over would refuse forever after reset, with no path forward — safe against the leak, but a
+genuine functional regression (Start Over would never again be able to complete).
+
+**Revised, empirically-verified design**: widen BOTH.
+`resetCorruptReadyProfile()`/`resetInterruptedProfile()` now also call a new
+`deleteResidualFedosProfileData()` (best-effort, after their existing 2-file `delete()` calls
+succeed) that clears every other durable leaf `planFedosLocalProfilePaths()` names — so a
+completed Start Over is genuinely, not just nominally, a fresh root. The widened freshness check
+(`hasResidualFedosProfileData()`, unchanged from the original decision) stays in
+`createProfile()`'s overwrite guard and `restoreFedosRecoveryBundle()`'s `target-not-fresh` check
+as defense in depth for any path that reaches a profile root WITHOUT going through a reset at all
+(a bug in reset itself, a manual/external filesystem restore, ...) — never as the only guard, and
+never a substitute for reset actually clearing what it claims to reset.
+
+Verified via `test/secure_runtime_alpha_4661_4740_first_run_onboarding.test.ts` Phase T (new) and
+`test/fedos_disaster_recovery_portable_backup_import_coordinator.test.ts` tests 14-15 (new): (1)
+Start Over now genuinely clears a real board post before a fresh `createProfile()` succeeds at
+the same root; (2) `createProfile()` and `restoreFedosRecoveryBundle()` still independently refuse
+residual data that reaches a root some other way; (3) the existing Phase S "reset → fresh create
+succeeds" regressions, which had broken under the refuse-only design, pass again unmodified.

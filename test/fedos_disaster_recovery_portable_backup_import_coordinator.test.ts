@@ -514,3 +514,85 @@ describe("Disaster Recovery Portable Backup -- sealed Master Seed durability (se
     });
   });
 });
+
+describe("Disaster Recovery Product Closure arc, Track 3 -- widened target-freshness check (CONFIRMED identity-boundary leak closed)", () => {
+  it("14. restore refuses when the sealedMasterSeedFile is ABSENT but another durable leaf (e.g. board.ndjson) is still present -- the exact shape left behind by Start Over, which deletes only the descriptor + sealed seed", async () => {
+    await withTempDir(async (sourceRoot) => {
+      await withTempDir(async (targetRoot) => {
+        const boundary = fakeRoundTrippingRuntimeBoundary();
+        const bundleBytes = await buildBundleWithDescriptorAndBoard(boundary, sourceRoot);
+        const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+
+        // Simulate the post-Start-Over shape: the 2 identity files are
+        // gone, but an OLD identity's own board data is still sitting on
+        // disk at this exact root.
+        mkdirSync(dirname(targetPaths.boardLogFile), { recursive: true });
+        writeFileSync(targetPaths.boardLogFile, '{"kind":"post","body":"old identity private data"}\n');
+        expect(existsSync(targetPaths.sealedMasterSeedFile), "the narrow pre-fix check alone would have let this through").toBe(false);
+
+        const result = await restoreFedosRecoveryBundle({
+          bundleBytes,
+          passphrase: new TextEncoder().encode("correct horse"),
+          suite: SUITE,
+          accountIndex: 0,
+          masterSeedAuthority: fakeMasterSeedAuthority(),
+          resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+          targetPaths,
+          freshLocalDeviceId: "device-TARGET-MACHINE-B",
+          now: 1_800_000_000_000,
+          runtimeBoundary: boundary,
+        });
+
+        expect(result.outcome).toBe("target-not-fresh");
+        expect(existsSync(targetPaths.sealedMasterSeedFile), "must never write the new identity's seed on top of old residue").toBe(false);
+        expect(existsSync(targetPaths.profileDescriptorFile), "must stop before writing anything else").toBe(false);
+        expect(readFileSync(targetPaths.boardLogFile, "utf8"), "the old identity's own residual data must be left completely untouched").toBe(
+          '{"kind":"post","body":"old identity private data"}\n',
+        );
+      });
+    });
+  });
+
+  it("15. once the residual leaf is genuinely cleared, restore proceeds normally -- the widened check is not overly strict", async () => {
+    await withTempDir(async (sourceRoot) => {
+      await withTempDir(async (targetRoot) => {
+        const boundary = fakeRoundTrippingRuntimeBoundary();
+        const bundleBytes = await buildBundleWithDescriptorAndBoard(boundary, sourceRoot);
+        const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+
+        mkdirSync(dirname(targetPaths.boardLogFile), { recursive: true });
+        writeFileSync(targetPaths.boardLogFile, '{"kind":"post","body":"leftover"}\n');
+
+        const blocked = await restoreFedosRecoveryBundle({
+          bundleBytes,
+          passphrase: new TextEncoder().encode("correct horse"),
+          suite: SUITE,
+          accountIndex: 0,
+          masterSeedAuthority: fakeMasterSeedAuthority(),
+          resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+          targetPaths,
+          freshLocalDeviceId: "device-TARGET-MACHINE-B",
+          now: 1_800_000_000_000,
+          runtimeBoundary: boundary,
+        });
+        expect(blocked.outcome).toBe("target-not-fresh");
+
+        rmSync(targetPaths.boardLogFile, { force: true });
+
+        const result = await restoreFedosRecoveryBundle({
+          bundleBytes,
+          passphrase: new TextEncoder().encode("correct horse"),
+          suite: SUITE,
+          accountIndex: 0,
+          masterSeedAuthority: fakeMasterSeedAuthority(),
+          resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+          targetPaths,
+          freshLocalDeviceId: "device-TARGET-MACHINE-B",
+          now: 1_800_000_000_000,
+          runtimeBoundary: boundary,
+        });
+        expect(result.outcome).toBe("restored");
+      });
+    });
+  });
+});

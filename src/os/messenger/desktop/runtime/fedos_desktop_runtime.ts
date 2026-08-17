@@ -272,6 +272,7 @@ import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../../device/
 import { FedosDeviceSyncOperationalFacade, type FedosDeviceSyncOperationalFacadeDeps } from "./fedos_device_sync_operational_facade.js";
 import { FedosDeviceSyncJournalOutboundCoordinator } from "../../device/sync_journal_transport/fedos_device_sync_journal_outbound_coordinator.js";
 import { FedosWasmDeviceSyncJournalPackageEncryptionAuthority } from "../../device/sync_journal_transport/fedos_device_sync_journal_package_encryption.js";
+import { FedosProductionDeviceSyncJournalPackageEncryptionRuntimeBoundary } from "../../device/sync_journal_transport/fedos_production_device_sync_journal_package_encryption_runtime_boundary.js";
 import { FedosDeviceSyncJournalInboundHandler } from "../../device/sync_journal_transport/fedos_device_sync_journal_inbound_handler.js";
 import { FedosDeviceSyncJournalInboundSubscription } from "../../device/sync_journal_transport/fedos_device_sync_journal_inbound_subscription.js";
 import type { FedosDeviceRelaySyncInboundDedupPersistence } from "../../device/relay_sync/persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
@@ -1730,7 +1731,18 @@ export async function startFedosDesktopRuntime(
       const journalRelaySet = new FedosConversationRelaySet(config.conversationTransportRelays);
       await journalRelaySet.connectAll();
       const journalPublisher = new FedosDeviceRelaySyncPublisher(journalRelaySet);
-      const journalEncryptionAuthority = new FedosWasmDeviceSyncJournalPackageEncryptionAuthority(config.deviceSyncJournalMasterSeedAuthority);
+      // Disaster Recovery Product Closure arc (Track 2, CONFIRMED) -- real
+      // WASM-backed Sync Journal encryption when the supplied authority is
+      // genuinely a production one; `undefined` (the existing dev-gated
+      // default, which hits the cross-WASM-instance opaque-handle bug in a
+      // real packaged process) otherwise. Mirrors the Conversation Archive
+      // encryption boundary immediately below in this same file exactly.
+      const journalEncryptionAuthority = new FedosWasmDeviceSyncJournalPackageEncryptionAuthority(
+        config.deviceSyncJournalMasterSeedAuthority,
+        isFedosProductionConversationAeadHandleSource(config.deviceSyncJournalMasterSeedAuthority)
+          ? new FedosProductionDeviceSyncJournalPackageEncryptionRuntimeBoundary(config.deviceSyncJournalMasterSeedAuthority)
+          : undefined,
+      );
       deviceSyncJournalOutboundInstance = new FedosDeviceSyncJournalOutboundCoordinator({
         registryPersistence: deviceRegistryPersistence!,
         syncState: syncStateInstance,

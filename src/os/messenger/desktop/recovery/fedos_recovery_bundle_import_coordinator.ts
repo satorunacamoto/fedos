@@ -68,6 +68,7 @@ import {
   fedosRecoveryBundleCommerceDestinationPathFor,
 } from "./fedos_recovery_bundle_commerce_and_settings_selection.js";
 import type { FedosLocalProfilePaths } from "../onboarding/fedos_local_profile_paths.js";
+import { hasResidualFedosProfileData } from "../onboarding/fedos_local_profile_paths.js";
 import {
   isWellFormedFedosLocalProfileDescriptorV1,
   createFedosLocalProfileDescriptorV1,
@@ -255,6 +256,20 @@ export async function restoreFedosRecoveryBundle(request: FedosRecoveryBundleRes
   // `sealedSeedPersistence.writeIfAbsent()`'s own "already-exists" guard in
   // `createProfile()`, since a restore target must always be fresh.
   if (existsSync(request.targetPaths.sealedMasterSeedFile)) {
+    return { outcome: "target-not-fresh" };
+  }
+  // Disaster Recovery Product Closure arc, Track 3 — CONFIRMED,
+  // live-reproduced: the check above alone (mirroring
+  // `createProfile()`'s own pre-fix guard) only inspects the sealed
+  // Master Seed file. A prior identity's OTHER durable data (board,
+  // conversations, ...) can still be present at this target root even
+  // when that one file is gone -- most commonly right after Start Over,
+  // which by design deletes only the profile descriptor + sealed seed.
+  // Restoring on top of that residue would let the restored identity's
+  // own, legitimate read APIs observe the OLD identity's private data.
+  // Widen the freshness check itself (never widen deletion scope -- see
+  // `hasResidualFedosProfileData()`'s own doc comment for why).
+  if (hasResidualFedosProfileData(request.targetPaths)) {
     return { outcome: "target-not-fresh" };
   }
   if (!atomicWrite(request.targetPaths.sealedMasterSeedFile, new TextEncoder().encode(bundle.sealedMasterSeedEnvelope))) {

@@ -1221,3 +1221,95 @@ describe("Phase S — ready descriptor + structurally corrupt/missing sealed see
     }
   });
 });
+
+// ---------------------------------------------------------------------
+// Disaster Recovery Product Closure arc, Track 3 -- CONFIRMED,
+// live-reproduced identity-boundary leak: `resetCorruptReadyProfile()`/
+// `resetInterruptedProfile()` delete only `profile.json` +
+// `master-seed.sealed.json`. Before this arc, `createProfile()`'s
+// overwrite guard trusted `detectProfileState()`, which inspects only
+// those same two files -- so a NEW identity created right after Start
+// Over could be silently created on top of the OLD identity's still-
+// present other durable data (board, conversations, ...), and the new
+// identity's own legitimate read APIs could then observe it. The fix
+// widens the freshness check (`hasResidualFedosProfileData()`) rather
+// than widening what reset deletes -- see
+// `docs/reviews/fedos_disaster_recovery_portable_backup_v1/13_PRODUCT_CLOSURE_DECISION.md`.
+// ---------------------------------------------------------------------
+
+describe("Phase T — widened freshness check + widened reset close the Start-Over identity-boundary leak (Product Closure Track 3)", () => {
+  it("resetCorruptReadyProfile() now ALSO clears residual durable leaves (e.g. a board post), so Start Over both closes the leak AND remains able to complete a genuine fresh createProfile() at the same root", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+
+    // Identity A: a real profile with real board data.
+    const created = await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Identity A" },
+      fedosProfileUnlockSecretFromUtf8("identity-a-secret-value"),
+    );
+    expect(created.outcome).toBe("ok");
+    writeFileSync(paths.boardLogFile, '{"kind":"post","body":"Identity A private board post"}\n', "utf8");
+    expect(existsSync(paths.boardLogFile)).toBe(true);
+
+    // Identity A's own sealed seed goes structurally missing (mirrors
+    // Phase S's own established "corrupt-ready" reproduction) and gets
+    // reset via Start Over -- exactly this arc's own live-reproduced
+    // starting shape.
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    relaunch.detectProfileState();
+    const reset = await relaunch.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("ok");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+    expect(existsSync(paths.sealedMasterSeedFile)).toBe(false);
+    // Before this fix, reset deleted only the 2 identity files -- Identity
+    // A's board post would have survived here. It must not any more.
+    expect(existsSync(paths.boardLogFile), "Start Over must genuinely clear Identity A's own residual data, not just its 2 identity files").toBe(
+      false,
+    );
+
+    // Identity B now creates a fresh profile at the SAME root -- this must
+    // succeed cleanly (Start Over is still a real, usable product feature)
+    // AND Identity B's own board file must contain nothing from Identity A.
+    const attemptB = await relaunch.createProfile(
+      { displayLabel: "Identity B" },
+      fedosProfileUnlockSecretFromUtf8("identity-b-secret-value"),
+    );
+    expect(attemptB.outcome).toBe("ok");
+    if (attemptB.outcome === "ok") expect(attemptB.value.displayLabel).toBe("Identity B");
+    expect(existsSync(paths.boardLogFile) ? readFileSync(paths.boardLogFile, "utf8") : "").not.toContain("Identity A private board post");
+    await relaunch.lock();
+  });
+
+  it("createProfile() still REFUSES with 'residual-data-present' when a durable leaf exists WITHOUT ever having gone through a reset -- defense in depth, independent of reset's own cleanup", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const coordinator = makeCoordinator(root);
+    // No profile was ever created here -- simulates a stray leftover leaf
+    // reaching this root some OTHER way (a bug in reset, a manual/external
+    // filesystem restore, ...), never through the normal create/reset
+    // lifecycle at all.
+    writeFileSync(paths.boardLogFile, '{"kind":"post","body":"stray data, never created via this coordinator"}\n', "utf8");
+
+    const attempt = await coordinator.createProfile({ displayLabel: "Should be refused" }, fedosProfileUnlockSecretFromUtf8("refused-secret-value"));
+    expect(attempt.outcome).toBe("residual-data-present");
+    expect(existsSync(paths.profileDescriptorFile), "must not silently create on top of the stray residue").toBe(false);
+    expect(readFileSync(paths.boardLogFile, "utf8")).toBe('{"kind":"post","body":"stray data, never created via this coordinator"}\n');
+
+    // Once genuinely cleared, create succeeds normally -- the guard is not
+    // overly strict.
+    rmSync(paths.boardLogFile, { force: true });
+    const retried = await coordinator.createProfile({ displayLabel: "Now clean" }, fedosProfileUnlockSecretFromUtf8("now-clean-secret-value"));
+    expect(retried.outcome).toBe("ok");
+    await coordinator.lock();
+  });
+
+  it("createProfile() on a genuinely fresh root (no residual data at all) is unaffected by the widened check", async () => {
+    const root = makeTmpRoot();
+    const coordinator = makeCoordinator(root);
+    const created = await coordinator.createProfile({ displayLabel: "Truly fresh" }, fedosProfileUnlockSecretFromUtf8("truly-fresh-secret"));
+    expect(created.outcome).toBe("ok");
+    await coordinator.lock();
+  });
+});
