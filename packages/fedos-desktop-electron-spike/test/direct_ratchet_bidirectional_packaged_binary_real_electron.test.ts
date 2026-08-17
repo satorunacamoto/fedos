@@ -914,9 +914,22 @@ realSuite("Direct Ratchet Bidirectional -- REAL packaged/installed binary, two i
       const bobStatusRaw = stepAt(bob5, 3, "acceptance-direct-ratchet-status");
       const bobStatus = unwrapDirectRatchetStatus(bobStatusRaw);
       expect(bobStatus.status, `Bob's session must still be "active" for a second round trip: ${JSON.stringify(bobStatusRaw)}`).toBe("active");
-      const bobRound2Send = stepAt(bob5, 4, "acceptance-send-message") as { outcome: string; value?: { messageId?: string } };
+      const bobRound2Send = stepAt(bob5, 4, "acceptance-send-message") as {
+        outcome: string;
+        value?: { messageId?: string; delivery?: { route: string; state: string; reason?: string } };
+      };
       expect(bobRound2Send.outcome, `Bob's SECOND real Direct-Ratchet-routed send must succeed -- proves the ratchet genuinely advances across multiple exchanges: ${JSON.stringify(bobRound2Send)}`).toBe("ok");
-      record(`STEP 9a -- Bob sent round-2 Direct Ratchet message, messageId=${String(bobRound2Send.value?.messageId)}`);
+      // FedOS Message Delivery Truth arc -- proves the real installed binary
+      // now surfaces the true lower-layer delivery outcome (never the old
+      // hardcoded fanout: "not-applicable") over the exact same IPC surface
+      // an ordinary renderer send uses: `handleAcceptanceSendMessage()`
+      // returns `shell.sendMessage()` verbatim, so this is the SAME field a
+      // real UI would receive.
+      expect(
+        bobRound2Send.value?.delivery,
+        `a real, genuinely-active Direct Ratchet send must report delivery.route="direct-ratchet" and a real, non-fabricated state -- never silently absent or hardcoded: ${JSON.stringify(bobRound2Send)}`,
+      ).toEqual({ route: "direct-ratchet", state: "queued" });
+      record(`STEP 9a -- Bob sent round-2 Direct Ratchet message, messageId=${String(bobRound2Send.value?.messageId)}, delivery=${JSON.stringify(bobRound2Send.value?.delivery)}`);
 
       const alice5 = await runPackagedAcceptance(
         "ALICE_5_RESTART_RECEIVE_AND_REPLY_ROUND2",
@@ -1003,11 +1016,22 @@ realSuite("Direct Ratchet Bidirectional -- REAL packaged/installed binary, two i
       // ignores a real, live, usable session, not merely a nonexistent one.
       expect(bobStatus.status, `Bob's session must be "active" for this to be a meaningful silent-downgrade proof (not merely "no session to downgrade from"): ${JSON.stringify(bobStatusRaw)}`).toBe("active");
       record(`STEP 9b -- Bob's status confirmed "active" immediately before an ordinary (non-Ratchet-forced) send.`);
-      const bobThirdSend = stepAt(bob6, 4, "acceptance-send-message") as { outcome: string; value?: { messageId?: string } };
+      const bobThirdSend = stepAt(bob6, 4, "acceptance-send-message") as {
+        outcome: string;
+        value?: { messageId?: string; delivery?: { route: string; state: string; reason?: string } };
+      };
       expect(
         bobThirdSend.outcome,
         `the send must still succeed via the legacy route even with a real active Ratchet session available -- this is precisely the silent-downgrade mechanism: ${JSON.stringify(bobThirdSend)}`,
       ).toBe("ok");
+      // FedOS Message Delivery Truth arc -- the legacy route gets the exact
+      // same truthful treatment as the Ratchet route (mandate section 26,
+      // no asymmetric fix): real delivery.route="legacy-nip17" with a real
+      // queued state, never silently absent.
+      expect(
+        bobThirdSend.value?.delivery,
+        `the legacy route's own real delivery outcome must be honestly reported too, not just the Ratchet route's: ${JSON.stringify(bobThirdSend)}`,
+      ).toEqual({ route: "legacy-nip17", state: "queued" });
       markScenario(
         "l",
         "PASS",
