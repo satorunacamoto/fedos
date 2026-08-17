@@ -52,6 +52,8 @@ const MAX_PAIRING_ENVELOPE_CHARS = 8192;
 const MAX_SEARCH_QUERY_CHARS = 256;
 /** Secure Runtime Alpha 7321-7400 — a real filesystem path for Archive export/import. */
 const MAX_ARCHIVE_PATH_CHARS = 4096;
+/** Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — mirrors `fedos_electron_beta_main.cts`'s own identical `MAX_RECOVERY_BUNDLE_BASE64_CHARS` exactly (bounds are enforced independently on both sides of the IPC boundary, same discipline as every other bound in this file). */
+const MAX_RECOVERY_BUNDLE_BASE64_CHARS = 64_000_000;
 /** Commerce E2E Completion arc — mirrors `fedos_electron_beta_main.cts`'s own identical constants exactly (bounds are enforced independently on both sides of the IPC boundary, same discipline as every other bound in this file). */
 const MAX_PRODUCT_TITLE_CHARS = 200;
 const MAX_PRODUCT_DESCRIPTION_CHARS = 4000;
@@ -94,6 +96,21 @@ const fedosProfile: FedosBetaProfileBridge = Object.freeze({
   // `resetCorruptReadyProfile()` guard decides safety, never a renderer-
   // supplied flag.
   resetCorruptReady: () => ipcRenderer.invoke("fedos-profile:reset-corrupt-ready"),
+  // Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- the
+  // Restore-from-backup entry point on the Welcome screen. `bundleBase64` is
+  // ALREADY base64 text (either read from a chosen file via
+  // `recoveryChooseBundleFile` below, or pasted directly) -- never
+  // re-encoded here, so the SAME bytes the main process's own
+  // `validatedRecoveryBundleBytes()` decodes are the bytes the user
+  // actually chose/pasted.
+  recoveryInspect: (bundleBase64: string) =>
+    ipcRenderer.invoke("fedos-profile:recovery-inspect", { bundleBytes: boundedString(bundleBase64, MAX_RECOVERY_BUNDLE_BASE64_CHARS) }),
+  recoveryRestore: (bundleBase64: string, passphrase: string) =>
+    ipcRenderer.invoke("fedos-profile:recovery-restore", {
+      bundleBytes: boundedString(bundleBase64, MAX_RECOVERY_BUNDLE_BASE64_CHARS),
+      secret: boundedString(passphrase, MAX_PASSPHRASE_CHARS),
+    }),
+  recoveryChooseBundleFile: () => ipcRenderer.invoke("fedos-profile:recovery-choose-bundle-file"),
 });
 
 const fedosBeta: FedosBetaBridge = Object.freeze({
@@ -190,6 +207,12 @@ const fedosApp: FedosAppBridge = Object.freeze({
   archiveWorkflowWarnings: (operation: "inspect" | "preflightRestore" | "export" | "restore") => ipcRenderer.invoke("fedos-app:archive-workflow-warnings", { operation }),
   archiveChooseExportDestination: (conversationId: string) => ipcRenderer.invoke("fedos-app:archive-choose-export-destination", { conversationId: boundedString(conversationId, MAX_ID_CHARS) }),
   archiveChooseSource: () => ipcRenderer.invoke("fedos-app:archive-choose-source"),
+  // Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- the
+  // Settings "Export Backup" entry point. No arguments -- the main process
+  // resolves the currently active, unlocked profile itself (never a
+  // renderer-supplied profile reference) and drives its own native save
+  // dialog; see `handleRecoveryExportToFile()`'s own header.
+  recoveryExportToFile: () => ipcRenderer.invoke("fedos-app:recovery-export-to-file"),
   devicesList: () => ipcRenderer.invoke("fedos-app:devices-list"),
   deviceDetail: (deviceId: string) => ipcRenderer.invoke("fedos-app:device-detail", { deviceId: boundedString(deviceId, MAX_ID_CHARS) }),
   deviceRevoke: (deviceId: string, devicePublicKeyHex: string) =>

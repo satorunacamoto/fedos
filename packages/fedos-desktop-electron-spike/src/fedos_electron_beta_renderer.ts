@@ -29,6 +29,10 @@ type ScreenName =
   | "initializing"
   | "unlock-failed"
   | "recovery"
+  // Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- a
+  // DISTINCT screen from "recovery" above (see `screen-restore-bundle`'s
+  // own HTML comment for why the two must never share state/actions).
+  | "restore-bundle"
   | "ready";
 
 type AppScreenName =
@@ -833,6 +837,12 @@ type FedosDeletionRequestUiState =
 const deletionRequestUiState = new Map<string, FedosDeletionRequestUiState>();
 let archiveExportDestinationPath: string | null = null;
 let archiveRestoreSourcePath: string | null = null;
+// Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- the
+// currently-chosen/pasted Recovery Bundle's own base64 bytes, held ONLY
+// in this renderer's own memory (never persisted, never logged) between
+// "choose/paste" and "inspect"/"restore". Cleared on Back and on a fresh
+// choose/paste, exactly like `archiveRestoreSourcePath` above.
+let restoreBundleBase64: string | null = null;
 /**
  * A message arriving over the real relay in the background (the SAME
  * inbound subscription/Outbox Scheduler this codebase already runs) is
@@ -5193,6 +5203,327 @@ async function onRecoveryStartOverCorrupt(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------
+// Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- Restore
+// a PREVIOUS identity's data from a backup file (Welcome screen entry
+// point), and Export a backup of the CURRENT identity (Settings screen
+// entry point). A SEPARATE feature from "Start Over" above: Start Over
+// discards THIS device's own interrupted/corrupt setup and creates a
+// fresh profile; Restore brings back a PREVIOUS identity's data. Neither
+// screen offers the other's action or shares state with it.
+// ---------------------------------------------------------------------
+
+interface RecoveryOutcomeCopy {
+  readonly headline: string;
+  readonly detail: string;
+}
+
+/**
+ * Track 1 -- the ONE translation table for `handleRecoveryRestore()`'s own
+ * real, closed outcome vocabulary (`fedos_electron_beta_main.cts`, itself
+ * echoing `restoreFedosRecoveryBundle()`'s own union type,
+ * `fedos_recovery_bundle_import_coordinator.ts`) -- every key here is a
+ * REAL outcome that pair can actually return, never an invented code.
+ * Deliberately distinguishes a WRONG PASSPHRASE (`wrong-secret`, invites
+ * retrying the SAME bundle file) from a CORRUPT/TAMPERED bundle
+ * (`malformed`/`data-part-restore-failed`/`descriptor-invalid`, where
+ * retrying the same file will never help -- a different bundle file is
+ * needed). `target-not-fresh` covers BOTH "a profile already exists here"
+ * AND "an earlier identity's leftover data is present with no active
+ * profile" (the FedOS Installed Startup Root-Cause Arc's own widened
+ * freshness check, `hasResidualFedosProfileData()` in
+ * `fedos_recovery_bundle_import_coordinator.ts`) -- the copy below names
+ * both reasons rather than a generic "already exists" claim.
+ */
+const RECOVERY_RESTORE_OUTCOME_COPY: Readonly<Record<string, RecoveryOutcomeCopy>> = {
+  "wrong-secret": {
+    headline: "Wrong passphrase.",
+    detail: "This bundle file itself looks fine, but the passphrase you entered does not unlock it. Double-check it (case and spacing matter) and try again with the SAME bundle file.",
+  },
+  malformed: {
+    headline: "This file is not a valid FedOS Recovery Bundle, or it is corrupted.",
+    detail: "Retrying with the same file will not help. Choose a different bundle file — ideally a more recent export.",
+  },
+  "data-part-restore-failed": {
+    headline: "This bundle's data appears corrupted or tampered with.",
+    detail: "Your account identity may still be restorable from this same file, but its conversation/settings data failed verification and was refused. Retrying with the same file will not help for that data — try a different export if you have one.",
+  },
+  "descriptor-invalid": {
+    headline: "This bundle's profile information is corrupted.",
+    detail: "Retrying with the same file will not help. Choose a different bundle file.",
+  },
+  "identity-restore-failed": {
+    headline: "Could not restore your account identity from this bundle.",
+    detail: "This is not a passphrase problem. Try again once; if it keeps happening, this bundle file may be damaged — try a different export if you have one.",
+  },
+  "account-identity-unresolved": {
+    headline: "Could not verify the restored identity.",
+    detail: "The restore did not complete and nothing was changed. This device's secure crypto may be temporarily unavailable — try again.",
+  },
+  "write-failed": {
+    headline: "Could not save the restored data to this device.",
+    detail: "Check that this device has free disk space and that FedOS can write to its data folder, then try again.",
+  },
+  "target-not-fresh": {
+    headline: "This device already has profile data on it.",
+    detail: 'Restore only works into a completely empty location: either a profile already exists here, or an earlier identity’s leftover data is still present even though no profile is currently active. Use "Start over" (from the recovery screen, not this one) to clear an interrupted/corrupt profile, or restore onto a different, genuinely empty device or data location — never on top of existing data.',
+  },
+  "already-exists": {
+    headline: "A profile already exists on this device.",
+    detail: "Restore refuses to overwrite it. Unlock and use that existing profile normally, or restore onto a different, fresh device or data location.",
+  },
+  "seed-unavailable": {
+    headline: "Secure crypto isn't available on this device.",
+    detail: "This build cannot perform a restore right now. Try again after restarting the application.",
+  },
+  "invalid-input": {
+    headline: "That doesn't look like a valid bundle file or passphrase.",
+    detail: "Check the file you chose (or the text you pasted) and the passphrase, then try again.",
+  },
+};
+
+function describeRecoveryRestoreOutcome(outcome: string): RecoveryOutcomeCopy {
+  return RECOVERY_RESTORE_OUTCOME_COPY[outcome] ?? { headline: "Restore did not complete.", detail: describeOutcome(outcome) };
+}
+
+/** Track 1 -- mirrors `inspectFedosRecoveryBundle()`'s own closed outcome vocabulary (`"ok"|"malformed"|"unsupported-version"`), plus the transport-level `"invalid-input"` `handleRecoveryInspect()` itself can also return. */
+const RECOVERY_INSPECT_OUTCOME_COPY: Readonly<Record<string, RecoveryOutcomeCopy>> = {
+  malformed: { headline: "This file is not a valid FedOS Recovery Bundle, or it is corrupted.", detail: "Choose a different bundle file." },
+  "unsupported-version": { headline: "This bundle was created by an incompatible version of FedOS.", detail: "This build cannot read it — try a build matching the version that created it." },
+  "invalid-input": { headline: "That doesn't look like a valid bundle.", detail: "Choose the bundle file again, or check the pasted text." },
+};
+
+function describeRecoveryInspectOutcome(outcome: string): RecoveryOutcomeCopy {
+  return RECOVERY_INSPECT_OUTCOME_COPY[outcome] ?? { headline: "Could not inspect this bundle.", detail: describeOutcome(outcome) };
+}
+
+/** Track 1 -- mirrors `handleRecoveryExportToFile()`'s own real outcome vocabulary (`fedos_electron_beta_main.cts`), including the outcomes it forwards verbatim from the underlying `handleRecoveryExport()`/`exportFedosRecoveryBundle()`. */
+const RECOVERY_EXPORT_OUTCOME_COPY: Readonly<Record<string, RecoveryOutcomeCopy>> = {
+  "not-unlocked": { headline: "You need to unlock your profile before exporting a backup.", detail: "" },
+  "seed-unreadable": { headline: "Could not read your local identity key material.", detail: "Try again once your profile is unlocked." },
+  "account-identity-unresolved": { headline: "Could not verify your account identity.", detail: "Try again." },
+  "build-failed": { headline: "Could not build the backup file.", detail: "Try again." },
+  "write-failed": { headline: "Could not save the backup file.", detail: "Check disk space and permissions at the location you chose, then try again." },
+};
+
+function describeRecoveryExportOutcome(outcome: string): RecoveryOutcomeCopy {
+  return RECOVERY_EXPORT_OUTCOME_COPY[outcome] ?? { headline: "Could not export a backup.", detail: describeOutcome(outcome) };
+}
+
+/** Non-secret, closed-vocabulary label for each restored asset row (mirrors `FedosRecoveryAssetClassification` exactly — never invents a classification the backend cannot return). */
+function describeRecoveryAssetClassification(classification: string): string {
+  switch (classification) {
+    case "recovered":
+      return "Recovered";
+    case "partial":
+      return "Partially recovered";
+    case "reestablished":
+      return "Not restored — re-establishes on its own";
+    case "lost":
+      return "Not recovered";
+    default:
+      return classification;
+  }
+}
+
+/** The restored `ready` view, held ONLY between a successful restore and the user clicking "Continue to your account" -- lets the per-asset outcome list and fresh-device disclosure stay on screen and be actually read before this renderer switches to the ordinary Ready screen. Never a secret (same shape `renderReady()` already renders from create/unlock). */
+let pendingRestoreReadyView: FedosRecoveryRestoreResult["ready"] = undefined;
+
+function resetRestoreBundleState(): void {
+  restoreBundleBase64 = null;
+  pendingRestoreReadyView = undefined;
+  byId("restore-file-label").textContent = "";
+  byId<HTMLTextAreaElement>("restore-bundle-paste").value = "";
+  byId<HTMLButtonElement>("restore-inspect-btn").disabled = true;
+  byId("restore-plan").hidden = true;
+  byId("restore-plan-summary").textContent = "";
+  byId("restore-plan-staleness").textContent = "";
+  byId("restore-plan-manifest-logs").textContent = "";
+  byId("restore-plan-supported-logs").textContent = "";
+  byId("restore-plan-excluded-fields").textContent = "";
+  clearField("restore-passphrase");
+  byId<HTMLInputElement>("restore-passphrase").disabled = true;
+  resetPasswordVisibility("restore-passphrase-show-hide", "restore-passphrase");
+  byId<HTMLButtonElement>("restore-submit-btn").disabled = true;
+  byId("restore-choose-error").textContent = "";
+  byId("restore-inspect-error").textContent = "";
+  byId("restore-submit-error").textContent = "";
+  byId("restore-result").hidden = true;
+  byId("restore-result-success").hidden = true;
+  byId("restore-assets-list").textContent = "";
+}
+
+function onRestoreOpenScreen(): void {
+  resetRestoreBundleState();
+  showScreen("restore-bundle");
+}
+
+/** Common tail for both "choose file" and "paste text" -- a newly (re)chosen bundle invalidates any prior plan/passphrase/result state, so a stale plan can never be restored against a bundle it was never actually computed from. */
+function applyRestoreBundleBase64(bundleBase64: string, label: string): void {
+  restoreBundleBase64 = bundleBase64;
+  byId("restore-file-label").textContent = label;
+  byId("restore-choose-error").textContent = "";
+  byId<HTMLButtonElement>("restore-inspect-btn").disabled = bundleBase64.length === 0;
+  byId("restore-plan").hidden = true;
+  byId<HTMLInputElement>("restore-passphrase").disabled = true;
+  byId<HTMLButtonElement>("restore-submit-btn").disabled = true;
+  byId("restore-result").hidden = true;
+}
+
+async function onRestoreChooseFile(): Promise<void> {
+  byId("restore-choose-error").textContent = "";
+  const chooseFile = fedosProfile.recoveryChooseBundleFile;
+  if (chooseFile === undefined) {
+    byId("restore-choose-error").textContent = 'Choosing a file is not available in this build — use "paste bundle text instead" below.';
+    return;
+  }
+  const result = await chooseFile();
+  if (result.outcome === "cancelled") return;
+  if (result.outcome !== "ok" || result.bundleBase64 === undefined || result.path === undefined) {
+    byId("restore-choose-error").textContent = "Could not read that file. Choose a different bundle file.";
+    return;
+  }
+  applyRestoreBundleBase64(result.bundleBase64, `File: ${result.path}`);
+}
+
+function onRestoreUsePastedText(): void {
+  byId("restore-choose-error").textContent = "";
+  const pasted = byId<HTMLTextAreaElement>("restore-bundle-paste").value.trim();
+  if (pasted.length === 0) {
+    byId("restore-choose-error").textContent = "Paste bundle text first.";
+    return;
+  }
+  applyRestoreBundleBase64(pasted, "Pasted bundle text.");
+}
+
+async function onRestoreInspect(): Promise<void> {
+  clearError("restore-inspect-error");
+  byId("restore-plan").hidden = true;
+  if (restoreBundleBase64 === null) return;
+  const inspect = fedosProfile.recoveryInspect;
+  if (inspect === undefined) {
+    byId("restore-inspect-error").textContent = "Inspecting a bundle is not available in this build.";
+    return;
+  }
+  setBusy(true, "restore-inspect-btn");
+  let result: FedosRecoveryInspectResult;
+  try {
+    result = await inspect(restoreBundleBase64);
+  } finally {
+    setBusy(false, "restore-inspect-btn");
+  }
+  if (result.outcome !== "ok" || result.plan === undefined) {
+    const copy = describeRecoveryInspectOutcome(result.outcome);
+    byId("restore-inspect-error").textContent = `${copy.headline} ${copy.detail}`.trim();
+    byId<HTMLInputElement>("restore-passphrase").disabled = true;
+    byId<HTMLButtonElement>("restore-submit-btn").disabled = true;
+    return;
+  }
+  const plan = result.plan;
+  byId("restore-plan-summary").textContent = plan.hasDataPart
+    ? `This bundle includes your account identity AND conversation/settings data, exported ${new Date(plan.createdAt).toLocaleString()}.`
+    : `This bundle includes ONLY your account identity — no conversation/settings data — exported ${new Date(plan.createdAt).toLocaleString()}.`;
+  byId("restore-plan-staleness").textContent = plan.stalenessWarning;
+  byId("restore-plan-manifest-logs").textContent = `This bundle claims to include: ${plan.manifestIncludedLogs.length > 0 ? plan.manifestIncludedLogs.join(", ") : "(identity only)"}.`;
+  byId("restore-plan-supported-logs").textContent = `This build of FedOS can restore: ${plan.currentlySupportedLogs.join(", ")}.`;
+  byId("restore-plan-excluded-fields").textContent = `Never included in any bundle: ${plan.deliberatelyExcludedFieldNames.join(", ")}.`;
+  byId("restore-plan").hidden = false;
+  byId<HTMLInputElement>("restore-passphrase").disabled = false;
+  byId<HTMLButtonElement>("restore-submit-btn").disabled = false;
+}
+
+function renderRestoreAssetsList(assets: readonly FedosRecoveryAssetOutcomeView[]): void {
+  const list = byId("restore-assets-list");
+  list.textContent = "";
+  for (const asset of assets) {
+    const li = document.createElement("li");
+    const label = document.createElement("strong");
+    label.textContent = `${asset.name}: ${describeRecoveryAssetClassification(asset.classification)}. `;
+    li.appendChild(label);
+    const detail = document.createElement("span");
+    detail.className = "muted";
+    detail.textContent = asset.detail;
+    li.appendChild(detail);
+    list.appendChild(li);
+  }
+}
+
+async function onRestoreSubmit(): Promise<void> {
+  clearError("restore-submit-error");
+  byId("restore-result").hidden = true;
+  byId("restore-result-success").hidden = true;
+  if (restoreBundleBase64 === null) return;
+  const passphrase = byId<HTMLInputElement>("restore-passphrase").value;
+  if (passphrase.length === 0) {
+    byId("restore-submit-error").textContent = "Enter the bundle's passphrase.";
+    return;
+  }
+  const restore = fedosProfile.recoveryRestore;
+  if (restore === undefined) {
+    byId("restore-submit-error").textContent = "Restoring is not available in this build.";
+    return;
+  }
+  setBusy(true, "restore-submit-btn");
+  let result: FedosRecoveryRestoreResult;
+  try {
+    result = await restore(restoreBundleBase64, passphrase);
+  } finally {
+    clearField("restore-passphrase");
+    resetPasswordVisibility("restore-passphrase-show-hide", "restore-passphrase");
+    setBusy(false, "restore-submit-btn");
+  }
+  if (result.outcome !== "ok" || result.ready === undefined) {
+    const copy = describeRecoveryRestoreOutcome(result.outcome);
+    byId("restore-result-headline").textContent = copy.headline;
+    byId("restore-result-detail").textContent = copy.detail;
+    byId("restore-result").hidden = false;
+    return;
+  }
+  // Success — keep the user on THIS screen (never auto-jump to Ready) so
+  // the real per-asset outcome list and the fresh-device disclosure are
+  // actually seen, not skipped past. `onRestoreContinue()` completes the
+  // transition once the user has read them.
+  pendingRestoreReadyView = result.ready;
+  byId<HTMLInputElement>("restore-passphrase").disabled = true;
+  byId<HTMLButtonElement>("restore-submit-btn").disabled = true;
+  byId("restore-result-headline").textContent = "Restore complete.";
+  byId(
+    "restore-result-detail",
+  ).textContent = `Your account identity (${result.ready.accountPublicIdentifier}) is now active on this device with a fresh Device identity.`;
+  renderRestoreAssetsList(result.assets ?? []);
+  byId("restore-result-success").hidden = false;
+  byId("restore-result").hidden = false;
+}
+
+function onRestoreContinue(): void {
+  if (pendingRestoreReadyView === undefined) return;
+  const ready = pendingRestoreReadyView;
+  pendingRestoreReadyView = undefined;
+  clearAllRendererContentState();
+  renderReady(ready);
+}
+
+async function onRecoveryExportToFile(): Promise<void> {
+  byId("recovery-export-feedback").textContent = "";
+  setBusy(true, "recovery-export-btn");
+  let result: { readonly outcome: string; readonly reason?: string; readonly path?: string };
+  try {
+    result = await window.fedosApp.recoveryExportToFile();
+  } finally {
+    setBusy(false, "recovery-export-btn");
+  }
+  if (result.outcome === "cancelled") {
+    byId("recovery-export-feedback").textContent = "Export cancelled — no file was saved.";
+    return;
+  }
+  if (result.outcome !== "ok" || result.path === undefined) {
+    const copy = describeRecoveryExportOutcome(result.outcome);
+    byId("recovery-export-feedback").textContent = `${copy.headline} ${copy.detail}`.trim();
+    return;
+  }
+  byId("recovery-export-feedback").textContent = `Backup saved to: ${result.path}`;
+}
+
 function stopRelayStatusPolling(): void {
   if (relayStatusIntervalId !== null) {
     clearInterval(relayStatusIntervalId);
@@ -5234,6 +5565,12 @@ function clearAllRendererContentState(): void {
   currentDeletionRequestId = null;
   archiveExportDestinationPath = null;
   archiveRestoreSourcePath = null;
+  // Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- same
+  // defense-in-depth discipline as `archiveExportDestinationPath`/
+  // `archiveRestoreSourcePath` immediately above: a prior session's chosen
+  // bundle bytes, inspected plan, or pending post-restore view must never
+  // survive into a fresh session.
+  resetRestoreBundleState();
   settingsWorkingCopy = null;
   localAccountPublicIdentifier = "";
   localDisplayLabel = "";
@@ -5282,6 +5619,7 @@ function clearAllRendererContentState(): void {
     "invite-error",
     "recovery-copy-feedback",
     "recovery-start-over-feedback",
+    "recovery-export-feedback",
     "settings-report",
     "settings-relay-error",
     "settings-relay-list",
@@ -5370,6 +5708,9 @@ document.addEventListener(
 byId<HTMLButtonElement>("welcome-create-btn").addEventListener("click", () => {
   showScreen("create");
 });
+byId<HTMLButtonElement>("welcome-restore-btn").addEventListener("click", () => {
+  onRestoreOpenScreen();
+});
 byId<HTMLButtonElement>("create-submit").addEventListener("click", () => {
   void onCreateSubmit();
 });
@@ -5407,6 +5748,36 @@ byId<HTMLButtonElement>("recovery-start-over-btn").addEventListener("click", () 
 });
 byId<HTMLButtonElement>("recovery-start-over-corrupt-btn").addEventListener("click", () => {
   void onRecoveryStartOverCorrupt();
+});
+
+// Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- Restore
+// screen wiring. `restore-back-btn` returns to Welcome via a fresh status
+// read (same discipline `retry-btn`/`onRecoveryRetry()` above already
+// use), never assuming "absent" outright.
+byId<HTMLButtonElement>("restore-choose-file-btn").addEventListener("click", () => {
+  void onRestoreChooseFile();
+});
+byId<HTMLButtonElement>("restore-paste-use-btn").addEventListener("click", () => {
+  onRestoreUsePastedText();
+});
+byId<HTMLButtonElement>("restore-inspect-btn").addEventListener("click", () => {
+  void onRestoreInspect();
+});
+byId<HTMLButtonElement>("restore-passphrase-show-hide").addEventListener("click", () => {
+  togglePasswordVisibility("restore-passphrase-show-hide", "restore-passphrase");
+});
+byId<HTMLButtonElement>("restore-submit-btn").addEventListener("click", () => {
+  void onRestoreSubmit();
+});
+byId<HTMLButtonElement>("restore-continue-btn").addEventListener("click", () => {
+  onRestoreContinue();
+});
+byId<HTMLButtonElement>("restore-back-btn").addEventListener("click", () => {
+  resetRestoreBundleState();
+  void refreshFromStatus();
+});
+byId<HTMLButtonElement>("recovery-export-btn").addEventListener("click", () => {
+  void onRecoveryExportToFile();
 });
 
 // Phase M — Enter submits the focused form's primary action.

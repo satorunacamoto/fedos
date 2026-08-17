@@ -161,6 +161,12 @@
       <p>Welcome. No local profile was found on this device.</p>
       <p class="warn" id="welcome-security-notice">This is a Closed Beta build: no independent, external security audit has been performed, and the installer is not code-signed. Do not use it to protect information where compromise would cause serious harm. See <code>KNOWN_LIMITATIONS.md</code> and the in-app Safety Center for the current, honest security state.</p>
       <button id="welcome-create-btn" type="button">Create a profile</button>
+      <!-- Disaster Recovery Product Closure arc, Track 1 (Recovery UI) --
+           a DISTINCT entry point from "Create a profile" and from the
+           unrelated "Start over" action on the (separate) recovery
+           screen: this brings back a PREVIOUS identity's data from a
+           backup file, it never discards/resets anything. -->
+      <button id="welcome-restore-btn" type="button">Restore from a backup</button>
     </section>
 
     <section id="screen-create">
@@ -217,6 +223,69 @@
       <button id="recovery-copy-btn" type="button">Copy diagnostic code</button>
       <p id="recovery-copy-feedback" role="status" aria-live="polite" class="muted"></p>
       <button id="quit-btn-recovery" type="button">Quit</button>
+    </section>
+
+    <!-- Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- a
+         DISTINCT screen from `screen-recovery` above: that screen's own
+         "Start over" DISCARDS an interrupted/corrupt local profile and
+         creates a fresh one; THIS screen brings back a PREVIOUS identity's
+         data from a backup file. Neither screen offers the other's action,
+         so a click here can never accidentally trigger Start Over or vice
+         versa. Reachable only from the Welcome screen (`presence ===
+         "absent"`) -- restoring, like create, only ever targets a
+         genuinely empty local profile location; see
+         `handleRecoveryRestore()`'s own `"already-exists"`/`"target-not-fresh"`
+         guards, `fedos_electron_beta_main.cts`. -->
+    <section id="screen-restore-bundle">
+      <p>Restore a previous identity's data from a FedOS Recovery Bundle backup file.</p>
+      <p class="warn">This can only restore into a completely empty location on this device — it never merges into or overwrites an existing profile. It is a different feature from "Start over" on the recovery screen: Start Over discards this device's own interrupted setup; Restore brings back a PREVIOUS identity's data from a backup.</p>
+      <p class="muted" id="restore-bundle-scope-note">A Recovery Bundle includes your account identity and (best-effort) your locally stored conversation/settings data as of the moment it was exported. It never includes your active Direct Ratchet sessions or any device's trust/registry — after restoring, you and each contact must re-establish secure sessions and device trust again before messaging works.</p>
+
+      <h3>Step 1 — Choose a bundle</h3>
+      <button id="restore-choose-file-btn" type="button">Choose bundle file…</button>
+      <p class="muted" id="restore-file-label"></p>
+      <details id="restore-paste-details">
+        <summary>Advanced: paste bundle text instead</summary>
+        <label for="restore-bundle-paste">Bundle text (base64)</label>
+        <textarea id="restore-bundle-paste" rows="3"></textarea>
+        <button id="restore-paste-use-btn" type="button">Use pasted text</button>
+      </details>
+      <div id="restore-choose-error" class="error" role="alert"></div>
+
+      <h3>Step 2 — Review what will be restored</h3>
+      <p class="muted">This step never asks for your passphrase and never changes anything on this device — it only reads the bundle's own claimed contents.</p>
+      <button id="restore-inspect-btn" type="button" disabled>Inspect bundle</button>
+      <div id="restore-plan" hidden>
+        <p id="restore-plan-summary"></p>
+        <p class="warn" id="restore-plan-staleness"></p>
+        <details id="restore-plan-technical-details">
+          <summary>Technical details (manifest)</summary>
+          <p class="muted" id="restore-plan-manifest-logs"></p>
+          <p class="muted" id="restore-plan-supported-logs"></p>
+          <p class="muted" id="restore-plan-excluded-fields"></p>
+        </details>
+      </div>
+      <div id="restore-inspect-error" class="error" role="alert"></div>
+
+      <h3>Step 3 — Enter the bundle's passphrase and restore</h3>
+      <label for="restore-passphrase">Passphrase</label>
+      <input id="restore-passphrase" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" disabled />
+      <button id="restore-passphrase-show-hide" type="button" aria-pressed="false">Show passphrase</button>
+      <div id="restore-submit-error" class="error" role="alert"></div>
+      <button id="restore-submit-btn" type="button" disabled>Restore</button>
+
+      <div id="restore-result" hidden>
+        <p class="warn" id="restore-result-headline"></p>
+        <p class="muted" id="restore-result-detail"></p>
+        <div id="restore-result-success" hidden>
+          <p class="warn" id="restore-fresh-device-disclosure">Your account identity was restored, but your Direct Ratchet secure conversation sessions and this device's trust with your contacts (Device Registry) were NOT restored — they never travel in a backup by design. Messaging will not work identically to before: you and each contact must re-establish a secure session, and each of your contacts' devices must re-learn to trust this device, before messages can flow again.</p>
+          <h4>What was restored</h4>
+          <ul class="plain-list" id="restore-assets-list"></ul>
+          <button id="restore-continue-btn" type="button">Continue to your account</button>
+        </div>
+      </div>
+
+      <button id="restore-back-btn" type="button">&larr; Back</button>
     </section>
 
     <section id="screen-ready">
@@ -852,6 +921,14 @@
 
           <p class="muted">Relay changes require a restart of this application to take effect. Nothing is applied until you press Save.</p>
           <button id="settings-save" type="button">Save settings</button>
+
+          <fieldset>
+            <legend>Backup (Disaster Recovery Bundle)</legend>
+            <p class="muted">Creates a single passphrase-protected backup file of your account identity and (best-effort) your locally stored conversation/settings data, as of right now.</p>
+            <p class="warn" id="recovery-export-scope-note">Does NOT include your active Direct Ratchet sessions or this device's trust with your contacts — those never travel in a backup by design. After restoring this backup on another device, you and each contact must re-establish secure sessions and device trust again before messaging works.</p>
+            <button id="recovery-export-btn" type="button">Export Backup…</button>
+            <p id="recovery-export-feedback" role="status" aria-live="polite" class="muted"></p>
+          </fieldset>
 
           <fieldset>
             <legend>Network Transport (Tor)</legend>

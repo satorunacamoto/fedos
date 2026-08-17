@@ -825,6 +825,8 @@ interface RecoveryRestoreRequestLike {
   readonly now: number;
   readonly targetCommerceRoot?: string;
   readonly targetSettingsPath?: string;
+  /** Disaster Recovery Product Closure arc, Track 3 (R2 follow-up) -- mirrors `FedosRecoveryBundleRestoreRequest.additionalFreshnessCheckPaths` (`fedos_recovery_bundle_import_coordinator.ts`). */
+  readonly additionalFreshnessCheckPaths?: readonly string[];
   readonly runtimeBoundary?: unknown;
 }
 interface RecoveryRestoreResultLike {
@@ -5270,6 +5272,18 @@ async function buildFreshCoordinator(): Promise<{
     deviceSyncSchedulerEnabled: true,
     deviceSyncAbandonmentPolicy: DEVICE_SYNC_ABANDONMENT_POLICY,
     deviceSyncAttemptFn: eventBridge.wrapAttemptFn(journalAttemptFn),
+    // Disaster Recovery Product Closure arc, Track 3 (R2 follow-up) --
+    // `navigationLogPath()`/`commerceNetworkProfileFilePath()` are real
+    // SIBLINGS of `paths.root` this Coordinator's own `paths` cannot see
+    // (only THIS file, which owns the wider `userData` layout, knows they
+    // exist). Threaded into every `createProfile()`/`resetInterruptedProfile()`/
+    // `resetCorruptReadyProfile()` call this single shared construction
+    // point backs, so a genuinely completed Start Over clears them too and
+    // a fresh create/restore correctly refuses if either is still present
+    // (`navigation.log`'s own leak: `FedosDesktopConversationWindowRegistry`
+    // reads it back unconditionally and serves it through the real
+    // `fedos-beta:status` channel to whichever identity is active).
+    additionalResidualPaths: [navigationLogPath(), commerceNetworkProfileFilePath()],
     ...secureRuntimeBundle,
   });
   coordinatorHandle = coordinator;
@@ -5722,6 +5736,11 @@ async function handleRecoveryRestore(payload: unknown) {
       now: Date.now(),
       targetCommerceRoot: path.join(dataDir(), "commerce"),
       targetSettingsPath: settingsFilePath(),
+      // Disaster Recovery Product Closure arc, Track 3 (R2 follow-up) --
+      // same reasoning as `buildFreshCoordinator()`'s own
+      // `additionalResidualPaths` above: `paths` (= `targetPaths`) cannot
+      // see these two real siblings of its own root.
+      additionalFreshnessCheckPaths: [navigationLogPath(), commerceNetworkProfileFilePath()],
       runtimeBoundary: productionRecoveryBundleRuntimeBoundary(m, built.masterSeedAuthority),
     });
     secretBytes.fill(0);
@@ -5802,6 +5821,74 @@ async function handleRecoveryExport() {
     return { outcome: exportResult.outcome, reason: exportResult.reason ?? "export did not complete" };
   }
   return { outcome: "ok", bundleBase64: Buffer.from(exportResult.bundleBytes).toString("base64") };
+}
+
+/**
+ * Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — the
+ * "export to a file the user picks" companion channel Track 1's own
+ * renderer needs. Deliberately does NOT reimplement the export itself:
+ * it calls the existing, unmodified `handleRecoveryExport()` above to get
+ * the real base64 bundle bytes (same real backend, same outcome
+ * vocabulary — a `"not-unlocked"`/`"failed"`/etc. outcome from that call
+ * is returned to the caller verbatim, unchanged), then adds ONLY the
+ * native save-dialog + file-write step, mirroring
+ * `handleAppArchiveChooseExportDestination()`'s own "one named channel,
+ * one user-chosen path, never a generic read/write-arbitrary-path"
+ * discipline. Never returns `bundleBase64`/raw bytes to the renderer on
+ * success — only the chosen path, so the primary UX never has to handle
+ * (and cannot accidentally display) raw sealed bundle material.
+ */
+async function handleRecoveryExportToFile(): Promise<{ readonly outcome: string; readonly reason?: string; readonly path?: string }> {
+  if (mainWindow === null) return { outcome: "failed", reason: "no active window" };
+  const exportResult = await handleRecoveryExport();
+  if (exportResult.outcome !== "ok" || typeof (exportResult as { bundleBase64?: unknown }).bundleBase64 !== "string") {
+    return exportResult as { readonly outcome: string; readonly reason?: string };
+  }
+  const dialogResult = await dialog.showSaveDialog(mainWindow, {
+    title: "Export FedOS Recovery Bundle",
+    defaultPath: "fedos-recovery-bundle.fedosrecovery",
+    filters: [{ name: "FedOS Recovery Bundle", extensions: ["fedosrecovery"] }],
+  });
+  if (dialogResult.canceled || dialogResult.filePath === undefined) return { outcome: "cancelled" };
+  try {
+    fs.writeFileSync(dialogResult.filePath, Buffer.from((exportResult as { bundleBase64: string }).bundleBase64, "base64"));
+  } catch {
+    return { outcome: "write-failed" };
+  }
+  return { outcome: "ok", path: dialogResult.filePath };
+}
+
+/**
+ * Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — pairs
+ * with `handleRecoveryExportToFile()` above: a native OPEN dialog + read
+ * step for the Restore screen's "choose a bundle file" entry point, so a
+ * real Restore flow is not limited to pasting base64 text by hand. Reads
+ * the chosen file and returns it re-encoded as base64 (the SAME transport
+ * shape `handleRecoveryInspect()`/`handleRecoveryRestore()` already
+ * expect as their own `bundleBytes` field, validated by the SAME
+ * `MAX_RECOVERY_BUNDLE_BASE64_CHARS` bound `validatedRecoveryBundleBytes()`
+ * enforces) plus the chosen path for display — never any other
+ * filesystem access, never a raw byte count/hex dump shown anywhere.
+ */
+async function handleRecoveryChooseBundleFile(): Promise<{ readonly outcome: string; readonly reason?: string; readonly path?: string; readonly bundleBase64?: string }> {
+  if (mainWindow === null) return { outcome: "failed", reason: "no active window" };
+  const dialogResult = await dialog.showOpenDialog(mainWindow, {
+    title: "Choose a FedOS Recovery Bundle",
+    properties: ["openFile"],
+    filters: [{ name: "FedOS Recovery Bundle", extensions: ["fedosrecovery"] }, { name: "All Files", extensions: ["*"] }],
+  });
+  if (dialogResult.canceled || dialogResult.filePaths.length === 0) return { outcome: "cancelled" };
+  const filePath = dialogResult.filePaths[0]!;
+  let raw: Buffer;
+  try {
+    raw = fs.readFileSync(filePath);
+  } catch {
+    return { outcome: "read-failed" };
+  }
+  if (raw.length === 0) return { outcome: "invalid-input", reason: "the chosen file is empty" };
+  const bundleBase64 = raw.toString("base64");
+  if (bundleBase64.length > MAX_RECOVERY_BUNDLE_BASE64_CHARS) return { outcome: "invalid-input", reason: "the chosen file is too large" };
+  return { outcome: "ok", path: filePath, bundleBase64 };
 }
 
 /** Phase G — Lock: stops background sync + the ONE Runtime (via the assembly), clears badge/tray to their inert "no active sensitive work" state, THEN the Coordinator's own lock() (safe second call). */
@@ -9014,6 +9101,11 @@ function registerIpcHandlers(): void {
   // against the SAME active profile are still serialized against each
   // other via `allowConcurrentSelf: false` (the registry's own default).
   ipcCommands.registerHandle(ipcMain, "fedos-profile:recovery-export", async () => handleRecoveryExport());
+  // Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — the
+  // Restore screen's own "choose a bundle file" picker. Pure dialog + file
+  // read, no profile state touched, so it is not in the "profile-lifecycle"
+  // group either — same reasoning as recovery-inspect immediately above.
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:recovery-choose-bundle-file", async () => handleRecoveryChooseBundleFile(), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-profile:lock", async () => handleLock(), { group: "profile-lifecycle", bumpsOwnGeneration: true });
   // FedOS Peer Device Discovery Arc P0 Closure (Agent F) -- "Start Over" on
   // the recovery screen. Same "profile-lifecycle" serialization group as
@@ -9112,6 +9204,11 @@ function registerIpcHandlers(): void {
   ipcCommands.registerHandle(ipcMain, "fedos-app:archive-workflow-warnings", (payload: unknown) => handleAppArchiveWorkflowWarnings(payload), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-app:archive-choose-export-destination", (payload: unknown) => handleAppArchiveChooseExportDestination(payload));
   ipcCommands.registerHandle(ipcMain, "fedos-app:archive-choose-source", async () => handleAppArchiveChooseSource());
+  // Disaster Recovery Product Closure arc, Track 1 (Recovery UI) -- the
+  // Settings "Export Backup" entry point. Delegates to the SAME
+  // `handleRecoveryExport()` the pre-existing `fedos-profile:recovery-export`
+  // channel already uses (see `handleRecoveryExportToFile()`'s own header).
+  ipcCommands.registerHandle(ipcMain, "fedos-app:recovery-export-to-file", async () => handleRecoveryExportToFile());
   // Phase H -- Device management.
   ipcCommands.registerHandle(ipcMain, "fedos-app:devices-list", async () => handleAppDevicesList(), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-app:device-detail", (payload: unknown) => handleAppDeviceDetail(payload), { allowConcurrentSelf: true });
@@ -9339,6 +9436,13 @@ app.whenReady().then(async () => {
         "profile-recovery-inspect": (payload) => handleRecoveryInspect(payload),
         "profile-recovery-restore": (payload) => handleRecoveryRestore(payload),
         "profile-recovery-export": () => handleRecoveryExport(),
+        // Disaster Recovery Product Closure arc, Track 3 (R2 follow-up) --
+        // the SAME real handler functions `registerIpcHandlers()` already
+        // registers for `fedos-profile:reset-interrupted`/`-reset-corrupt-ready`,
+        // needed to drive a real end-to-end Start-Over regression proof
+        // through this same acceptance-script harness.
+        "profile-reset-interrupted": () => handleResetInterruptedProfile(),
+        "profile-reset-corrupt-ready": () => handleResetCorruptReadyProfile(),
         "beta-status": () => handleBetaStatus(),
         "unified-graph": () => Promise.resolve(unifiedGraphDiagnostics()),
         "acceptance-create-direct-conversation": (payload) => handleAcceptanceCreateDirectConversation(payload),

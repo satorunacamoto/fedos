@@ -120,6 +120,77 @@ interface FedosBetaProfileBridge {
    * OPTIONAL for the same reason `resetInterrupted` is above.
    */
   readonly resetCorruptReady?: () => Promise<FedosBetaProfileCommandResult>;
+  /**
+   * Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — pure
+   * structural preview of a Recovery Bundle (mirrors
+   * `inspectFedosRecoveryBundle()`, root
+   * `src/os/messenger/desktop/recovery/fedos_recovery_bundle_import_coordinator.ts`).
+   * No passphrase, no mutation, never fails closed on a wrong secret (it
+   * never reads one) — safe to call before the user has decided to
+   * commit to a restore. OPTIONAL for the same reason `resetInterrupted`
+   * is above (this file's own header).
+   */
+  readonly recoveryInspect?: (bundleBase64: string) => Promise<FedosRecoveryInspectResult>;
+  /**
+   * Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — the
+   * actual restore mutation (mirrors `restoreFedosRecoveryBundle()`, same
+   * file as `recoveryInspect` above). Only ever succeeds against a
+   * genuinely fresh target — see that coordinator's own closed
+   * `FedosRecoveryBundleRestoreResult["outcome"]` vocabulary, echoed
+   * verbatim through `handleRecoveryRestore()`
+   * (`fedos_electron_beta_main.cts`). OPTIONAL for the same reason
+   * `resetInterrupted` is above.
+   */
+  readonly recoveryRestore?: (bundleBase64: string, passphrase: string) => Promise<FedosRecoveryRestoreResult>;
+  /**
+   * Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — native
+   * OPEN-dialog "choose a bundle file" companion for `recoveryInspect`/
+   * `recoveryRestore` above, mirroring `FedosAppBridge.archiveChooseSource`'s
+   * own "one named channel, returns only a chosen path" discipline, plus
+   * the file's own bytes re-encoded as base64 (the same transport shape
+   * `recoveryInspect`/`recoveryRestore` already expect). OPTIONAL for the
+   * same reason `resetInterrupted` is above.
+   */
+  readonly recoveryChooseBundleFile?: () => Promise<{ readonly outcome: string; readonly reason?: string; readonly path?: string; readonly bundleBase64?: string }>;
+}
+
+/** Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — mirrors `FedosRecoveryBundleRestorePlan` (`src/os/messenger/desktop/recovery/fedos_recovery_bundle_import_coordinator.ts`) at the IPC boundary. Every field here is non-secret (logical-name lists and a fixed staleness sentence only). */
+interface FedosRecoveryBundlePlanView {
+  readonly createdAt: number;
+  readonly hasDataPart: boolean;
+  readonly manifestIncludedLogs: readonly string[];
+  readonly currentlySupportedLogs: readonly string[];
+  readonly deliberatelyExcludedFieldNames: readonly string[];
+  readonly stalenessWarning: string;
+}
+
+/** Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — mirrors `FedosRecoveryBundleInspectResult`'s closed outcome vocabulary (`"ok"|"malformed"|"unsupported-version"`), plus the `"invalid-input"` shape `handleRecoveryInspect()` itself can also return for a malformed transport payload. */
+interface FedosRecoveryInspectResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly plan?: FedosRecoveryBundlePlanView;
+  readonly foundVersion?: unknown;
+}
+
+/** Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — mirrors `FedosRecoveryAssetOutcome` (same coordinator file as `FedosRecoveryBundlePlanView` above). `detail` is always a closed-vocabulary-ish, non-secret sentence, never raw sealed/manifest bytes. */
+interface FedosRecoveryAssetOutcomeView {
+  readonly name: string;
+  readonly classification: "recovered" | "reestablished" | "partial" | "lost";
+  readonly detail: string;
+}
+
+/** Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — mirrors `handleRecoveryRestore()`'s own real, closed outcome vocabulary verbatim (`fedos_electron_beta_main.cts`): `"ok"` (with `ready`+`assets`), `"malformed"`, `"wrong-secret"`, `"identity-restore-failed"`, `"account-identity-unresolved"`, `"data-part-restore-failed"`, `"descriptor-invalid"`, `"write-failed"`, `"target-not-fresh"`, `"already-exists"`, `"seed-unavailable"`, `"invalid-input"`, `"failed"`. */
+interface FedosRecoveryRestoreResult {
+  readonly outcome: string;
+  readonly reason?: string;
+  readonly ready?: {
+    readonly displayLabel: string;
+    readonly accountPublicIdentifier: string;
+    readonly localDeviceId: string;
+    readonly deviceTrustState: string;
+    readonly recoveryNotice: FedosProfileRecoveryNoticeView;
+  };
+  readonly assets?: readonly FedosRecoveryAssetOutcomeView[];
 }
 
 /** The Phase H Beta Home status surface — real, non-secret facts only (see `fedos_desktop_beta_*` value objects, `src/desktop/beta/`). */
@@ -606,6 +677,16 @@ interface FedosAppBridge {
   readonly archiveWorkflowWarnings: (operation: "inspect" | "preflightRestore" | "export" | "restore") => Promise<FedosAppCommandResult>;
   readonly archiveChooseExportDestination: (conversationId: string) => Promise<{ readonly outcome: string; readonly path?: string }>;
   readonly archiveChooseSource: () => Promise<{ readonly outcome: string; readonly path?: string }>;
+  /**
+   * Disaster Recovery Product Closure arc, Track 1 (Recovery UI) — the
+   * Settings "Export Backup" entry point. No arguments (the main process
+   * resolves the currently active, unlocked profile itself); drives a
+   * native save dialog then writes the bundle bytes to the chosen path.
+   * Never returns bundle bytes/base64 to the renderer — only a path, so
+   * the primary Export UX never has to handle raw sealed material. See
+   * `handleRecoveryExportToFile()`'s own header, `fedos_electron_beta_main.cts`.
+   */
+  readonly recoveryExportToFile: () => Promise<{ readonly outcome: string; readonly reason?: string; readonly path?: string }>;
   readonly devicesList: () => Promise<FedosAppCommandResult>;
   readonly deviceDetail: (deviceId: string) => Promise<FedosAppCommandResult>;
   readonly deviceRevoke: (deviceId: string, devicePublicKeyHex: string) => Promise<FedosAppCommandResult>;
