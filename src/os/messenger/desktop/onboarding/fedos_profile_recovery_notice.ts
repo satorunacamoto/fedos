@@ -18,6 +18,20 @@
  * as plaintext (this Arc has no authorization to add a plaintext-seed
  * display, and none exists to reuse — Phase I).
  *
+ * Product Durability mega-arc — every OTHER durable concern this profile
+ * owns (conversations, message history, Device trust, Direct Ratchet
+ * sessions, Commerce products/orders/receipts/purchased-content bytes,
+ * Signed Deletion state, Identity Transition state, app settings) is ALSO
+ * just a plain file directly under this SAME profile `root` directory
+ * (`fedos_local_profile_paths.ts` — every `*LogFile` field is
+ * `join(root, "<name>")`, zero subdirectories). This was previously true
+ * but undisclosed here: this notice named only the 2 files required for
+ * IDENTITY recovery, never told the user that backing up the WHOLE root
+ * directory recovers everything else too. `wholeProfileDirectoryRecommendation`
+ * states this honestly as a separate, additive fact — it does not change
+ * the 2-item `backupItems` list, which remains the correct MINIMUM for
+ * identity recovery alone.
+ *
  * HARD GUARDRAILS:
  *   - No secret, no sealed byte, no passphrase in the notice — only file
  *     PATHS and fixed human-readable strings.
@@ -46,6 +60,21 @@ export interface FedosProfileRecoveryNotice {
   readonly forgottenSecretIsUnrecoverable: true;
   /** Whether a conversation-data Archive export is separately available (recovers messages, NOT account authority). */
   readonly conversationArchiveExportAvailable: boolean;
+  /**
+   * Product Durability mega-arc — additive, honest fact: this profile's
+   * `root` directory (a non-secret path) contains every other durable
+   * concern this profile owns, not just the 2 `backupItems` above. Backing
+   * up the WHOLE directory (not just those 2 files) additionally recovers
+   * conversations, message history, Device trust, Direct Ratchet sessions,
+   * Commerce data, Signed Deletion state, Identity Transition state, and
+   * app settings — none of which the 2-item minimum list above covers on
+   * its own. This is a RECOMMENDATION, not a new requirement: the 2-item
+   * list remains independently sufficient for identity recovery alone.
+   */
+  readonly wholeProfileDirectoryRecommendation: {
+    readonly path: string;
+    readonly text: string;
+  };
 }
 
 const RECOVERY_WARNINGS: readonly string[] = Object.freeze([
@@ -85,5 +114,13 @@ export function buildFedosProfileRecoveryNotice(
     warnings: RECOVERY_WARNINGS,
     forgottenSecretIsUnrecoverable: true,
     conversationArchiveExportAvailable: options.conversationArchiveExportAvailable,
+    wholeProfileDirectoryRecommendation: Object.freeze({
+      path: paths.root,
+      text:
+        "For a more complete backup, copy this ENTIRE folder (not just the two files above) somewhere safe. " +
+        "It also contains your conversations, message history, Device trust, Direct Ratchet sessions, Commerce data, " +
+        "deletion and identity-change records, and app settings. This is a recommendation, not a requirement — " +
+        "the two files above are still all you need to recover your identity alone.",
+    }),
   });
 }

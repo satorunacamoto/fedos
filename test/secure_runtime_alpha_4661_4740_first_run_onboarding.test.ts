@@ -407,6 +407,18 @@ describe("Phase I — recovery material notice", () => {
     // No plaintext seed / passphrase anywhere in the notice.
     expect(JSON.stringify(notice)).not.toMatch(/plaintext seed|\bnsec1/i);
   });
+
+  it("Product Durability mega-arc: additively recommends a whole-profile-directory backup, naming the real root path, without weakening the 2-item minimum required list", () => {
+    const paths = planFedosLocalProfilePaths(makeTmpRoot())!;
+    const notice = buildFedosProfileRecoveryNotice(paths, { conversationArchiveExportAvailable: false });
+    expect(notice.wholeProfileDirectoryRecommendation.path).toBe(paths.root);
+    expect(notice.wholeProfileDirectoryRecommendation.text).toMatch(/conversations/i);
+    expect(notice.wholeProfileDirectoryRecommendation.text).toMatch(/recommendation, not a requirement/i);
+    // The 2-item minimum list is unchanged by this additive field.
+    expect(notice.backupItems).toHaveLength(2);
+    // No plaintext seed / passphrase anywhere in the notice, including the new field.
+    expect(JSON.stringify(notice)).not.toMatch(/plaintext seed|\bnsec1/i);
+  });
 });
 
 // ---------------------------------------------------------------------
