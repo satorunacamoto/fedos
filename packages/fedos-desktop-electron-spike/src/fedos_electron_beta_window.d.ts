@@ -609,6 +609,8 @@ interface FedosAppBridge {
   readonly peerDeviceAnnouncementListObserved: () => Promise<FedosAppCommandResult>;
   readonly settingsLoad: () => Promise<FedosAppCommandResult>;
   readonly relayStatus: () => Promise<FedosAppCommandResult>;
+  /** Public Relay Reliability + Tor Security UI arc — real, live `FedosStrictTransportPolicy` state (never cached, never persisted). `value: { state: "disabled"|"starting"|"ready"|"degraded"|"failed-closed"; enabled: boolean }`. */
+  readonly torTransportState: () => Promise<FedosAppCommandResult>;
   /** Commerce Reachable Catalog + Product Surface Phase 1 — read-only. */
   readonly commerceCatalogList: () => Promise<FedosCommerceCatalogListResult>;
   /** Real Two-Party Commerce + UX P0/P1 Closure arc (Agent S) -- `previewActorPubkey` optional/additive, see `FedosCommerceProductDetail.isPreview`. */

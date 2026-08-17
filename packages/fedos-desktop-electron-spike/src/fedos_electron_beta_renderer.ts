@@ -4630,11 +4630,49 @@ async function reloadSettingsData(): Promise<void> {
   renderSettingsForm();
 }
 
+/**
+ * Public Relay Reliability + Gift-Wrap Subscription Narrowing arc --
+ * Tor Security UI (mandate section 17-22). Reads `FedosStrictTransportPolicy`'s
+ * own real, live state via `torTransportState()` (`fedos-app:tor-transport-state`,
+ * added by the prior arc's own backend-only pass) -- never a cached or
+ * derived copy, never persisted across restart (mandate section 22: "no
+ * persisted false Ready"). A genuine live IPC call every time the
+ * Settings screen is opened, matching this codebase's own established
+ * "no push/poll, explicit refresh" convention (see the Commerce Orders
+ * refresh functions immediately below) rather than adding a new
+ * background polling loop -- disclosed limitation: does not
+ * auto-refresh while the user stays parked on this screen without
+ * re-entering it.
+ */
+async function refreshTorTransportStatus(): Promise<void> {
+  const el = byId("settings-tor-status");
+  const result = await window.fedosApp.torTransportState();
+  if (result.outcome !== "ok") {
+    el.textContent = "Tor transport: status unavailable";
+    return;
+  }
+  const value = result.value as { readonly enabled: boolean; readonly state: "disabled" | "starting" | "ready" | "degraded" | "failed-closed" };
+  if (!value.enabled || value.state === "disabled") {
+    el.textContent = "Tor transport: Off";
+    return;
+  }
+  // Mandate section 17/20: only these four truthful labels -- never
+  // "Anonymous"/"Untraceable"/"Invisible"/"Fully private" anywhere.
+  const label: Record<"starting" | "ready" | "degraded" | "failed-closed", string> = {
+    starting: "Starting — network traffic is blocked until Tor is ready",
+    ready: "Ready — network traffic is routed through Tor",
+    degraded: "Recovering — Tor was ready and is re-checking now; traffic stays blocked",
+    "failed-closed": "Unavailable — Tor is not ready; network traffic is blocked (no direct fallback)",
+  };
+  el.textContent = `Tor transport: ${label[value.state]}`;
+}
+
 async function refreshSettings(): Promise<void> {
   clearError("settings-error");
   byId("settings-report").textContent = "";
   await reloadSettingsData();
   await refreshCommerceNetworkProfile();
+  await refreshTorTransportStatus();
 }
 
 // ---------------------------------------------------------------------

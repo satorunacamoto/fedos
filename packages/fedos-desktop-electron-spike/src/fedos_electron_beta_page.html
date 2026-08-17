@@ -843,6 +843,12 @@
           <button id="settings-save" type="button">Save settings</button>
 
           <fieldset>
+            <legend>Network Transport (Tor)</legend>
+            <p id="settings-tor-status" role="status" aria-live="polite">Tor transport: Off</p>
+            <p class="muted" id="settings-tor-explainer">When strict Tor routing is enabled, network activity is blocked until the Tor transport is ready. Tor changes the network route; it does not verify who the other person is, and does not guarantee anonymity.</p>
+          </fieldset>
+
+          <fieldset>
             <legend>Commerce Nostr Publication (experimental)</legend>
             <p class="warn">Optional. Publishing Commerce listings to Nostr makes them visible to relay operators and anyone else observing the relay. Local Only (the default) never reaches the network.</p>
             <div id="commerce-network-profile-error" class="error" role="alert"></div>
