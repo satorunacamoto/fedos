@@ -245,7 +245,8 @@ export class FedosConversationDirectMessagingCoordinator {
 
     if (result.outcome === "sent-locally" && this.#deps.ratchetDelivery !== undefined) {
       const delivery = await this.#deps.ratchetDelivery.sendRatchetMailboxNip17(result.envelopeId, conversationId, plaintext);
-      return forwardSecrecy === undefined ? { ...result, delivery } : { ...result, delivery, forwardSecrecy };
+      const route = "direct-ratchet" as const;
+      return forwardSecrecy === undefined ? { ...result, delivery, route } : { ...result, delivery, route, forwardSecrecy };
     }
     if (result.outcome === "sent-locally" && this.#deps.delivery !== undefined) {
       // Secure Runtime Alpha 7401-7480 (FedOS Direct Conversation Route
@@ -279,7 +280,8 @@ export class FedosConversationDirectMessagingCoordinator {
         }),
       );
       const delivery = await this.#deps.delivery.sendMailboxNip17(result.envelopeId, conversationId, wireBytes);
-      return forwardSecrecy === undefined ? { ...result, delivery } : { ...result, delivery, forwardSecrecy };
+      const route = "legacy-nip17" as const;
+      return forwardSecrecy === undefined ? { ...result, delivery, route } : { ...result, delivery, route, forwardSecrecy };
     }
 
     if (result.outcome === "sent-locally" && forwardSecrecy !== undefined) return { ...result, forwardSecrecy };

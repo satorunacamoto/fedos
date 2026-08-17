@@ -76,6 +76,40 @@ export interface FedosContentAccessorMessageView {
 }
 
 /**
+ * FedOS Message Delivery Truth arc — a SEPARATE fact from `fanout`/
+ * `localWrite`, mirroring `FedosConversationDirectMessageSendResult.delivery`'s
+ * own "never label Relay ACK as recipient delivery, return SEPARATE facts"
+ * discipline (Alpha 1851) one layer up, into the application/presentation
+ * boundary. This is the field that used to be silently thrown away: a
+ * Direct send's real `result.delivery` (already correctly awaited and
+ * carried by the Runtime coordinator) reached this file's own
+ * `sendMessage()` and was discarded in favor of a hardcoded
+ * `fanout: "not-applicable"` — which is honest about fan-out (a Direct
+ * send genuinely has none) but said nothing at all about whether the
+ * message actually queued for delivery, and silently dropped a real
+ * failure (`crypto-unavailable`/`route-unavailable`/etc.) as if it had
+ * never happened.
+ *
+ * Only ever reflects what the current architecture can actually prove
+ * synchronously at send time: whether the message was handed to a real
+ * transport/ratchet delivery attempt and what that attempt's own closed
+ * outcome was. `"queued"` means genuinely queued for asynchronous relay
+ * delivery via the existing outbox/mailbox mechanism — NEVER a relay ACK,
+ * NEVER "the recipient received it" (this codebase has no synchronous
+ * relay-ACK-to-caller path today; claiming one would itself be a new
+ * lie). `undefined` (the field entirely absent) means no delivery
+ * dependency was configured for this send at all — a real, honest
+ * "unknown" distinct from every other state, never coerced to `"queued"`.
+ */
+export type FedosContentAccessorDeliveryRoute = "direct-ratchet" | "legacy-nip17";
+
+export type FedosContentAccessorDeliveryFact =
+  | { readonly route: FedosContentAccessorDeliveryRoute; readonly state: "queued" }
+  | { readonly route: FedosContentAccessorDeliveryRoute; readonly state: "route-unavailable"; readonly reason: string }
+  | { readonly route: FedosContentAccessorDeliveryRoute; readonly state: "unavailable"; readonly reason: string }
+  | { readonly route: FedosContentAccessorDeliveryRoute; readonly state: "failed"; readonly reason: string };
+
+/**
  * The result of a just-performed `sendMessage()`/`replyToMessage()` call —
  * deliberately NOT a `FedosContentAccessorMessageView` (the caller already
  * knows the plaintext it just sent; re-embedding it would invite a second,
@@ -86,7 +120,9 @@ export interface FedosContentAccessorMessageView {
  * recipient's own Envelope failed while at least one other succeeded (a
  * whole-operation failure — zero recipients stored — is a
  * `FedosContentAccessorFailure` instead, never an `ok` result nobody can
- * actually read).
+ * actually read). `delivery` is Direct-only (see its own header above) —
+ * always `undefined` for a Group send, which already reports its own real
+ * per-recipient outcome via `fanout`.
  */
 export interface FedosContentAccessorSendResult {
   readonly messageId: string;
@@ -94,6 +130,7 @@ export interface FedosContentAccessorSendResult {
   readonly createdAt: number;
   readonly localWrite: "stored";
   readonly fanout: "not-applicable" | "complete" | "partial";
+  readonly delivery?: FedosContentAccessorDeliveryFact;
 }
 
 export interface FedosContentAccessorSearchHit {

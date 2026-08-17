@@ -37,11 +37,24 @@ import type { FedosPrivateWireDeliveryQueueOutcome } from "../../adapters/nostr/
 import type { FedosDirectRatchetSendOutcome } from "../ratchet/fedos_direct_ratchet_outbound_integration.js";
 import type { FedosForwardSecrecyUnavailableReason } from "../ratchet/fedos_direct_conversation_forward_secrecy_route.js";
 
+export type FedosConversationDirectMessageDeliveryRoute = "direct-ratchet" | "legacy-nip17";
+
 export type FedosConversationDirectMessageSendResult =
   | {
       readonly outcome: "sent-locally";
       readonly envelopeId: string;
       readonly delivery?: FedosPrivateWireDeliveryQueueOutcome | FedosDirectRatchetSendOutcome;
+      /**
+       * FedOS Message Delivery Truth arc — ADDITIVE, present iff `delivery`
+       * is, naming which of the two configured delivery dependencies
+       * (`ratchetDelivery`/`delivery`) actually ran. Exists because several
+       * `delivery` outcome strings are structurally identical between the
+       * two real union members it can hold (e.g. `"crypto-unavailable"`),
+       * so a downstream caller cannot always tell them apart from
+       * `delivery`'s own shape alone — this field is set by the coordinator
+       * branch that unambiguously knows, never inferred.
+       */
+      readonly route?: FedosConversationDirectMessageDeliveryRoute;
       /**
        * FedOS Conversation Forward Secrecy (Phase 1) — ADDITIVE, OPTIONAL,
        * present only when a caller supplied `forwardSecrecySelector`.

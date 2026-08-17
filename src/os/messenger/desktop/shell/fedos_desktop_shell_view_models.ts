@@ -34,6 +34,9 @@ import type { FedosConversationMembership } from "../../conversations/membership
 import type { FedosConversationParticipantReference } from "../../conversations/membership/fedos_conversation_participant_reference.js";
 import type { FedosConversationConstructionCoordinationPhase } from "../../conversations/construction/coordination/fedos_persisted_conversation_construction_coordination_v1.js";
 import type { FedosConversationCapabilityDescriptor } from "../../conversations/capability/fedos_conversation_capability_descriptor.js";
+import type { FedosContentAccessorDeliveryFact } from "../content_accessor/fedos_desktop_conversation_content_accessor_result.js";
+
+export type { FedosContentAccessorDeliveryFact };
 
 /**
  * `activationStatus` is the live `readinessForConversation().overall`
@@ -109,6 +112,8 @@ export interface FedosMessageSendResultView {
   readonly createdAt: number;
   readonly localWrite: "stored";
   readonly fanout: "not-applicable" | "complete" | "partial";
+  /** FedOS Message Delivery Truth arc — see `FedosContentAccessorDeliveryFact`'s own header. `undefined` for a Group send or when no delivery dependency was configured. */
+  readonly delivery?: FedosContentAccessorDeliveryFact;
 }
 
 export interface FedosIssuedInvitationView {

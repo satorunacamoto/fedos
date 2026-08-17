@@ -61,7 +61,100 @@ import {
   type FedosContentAccessorSearchHit,
   type FedosContentAccessorArchiveCommand,
   type FedosContentAccessorArchiveValue,
+  type FedosContentAccessorDeliveryFact,
+  type FedosContentAccessorDeliveryRoute,
 } from "./fedos_desktop_conversation_content_accessor_result.js";
+import type { FedosPrivateWireDeliveryQueueOutcome } from "../../adapters/nostr/transport/fedos_private_wire_prepared_delivery.js";
+import type { FedosDirectRatchetSendOutcome } from "../../conversations/ratchet/fedos_direct_ratchet_outbound_integration.js";
+
+/**
+ * FedOS Message Delivery Truth arc — the ONE place a Runtime-layer
+ * `FedosPrivateWireDeliveryQueueOutcome` (legacy NIP-17 route) is mapped
+ * to this file's own presentation-safe `FedosContentAccessorDeliveryFact`.
+ * Every branch of the real, closed source vocabulary is mapped
+ * explicitly — no default/fallthrough case, so a future addition to that
+ * vocabulary fails to compile here rather than silently reading as
+ * `"queued"`.
+ */
+function mapWireDeliveryQueueOutcome(route: FedosContentAccessorDeliveryRoute, outcome: FedosPrivateWireDeliveryQueueOutcome): FedosContentAccessorDeliveryFact {
+  switch (outcome.outcome) {
+    case "queued":
+      return { route, state: "queued" };
+    case "route-unavailable":
+      return { route, state: "route-unavailable", reason: "route-unavailable" };
+    case "unsupported-recipient":
+      return { route, state: "route-unavailable", reason: "unsupported-recipient" };
+    case "identity-unavailable":
+      return { route, state: "unavailable", reason: "identity-unavailable" };
+    case "unauthorized":
+      return { route, state: "unavailable", reason: "unauthorized" };
+    case "crypto-unavailable":
+      return { route, state: "unavailable", reason: "crypto-unavailable" };
+    case "invalid-input":
+      return { route, state: "failed", reason: "invalid-input" };
+    case "persistence-failed":
+      return { route, state: "failed", reason: "persistence-failed" };
+    case "failed":
+      return { route, state: "failed", reason: "failed" };
+  }
+}
+
+/**
+ * Same discipline as `mapWireDeliveryQueueOutcome()` immediately above,
+ * for the Direct Ratchet route's own closed outcome vocabulary
+ * (`FedosDirectRatchetSendOutcome`). Its own `"queued"` case wraps a
+ * REAL `FedosPrivateWireDeliveryQueueOutcome` (the underlying NIP-17
+ * mailbox send the Ratchet route still uses to actually move bytes) —
+ * delegated to the same mapper above rather than duplicating its cases,
+ * so the two routes can never silently drift apart.
+ */
+function mapDirectRatchetSendOutcome(outcome: FedosDirectRatchetSendOutcome): FedosContentAccessorDeliveryFact {
+  const route: FedosContentAccessorDeliveryRoute = "direct-ratchet";
+  switch (outcome.outcome) {
+    case "queued":
+      return mapWireDeliveryQueueOutcome(route, outcome.queue);
+    case "route-unavailable":
+      return { route, state: "route-unavailable", reason: outcome.reason };
+    case "crypto-unavailable":
+      return { route, state: "unavailable", reason: "crypto-unavailable" };
+    case "persistence-failed":
+      return { route, state: "failed", reason: "persistence-failed" };
+    case "not-direct":
+      return { route, state: "unavailable", reason: "not-direct" };
+    case "identity-unavailable":
+      return { route, state: "unavailable", reason: "identity-unavailable" };
+  }
+}
+
+/**
+ * FedOS Message Delivery Truth arc — the ONE place `sendDirectMessage()`'s
+ * own already-correct, already-awaited `result.delivery` (see
+ * `fedos_conversation_direct_message_send_result.ts`'s own header, Alpha
+ * 1851/5561-5640: a SEPARATE fact from local storage, present only when a
+ * delivery dependency was actually configured) is turned into this file's
+ * presentation-safe fact instead of being silently discarded. `undefined`
+ * in, `undefined` out — a send with no delivery dependency configured at
+ * all stays honestly `undefined`, never coerced into a fabricated
+ * `"queued"`.
+ */
+/**
+ * `route` is `result.route` (see `fedos_conversation_direct_message_send_result.ts`'s
+ * own header) — the coordinator's OWN unambiguous record of which branch
+ * ran, never guessed from `delivery`'s runtime shape: several outcome
+ * strings (`"crypto-unavailable"`/`"persistence-failed"`/
+ * `"identity-unavailable"`) are structurally identical between the two
+ * real union members `delivery` can hold, so inferring the route from
+ * shape alone would be unreliable for exactly the failure cases this fix
+ * exists to report accurately.
+ */
+function toContentAccessorDeliveryFact(
+  route: FedosContentAccessorDeliveryRoute | undefined,
+  delivery: FedosPrivateWireDeliveryQueueOutcome | FedosDirectRatchetSendOutcome | undefined,
+): FedosContentAccessorDeliveryFact | undefined {
+  if (delivery === undefined || route === undefined) return undefined;
+  if (route === "direct-ratchet") return mapDirectRatchetSendOutcome(delivery as FedosDirectRatchetSendOutcome);
+  return mapWireDeliveryQueueOutcome("legacy-nip17", delivery as FedosPrivateWireDeliveryQueueOutcome);
+}
 
 export interface FedosDesktopConversationContentAccessorDependencies {
   readonly conversationRuntime: FedosConversationRuntime;
@@ -310,8 +403,16 @@ export class FedosDesktopConversationContentAccessor {
           const envelope = this.#deps.conversationRuntime.getConversationMessageEnvelope(conversationId, result.envelopeId);
           if (envelope === null) return fedosContentAccessorFailure("failed", "sent but envelope metadata could not be re-read");
           this.#searchIndex.indexEnvelope({ envelope, text: body });
+          const delivery = toContentAccessorDeliveryFact(result.route, result.delivery);
           return fedosContentAccessorOk(
-            Object.freeze({ messageId: result.envelopeId, conversationId, createdAt: envelope.createdAt, localWrite: "stored" as const, fanout: "not-applicable" as const }),
+            Object.freeze({
+              messageId: result.envelopeId,
+              conversationId,
+              createdAt: envelope.createdAt,
+              localWrite: "stored" as const,
+              fanout: "not-applicable" as const,
+              ...(delivery === undefined ? {} : { delivery }),
+            }),
           );
         }
         case "invalid-input":

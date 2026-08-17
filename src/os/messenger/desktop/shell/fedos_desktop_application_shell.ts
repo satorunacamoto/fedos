@@ -236,6 +236,7 @@ function toShellSendResultView(conversationId: string, result: FedosContentAcces
     createdAt: result.createdAt,
     localWrite: result.localWrite,
     fanout: result.fanout,
+    ...(result.delivery === undefined ? {} : { delivery: result.delivery }),
   });
 }
 
