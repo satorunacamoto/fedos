@@ -270,6 +270,7 @@ const fedosApp: FedosAppBridge = Object.freeze({
   peerDeviceAnnouncementListObserved: () => ipcRenderer.invoke("fedos-app:peer-device-announcement-list-observed"),
   settingsLoad: () => ipcRenderer.invoke("fedos-app:settings-load"),
   relayStatus: () => ipcRenderer.invoke("fedos-app:relay-status"),
+  torTransportState: () => ipcRenderer.invoke("fedos-app:tor-transport-state"),
   // Commerce Reachable Catalog + Product Surface Phase 1 -- read-only,
   // same bounded-string discipline as every method above.
   commerceCatalogList: () => ipcRenderer.invoke("fedos-app:commerce-catalog-list"),

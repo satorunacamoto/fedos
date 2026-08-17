@@ -8510,6 +8510,28 @@ async function handleAppSettingsLoad() {
 }
 
 /**
+ * Public Tor Validation arc -- Tor Security UI (mandate section 17-22).
+ * Reads `strictTransportPolicy`'s OWN real, live `state()` directly --
+ * never a cached/derived copy, never persisted across restart (mandate
+ * section 21/31: no stale/false READY). Deliberately reachable
+ * regardless of `activeAssembly` (unlike `handleAppSettingsLoad()` above):
+ * `strictTransportPolicy` is a real, process-wide, module-level object
+ * constructed once at launch (line ~206), independent of any profile
+ * being unlocked -- the ordinary case (STRICT_TOR_ENABLED unset) reports
+ * the honest, permanent "disabled" state even before any profile exists,
+ * never a fabricated "unavailable" gate rejection for a fact that is
+ * genuinely already known. Never returns a boolean flag alone (mandate
+ * section 7): the full 5-value `FedosStrictTransportState` union is
+ * returned verbatim, so a caller can distinguish "disabled" from
+ * "starting"/"ready"/"degraded"/"failed-closed" -- collapsing any of
+ * these into a single "on/off" reading would misrepresent the real
+ * runtime state this arc's whole architecture exists to keep honest.
+ */
+function handleAppTorTransportState() {
+  return { outcome: "ok", value: { state: strictTransportPolicy.state(), enabled: strictTransportPolicy.isStrictModeEnabled() } };
+}
+
+/**
  * Secure Runtime Alpha 8121-8200 -- real, disclosed Phase K gap this Arc's
  * own extended vertical slice found live: the nav bar's own `#app-status-area`
  * was wired in the renderer but never actually populated with real Relay
@@ -8698,6 +8720,7 @@ function registerIpcHandlers(): void {
   // Phase C -- Settings read (write already exists as `fedos-beta:settings-plan`/`:settings-apply`).
   ipcCommands.registerHandle(ipcMain, "fedos-app:settings-load", async () => handleAppSettingsLoad(), { allowConcurrentSelf: true });
   ipcCommands.registerHandle(ipcMain, "fedos-app:relay-status", async () => handleAppRelayStatus(), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-app:tor-transport-state", async () => handleAppTorTransportState(), { allowConcurrentSelf: true });
   // Commerce Reachable Catalog + Product Surface Phase 1 -- exactly one
   // new, bounded IPC channel family. Read-only; never gated on shell/
   // profile readiness (see the handlers' own header comment).
@@ -8894,6 +8917,7 @@ app.whenReady().then(async () => {
         "acceptance-direct-ratchet-status": (payload) => handleAcceptanceDirectRatchetStatus(payload),
         "acceptance-direct-ratchet-status-poll-until-active": (payload) => handleAcceptanceDirectRatchetStatusPollUntilActive(payload),
         "acceptance-direct-ratchet-live-verification": (payload) => handleAcceptanceDirectRatchetLiveVerification(payload),
+        "acceptance-tor-transport-state": () => Promise.resolve(handleAppTorTransportState()),
         "acceptance-list-messages-poll-until-count": (payload) => handleAcceptanceListMessagesPollUntilCount(payload),
         "acceptance-create-conversation-invitation": (payload) => handleAcceptanceCreateConversationInvitation(payload),
         "acceptance-search": (payload) => handleAcceptanceSearch(payload),
