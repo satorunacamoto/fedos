@@ -20,3 +20,44 @@ touched file (998 total pre-existing errors, unchanged in kind from the known
 Full release gates (test:current, cargo test/build, WASM build, Electron package where
 feasible) and installed regression checks are recorded separately — see the final
 coordinator report for FINAL CandidateHead/EvidenceHead and gate results.
+
+## Independent mini-red-team (3 fresh, non-self-grading roles) — findings
+
+Three independent agents (Security, Normal-User/Data-Loss, Release/Operations), each with
+no prior context on this arc's own work, independently re-verified all 5 closed findings
+from scratch against source and real test execution. All 5 were VERIFIED or PARTIALLY
+VERIFIED (none REFUTED at the mechanism level). They also found:
+
+1. **REAL, ARC-CAUSED GAP (now fixed):** `fedos_electron_beta_preload.cts` still typed
+   its `fedosProfile` export as the OLD `FedosProfileBridge` name after the un-merge fix
+   renamed the interface — silently resolving to the wrong (unlock window's) interface.
+   Also caught a real regression in `secure_runtime_alpha_8041_8120_structural_guards.test.ts`
+   (a hard-coded assertion against the old type name) that the original fix pass never
+   re-ran (only a narrower test slice was checked, not the full `test:electron-spike`
+   suite). **Both fixed** in a follow-up commit, along with a related, independently-found
+   `FedosProfileStatusResult` merge gap (same bug class, was inert but structurally
+   identical) and a CRLF line-ending regression the Python-based bulk renames introduced
+   (which had silently broken an unrelated, pre-existing fixed-width-offset test by
+   pushing a target string 74 bytes past its 2600-char search window).
+2. **NEW P2 (not fixed this pass, documented):** the delivery-status fix's `#chat-error`
+   box shows a raw internal reason slug (e.g. `persistence-failed`, `crypto-unavailable`)
+   verbatim to the user on non-queued outcomes, instead of translated human text — the
+   quieter `#chat-send-feedback` line IS correctly translated, but the more prominent
+   error box bypasses that table. Recommend: extend `CHAT_SEND_DELIVERY_STATE_TEXT` (or
+   an equivalent reason-code map) to cover `delivery.reason` before it reaches
+   `#chat-error`.
+3. **NEW P1 (not fixed this pass, documented — pre-existing, not caused by this arc):**
+   `resetCorruptReadyProfile()` ("Start Over" on a corrupted profile) deletes only the 2
+   identity/seal files, never touches the ~28 other profile-scoped NDJSON files
+   (conversations, board, device registry, etc.). A fresh identity created afterward, in
+   the same profile directory, will hydrate and display the destroyed identity's old
+   conversation/thread *metadata* (message bodies stay encrypted/unreadable, but
+   participant references and thread structure leak across the identity boundary).
+   Untested anywhere in the repo, undisclosed in current docs. This bug predates this
+   arc entirely (the corrupt-profile fix itself landed on an earlier, unrelated arc) —
+   flagged here because independent verification of *this* arc's related backup-notice
+   fix surfaced it. Recommend as a priority follow-up before public release, given
+   "Start Over" is the ONLY recovery path from a corrupted profile.
+
+Full independent verification narrative available in this session's transcript; not
+separately filed here to keep this matrix scannable.
