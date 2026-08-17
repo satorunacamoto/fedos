@@ -1312,4 +1312,53 @@ describe("Phase T — widened freshness check + widened reset close the Start-Ov
     expect(created.outcome).toBe("ok");
     await coordinator.lock();
   });
+
+  it("catches residue this planner has NO named field for -- e.g. a 'commerce/' subdirectory an Electron-main-process-level caller creates directly under the same root (self-discovered gap: the original per-leaf-name check could never see this)", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    const signing = new RealFedosNostrSigningAuthority();
+    await makeCoordinator(root, { accountSigningAuthority: signing }).createProfile(
+      { displayLabel: "Identity A with Commerce data" },
+      fedosProfileUnlockSecretFromUtf8("identity-a-commerce-secret"),
+    );
+
+    // Mirrors `commerceDurableFilePath()` in fedos_electron_beta_main.cts:
+    // `<dataDir()>/commerce/<name>.ndjson` -- a real subdirectory this
+    // planner (`fedos_local_profile_paths.ts`) has zero named-field
+    // knowledge of, created directly under the SAME profile root.
+    const commerceDir = join(root, "commerce");
+    mkdirSync(commerceDir, { recursive: true });
+    writeFileSync(join(commerceDir, "products.ndjson"), '{"kind":"product","body":"Identity A private listing"}\n', "utf8");
+
+    rmSync(paths.sealedMasterSeedFile, { force: true });
+    const relaunch = makeCoordinator(root, { accountSigningAuthority: signing });
+    relaunch.detectProfileState();
+    const reset = await relaunch.resetCorruptReadyProfile();
+    expect(reset.outcome).toBe("ok");
+    // Start Over must genuinely clear the Commerce directory too -- not
+    // just the 2 identity files or the named NDJSON leaves this planner
+    // happens to know about.
+    expect(existsSync(commerceDir), "Commerce data must not survive Start Over even though this planner never named it").toBe(false);
+
+    const attemptB = await relaunch.createProfile(
+      { displayLabel: "Identity B" },
+      fedosProfileUnlockSecretFromUtf8("identity-b-commerce-secret"),
+    );
+    expect(attemptB.outcome).toBe("ok");
+    await relaunch.lock();
+  });
+
+  it("createProfile() REFUSES when only an unnamed residual directory (no known leaf) exists -- proves the directory-listing check, not just the old per-leaf-name check, is what's gating this", async () => {
+    const root = makeTmpRoot();
+    const paths = planFedosLocalProfilePaths(root)!;
+    ensureFedosLocalProfileDirectories(paths);
+    const commerceDir = join(root, "commerce");
+    mkdirSync(commerceDir, { recursive: true });
+    writeFileSync(join(commerceDir, "orders.ndjson"), '{"kind":"order"}\n', "utf8");
+
+    const coordinator = makeCoordinator(root);
+    const attempt = await coordinator.createProfile({ displayLabel: "Should be refused" }, fedosProfileUnlockSecretFromUtf8("refused-secret-value"));
+    expect(attempt.outcome).toBe("residual-data-present");
+    expect(existsSync(paths.profileDescriptorFile)).toBe(false);
+  });
 });

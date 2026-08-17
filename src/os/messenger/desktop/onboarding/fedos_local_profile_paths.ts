@@ -33,8 +33,8 @@
  * packaging compatibility documented").
  */
 
-import { join, isAbsolute } from "node:path";
-import { mkdirSync, existsSync, unlinkSync } from "node:fs";
+import { join, isAbsolute, basename } from "node:path";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 
 /** Every named durable leaf a profile owns. Non-secret path strings only. */
 export interface FedosLocalProfilePaths {
@@ -255,70 +255,92 @@ export function fedosLocalProfilePathsIsolated(a: FedosLocalProfilePaths, b: Fed
 }
 
 /**
- * Every durable leaf FILE `detectProfileState()`'s own narrow 2-file check
- * does NOT inspect (excludes `root`, the two identity files it already
- * checks, and the two bare directories `ensureDirectories()` creates for
- * every profile — an empty directory existing is not itself residual
- * data). Disaster Recovery Product Closure arc, Track 3: the authoritative
- * list backing the widened "is this location TRULY safe to create/restore
- * a new identity into" guard — added after a CONFIRMED, live-reproduced
- * identity-boundary leak (an old identity's board post remained readable
- * by a newly created identity in the same profile root after Start Over,
- * because reset deleted only the 2 files `detectProfileState()` checks).
+ * The ONLY entries safe to find directly under `paths.root` on a location
+ * this arc's widened guard should treat as "nothing residual here": the 2
+ * identity files (checked/deleted by their own dedicated ports elsewhere)
+ * and the 2 always-created, already-reviewed-as-non-meaningful diagnostic
+ * directories (`fedos_recovery_bundle_profile_selection.ts`'s own
+ * `logsDirectory`/`sessionStateDirectory` exclusion comments: "non-secret
+ * diagnostics"/"navigation/session UI state, never durable meaningful
+ * data"). Names are derived from `paths` itself (via `basename()`), never
+ * hardcoded literals, so this can never silently drift out of sync with
+ * `planFedosLocalProfilePaths()`'s own field names.
+ *
+ * Disaster Recovery Product Closure arc, Track 3 — this REPLACES an
+ * earlier, incomplete version of this check that enumerated only this
+ * planner's own NAMED leaves (`board.ndjson`, `conversation.ndjson`, ...).
+ * That version had a real, self-discovered gap during this same pass: a
+ * `commerce/` subdirectory is created directly under this same root by an
+ * Electron-main-process-level caller (`commerceDurableFilePath()` in
+ * `fedos_electron_beta_main.cts`) that this planner has ZERO knowledge of
+ * — a named-leaf enumeration structurally cannot see it, so an old
+ * identity's Commerce data (product listings, orders, receipts, persona)
+ * would have survived Start Over completely undetected. A real directory
+ * LISTING of `paths.root`'s own top-level entries, flagging anything not
+ * in the small known-safe set above, catches `commerce/` AND any other
+ * subsystem this planner has not yet been taught about — the only design
+ * that cannot silently miss a future durable subsystem the same way.
  */
-function residualProfileDataLeaves(paths: FedosLocalProfilePaths): readonly string[] {
-  const { root, profileDescriptorFile, sealedMasterSeedFile, logsDirectory, sessionStateDirectory, ...rest } = paths;
-  return Object.values(rest);
+function knownSafeRootEntryBasenames(paths: FedosLocalProfilePaths): ReadonlySet<string> {
+  return new Set([
+    basename(paths.profileDescriptorFile),
+    basename(paths.sealedMasterSeedFile),
+    basename(paths.logsDirectory),
+    basename(paths.sessionStateDirectory),
+  ]);
+}
+
+/** Absolute paths of every top-level entry under `paths.root` NOT in the known-safe set above. Never throws; a root that does not exist (or cannot be listed) yields no residual entries. */
+function residualRootEntries(paths: FedosLocalProfilePaths): readonly string[] {
+  const safe = knownSafeRootEntryBasenames(paths);
+  let names: string[];
+  try {
+    names = readdirSync(paths.root);
+  } catch {
+    return [];
+  }
+  return names.filter((name) => !safe.has(name)).map((name) => join(paths.root, name));
 }
 
 /**
- * True iff any durable leaf beyond the profile descriptor and sealed
- * Master Seed still exists on disk. `detectProfileState()` alone cannot
- * answer this — it inspects only those two files, which is exactly the
- * narrow check `createProfile()`'s overwrite guard and Recovery restore's
+ * True iff anything beyond the profile descriptor, sealed Master Seed, and
+ * the 2 non-meaningful diagnostic directories still exists directly under
+ * `paths.root`. `detectProfileState()` alone cannot answer this — it
+ * inspects only the 2 identity files, which is exactly the narrow check
+ * `createProfile()`'s overwrite guard and Recovery restore's
  * `target-not-fresh` check both trusted, and exactly the gap Start Over's
- * 2-file delete left open. Never throws; a filesystem error reading a
- * given leaf is treated as "not present" for THAT leaf only (this can only
- * weaken the guard toward a false negative on an already-degenerate
- * filesystem — it can never cause a genuine leak to be silently allowed).
+ * 2-file delete left open. Never throws.
  */
 export function hasResidualFedosProfileData(paths: FedosLocalProfilePaths): boolean {
-  for (const leaf of residualProfileDataLeaves(paths)) {
-    try {
-      if (existsSync(leaf)) return true;
-    } catch {
-      // treated as absent for this leaf; see doc comment above
-    }
-  }
-  return false;
+  return residualRootEntries(paths).length > 0;
 }
 
 /**
- * Deletes every durable leaf `hasResidualFedosProfileData()` inspects (the
- * same list, minus `root`/the two identity files/the two bare
- * directories). Disaster Recovery Product Closure arc, Track 3 —
- * companion to `hasResidualFedosProfileData()`: the widened freshness
- * CHECK alone (refuse-only) turned out to make a legitimate Start Over
- * permanently unable to complete a real re-creation, because a normal
- * `createProfile()` call durably writes well beyond the 2 identity files
- * during its own Device/Runtime bootstrap step (e.g. the local Device
- * Registry entry) — so every post-reset retry would refuse forever with
- * no path forward. `resetCorruptReadyProfile()`/`resetInterruptedProfile()`
- * call this AFTER their own existing 2-file `delete()` calls succeed, so a
- * completed reset is now genuinely, not just nominally, a fresh root — the
- * widened freshness check in `createProfile()`/`restoreFedosRecoveryBundle()`
- * then remains as defense in depth for any OTHER path that reaches this
- * root without going through a reset at all (a bug in reset itself, a
+ * Recursively removes every residual entry `hasResidualFedosProfileData()`
+ * would flag (a plain file OR a directory tree like `commerce/` — both
+ * handled uniformly via `rmSync(..., { recursive: true, force: true })`).
+ * Disaster Recovery Product Closure arc, Track 3 — companion to
+ * `hasResidualFedosProfileData()`: the widened freshness CHECK alone
+ * (refuse-only) turned out to make a legitimate Start Over permanently
+ * unable to complete a real re-creation, because a normal `createProfile()`
+ * call durably writes well beyond the 2 identity files during its own
+ * Device/Runtime bootstrap step (e.g. the local Device Registry entry) —
+ * so every post-reset retry would refuse forever with no path forward.
+ * `resetCorruptReadyProfile()`/`resetInterruptedProfile()` call this AFTER
+ * their own existing 2-file `delete()` calls succeed, so a completed reset
+ * is now genuinely, not just nominally, a fresh root — the widened
+ * freshness check in `createProfile()`/`restoreFedosRecoveryBundle()` then
+ * remains as defense in depth for any OTHER path that reaches this root
+ * without going through a reset at all (a bug in reset itself, a
  * manual/external filesystem restore, ...), never as the only guard.
- * Best-effort per leaf (a single stray `unlinkSync` failure never aborts
- * the rest); returns `true` iff every leaf that existed was successfully
- * removed.
+ * Best-effort per entry (a single stray failure never aborts the rest);
+ * returns `true` iff every entry that existed was successfully removed.
  */
 export function deleteResidualFedosProfileData(paths: FedosLocalProfilePaths): boolean {
   let allSucceeded = true;
-  for (const leaf of residualProfileDataLeaves(paths)) {
+  for (const entry of residualRootEntries(paths)) {
     try {
-      if (existsSync(leaf)) unlinkSync(leaf);
+      rmSync(entry, { recursive: true, force: true });
     } catch {
       allSucceeded = false;
     }
