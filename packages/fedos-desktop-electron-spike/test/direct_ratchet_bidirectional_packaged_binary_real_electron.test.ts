@@ -680,6 +680,30 @@ realSuite("Direct Ratchet Bidirectional -- REAL packaged/installed binary, two i
       expect(sendResult.outcome, `Bob's real Direct-Ratchet-routed send must succeed (forced via FEDOS_BETA_DIRECT_RATCHET_MESSAGE_DELIVERY_REMOTE_DEVICE_REF -- a failure here would mean the "active" status above is not backed by a genuine, usable sending chain): ${JSON.stringify(sendResult)}`).toBe("ok");
       bobMessageId = sendResult.value!.messageId!;
       record(`STEP 5 PASS -- Bob sent a real message to Alice via a genuine Direct Ratchet session (round 1), messageId=${bobMessageId}`);
+
+      // Outbox Flush Reliability arc -- a real, fresh launch querying this
+      // arc's own new `deliveryStatusForEnvelope()` fact through the real
+      // installed-binary acceptance IPC surface (never a unit-level proof
+      // alone). By the time this fresh launch runs, real wall-clock time
+      // has passed since STEP 5's own send against the REAL local relay
+      // (which always accepts) -- so the honest, provable answer is
+      // "delivered", never a fabricated/optimistic status.
+      const bobDeliveryStatus = await runPackagedAcceptance("BOB_3B_DELIVERY_STATUS", launchExePath, bobDataDir, [
+        { command: "profile-unlock", payload: { secret: BOB_PASSPHRASE } },
+        { command: "acceptance-delivery-status-for-message", payload: { messageId: bobMessageId } },
+      ]);
+      stepAt(bobDeliveryStatus, 0, "profile-unlock");
+      const deliveryStatusResult = stepAt(bobDeliveryStatus, 1, "acceptance-delivery-status-for-message") as {
+        outcome: string;
+        value?: { outcome: string; value?: string };
+      };
+      expect(deliveryStatusResult.outcome, JSON.stringify(deliveryStatusResult)).toBe("ok");
+      expect(deliveryStatusResult.value?.outcome, JSON.stringify(deliveryStatusResult)).toBe("ok");
+      expect(
+        deliveryStatusResult.value?.value,
+        `a real send against a real, always-accepting local relay must report "delivered" through the real installed-binary acceptance surface, proving deliveryStatusForEnvelope() genuinely reads the real Delivery Observation history rather than a fabricated/optimistic status: ${JSON.stringify(deliveryStatusResult)}`,
+      ).toBe("delivered");
+      record(`STEP 5B PASS -- deliveryStatusForEnvelope() (Outbox Flush Reliability arc) reports "delivered" for Bob's real message through the real installed binary's own acceptance IPC surface, matching the real relay ACK this message actually received.`);
     },
     // Bumped alongside the outer process safety-kill's own 150000ms ->
     // 240000ms fix: this it()'s one launch now has a worst-case (poll

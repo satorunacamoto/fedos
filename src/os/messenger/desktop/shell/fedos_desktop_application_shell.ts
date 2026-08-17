@@ -48,6 +48,8 @@ import type {
 } from "../../conversations/construction/fedos_private_conversation_construction_command.js";
 import type { FedosPrivateConversationConstructionResult } from "../../conversations/construction/fedos_private_conversation_construction_result.js";
 import type { FedosConversationParticipantReference } from "../../conversations/membership/fedos_conversation_participant_reference.js";
+import type { FedosConversationEnvelopeId } from "../../conversations/envelope/fedos_conversation_envelope_id.js";
+import type { FedosPrivateTransport, FedosConversationDeliveryStatus } from "../../adapters/nostr/transport/fedos_private_transport.js";
 import type { FedosConversationId } from "../../conversations/fedos_conversation_id.js";
 import {
   fedosDesktopShellOk,
@@ -485,6 +487,28 @@ export class FedosDesktopApplicationShell {
     if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
     const result = await this.#runtime.conversationContentAccessor().sendMessage(conversationId, body, null);
     return this.#mapSendResult(conversationId, result);
+  }
+
+  /**
+   * Outbox Flush Reliability arc — the ONE queryable answer to "what
+   * actually happened to this specific logical send," mirroring
+   * `directRatchetStatus()`'s own exact "thin, fail-closed passthrough"
+   * pattern. `messageId` here is the SAME `envelopeId` a real Direct
+   * `sendMessage()`/`reply()` call already returns on its own
+   * `FedosMessageSendResultView.messageId` field (see
+   * `fedos_desktop_conversation_content_accessor.ts`'s own
+   * `messageId: result.envelopeId` for a Direct send) — never a second,
+   * independently-derived id.
+   */
+  deliveryStatusForMessage(messageId: string): FedosDesktopShellResult<FedosConversationDeliveryStatus> {
+    if (this.#runtime === null) return fedosDesktopShellFailure("unavailable", "shell is not running");
+    let transport: FedosPrivateTransport;
+    try {
+      transport = this.#runtime.privateTransport();
+    } catch {
+      return fedosDesktopShellFailure("unavailable", "private transport is not enabled");
+    }
+    return fedosDesktopShellOk(transport.deliveryStatusForEnvelope(messageId as unknown as FedosConversationEnvelopeId));
   }
 
   async reply(
