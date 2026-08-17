@@ -21,7 +21,7 @@
  * two files' declarations no longer merge.
  */
 
-interface FedosProfileStatusResult {
+interface FedosBetaProfileStatusResult {
   readonly presence: string;
   readonly lifecycleState: string;
   readonly displayLabel: string | null;
@@ -83,7 +83,7 @@ interface FedosBetaProfileCommandResult {
 }
 
 interface FedosBetaProfileBridge {
-  readonly status: () => Promise<FedosProfileStatusResult>;
+  readonly status: () => Promise<FedosBetaProfileStatusResult>;
   readonly create: (label: string, passphrase: string) => Promise<FedosBetaProfileCommandResult>;
   readonly unlock: (passphrase: string) => Promise<FedosBetaProfileCommandResult>;
   readonly lock: () => Promise<FedosBetaProfileCommandResult>;
@@ -124,7 +124,7 @@ interface FedosBetaProfileBridge {
 
 /** The Phase H Beta Home status surface — real, non-secret facts only (see `fedos_desktop_beta_*` value objects, `src/desktop/beta/`). */
 interface FedosBetaStatusResult {
-  readonly profile: FedosProfileStatusResult;
+  readonly profile: FedosBetaProfileStatusResult;
   readonly settingsEffectiveState: unknown;
   readonly capabilities: unknown;
   readonly release: unknown;

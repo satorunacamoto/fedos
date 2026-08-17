@@ -4910,7 +4910,7 @@ function renderReady(ready: FedosBetaProfileCommandResult["ready"]): void {
   void refreshCommerceNetworkProfileCache();
 }
 
-function routeByStatus(status: FedosProfileStatusResult): void {
+function routeByStatus(status: FedosBetaProfileStatusResult): void {
   if (status.presence === "ready") {
     byId("ready-label").textContent = status.displayLabel ?? "";
     byId("ready-account").textContent = status.accountPublicIdentifier ?? "";

@@ -72,7 +72,7 @@ function boundedString(value: unknown, max: number): string {
   return typeof value === "string" ? value.slice(0, max) : "";
 }
 
-const fedosProfile: FedosProfileBridge = Object.freeze({
+const fedosProfile: FedosBetaProfileBridge = Object.freeze({
   status: () => ipcRenderer.invoke("fedos-profile:status"),
   create: (label: string, passphrase: string) =>
     ipcRenderer.invoke("fedos-profile:create", {
