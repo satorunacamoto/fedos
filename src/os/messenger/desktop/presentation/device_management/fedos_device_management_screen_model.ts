@@ -187,7 +187,23 @@ export function fedosDeviceManagementDeriveSyncActionState(input: {
   if (input.actionInFlight === "start") return "starting";
   if (input.actionInFlight === "stop") return "stopping";
   if (input.schedulerStatus.tickInFlight) return "tick-in-flight";
-  return input.schedulerStatus.running ? "running" : "stopped";
+  if (!input.schedulerStatus.running) return "stopped";
+  // Own-Device Sync Truthfulness fix -- `"failed"` was a real, closed
+  // vocabulary member this function's own return type already declared
+  // but never actually produced: the Scheduler surfaces a real, durable
+  // `operatorRequiredCount` (every schedule that hit a terminal
+  // "needs-a-human" outcome -- see `classifyFedosDeviceSyncRetryDirective()`,
+  // `fedos_device_sync_retry_policy.ts`) directly on the SAME
+  // `schedulerStatus` this function already receives, but this function
+  // never read it -- so a Scheduler where genuinely every attempt is
+  // permanently stuck still reported the identical `"running"` a
+  // healthy, successfully-syncing Scheduler would. `pendingCount === 0`
+  // is required alongside `operatorRequiredCount > 0` so a schedule that
+  // is merely retrying-later (a normal, transient, already-pending
+  // condition) is never mislabeled `"failed"` -- only genuinely
+  // exhausted-and-stuck schedules with nothing left pending are.
+  if (input.schedulerStatus.operatorRequiredCount > 0 && input.schedulerStatus.pendingCount === 0) return "failed";
+  return "running";
 }
 
 export interface FedosDeviceManagementSyncStatusContent {
