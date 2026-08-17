@@ -110,7 +110,15 @@ async function performHandshake(socket: net.Socket, host: string, path: string):
       const headerText = buffered.subarray(0, headerEnd).toString("utf8");
       const remainder = buffered.subarray(headerEnd + 4);
       const statusLine = headerText.split("\r\n")[0] ?? "";
-      if (!statusLine.includes(" 101 ")) {
+      // Red-team fix (fresh Agent R re-run) -- `.includes(" 101 ")` was a
+      // substring check against the WHOLE status line, so a malicious/
+      // misbehaving SOCKS-connected destination could satisfy it with a
+      // crafted-but-non-101 status line (e.g. "HTTP/1.1 999 101 Nope").
+      // Not a clearnet-bypass risk (both paths still only ever talk to
+      // the SOCKS-negotiated socket), but a real correctness/robustness
+      // gap -- fixed to an exact prefix check against the real status
+      // code position.
+      if (!/^HTTP\/1\.[01] 101\b/.test(statusLine)) {
         reject(new StrictTransportError("handshake-failed", `unexpected HTTP status in WebSocket handshake: ${statusLine}`));
         return;
       }
