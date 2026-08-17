@@ -62,12 +62,18 @@ import {
   FEDOS_RECOVERY_BUNDLE_EXCLUDED_LOGS,
   fedosRecoveryBundleDestinationPathFor,
 } from "./fedos_recovery_bundle_profile_selection.js";
+import {
+  FEDOS_RECOVERY_BUNDLE_INCLUDED_COMMERCE_LOGS,
+  FEDOS_RECOVERY_BUNDLE_SETTINGS_LOGICAL_NAME,
+  fedosRecoveryBundleCommerceDestinationPathFor,
+} from "./fedos_recovery_bundle_commerce_and_settings_selection.js";
 import type { FedosLocalProfilePaths } from "../onboarding/fedos_local_profile_paths.js";
 import {
   isWellFormedFedosLocalProfileDescriptorV1,
   createFedosLocalProfileDescriptorV1,
   type FedosLocalProfileDescriptorV1,
 } from "../onboarding/fedos_local_profile_descriptor.js";
+import { decodeFedosSettingsDescriptorV1, encodeFedosSettingsDescriptorV1 } from "../../../core/settings/fedos_settings_codec.js";
 
 // ---------------------------------------------------------------------------
 // Plan (mandate §11 — a validated plan the caller shows the operator BEFORE
@@ -148,6 +154,10 @@ export interface FedosRecoveryBundleRestoreRequest {
   readonly freshLocalDeviceId: string;
   readonly now: number;
   readonly runtimeBoundary?: FedosRecoveryBundleEncryptionRuntimeBoundary;
+  /** The TARGET's own `<dataRoot>/commerce` directory — `commerceDurableFilePath()`'s own root in `fedos_electron_beta_main.cts`. Omit if the caller does not want Commerce entries restored (e.g. this build has no Commerce enabled); any Commerce entry in the bundle is then classified `lost` rather than silently written nowhere. */
+  readonly targetCommerceRoot?: string;
+  /** The TARGET's own `settings.json` path — a SIBLING of `targetPaths.root`, never nested inside it. Omit to skip settings restoration the same way. */
+  readonly targetSettingsPath?: string;
 }
 
 export type FedosRecoveryBundleRestoreResult =
@@ -163,7 +173,8 @@ export type FedosRecoveryBundleRestoreResult =
   | { readonly outcome: "account-identity-unresolved" }
   | { readonly outcome: "data-part-restore-failed"; readonly reason: string }
   | { readonly outcome: "descriptor-invalid" }
-  | { readonly outcome: "write-failed"; readonly failedAsset: string };
+  | { readonly outcome: "write-failed"; readonly failedAsset: string }
+  | { readonly outcome: "target-not-fresh" };
 
 /** Atomic write (temp-file-then-rename), mirroring this codebase's own documented `docs/secure_runtime_alpha_366_compaction_architecture_review.md` convention. Creates the parent directory if needed (a fresh profile root may not have every subdirectory yet). Returns `false` on any failure, never throws. */
 function atomicWrite(destinationPath: string, bytes: Uint8Array): boolean {
@@ -227,6 +238,29 @@ export async function restoreFedosRecoveryBundle(request: FedosRecoveryBundleRes
   if (identityResult === "malformed") return { outcome: "malformed" };
   if (identityResult === "failed") return { outcome: "identity-restore-failed", reason: "restoreSealed threw or returned unavailable" };
 
+  // `authority.restoreIdentity()` above only unseals the Master Seed INTO
+  // THIS PROCESS's `request.masterSeedAuthority` instance -- it never
+  // touches disk (mirrors `FedosRecoveryBundleEncryptionAuthority`'s own
+  // documented "drives restoreSealed(), nothing else" scope). Without this
+  // write, a restored profile would work only for the remainder of this one
+  // call and become permanently unrecoverable on the very next launch (a
+  // plain `unlockProfile()` constructs its OWN fresh `masterSeedAuthority`
+  // and reads `targetPaths.sealedMasterSeedFile` from disk -- there would be
+  // nothing there). `bundle.sealedMasterSeedEnvelope` is the SAME verbatim
+  // JSON string this format's own design copies out of the source
+  // `master-seed.sealed.json` (`fedos_recovery_bundle.ts`'s own
+  // `sealedMasterSeedEnvelope: string` field), so it round-trips into the
+  // identical on-disk shape `SealedSeedPersistence` already knows how to
+  // read. Never overwrites an existing file -- refusing here mirrors
+  // `sealedSeedPersistence.writeIfAbsent()`'s own "already-exists" guard in
+  // `createProfile()`, since a restore target must always be fresh.
+  if (existsSync(request.targetPaths.sealedMasterSeedFile)) {
+    return { outcome: "target-not-fresh" };
+  }
+  if (!atomicWrite(request.targetPaths.sealedMasterSeedFile, new TextEncoder().encode(bundle.sealedMasterSeedEnvelope))) {
+    return { outcome: "write-failed", failedAsset: "sealed-master-seed" };
+  }
+
   const accountPublicKeyHex = await request.resolveAccountPublicKeyHex(request.accountIndex);
   if (accountPublicKeyHex === null || accountPublicKeyHex.length === 0) {
     return { outcome: "account-identity-unresolved" };
@@ -283,13 +317,38 @@ export async function restoreFedosRecoveryBundle(request: FedosRecoveryBundleRes
       continue;
     }
 
-    const destination = fedosRecoveryBundleDestinationPathFor(entry.name, request.targetPaths);
+    if (entry.name === FEDOS_RECOVERY_BUNDLE_SETTINGS_LOGICAL_NAME) {
+      if (request.targetSettingsPath === undefined) {
+        assets.push({ name: entry.name, classification: "lost", detail: "Caller did not supply a target settings path -- not restored." });
+        continue;
+      }
+      const restoredSettings = decodeFedosSettingsDescriptorV1(new TextDecoder().decode(entry.bytes));
+      if (restoredSettings === null) return { outcome: "descriptor-invalid" };
+      // archiveDirectory is a machine-specific absolute path on the SOURCE
+      // machine (same hazard class as profile-descriptor's own path
+      // fields) -- reset it, never carried forward verbatim.
+      const regeneratedSettings = { ...restoredSettings, archiveDirectory: "" };
+      if (!atomicWrite(request.targetSettingsPath, new TextEncoder().encode(encodeFedosSettingsDescriptorV1(regeneratedSettings)))) {
+        return { outcome: "write-failed", failedAsset: entry.name };
+      }
+      assets.push({
+        name: entry.name,
+        classification: "partial",
+        detail: "Theme/language/relay/notification/window preferences restored; the Archive export directory (a machine-specific path) was reset and must be reconfigured on this machine.",
+      });
+      continue;
+    }
+
+    const destination =
+      fedosRecoveryBundleDestinationPathFor(entry.name, request.targetPaths) ??
+      (request.targetCommerceRoot !== undefined ? fedosRecoveryBundleCommerceDestinationPathFor(entry.name, request.targetCommerceRoot) : null);
     if (destination === null) {
       // A logical name the bundle's own manifest claims but this build's
-      // profile-selection table does not recognize (older/newer FedOS) --
+      // profile-selection table does not recognize (older/newer FedOS), OR
+      // a Commerce name the caller did not supply a target root for --
       // never written to an arbitrary path; classified LOST, not silently
       // dropped.
-      assets.push({ name: entry.name, classification: "lost", detail: "Unrecognized by this build's Data Part schema -- not restored." });
+      assets.push({ name: entry.name, classification: "lost", detail: "Unrecognized by this build's Data Part schema, or no target root supplied -- not restored." });
       continue;
     }
     if (!atomicWrite(destination, entry.bytes)) {
@@ -301,11 +360,21 @@ export async function restoreFedosRecoveryBundle(request: FedosRecoveryBundleRes
 
   // Any INCLUDED logical name the bundle simply never carried (e.g. an
   // empty/never-written source log) is honestly absent, not silently
-  // implied "recovered" -- report it explicitly.
+  // implied "recovered" -- report it explicitly. Commerce/settings are
+  // OPTIONAL categories (the bundle may never have carried them at all,
+  // e.g. an older FedOS build) -- only reported this way if the caller
+  // actually supplied a target for them, matching the "lost" branch above.
   const restoredNames = new Set(assets.map((a) => a.name));
   for (const logicalName of FEDOS_RECOVERY_BUNDLE_INCLUDED_LOGS.keys()) {
     if (!restoredNames.has(logicalName)) {
       assets.push({ name: logicalName, classification: "lost", detail: "Not present in the bundle's Data Part (the source profile had no data for this category)." });
+    }
+  }
+  if (request.targetCommerceRoot !== undefined) {
+    for (const logicalName of FEDOS_RECOVERY_BUNDLE_INCLUDED_COMMERCE_LOGS.keys()) {
+      if (!restoredNames.has(logicalName)) {
+        assets.push({ name: logicalName, classification: "lost", detail: "Not present in the bundle's Data Part (the source profile had no Commerce data for this category)." });
+      }
     }
   }
 

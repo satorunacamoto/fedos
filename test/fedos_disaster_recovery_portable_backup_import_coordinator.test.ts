@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 import { FedosRecoveryBundleEncryptionAuthority, type FedosRecoveryBundleEncryptionRuntimeBoundary } from "../src/os/messenger/desktop/recovery/fedos_recovery_bundle_encryption.js";
 import type { FedosRecoveryBundleDataPartEntry } from "../src/os/messenger/desktop/recovery/fedos_recovery_bundle_data_part_codec.js";
@@ -11,6 +11,8 @@ import { planFedosLocalProfilePaths, type FedosLocalProfilePaths } from "../src/
 import { createFedosLocalProfileDescriptorV1 } from "../src/os/messenger/desktop/onboarding/fedos_local_profile_descriptor.js";
 import type { FedosMasterSeedAuthority } from "../src/os/core/vault/wasm/fedos_master_seed_authority.js";
 import type { AeadCiphertextHandle, AeadCiphertextWire, AeadKeyHandle } from "../src/runtime/fedos_wasm_loader.js";
+import { encodeFedosSettingsDescriptorV1, decodeFedosSettingsDescriptorV1 } from "../src/os/core/settings/fedos_settings_codec.js";
+import { defaultFedosSettingsDescriptorV1 } from "../src/os/core/settings/fedos_settings_descriptor.js";
 
 const VALID_SEALED_ENVELOPE = '{"v":1,"kdf":"argon2id","m":19456,"t":2,"p":1,"salt":"aa","alg":"chacha20poly1305","n":"bb","ct":"cc"}';
 const ACCOUNT_PUBLIC_KEY_HEX = "ab".repeat(32);
@@ -60,10 +62,23 @@ function fakeRoundTrippingRuntimeBoundary(): FedosRecoveryBundleEncryptionRuntim
   };
 }
 
-function withTempDir<T>(fn: (dir: string) => T): T {
+/**
+ * NOTE: `fn` must be awaited INSIDE this function, not merely returned --
+ * `return fn(dir)` (without `await`) lets `finally`'s `rmSync` run
+ * synchronously right after `fn(dir)` yields its first pending Promise,
+ * deleting the directory while the caller's own `await`-separated body is
+ * still mid-flight. This never manifested in THIS file's own tests (none
+ * of them read a real file back off `sourceRoot`'s disk, and
+ * `restoreFedosRecoveryBundle()`'s own `atomicWrite()` defensively
+ * recreates a missing target directory on write) but is a real latent
+ * landmine for any test added later that does real I/O across an await
+ * boundary -- found and fixed while writing the sibling
+ * `_export_coordinator.test.ts` suite, which hit it immediately.
+ */
+async function withTempDir<T>(fn: (dir: string) => T | Promise<T>): Promise<T> {
   const dir = mkdtempSync(join(tmpdir(), "fedos-recovery-import-coordinator-"));
   try {
-    return fn(dir);
+    return await fn(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -267,6 +282,234 @@ describe("Disaster Recovery Portable Backup -- restoreFedosRecoveryBundle (manda
           runtimeBoundary: boundary,
         });
         expect(result.outcome).toBe("account-identity-unresolved");
+      });
+    });
+  });
+});
+
+describe("Disaster Recovery Portable Backup -- Commerce + settings.json extension (Lineage Reconciliation follow-up)", () => {
+  it("9. a Commerce entry restores verbatim to the target's own commerce root when targetCommerceRoot is supplied", async () => {
+    await withTempDir(async (sourceRoot) => {
+      await withTempDir(async (targetRoot) => {
+        await withTempDir(async (targetCommerceRoot) => {
+          const boundary = fakeRoundTrippingRuntimeBoundary();
+          const buildAuthority = new FedosRecoveryBundleEncryptionAuthority(fakeMasterSeedAuthority(), boundary);
+          const entries: FedosRecoveryBundleDataPartEntry[] = [{ name: "commerce-orders", bytes: new TextEncoder().encode('{"orderId":"o1"}\n') }];
+          const buildResult = await buildAuthority.build({
+            sealedMasterSeedEnvelope: VALID_SEALED_ENVELOPE,
+            now: 1_700_000_000,
+            dataPart: { suite: SUITE, accountIndex: 0, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, entries },
+          });
+          expect(buildResult.outcome).toBe("built");
+          if (buildResult.outcome !== "built") return;
+
+          const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+          const result = await restoreFedosRecoveryBundle({
+            bundleBytes: serializeFedosRecoveryBundleToBytes(buildResult.bundle),
+            passphrase: new TextEncoder().encode("correct horse"),
+            suite: SUITE,
+            accountIndex: 0,
+            masterSeedAuthority: fakeMasterSeedAuthority(),
+            resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+            targetPaths,
+            targetCommerceRoot,
+            freshLocalDeviceId: "device-B",
+            now: 0,
+            runtimeBoundary: boundary,
+          });
+          expect(result.outcome).toBe("restored");
+          if (result.outcome !== "restored") return;
+          const ordersAsset = result.assets.find((a) => a.name === "commerce-orders");
+          expect(ordersAsset?.classification).toBe("recovered");
+          expect(readFileSync(join(targetCommerceRoot, "orders.ndjson"), "utf8")).toBe('{"orderId":"o1"}\n');
+        });
+      });
+    });
+  });
+
+  it("10. a Commerce entry is classified lost, never written anywhere, when the caller supplies no targetCommerceRoot", async () => {
+    await withTempDir(async (sourceRoot) => {
+      await withTempDir(async (targetRoot) => {
+        const boundary = fakeRoundTrippingRuntimeBoundary();
+        const buildAuthority = new FedosRecoveryBundleEncryptionAuthority(fakeMasterSeedAuthority(), boundary);
+        const entries: FedosRecoveryBundleDataPartEntry[] = [{ name: "commerce-receipts", bytes: new TextEncoder().encode('{"receiptId":"r1"}\n') }];
+        const buildResult = await buildAuthority.build({
+          sealedMasterSeedEnvelope: VALID_SEALED_ENVELOPE,
+          now: 1_700_000_000,
+          dataPart: { suite: SUITE, accountIndex: 0, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, entries },
+        });
+        expect(buildResult.outcome).toBe("built");
+        if (buildResult.outcome !== "built") return;
+
+        const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+        const result = await restoreFedosRecoveryBundle({
+          bundleBytes: serializeFedosRecoveryBundleToBytes(buildResult.bundle),
+          passphrase: new TextEncoder().encode("correct horse"),
+          suite: SUITE,
+          accountIndex: 0,
+          masterSeedAuthority: fakeMasterSeedAuthority(),
+          resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+          targetPaths,
+          freshLocalDeviceId: "device-B",
+          now: 0,
+          runtimeBoundary: boundary,
+        });
+        expect(result.outcome).toBe("restored");
+        if (result.outcome !== "restored") return;
+        expect(result.assets.find((a) => a.name === "commerce-receipts")?.classification).toBe("lost");
+      });
+    });
+  });
+
+  it("11. settings.json restores preferences verbatim but resets the machine-specific archiveDirectory, never carrying the source path forward", async () => {
+    await withTempDir(async (sourceRoot) => {
+      await withTempDir(async (targetRoot) => {
+        await withTempDir(async (targetSettingsDir) => {
+          const targetSettingsPath = join(targetSettingsDir, "settings.json");
+          const sourceSettings = { ...defaultFedosSettingsDescriptorV1(), theme: "dark" as const, language: "ja" as const, archiveDirectory: join(sourceRoot, "archive") };
+
+          const boundary = fakeRoundTrippingRuntimeBoundary();
+          const buildAuthority = new FedosRecoveryBundleEncryptionAuthority(fakeMasterSeedAuthority(), boundary);
+          const entries: FedosRecoveryBundleDataPartEntry[] = [{ name: "app-settings", bytes: new TextEncoder().encode(encodeFedosSettingsDescriptorV1(sourceSettings)) }];
+          const buildResult = await buildAuthority.build({
+            sealedMasterSeedEnvelope: VALID_SEALED_ENVELOPE,
+            now: 1_700_000_000,
+            dataPart: { suite: SUITE, accountIndex: 0, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, entries },
+          });
+          expect(buildResult.outcome).toBe("built");
+          if (buildResult.outcome !== "built") return;
+
+          const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+          const result = await restoreFedosRecoveryBundle({
+            bundleBytes: serializeFedosRecoveryBundleToBytes(buildResult.bundle),
+            passphrase: new TextEncoder().encode("correct horse"),
+            suite: SUITE,
+            accountIndex: 0,
+            masterSeedAuthority: fakeMasterSeedAuthority(),
+            resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+            targetPaths,
+            targetSettingsPath,
+            freshLocalDeviceId: "device-B",
+            now: 0,
+            runtimeBoundary: boundary,
+          });
+          expect(result.outcome).toBe("restored");
+          if (result.outcome !== "restored") return;
+          expect(result.assets.find((a) => a.name === "app-settings")?.classification).toBe("partial");
+
+          const restored = decodeFedosSettingsDescriptorV1(readFileSync(targetSettingsPath, "utf8"));
+          expect(restored?.theme).toBe("dark");
+          expect(restored?.language).toBe("ja");
+          expect(restored?.archiveDirectory, "must never carry the source machine's own path forward").toBe("");
+        });
+      });
+    });
+  });
+});
+
+describe("Disaster Recovery Portable Backup -- commerce-payment-settlements classification (self-discovered gap, closed during IPC-wiring pass)", () => {
+  it("14. a commerce-payment-settlements entry restores verbatim to the target's own commerce root -- was previously unclassified in neither the included nor excluded lists", async () => {
+    await withTempDir(async (targetRoot) => {
+      await withTempDir(async (targetCommerceRoot) => {
+        const boundary = fakeRoundTrippingRuntimeBoundary();
+        const buildAuthority = new FedosRecoveryBundleEncryptionAuthority(fakeMasterSeedAuthority(), boundary);
+        const entries: FedosRecoveryBundleDataPartEntry[] = [
+          { name: "commerce-payment-settlements", bytes: new TextEncoder().encode('{"paymentId":"p1","status":"settled"}\n') },
+        ];
+        const buildResult = await buildAuthority.build({
+          sealedMasterSeedEnvelope: VALID_SEALED_ENVELOPE,
+          now: 1_700_000_000,
+          dataPart: { suite: SUITE, accountIndex: 0, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, entries },
+        });
+        expect(buildResult.outcome).toBe("built");
+        if (buildResult.outcome !== "built") return;
+
+        const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+        const result = await restoreFedosRecoveryBundle({
+          bundleBytes: serializeFedosRecoveryBundleToBytes(buildResult.bundle),
+          passphrase: new TextEncoder().encode("correct horse"),
+          suite: SUITE,
+          accountIndex: 0,
+          masterSeedAuthority: fakeMasterSeedAuthority(),
+          resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+          targetPaths,
+          targetCommerceRoot,
+          freshLocalDeviceId: "device-B",
+          now: 0,
+          runtimeBoundary: boundary,
+        });
+        expect(result.outcome).toBe("restored");
+        if (result.outcome !== "restored") return;
+        expect(result.assets.find((a) => a.name === "commerce-payment-settlements")?.classification).toBe("recovered");
+        expect(readFileSync(join(targetCommerceRoot, "payment_settlements.ndjson"), "utf8")).toBe('{"paymentId":"p1","status":"settled"}\n');
+      });
+    });
+  });
+});
+
+describe("Disaster Recovery Portable Backup -- sealed Master Seed durability (self-discovered gap, Lineage Reconciliation follow-up round 2)", () => {
+  it("12. restore persists the bundle's own sealed Master Seed envelope verbatim to the target's sealedMasterSeedFile, not just in-memory", async () => {
+    await withTempDir(async (sourceRoot) => {
+      await withTempDir(async (targetRoot) => {
+        const boundary = fakeRoundTrippingRuntimeBoundary();
+        const bundleBytes = await buildBundleWithDescriptorAndBoard(boundary, sourceRoot);
+        const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+
+        expect(existsSync(targetPaths.sealedMasterSeedFile), "must not exist before restore").toBe(false);
+
+        const result = await restoreFedosRecoveryBundle({
+          bundleBytes,
+          passphrase: new TextEncoder().encode("correct horse"),
+          suite: SUITE,
+          accountIndex: 0,
+          masterSeedAuthority: fakeMasterSeedAuthority(),
+          resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+          targetPaths,
+          freshLocalDeviceId: "device-TARGET-MACHINE-B",
+          now: 1_800_000_000_000,
+          runtimeBoundary: boundary,
+        });
+
+        expect(result.outcome).toBe("restored");
+        // Without this write a restored profile would only work for the
+        // remainder of this one call -- a later, ordinary unlockProfile()
+        // constructs its OWN fresh masterSeedAuthority and reads this exact
+        // path from disk; there would be nothing there.
+        expect(existsSync(targetPaths.sealedMasterSeedFile), "the sealed Master Seed envelope must be durably persisted to the target's own path").toBe(true);
+        expect(readFileSync(targetPaths.sealedMasterSeedFile, "utf8"), "must be the bundle's own envelope, verbatim").toBe(VALID_SEALED_ENVELOPE);
+      });
+    });
+  });
+
+  it("13. restore refuses to overwrite an already-present sealedMasterSeedFile at the target -- target-not-fresh, nothing else written", async () => {
+    await withTempDir(async (sourceRoot) => {
+      await withTempDir(async (targetRoot) => {
+        const boundary = fakeRoundTrippingRuntimeBoundary();
+        const bundleBytes = await buildBundleWithDescriptorAndBoard(boundary, sourceRoot);
+        const targetPaths = planFedosLocalProfilePaths(targetRoot)!;
+
+        // Simulate a target that is NOT actually fresh -- e.g. a live profile already exists there.
+        mkdirSync(dirname(targetPaths.sealedMasterSeedFile), { recursive: true });
+        writeFileSync(targetPaths.sealedMasterSeedFile, "pre-existing live profile's own sealed seed");
+
+        const result = await restoreFedosRecoveryBundle({
+          bundleBytes,
+          passphrase: new TextEncoder().encode("correct horse"),
+          suite: SUITE,
+          accountIndex: 0,
+          masterSeedAuthority: fakeMasterSeedAuthority(),
+          resolveAccountPublicKeyHex: async () => ACCOUNT_PUBLIC_KEY_HEX,
+          targetPaths,
+          freshLocalDeviceId: "device-TARGET-MACHINE-B",
+          now: 1_800_000_000_000,
+          runtimeBoundary: boundary,
+        });
+
+        expect(result.outcome).toBe("target-not-fresh");
+        expect(readFileSync(targetPaths.sealedMasterSeedFile, "utf8"), "the pre-existing live profile's own seed must never be clobbered").toBe(
+          "pre-existing live profile's own sealed seed",
+        );
+        expect(existsSync(targetPaths.profileDescriptorFile), "must stop before writing anything else").toBe(false);
       });
     });
   });

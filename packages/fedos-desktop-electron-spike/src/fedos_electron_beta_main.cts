@@ -458,6 +458,8 @@ const MAX_PAIRING_ENVELOPE_CHARS = 8192;
 const MAX_SEARCH_QUERY_CHARS = 256;
 /** Secure Runtime Alpha 7321-7400 — a real filesystem path for Archive export/import, bounded but generous (Windows long-path aware). */
 const MAX_ARCHIVE_PATH_CHARS = 4096;
+/** Disaster Recovery / Portable Backup Arc -- same base64-transport-form discipline as `MAX_PRODUCT_IMAGE_BASE64_CHARS` above, sized for a curated NDJSON-logs bundle (never raw media -- `media_release_content` is deliberately excluded from every bundle) rather than a single image. ~48MB decoded. */
+const MAX_RECOVERY_BUNDLE_BASE64_CHARS = 64_000_000;
 
 /** Secure Runtime Alpha 5161-5240 — mirrors `fedos_electron_badge_main.cts`'s own identical policy value (`DEVICE_SYNC_ABANDONMENT_POLICY`). */
 const DEVICE_SYNC_ABANDONMENT_POLICY = Object.freeze({ maxAttempts: 5, laterDelaySeconds: 30 });
@@ -719,6 +721,27 @@ interface MasterSeedAuthorityLike {
     sealedBlob: string,
   ): Promise<Uint8Array | null>;
   /**
+   * Secure Runtime Alpha 7161-7240 -- present (as real, SYNCHRONOUS,
+   * callable functions) on the SAME canonical production
+   * `FedosProductionMasterSeedAuthority` this Coordinator already
+   * activates -- the production-safe encrypt/decrypt pairing for a
+   * `resolveConversationKey()`-resolved handle (see
+   * `fedos_production_conversation_encryption_runtime_boundary.ts`'s own
+   * header for why the dev-only `fedos_runtime_encrypt.ts` family is
+   * UNSAFE for a production caller: different WASM module instantiation
+   * than the one that produced the handle). OPTIONAL for the same
+   * "other, non-production callers satisfy this structural interface
+   * too" reason as `resolveCommerceMediaKey?` above -- Disaster Recovery
+   * / Portable Backup Arc's own `productionRecoveryBundleRuntimeBoundary()`
+   * (below) is the only caller, detecting presence at runtime and
+   * falling back to `fedos_recovery_bundle_encryption.ts`'s own default
+   * dev-only boundary when absent.
+   */
+  encryptAead?(key: unknown, algorithm: string, aadDomain: string, plaintext: Uint8Array): unknown;
+  decryptAead?(key: unknown, algorithm: string, aadDomain: string, ciphertext: unknown): Uint8Array | null;
+  serializeAeadCiphertext?(ciphertext: unknown): string | null;
+  deserializeAeadCiphertext?(wire: string): unknown;
+  /**
    * FedOS Commerce "Real Two-Party Commerce + UX P0/P1 Closure" mega-arc
    * (Agent D) -- present (as real, callable functions) on the SAME
    * canonical production `FedosProductionMasterSeedAuthority`
@@ -765,6 +788,68 @@ type Activation =
 interface PathsLike {
   readonly profileDescriptorFile: string;
   readonly sealedMasterSeedFile: string;
+}
+
+/**
+ * Disaster Recovery / Portable Backup Arc — Restore Coordinator IPC wiring.
+ * Structural mirrors of `fedos_recovery_bundle_import_coordinator.ts`'s own
+ * exported shapes, same "never `import type`s across the dist boundary"
+ * discipline as every other `*Like` interface in this file.
+ */
+interface RecoveryInspectResultLike {
+  readonly outcome: string;
+  readonly foundVersion?: unknown;
+  readonly plan?: {
+    readonly createdAt: number;
+    readonly hasDataPart: boolean;
+    readonly manifestIncludedLogs: readonly string[];
+    readonly currentlySupportedLogs: readonly string[];
+    readonly deliberatelyExcludedFieldNames: readonly string[];
+    readonly stalenessWarning: string;
+  };
+}
+interface RecoveryAssetOutcomeLike {
+  readonly name: string;
+  readonly classification: string;
+  readonly detail: string;
+}
+interface RecoveryRestoreRequestLike {
+  readonly bundleBytes: Uint8Array;
+  readonly passphrase: Uint8Array;
+  readonly suite: string;
+  readonly accountIndex: number;
+  readonly masterSeedAuthority: MasterSeedAuthorityLike;
+  readonly resolveAccountPublicKeyHex: (accountIndex: number) => Promise<string | null>;
+  readonly targetPaths: PathsLike;
+  readonly freshLocalDeviceId: string;
+  readonly now: number;
+  readonly targetCommerceRoot?: string;
+  readonly targetSettingsPath?: string;
+  readonly runtimeBoundary?: unknown;
+}
+interface RecoveryRestoreResultLike {
+  readonly outcome: string;
+  readonly localDeviceId?: string;
+  readonly accountPublicKeyHex?: string;
+  readonly assets?: readonly RecoveryAssetOutcomeLike[];
+  readonly reason?: string;
+  readonly failedAsset?: string;
+}
+interface RecoveryExportRequestLike {
+  readonly sourcePaths: PathsLike;
+  readonly suite: string;
+  readonly accountIndex: number;
+  readonly masterSeedAuthority: MasterSeedAuthorityLike;
+  readonly resolveAccountPublicKeyHex: (accountIndex: number) => Promise<string | null>;
+  readonly now: number;
+  readonly sourceCommerceRoot?: string;
+  readonly sourceSettingsPath?: string;
+  readonly runtimeBoundary?: unknown;
+}
+interface RecoveryExportResultLike {
+  readonly outcome: string;
+  readonly bundleBytes?: Uint8Array;
+  readonly reason?: string;
 }
 interface AssemblyEffectiveStateLike {
   readonly [key: string]: unknown;
@@ -1032,6 +1117,21 @@ interface RootModules {
   readonly SealedSeedPersistence: new (file: string) => unknown;
   readonly Coordinator: new (deps: Record<string, unknown>) => CoordinatorLike;
   readonly UnlockSecret: new (bytes: Uint8Array) => UnlockSecretLike;
+  /**
+   * Disaster Recovery / Portable Backup Arc -- Restore Coordinator IPC
+   * wiring. `inspectFedosRecoveryBundle` is pure (no passphrase, no I/O
+   * beyond the bytes already in memory); `restoreFedosRecoveryBundle` does
+   * the actual mutation, always against a caller-supplied fresh target.
+   * `generateFedosDeviceSigningKeypair` mirrors `createProfile()`'s own
+   * Phase 7 fresh-Device-identity minting exactly -- a restore must never
+   * carry the source machine's own Device identity forward.
+   */
+  readonly inspectFedosRecoveryBundle: (bytes: Uint8Array) => RecoveryInspectResultLike;
+  readonly restoreFedosRecoveryBundle: (request: RecoveryRestoreRequestLike) => Promise<RecoveryRestoreResultLike>;
+  readonly exportFedosRecoveryBundle: (request: RecoveryExportRequestLike) => Promise<RecoveryExportResultLike>;
+  readonly generateFedosDeviceSigningKeypair: () => { readonly publicKeyHex: string };
+  /** Secure Runtime Alpha 7161-7240's own established production-boundary pattern, reused here (see `fedos_production_recovery_bundle_encryption_runtime_boundary.ts`'s own header) -- constructed only when the active `masterSeedAuthority` exposes the four production AEAD methods. */
+  readonly ProductionRecoveryBundleEncryptionRuntimeBoundary: new (handleSource: Record<string, unknown>) => unknown;
   readonly createFileBackedSettingsController: (filePath: string) => SettingsControllerLike;
   readonly BetaApplicationAssembly: {
     start(deps: {
@@ -2234,6 +2334,21 @@ async function loadRootModules(): Promise<RootModules> {
   const secret = (await import(distUrl("os", "messenger", "desktop", "onboarding", "fedos_profile_unlock_secret.js"))) as {
     FedosProfileUnlockSecret: RootModules["UnlockSecret"];
   };
+  const recoveryImportCoordinator = (await import(distUrl("os", "messenger", "desktop", "recovery", "fedos_recovery_bundle_import_coordinator.js"))) as {
+    inspectFedosRecoveryBundle: RootModules["inspectFedosRecoveryBundle"];
+    restoreFedosRecoveryBundle: RootModules["restoreFedosRecoveryBundle"];
+  };
+  const recoveryExportCoordinator = (await import(distUrl("os", "messenger", "desktop", "recovery", "fedos_recovery_bundle_export_coordinator.js"))) as {
+    exportFedosRecoveryBundle: RootModules["exportFedosRecoveryBundle"];
+  };
+  const recoveryProductionRuntimeBoundary = (await import(
+    distUrl("os", "messenger", "desktop", "recovery", "fedos_production_recovery_bundle_encryption_runtime_boundary.js")
+  )) as {
+    FedosProductionRecoveryBundleEncryptionRuntimeBoundary: RootModules["ProductionRecoveryBundleEncryptionRuntimeBoundary"];
+  };
+  const deviceSigningKeypair = (await import(distUrl("os", "messenger", "device", "crypto", "fedos_device_signing_keypair.js"))) as {
+    generateFedosDeviceSigningKeypair: RootModules["generateFedosDeviceSigningKeypair"];
+  };
   const settingsController = (await import(distUrl("os", "messenger", "desktop", "settings", "fedos_desktop_settings_controller.js"))) as {
     createFileBackedFedosDesktopSettingsController: RootModules["createFileBackedSettingsController"];
   };
@@ -2498,6 +2613,11 @@ async function loadRootModules(): Promise<RootModules> {
     SealedSeedPersistence: sealedPersistence.FileFedosSealedMasterSeedEnvelopePersistence,
     Coordinator: coordinator.FedosProfileInitializationCoordinator,
     UnlockSecret: secret.FedosProfileUnlockSecret,
+    inspectFedosRecoveryBundle: recoveryImportCoordinator.inspectFedosRecoveryBundle,
+    restoreFedosRecoveryBundle: recoveryImportCoordinator.restoreFedosRecoveryBundle,
+    exportFedosRecoveryBundle: recoveryExportCoordinator.exportFedosRecoveryBundle,
+    generateFedosDeviceSigningKeypair: deviceSigningKeypair.generateFedosDeviceSigningKeypair,
+    ProductionRecoveryBundleEncryptionRuntimeBoundary: recoveryProductionRuntimeBoundary.FedosProductionRecoveryBundleEncryptionRuntimeBoundary,
     createFileBackedSettingsController: settingsController.createFileBackedFedosDesktopSettingsController,
     BetaApplicationAssembly: assembly.FedosDesktopBetaApplicationAssembly,
     betaCapabilityManifestV1: capabilityManifest.fedosDesktopBetaCapabilityManifestV1,
@@ -5463,6 +5583,225 @@ async function handleUnlock(payload: unknown) {
   } finally {
     // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
   }
+}
+
+/**
+ * Disaster Recovery / Portable Backup Arc -- REAL BUG FIX (found via this
+ * Arc's own real packaged-Electron IPC acceptance test): the Recovery
+ * Bundle Encryption Authority's DEFAULT runtime boundary
+ * (`fedos_runtime_encrypt.ts`/`_decrypt`/`_export_ciphertext`/`_import_ciphertext`)
+ * constructs its OWN, fresh, independent WASM module instance per call --
+ * a DIFFERENT instantiation than the one that produced the `AeadKeyHandle`
+ * `masterSeedAuthority.resolveConversationKey()` already resolved, so a
+ * genuinely packaged Electron process hits a cross-instantiation opaque-
+ * handle mismatch (`encrypt()` silently returns `null`, never throws --
+ * this surfaces as `build-failed`/`"failed"` from `exportFedosRecoveryBundle()`/
+ * `data-part-restore-failed` from `restoreFedosRecoveryBundle()`). Mirrors
+ * Secure Runtime Alpha 7161-7240's own already-shipped fix for
+ * Conversation encryption (`FedosProductionConversationEncryptionRuntimeBoundary`)
+ * exactly -- see `fedos_production_recovery_bundle_encryption_runtime_boundary.ts`'s
+ * own header. Returns `undefined` (letting the coordinator fall back to
+ * its own default dev-only boundary) when `masterSeedAuthority` does not
+ * expose the four production AEAD methods (e.g. a non-production/dev
+ * authority in a test context).
+ */
+function productionRecoveryBundleRuntimeBoundary(m: RootModules, masterSeedAuthority: MasterSeedAuthorityLike): unknown {
+  if (
+    typeof masterSeedAuthority.encryptAead !== "function" ||
+    typeof masterSeedAuthority.decryptAead !== "function" ||
+    typeof masterSeedAuthority.serializeAeadCiphertext !== "function" ||
+    typeof masterSeedAuthority.deserializeAeadCiphertext !== "function"
+  ) {
+    return undefined;
+  }
+  return new m.ProductionRecoveryBundleEncryptionRuntimeBoundary(masterSeedAuthority as unknown as Record<string, unknown>);
+}
+
+/** Disaster Recovery / Portable Backup Arc -- validates the base64-encoded `bundleBytes` transport field of a `fedos-profile:recovery-inspect`/`recovery-restore` payload, same discipline as `handleCommerceProductImageAttach`'s own `imageBase64` handling. Never throws on malformed base64. */
+function validatedRecoveryBundleBytes(payload: unknown): Uint8Array | null {
+  const body = payload as { bundleBytes?: unknown } | null;
+  if (!isBoundedString(body?.bundleBytes, MAX_RECOVERY_BUNDLE_BASE64_CHARS)) return null;
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(Buffer.from(body.bundleBytes, "base64"));
+  } catch {
+    return null;
+  }
+  if (bytes.length === 0) return null;
+  return bytes;
+}
+
+/**
+ * Disaster Recovery / Portable Backup Arc (mandate §11) -- pure structural
+ * inspection of a Recovery Bundle the renderer is about to restore. Never
+ * touches the passphrase, never decrypts, never writes anything -- shown to
+ * the operator BEFORE they commit to a restore. Deliberately does NOT
+ * require `activeCoordinator === null` (an operator may want to inspect a
+ * bundle's own contents/staleness before deciding whether to lock/reset the
+ * current profile first).
+ */
+async function handleRecoveryInspect(payload: unknown) {
+  const bundleBytes = validatedRecoveryBundleBytes(payload);
+  if (bundleBytes === null) return { outcome: "invalid-input", reason: "malformed bundleBytes" };
+  return requireModules().inspectFedosRecoveryBundle(bundleBytes);
+}
+
+/**
+ * Disaster Recovery / Portable Backup Arc (mandate §9-11) -- the actual
+ * restore mutation. Never sends the Master Seed, any private key, or any
+ * raw secret byte back to the renderer -- the response is exactly
+ * `readyResult()`'s own shape (the SAME non-secret view `create`/`unlock`
+ * already return) plus the restore's own asset classification report.
+ *
+ * Deliberately refuses to restore over anything but a genuinely `"absent"`
+ * profile (never silently overwrites a live/partial/locked profile -- same
+ * "idempotent create guard" discipline as `createProfile()`'s own step 2).
+ * Mints a fresh Device identity itself (mirrors `createProfile()`'s own
+ * Phase 7 `generateFedosDeviceSigningKeypair()` pattern exactly -- a
+ * restore must never carry the source machine's own Device identity
+ * forward), then hands off to the SAME, already-proven `unlockProfile()`
+ * path `handleUnlock()` uses -- never trusts the just-restored in-memory
+ * Master Seed Authority state; everything is re-derived fresh from the
+ * durable bytes this restore just wrote to disk, exactly as a real second
+ * launch would.
+ */
+async function handleRecoveryRestore(payload: unknown) {
+  // The "profile-lifecycle" group guard on this channel's registerHandle()
+  // registration serializes this against create/unlock/lock — see
+  // fedos_electron_ipc_command_registry.ts.
+  if (activeCoordinator !== null) return { outcome: "already-exists", reason: "a profile is already active" };
+  const bundleBytes = validatedRecoveryBundleBytes(payload);
+  const secretBytes = validatedSecretBytes(payload, ["bundleBytes", "secret"]);
+  if (bundleBytes === null || secretBytes === null) {
+    if (secretBytes !== null) secretBytes.fill(0);
+    return { outcome: "invalid-input", reason: "malformed restore request" };
+  }
+  // An independent copy for the hand-off unlock below -- restore's own
+  // passphrase handling must never affect this second, later use.
+  const secretBytesForUnlock = new Uint8Array(secretBytes);
+  const m = requireModules();
+  try {
+    const built = await buildFreshCoordinator();
+    if (built === null) {
+      secretBytes.fill(0);
+      secretBytesForUnlock.fill(0);
+      return { outcome: "seed-unavailable", reason: "production crypto unavailable" };
+    }
+    const detect = built.coordinator.detectProfileState();
+    if (detect.outcome !== "ok" || !("value" in detect) || detect.value.presence !== "absent") {
+      secretBytes.fill(0);
+      secretBytesForUnlock.fill(0);
+      await built.masterSeedAuthority.clear();
+      return { outcome: "already-exists", reason: "a profile already exists at this location -- recover it, do not restore over it" };
+    }
+
+    const paths = m.planFedosLocalProfilePaths(dataDir());
+    if (paths === null) {
+      secretBytes.fill(0);
+      secretBytesForUnlock.fill(0);
+      await built.masterSeedAuthority.clear();
+      return { outcome: "failed", reason: "could not resolve profile paths" };
+    }
+    m.ensureFedosLocalProfileDirectories(paths);
+
+    const deviceKeypair = m.generateFedosDeviceSigningKeypair();
+    const freshLocalDeviceId = `device-${deviceKeypair.publicKeyHex.slice(0, 16)}`;
+
+    const restoreResult = await m.restoreFedosRecoveryBundle({
+      bundleBytes,
+      passphrase: secretBytes,
+      suite: "ChaCha20Poly1305",
+      accountIndex: 0,
+      masterSeedAuthority: built.masterSeedAuthority,
+      resolveAccountPublicKeyHex: async (accountIndex) => {
+        const identity = await built.signer.publicIdentityForAccount(accountIndex);
+        return identity?.publicKeyHex ?? null;
+      },
+      targetPaths: paths,
+      freshLocalDeviceId,
+      now: Date.now(),
+      targetCommerceRoot: path.join(dataDir(), "commerce"),
+      targetSettingsPath: settingsFilePath(),
+      runtimeBoundary: productionRecoveryBundleRuntimeBoundary(m, built.masterSeedAuthority),
+    });
+    secretBytes.fill(0);
+    await built.masterSeedAuthority.clear();
+    if (restoreResult.outcome !== "restored") {
+      secretBytesForUnlock.fill(0);
+      return { outcome: restoreResult.outcome, reason: restoreResult.reason ?? "restore did not complete" };
+    }
+
+    const unlockBuilt = await buildFreshCoordinator();
+    if (unlockBuilt === null) {
+      secretBytesForUnlock.fill(0);
+      return { outcome: "seed-unavailable", reason: "restored to disk, but production crypto unavailable for the immediate unlock" };
+    }
+    unlockBuilt.coordinator.detectProfileState();
+    const unlockSecret = new m.UnlockSecret(secretBytesForUnlock);
+    const unlockResult = await unlockBuilt.coordinator.unlockProfile(unlockSecret);
+    if (unlockResult.outcome !== "ok" || !("value" in unlockResult)) {
+      await unlockBuilt.masterSeedAuthority.clear();
+      return { outcome: "failed", reason: "profile restored to disk, but the immediate unlock failed -- retry via the normal unlock screen" };
+    }
+    const assembly = startAssembly(unlockBuilt.coordinator, unlockResult.value);
+    if (assembly === null) {
+      await unlockBuilt.coordinator.lock();
+      return { outcome: "failed", reason: "profile restored but application assembly failed to start" };
+    }
+    activeCoordinator = unlockBuilt.coordinator;
+    activeAssembly = assembly;
+    activeAssembly.boundary.securityState.setMessageDeliveryRemoteDeviceRef(activeMessageDeliveryRemoteDeviceRef);
+    ipcCommands.bumpGeneration(); // a new assembly now exists — discard any stale-generation in-flight results
+    activeViewerParticipant = { authority: "nostr", publicIdentifier: unlockResult.value.accountPublicIdentifier, identityId: null };
+    activeLocalIdentity = { displayLabel: unlockResult.value.displayLabel, accountPublicIdentifier: unlockResult.value.accountPublicIdentifier };
+    activeMasterSeedAuthority = unlockBuilt.masterSeedAuthority;
+    activeNostrSigningAuthority = unlockBuilt.signer;
+    initializeCommerceNetworkProfileFromRelayConfig();
+    commerceMediaStoreFor();
+    commerceNostrOutboundPortFor();
+    await attachPresentationLayer(assembly);
+    return { ...readyResult(unlockResult.value), assets: restoreResult.assets };
+  } finally {
+    // concurrency guard is now owned by ipcCommands' "profile-lifecycle" group
+  }
+}
+
+/**
+ * Disaster Recovery / Portable Backup Arc (mandate §9-11) -- builds a
+ * Recovery Bundle from the CURRENTLY ACTIVE, already-unlocked profile.
+ * Requires a live profile (never generates one) -- the Identity Part is
+ * that profile's own already-sealed `sealedMasterSeedFile`, read verbatim;
+ * this handler never touches a raw Master Seed byte or passphrase itself.
+ * The response is base64-encoded bundle bytes only (same transport
+ * convention as `handleCommerceProductImageAttach`'s own `imageBase64`
+ * field, just outbound) -- never a secret.
+ */
+async function handleRecoveryExport() {
+  if (activeCoordinator === null || activeMasterSeedAuthority === null || activeNostrSigningAuthority === null) {
+    return { outcome: "not-unlocked", reason: "no active unlocked profile to export" };
+  }
+  const m = requireModules();
+  const paths = m.planFedosLocalProfilePaths(dataDir());
+  if (paths === null) return { outcome: "failed", reason: "could not resolve profile paths" };
+  const signer = activeNostrSigningAuthority;
+  const exportResult = await m.exportFedosRecoveryBundle({
+    sourcePaths: paths,
+    suite: "ChaCha20Poly1305",
+    accountIndex: 0,
+    masterSeedAuthority: activeMasterSeedAuthority,
+    resolveAccountPublicKeyHex: async (accountIndex) => {
+      const identity = await signer.publicIdentityForAccount(accountIndex);
+      return identity?.publicKeyHex ?? null;
+    },
+    now: Date.now(),
+    sourceCommerceRoot: path.join(dataDir(), "commerce"),
+    sourceSettingsPath: settingsFilePath(),
+    runtimeBoundary: productionRecoveryBundleRuntimeBoundary(m, activeMasterSeedAuthority),
+  });
+  if (exportResult.outcome !== "exported" || exportResult.bundleBytes === undefined) {
+    return { outcome: exportResult.outcome, reason: exportResult.reason ?? "export did not complete" };
+  }
+  return { outcome: "ok", bundleBase64: Buffer.from(exportResult.bundleBytes).toString("base64") };
 }
 
 /** Phase G — Lock: stops background sync + the ONE Runtime (via the assembly), clears badge/tray to their inert "no active sensitive work" state, THEN the Coordinator's own lock() (safe second call). */
@@ -8662,6 +9001,19 @@ function registerIpcHandlers(): void {
   // safe (every OTHER channel keeps full stale-generation protection).
   ipcCommands.registerHandle(ipcMain, "fedos-profile:create", (payload: unknown) => handleCreate(payload), { group: "profile-lifecycle", bumpsOwnGeneration: true });
   ipcCommands.registerHandle(ipcMain, "fedos-profile:unlock", (payload: unknown) => handleUnlock(payload), { group: "profile-lifecycle", bumpsOwnGeneration: true });
+  // Disaster Recovery / Portable Backup Arc -- recovery-inspect is pure
+  // (no passphrase, no mutation) so it is NOT in the "profile-lifecycle"
+  // group; recovery-restore mutates a fresh profile into existence exactly
+  // like create/unlock, so it shares their group and generation-bump.
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:recovery-inspect", (payload: unknown) => handleRecoveryInspect(payload), { allowConcurrentSelf: true });
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:recovery-restore", (payload: unknown) => handleRecoveryRestore(payload), { group: "profile-lifecycle", bumpsOwnGeneration: true });
+  // recovery-export reads the CURRENTLY active profile's own already-sealed
+  // material -- it neither creates nor unlocks a profile, so it is NOT in
+  // the "profile-lifecycle" group (nothing about active profile identity
+  // changes), but it is real per-profile-state work, so concurrent calls
+  // against the SAME active profile are still serialized against each
+  // other via `allowConcurrentSelf: false` (the registry's own default).
+  ipcCommands.registerHandle(ipcMain, "fedos-profile:recovery-export", async () => handleRecoveryExport());
   ipcCommands.registerHandle(ipcMain, "fedos-profile:lock", async () => handleLock(), { group: "profile-lifecycle", bumpsOwnGeneration: true });
   // FedOS Peer Device Discovery Arc P0 Closure (Agent F) -- "Start Over" on
   // the recovery screen. Same "profile-lifecycle" serialization group as
@@ -8981,6 +9333,12 @@ app.whenReady().then(async () => {
         "profile-create": (payload) => handleCreate(payload),
         "profile-unlock": (payload) => handleUnlock(payload),
         "profile-lock": () => handleLock(),
+        // Disaster Recovery / Portable Backup Arc -- the SAME real handler
+        // functions `registerIpcHandlers()` also registers for a real
+        // renderer to call (`fedos-profile:recovery-inspect`/`-restore`).
+        "profile-recovery-inspect": (payload) => handleRecoveryInspect(payload),
+        "profile-recovery-restore": (payload) => handleRecoveryRestore(payload),
+        "profile-recovery-export": () => handleRecoveryExport(),
         "beta-status": () => handleBetaStatus(),
         "unified-graph": () => Promise.resolve(unifiedGraphDiagnostics()),
         "acceptance-create-direct-conversation": (payload) => handleAcceptanceCreateDirectConversation(payload),
