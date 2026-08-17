@@ -259,7 +259,7 @@ describe("Disaster Recovery Portable Backup -- Encryption Authority build()/rest
     expect(identityOutcome).toBe("restored");
     expect(targetMasterSeed.restoreSealed).toHaveBeenCalledTimes(1);
 
-    const dataOutcome = await restoreAuthority.restoreDataPart(buildResult.bundle, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX });
+    const dataOutcome = await restoreAuthority.restoreDataPart(buildResult.bundle, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, accountIndex: 0 });
     expect(dataOutcome.outcome).toBe("restored");
     if (dataOutcome.outcome === "restored") {
       expect(dataOutcome.entries.map((e) => e.name)).toEqual(["board", "conversation"]);
@@ -278,7 +278,7 @@ describe("Disaster Recovery Portable Backup -- Encryption Authority build()/rest
   it("21. restoreDataPart() on an Identity-only bundle reports identity-only, not failed", async () => {
     const authority = new FedosRecoveryBundleEncryptionAuthority(fakeMasterSeedAuthority());
     const bundle: FedosRecoveryBundleV1 = { v: 1, kind: "fedos-recovery-bundle", createdAt: 0, sealedMasterSeedEnvelope: VALID_SEALED_ENVELOPE, dataCiphertext: null, manifest: null };
-    const outcome = await authority.restoreDataPart(bundle, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX });
+    const outcome = await authority.restoreDataPart(bundle, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, accountIndex: 0 });
     expect(outcome.outcome).toBe("identity-only");
   });
 
@@ -295,13 +295,17 @@ describe("Disaster Recovery Portable Backup -- Encryption Authority build()/rest
     expect(buildResult.outcome).toBe("built");
     if (buildResult.outcome !== "built" || buildResult.bundle.manifest === null) return;
 
-    // Splice in a manifest claiming a different accountIndex -- the header re-derived at restore time
-    // will not match the header actually sealed inside the ciphertext.
+    // Splice in a manifest claiming a different accountIndex than the
+    // caller's own trusted request.accountIndex -- caught directly (mini
+    // red-team R1 fix: key derivation and this check now both use the
+    // caller's trusted accountIndex, never the unauthenticated manifest
+    // field), and would ALSO be caught by the header re-derived at restore
+    // time not matching the header actually sealed inside the ciphertext.
     const tampered: FedosRecoveryBundleV1 = {
       ...buildResult.bundle,
       manifest: { ...buildResult.bundle.manifest, accountIndex: 99 },
     };
-    const outcome = await authority.restoreDataPart(tampered, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX });
+    const outcome = await authority.restoreDataPart(tampered, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, accountIndex: 0 });
     expect(outcome.outcome).toBe("manifest-mismatch");
   });
 
@@ -310,7 +314,7 @@ describe("Disaster Recovery Portable Backup -- Encryption Authority build()/rest
     const authority = new FedosRecoveryBundleEncryptionAuthority(masterSeed);
     const manifest = buildFedosRecoveryBundleManifest({ createdAt: 0, accountIndex: 0, includedLogs: ["board"], dataPartBytes: new Uint8Array([1]) });
     const bundle: FedosRecoveryBundleV1 = { v: 1, kind: "fedos-recovery-bundle", createdAt: 0, sealedMasterSeedEnvelope: VALID_SEALED_ENVELOPE, dataCiphertext: "wire" as AeadCiphertextWire, manifest };
-    const outcome = await authority.restoreDataPart(bundle, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX });
+    const outcome = await authority.restoreDataPart(bundle, { suite: SUITE, selfAccountPublicKeyHex: ACCOUNT_PUBLIC_KEY_HEX, accountIndex: 0 });
     expect(outcome.outcome).toBe("key-unavailable");
   });
 });

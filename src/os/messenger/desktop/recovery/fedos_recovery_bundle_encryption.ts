@@ -67,6 +67,19 @@ export interface FedosRecoveryBundleDataPartRestoreRequest {
   readonly suite: AeadAlgorithm;
   /** ALREADY RESOLVED by the caller, against the identity `restoreIdentity()` just restored. */
   readonly selfAccountPublicKeyHex: string;
+  /**
+   * The caller's OWN trusted account index (never `bundle.manifest.accountIndex`,
+   * which travels in the clear and is never AEAD-protected -- see
+   * `fedos_recovery_bundle_manifest.ts`'s own header). Mini red-team R1
+   * (Disaster Recovery Product Closure arc) found key derivation and the
+   * post-decrypt header re-check both trusted the unauthenticated manifest
+   * field for a security-relevant selector; today inert (fails closed via
+   * AEAD auth failure, single-account app), but a live "trust an
+   * unauthenticated field" pattern that becomes exploitable the moment
+   * multi-account support ships. Fixed by requiring the caller's own
+   * verified value here instead.
+   */
+  readonly accountIndex: number;
 }
 
 export type FedosRecoveryBundleDataPartRestoreResult =
@@ -219,7 +232,7 @@ export class FedosRecoveryBundleEncryptionAuthority {
 
     let keyHandle: AeadKeyHandle | null;
     try {
-      keyHandle = await this.#masterSeedAuthority.resolveConversationKey(bundle.manifest.accountIndex, request.selfAccountPublicKeyHex);
+      keyHandle = await this.#masterSeedAuthority.resolveConversationKey(request.accountIndex, request.selfAccountPublicKeyHex);
     } catch {
       return { outcome: "key-unavailable" };
     }
@@ -235,7 +248,13 @@ export class FedosRecoveryBundleEncryptionAuthority {
       const split = splitFedosRecoveryBundleHeader(sealed);
       if (split === null) return { outcome: "failed" };
 
-      const expectedHeader = encodeFedosRecoveryBundleHeader({ accountIndex: bundle.manifest.accountIndex, createdAt: bundle.manifest.createdAt });
+      // The manifest's own claimed accountIndex must ALSO match the
+      // caller's trusted value -- catches a tampered manifest even in the
+      // (currently impossible, single-account) case where it happened to
+      // still decrypt under the caller's real key.
+      if (bundle.manifest.accountIndex !== request.accountIndex) return { outcome: "manifest-mismatch" };
+
+      const expectedHeader = encodeFedosRecoveryBundleHeader({ accountIndex: request.accountIndex, createdAt: bundle.manifest.createdAt });
       if (!fedosRecoveryBundleHeaderBytesAreEqual(split.header, expectedHeader)) return { outcome: "manifest-mismatch" };
 
       const recomputedHash = computeFedosRecoveryBundleContentHash(split.dataPartBytes);

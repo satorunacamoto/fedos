@@ -179,6 +179,7 @@ suite("Disaster Recovery Portable Backup -- fresh-machine restore (REAL WASM)", 
         const dataOutcome = await restoreAuthority.restoreDataPart(bundle as FedosRecoveryBundleV1, {
           suite: AEAD_SUITE,
           selfAccountPublicKeyHex: identityB!.publicKeyHex,
+          accountIndex: 0,
         });
         expect(dataOutcome.outcome).toBe("restored");
         if (dataOutcome.outcome !== "restored") return;

@@ -308,7 +308,7 @@ export async function restoreFedosRecoveryBundle(request: FedosRecoveryBundleRes
     return { outcome: "restored", localDeviceId: request.freshLocalDeviceId, accountPublicKeyHex, assets };
   }
 
-  const dataPartResult = await authority.restoreDataPart(bundle, { suite: request.suite, selfAccountPublicKeyHex: accountPublicKeyHex });
+  const dataPartResult = await authority.restoreDataPart(bundle, { suite: request.suite, selfAccountPublicKeyHex: accountPublicKeyHex, accountIndex: request.accountIndex });
   if (dataPartResult.outcome !== "restored") {
     return { outcome: "data-part-restore-failed", reason: dataPartResult.outcome };
   }

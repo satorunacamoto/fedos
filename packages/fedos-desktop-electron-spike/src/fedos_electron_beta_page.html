@@ -924,7 +924,7 @@
 
           <fieldset>
             <legend>Backup (Disaster Recovery Bundle)</legend>
-            <p class="muted">Creates a single passphrase-protected backup file of your account identity and (best-effort) your locally stored conversation/settings data, as of right now.</p>
+            <p class="muted">Creates a single backup file of your account identity and (best-effort) your locally stored conversation/settings data, as of right now, protected with your current account passphrase (not a new or separate one) — keep the file and that passphrase both safe.</p>
             <p class="warn" id="recovery-export-scope-note">Does NOT include your active Direct Ratchet sessions or this device's trust with your contacts — those never travel in a backup by design. After restoring this backup on another device, you and each contact must re-establish secure sessions and device trust again before messaging works.</p>
             <button id="recovery-export-btn" type="button">Export Backup…</button>
             <p id="recovery-export-feedback" role="status" aria-live="polite" class="muted"></p>

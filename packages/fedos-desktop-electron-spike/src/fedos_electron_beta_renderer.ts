@@ -5282,8 +5282,29 @@ const RECOVERY_RESTORE_OUTCOME_COPY: Readonly<Record<string, RecoveryOutcomeCopy
   },
 };
 
-function describeRecoveryRestoreOutcome(outcome: string): RecoveryOutcomeCopy {
-  return RECOVERY_RESTORE_OUTCOME_COPY[outcome] ?? { headline: "Restore did not complete.", detail: describeOutcome(outcome) };
+/**
+ * Track 1 follow-up (mini red-team R3, CONFIRMED) -- `handleRecoveryRestore()`
+ * can return `{ outcome: "failed", reason }` from TWO branches that run
+ * AFTER the restored identity is already durably written to disk (the
+ * immediate post-restore unlock failing, or application assembly failing
+ * to start) -- retrying the SAME bundle on THIS screen after either would
+ * now hit `already-exists`/`target-not-fresh`, since a profile now exists
+ * at this location. `RECOVERY_RESTORE_OUTCOME_COPY` cannot name these two
+ * specific shapes in advance (the backend already writes its own precise,
+ * human-appropriate `reason` string for each -- e.g. "...retry via the
+ * normal unlock screen"), so the real `reason` is shown verbatim here
+ * instead of a generic "try again" that would send the user in a circle.
+ * Mirrors this same file's own established `result.reason` verbatim
+ * precedent elsewhere (see this file's own `OUTCOME_TEXT` lookup, line
+ * ~298).
+ */
+function describeRecoveryRestoreOutcome(outcome: string, reason?: string): RecoveryOutcomeCopy {
+  const known = RECOVERY_RESTORE_OUTCOME_COPY[outcome];
+  if (known !== undefined) return known;
+  if (outcome === "failed" && reason !== undefined && reason.length > 0) {
+    return { headline: "Restore did not fully complete.", detail: reason };
+  }
+  return { headline: "Restore did not complete.", detail: describeOutcome(outcome) };
 }
 
 /** Track 1 -- mirrors `inspectFedosRecoveryBundle()`'s own closed outcome vocabulary (`"ok"|"malformed"|"unsupported-version"`), plus the transport-level `"invalid-input"` `handleRecoveryInspect()` itself can also return. */
@@ -5306,8 +5327,14 @@ const RECOVERY_EXPORT_OUTCOME_COPY: Readonly<Record<string, RecoveryOutcomeCopy>
   "write-failed": { headline: "Could not save the backup file.", detail: "Check disk space and permissions at the location you chose, then try again." },
 };
 
-function describeRecoveryExportOutcome(outcome: string): RecoveryOutcomeCopy {
-  return RECOVERY_EXPORT_OUTCOME_COPY[outcome] ?? { headline: "Could not export a backup.", detail: describeOutcome(outcome) };
+/** Track 1 follow-up (mini red-team R3) -- same reasoning as `describeRecoveryRestoreOutcome()`'s own `"failed"` handling immediately above: `handleRecoveryExport()`'s `"failed"` outcome carries a real, already human-appropriate `reason` string, shown verbatim rather than a generic fallback. Lower severity than the Restore case (no residual state is written on this path), fixed alongside it for consistency. */
+function describeRecoveryExportOutcome(outcome: string, reason?: string): RecoveryOutcomeCopy {
+  const known = RECOVERY_EXPORT_OUTCOME_COPY[outcome];
+  if (known !== undefined) return known;
+  if (outcome === "failed" && reason !== undefined && reason.length > 0) {
+    return { headline: "Could not export a backup.", detail: reason };
+  }
+  return { headline: "Could not export a backup.", detail: describeOutcome(outcome) };
 }
 
 /** Non-secret, closed-vocabulary label for each restored asset row (mirrors `FedosRecoveryAssetClassification` exactly — never invents a classification the backend cannot return). */
@@ -5463,17 +5490,22 @@ async function onRestoreSubmit(): Promise<void> {
     byId("restore-submit-error").textContent = "Restoring is not available in this build.";
     return;
   }
-  setBusy(true, "restore-submit-btn");
+  // Track 1 follow-up (mini red-team R3, PLAUSIBLE) -- this call can
+  // durably write a restored identity to disk and start a Runtime
+  // assembly in the main process; "Back"/"Choose a different file" must
+  // not be clickable while it is in flight, or `resetRestoreBundleState()`
+  // could race a write that is still actually happening.
+  setBusy(true, "restore-submit-btn", "restore-back-btn", "restore-choose-file-btn");
   let result: FedosRecoveryRestoreResult;
   try {
     result = await restore(restoreBundleBase64, passphrase);
   } finally {
     clearField("restore-passphrase");
     resetPasswordVisibility("restore-passphrase-show-hide", "restore-passphrase");
-    setBusy(false, "restore-submit-btn");
+    setBusy(false, "restore-submit-btn", "restore-back-btn", "restore-choose-file-btn");
   }
   if (result.outcome !== "ok" || result.ready === undefined) {
-    const copy = describeRecoveryRestoreOutcome(result.outcome);
+    const copy = describeRecoveryRestoreOutcome(result.outcome, result.reason);
     byId("restore-result-headline").textContent = copy.headline;
     byId("restore-result-detail").textContent = copy.detail;
     byId("restore-result").hidden = false;
@@ -5517,7 +5549,7 @@ async function onRecoveryExportToFile(): Promise<void> {
     return;
   }
   if (result.outcome !== "ok" || result.path === undefined) {
-    const copy = describeRecoveryExportOutcome(result.outcome);
+    const copy = describeRecoveryExportOutcome(result.outcome, result.reason);
     byId("recovery-export-feedback").textContent = `${copy.headline} ${copy.detail}`.trim();
     return;
   }
