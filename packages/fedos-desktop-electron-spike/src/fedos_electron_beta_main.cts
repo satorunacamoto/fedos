@@ -179,6 +179,8 @@ import {
   fedosCommerceDemoMerchantLabel,
   type FedosCommerceDemoProduct,
 } from "./fedos_electron_beta_commerce_demo_catalog.js";
+import { FedosStrictTransportPolicy, defaultFedosStrictTransportConfig } from "./fedos_electron_strict_transport_policy.js";
+import { createStrictFedosRelaySocketFactory } from "./fedos_electron_strict_transport_socket_factory.js";
 
 const APP_ID = "com.fedos.desktop.beta";
 const APP_VERSION = "0.1.0-beta.1";
@@ -187,6 +189,24 @@ const DEV_TOOLS_ENABLED = process.env.FEDOS_ELECTRON_BETA_DEVTOOLS === "1";
 const AUTOTEST_MODE = process.env.FEDOS_ELECTRON_BETA_AUTOTEST ?? "";
 /** TEST-INJECTION ONLY — see `fedos_electron_unlock_main.cts`'s own identical note. Never read on a normal launch. */
 const AUTOTEST_SECRET = process.env.FEDOS_BETA_AUTOTEST_SECRET ?? "";
+
+/**
+ * Tor Strict-Transport Local Closure arc — the ONE process-wide strict
+ * routing authority (see
+ * `docs/reviews/fedos-tor-strict-transport-current/03_STRICT_TRANSPORT_ARCHITECTURE.md`
+ * §4/§10). `STRICT TOR: OFF by default` (mandate §30) — enabling requires
+ * an explicit env var on THIS launch; a full Settings-UI toggle is
+ * disclosed future work (see this arc's own final report), not built this
+ * pass, to avoid widening scope into the renderer/Settings surface a
+ * sibling parallel arc may also be touching this same session.
+ */
+const STRICT_TOR_ENABLED = process.env.FEDOS_BETA_STRICT_TOR_ENABLED === "1";
+const STRICT_TOR_SOCKS_HOST = process.env.FEDOS_BETA_STRICT_TOR_SOCKS_HOST ?? "127.0.0.1";
+const STRICT_TOR_SOCKS_PORT = Number(process.env.FEDOS_BETA_STRICT_TOR_SOCKS_PORT ?? "9050");
+const strictTransportPolicy = new FedosStrictTransportPolicy();
+if (STRICT_TOR_ENABLED) {
+  strictTransportPolicy.enable(defaultFedosStrictTransportConfig(STRICT_TOR_SOCKS_HOST, STRICT_TOR_SOCKS_PORT));
+}
 
 /**
  * Secure Runtime Alpha 8121-8200 — Security Finding 1 (external audit
@@ -2456,7 +2476,18 @@ async function loadRootModules(): Promise<RootModules> {
     DeviceSyncEventBridge: deviceSyncEventBridgeModule.FedosDeviceSyncEventBridge,
     fedosDesktopTrayMenuItems: trayTypes.fedosDesktopTrayMenuItems,
     WebSocketRelay: websocketRelay.WebSocketRelay,
-    createNodeWebSocketRelaySocketFactory: websocketRelaySocketFactory.createNodeWebSocketRelaySocketFactory,
+    // Tor Strict-Transport Local Closure arc -- the ONE composition-root
+    // binding change this arc makes (see `03_STRICT_TRANSPORT_ARCHITECTURE.md`
+    // §4). Every one of the ~13 real relay-construction call sites below
+    // (Messenger + every Commerce Nostr transport) calls
+    // `m.createNodeWebSocketRelaySocketFactory()` unchanged; this is the
+    // single place that decides whether that call gets the strict,
+    // SOCKS5-routed factory or the ordinary direct one -- never decided
+    // per call site.
+    createNodeWebSocketRelaySocketFactory: () =>
+      strictTransportPolicy.isStrictModeEnabled()
+        ? createStrictFedosRelaySocketFactory(strictTransportPolicy)
+        : websocketRelaySocketFactory.createNodeWebSocketRelaySocketFactory(),
     Commerce: {
       listViewableProducts: commerce.listViewableProducts,
       LocalProductRepository: commerce.LocalProductRepository,
