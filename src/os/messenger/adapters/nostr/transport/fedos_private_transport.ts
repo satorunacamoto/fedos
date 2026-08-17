@@ -103,6 +103,11 @@ import { FedosDeliveryObservationQuery } from "../../../board/observation/fedos_
 import { FedosDeliveryRetryQuery } from "../../../board/observation/fedos_delivery_retry_query.js";
 import { FedosValidatingDeliveryObservationRepository } from "../../../board/observation/fedos_delivery_observation_write_validator.js";
 import { hydrateFedosConversationTransportDeliveryRecoveryState } from "./fedos_conversation_transport_delivery_recovery_hydration.js";
+import { toFedosDeliveryObservationSubjectId } from "../../../board/observation/fedos_delivery_observation.js";
+import {
+  mapFedosDeliveryRetryStateToConversationDeliveryStatus,
+  type FedosConversationDeliveryStatus,
+} from "./fedos_conversation_delivery_status_presentation.js";
 
 export interface FedosPrivateTransportInboundConfig {
   readonly filter: FedosSubscriptionFilter;
@@ -476,6 +481,26 @@ export class FedosPrivateTransport {
   }
 
   /**
+   * Outbox Flush Reliability arc — the ONE queryable answer to "what
+   * actually happened to this specific logical send," reading the SAME
+   * real, durable Delivery Observation history `#attemptOnce()` itself
+   * writes to, via the SAME `FedosDeliveryRetryQuery` attempt-scoped
+   * lookup this codebase already established (Alpha 528, UNCHANGED —
+   * this method adds no new query mechanism, only a caller-facing
+   * accessor plus the presentation-safe mapping). Never infers success
+   * from the synchronous `queued`/`sendMailboxNip17()` enqueue result
+   * alone -- this is the closure of that arc's own root-cause finding
+   * that a genuinely, permanently rejected send was previously invisible
+   * to every caller.
+   */
+  deliveryStatusForEnvelope(envelopeId: FedosConversationEnvelopeId): FedosConversationDeliveryStatus {
+    const subjectId = toFedosDeliveryObservationSubjectId(envelopeId as unknown as string);
+    if (subjectId === null) return "not-yet-attempted";
+    const retryQuery = new FedosDeliveryRetryQuery(this.observationQuery());
+    return mapFedosDeliveryRetryStateToConversationDeliveryStatus(retryQuery.currentStateFor(subjectId));
+  }
+
+  /**
    * Connects every relay in the Relay Set, starts the Mailbox Scheduler's
    * own timer, and — ONLY if `inbound` was supplied at construction —
    * resolves this transport's own local public key
@@ -537,3 +562,5 @@ export class FedosPrivateTransport {
 
 /** Re-exported for callers that need the branded Outbox id type without importing `./fedos_conversation_transport_outbox_types.js` directly. */
 export type { FedosConversationTransportOutboxId };
+/** Re-exported for callers that need the delivery-status vocabulary without importing `./fedos_conversation_delivery_status_presentation.js` directly. */
+export type { FedosConversationDeliveryStatus };
