@@ -185,6 +185,8 @@ const CURRENT_SUPPORTED_TEST_FILES = [
   "test/fedos_core_wasm_loader.test.ts",
   "test/fedos_direct_conversation_forward_secrecy_route.test.ts",
   "test/fedos_electron_beta_main_artifact_dir_wiring_structural_guard.test.ts",
+  "test/fedos_own_device_sync_cross_process_repro.test.ts",
+  "test/fedos_own_device_sync_journal_transport.test.ts",
   "test/fedos_ratchet_device_lifecycle_device_replacement.test.ts",
   "test/fedos_ratchet_device_lifecycle_session_reset_foundation_unit.test.ts",
   "test/identity_device_suite.test.ts",
