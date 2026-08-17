@@ -336,6 +336,7 @@ function wrapAsRunningDesktopRuntime(conversationRuntime: FedosConversationRunti
     deviceTrust: notEnabled("deviceTrust"),
     deviceSyncOperational: notEnabled("deviceSyncOperational"),
     devicePairing: notEnabled("devicePairing"),
+    deviceSyncJournalOutbound: () => undefined,
     archiveSuppressionAuthority: notEnabled("archiveSuppressionAuthority"),
     recordAndPropagateArchiveSuppression: notEnabled("recordAndPropagateArchiveSuppression"),
     stop: async () => {

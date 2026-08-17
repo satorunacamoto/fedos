@@ -61,6 +61,7 @@ import type { FedosRelay } from "../fedos_relay.js";
 import type { FedosNostrSigningAuthority } from "../../adapters/nostr/protocol/sign/fedos_nostr_signing_authority.js";
 import type { FedosConversationTransportPublisher } from "../../adapters/nostr/transport/fedos_conversation_transport_publisher.js";
 import type { FedosPrivateTransportInboundConfig } from "../../adapters/nostr/transport/fedos_private_transport.js";
+import type { FedosSyncApplyResult } from "../../sync/fedos_sync_state.js";
 import type { FedosMasterSeedAuthority } from "../../../core/vault/wasm/fedos_master_seed_authority.js";
 import type { FedosConversationArchiveRuntimeBounds } from "../../conversations/archive/runtime/fedos_conversation_archive_runtime.js";
 import type { FedosConversationEncryptionAuthority } from "../../conversations/encryption/fedos_conversation_encryption_authority.js";
@@ -472,6 +473,39 @@ export interface FedosDesktopRuntimeConfig {
   readonly deviceSyncTransferSessionLogPath?: string;
   /** Explicit, caller-supplied path to the Relay Sync Observation append-only log file. Omitted, in-memory. Used ONLY to distinguish `relayAccepted` from `deviceImported` on a Transfer Session view -- never to reconstruct a raw Relay event. */
   readonly deviceSyncRelaySyncObservationLogPath?: string;
+  /**
+   * Own-Device Sync Protocol Final Closure arc -- OPTIONAL, meaningful ONLY
+   * when `deviceSyncSchedulerEnabled` is also `true` AND both
+   * `conversationTransportRelays`/`conversationTransportSigningAuthority`
+   * are supplied (mirrors `archiveSuppressionSyncEnabled`'s own identical
+   * "requires the same real Relay/Signing collaborators" gate). When all
+   * three are present, a REAL `FedosDeviceSyncJournalOutboundCoordinator`
+   * is constructed (reusing the SAME durable Device Registry/Sync Journal
+   * instances `FedosDeviceTrustRuntime` already owns -- never a second,
+   * divergent one) and exposed via `runtime.deviceSyncJournalOutbound()`,
+   * giving the Scheduler's own `deviceSyncAttemptFn` injection point a
+   * real, non-fail-closed implementation for application-data (Sync
+   * Journal) delivery -- distinct from `conversationArchiveMasterSeedAuthority`
+   * (a different feature toggle; Sync Journal delivery must not become
+   * available or unavailable purely because Archive happens to be
+   * enabled/disabled). Omitted, `runtime.deviceSyncJournalOutbound()`
+   * returns `undefined` and the Scheduler's own attempt path is whatever
+   * `deviceSyncAttemptFn` the caller separately supplied (fail-closed by
+   * default, unchanged).
+   */
+  readonly deviceSyncJournalMasterSeedAuthority?: FedosMasterSeedAuthority;
+  /** Explicit, caller-supplied path to the Journal Transport Inbound Dedup append-only log file (SAME generic `FedosDeviceRelaySyncInboundDedupPersistence` shape Device Registry relay-sync inbound already uses -- never a second, divergent dedup schema). Omitted, in-memory -- meaningful only alongside `deviceSyncJournalMasterSeedAuthority`. */
+  readonly deviceSyncJournalInboundDedupLogPath?: string;
+  /**
+   * OPTIONAL, TEST-INJECTION ONLY -- mirrors this file's own
+   * `directRatchetMessageDeliveryRemoteDeviceRef`'s identical discipline:
+   * unset on every ordinary launch, `fedos_electron_beta_main.cts` never
+   * sets it. Observes the real per-entry conflict classification the
+   * Journal Transport Inbound Subscription's own auto-apply already
+   * performs after every successful delivery -- that apply's own return
+   * value has no other observable sink otherwise.
+   */
+  readonly deviceSyncJournalOnApplied?: (results: readonly FedosSyncApplyResult[]) => void;
 
   /**
    * Secure Runtime Alpha 4581–4660 ("Desktop Device Registration, Pairing,

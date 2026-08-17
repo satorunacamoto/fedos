@@ -627,6 +627,8 @@ interface RuntimeConversationLike {
 interface RunningRuntimeLike {
   conversationRuntime(): RuntimeConversationLike;
   deviceTrust(): unknown;
+  /** Own-Device Sync Protocol Final Closure arc — the real `FedosDeviceSyncJournalOutboundCoordinator`, or `undefined` when the running Runtime was never configured with `deviceSyncJournalMasterSeedAuthority`/relays/signing (an ordinary, expected state — e.g. no relay configured yet). Opaque here (never a throw); `createFedosDeviceSyncJournalAttemptFn()` is the only thing that knows its real shape. */
+  deviceSyncJournalOutbound(): unknown;
 }
 interface CoordinatorLike {
   detectProfileState(): CoordResult<StatusView>;
@@ -1027,6 +1029,8 @@ interface RootModules {
   readonly betaReleaseConfigurationV1: () => unknown;
   readonly betaLimitationsV1: () => unknown;
   readonly DeviceSyncEventBridge: new (deps: { listener: (event: unknown) => void; abandonmentMaxAttempts?: number }) => DeviceSyncEventBridgeLike;
+  /** Own-Device Sync Protocol Final Closure arc — wraps a real `FedosDeviceSyncJournalOutboundCoordinator` (opaque `unknown` here) into the real, non-fail-closed `FedosDeviceSyncAttemptFn` `wrapAttemptFn()` needs. */
+  readonly createFedosDeviceSyncJournalAttemptFn: (coordinator: unknown) => (request: unknown) => Promise<unknown>;
   readonly fedosDesktopTrayMenuItems: (disabled?: ReadonlySet<string>) => readonly FedosElectronBadgeTrayMenuItemLike[];
   readonly WebSocketRelay: new (url: string, factory: (url: string) => Promise<unknown>) => RelayLike;
   readonly createNodeWebSocketRelaySocketFactory: () => (url: string) => Promise<unknown>;
@@ -2234,6 +2238,11 @@ async function loadRootModules(): Promise<RootModules> {
   const deviceSyncEventBridgeModule = (await import(distUrl("device", "sync_events", "fedos_device_sync_event_bridge.js"))) as {
     FedosDeviceSyncEventBridge: RootModules["DeviceSyncEventBridge"];
   };
+  const deviceSyncJournalOutboundModule = (await import(
+    distUrl("os", "messenger", "device", "sync_journal_transport", "fedos_device_sync_journal_outbound_coordinator.js")
+  )) as {
+    createFedosDeviceSyncJournalAttemptFn: RootModules["createFedosDeviceSyncJournalAttemptFn"];
+  };
   const websocketRelay = (await import(distUrl("os", "messenger", "desktop", "websocket_relay.js"))) as {
     WebSocketRelay: RootModules["WebSocketRelay"];
   };
@@ -2476,6 +2485,7 @@ async function loadRootModules(): Promise<RootModules> {
     betaReleaseConfigurationV1: releaseConfiguration.fedosDesktopBetaReleaseConfigurationV1,
     betaLimitationsV1: limitations.fedosDesktopBetaLimitationsV1,
     DeviceSyncEventBridge: deviceSyncEventBridgeModule.FedosDeviceSyncEventBridge,
+    createFedosDeviceSyncJournalAttemptFn: deviceSyncJournalOutboundModule.createFedosDeviceSyncJournalAttemptFn,
     fedosDesktopTrayMenuItems: trayTypes.fedosDesktopTrayMenuItems,
     WebSocketRelay: websocketRelay.WebSocketRelay,
     // Tor Strict-Transport Local Closure arc -- the ONE composition-root
@@ -5094,6 +5104,23 @@ async function buildFreshCoordinator(): Promise<{
     },
     abandonmentMaxAttempts: DEVICE_SYNC_ABANDONMENT_POLICY.maxAttempts,
   });
+  // Own-Device Sync Protocol Final Closure arc -- the real `deviceSyncAttemptFn` `wrapAttemptFn()`
+  // wraps. IDENTICAL indirection to `eventBridge`'s own `listener` immediately above: `coordinator`
+  // does not exist yet at the point this closure must be constructed (it is itself a Coordinator
+  // constructor argument, via `eventBridge.wrapAttemptFn(journalAttemptFn)` below), so this closes
+  // over a `let` assigned right after `coordinator` is constructed, dereferenced only much later --
+  // by the time the Scheduler's own tick actually CALLS this, `coordinator.runningRuntime()` is
+  // guaranteed non-null (a real create/unlock has already completed). `runningRuntime()`
+  // returning `null` (not yet unlocked) or `deviceSyncJournalOutbound()` returning `undefined` (no
+  // relay configured yet) are both ordinary, expected states here -- never a fabricated "delivered".
+  let coordinatorHandle: CoordinatorLike | null = null;
+  const journalAttemptFn = async (request: unknown): Promise<unknown> => {
+    const runtime = coordinatorHandle?.runningRuntime() ?? null;
+    if (runtime === null) return { outcome: "failed" };
+    const journalOutbound = runtime.deviceSyncJournalOutbound();
+    if (journalOutbound === undefined) return { outcome: "route-rejected-permanent", reason: "device sync journal transport not configured -- no relay configured yet" };
+    return m.createFedosDeviceSyncJournalAttemptFn(journalOutbound)(request);
+  };
   const secureRuntimeBundle = secureRuntimeBundleConfig(m, signer);
   const coordinator = new m.Coordinator({
     paths,
@@ -5103,9 +5130,10 @@ async function buildFreshCoordinator(): Promise<{
     accountSigningAuthority: signer,
     deviceSyncSchedulerEnabled: true,
     deviceSyncAbandonmentPolicy: DEVICE_SYNC_ABANDONMENT_POLICY,
-    deviceSyncAttemptFn: eventBridge.wrapAttemptFn(),
+    deviceSyncAttemptFn: eventBridge.wrapAttemptFn(journalAttemptFn),
     ...secureRuntimeBundle,
   });
+  coordinatorHandle = coordinator;
   return { coordinator, masterSeedAuthority, eventBridge, signer };
 }
 

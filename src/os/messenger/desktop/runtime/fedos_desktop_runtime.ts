@@ -270,6 +270,13 @@ import type { FedosDeviceRelaySyncObservationRepository } from "../../device/rel
 import { AppendOnlyFedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/persistence/append_only_fedos_device_relay_sync_observation_repository.js";
 import { InMemoryFedosDeviceRelaySyncObservationRepository } from "../../device/relay_sync/persistence/in_memory_fedos_device_relay_sync_observation_repository.js";
 import { FedosDeviceSyncOperationalFacade, type FedosDeviceSyncOperationalFacadeDeps } from "./fedos_device_sync_operational_facade.js";
+import { FedosDeviceSyncJournalOutboundCoordinator } from "../../device/sync_journal_transport/fedos_device_sync_journal_outbound_coordinator.js";
+import { FedosWasmDeviceSyncJournalPackageEncryptionAuthority } from "../../device/sync_journal_transport/fedos_device_sync_journal_package_encryption.js";
+import { FedosDeviceSyncJournalInboundHandler } from "../../device/sync_journal_transport/fedos_device_sync_journal_inbound_handler.js";
+import { FedosDeviceSyncJournalInboundSubscription } from "../../device/sync_journal_transport/fedos_device_sync_journal_inbound_subscription.js";
+import type { FedosDeviceRelaySyncInboundDedupPersistence } from "../../device/relay_sync/persistence/fedos_device_relay_sync_inbound_dedup_persistence.js";
+import { AppendOnlyFedosDeviceRelaySyncInboundDedupPersistence } from "../../device/relay_sync/persistence/append_only_fedos_device_relay_sync_inbound_dedup_persistence.js";
+import { InMemoryFedosDeviceRelaySyncInboundDedupPersistence } from "../../device/relay_sync/persistence/in_memory_fedos_device_relay_sync_inbound_dedup_persistence.js";
 
 // Secure Runtime Alpha 4581-4660 (Desktop Device Registration, Pairing, and
 // Durable Sync Journal Arc) -- every import/addition below this comment is
@@ -464,6 +471,18 @@ export interface FedosRunningDesktopRuntime {
    * accessor on this handle already uses.
    */
   devicePairing(): FedosDevicePairingFacade;
+  /**
+   * Own-Device Sync Protocol Final Closure arc — the real
+   * `FedosDeviceSyncJournalOutboundCoordinator`, or `undefined` (never a
+   * throw — this is read from the Scheduler's own per-attempt hot path,
+   * where "not configured" is an ordinary, expected outcome, not a caller
+   * error) when `config.deviceSyncJournalMasterSeedAuthority`/
+   * `conversationTransportRelays`/`conversationTransportSigningAuthority`
+   * were not all supplied together. See that config field's own doc
+   * comment for the full gate. Still throws `"inaccessible after stop"`
+   * once `stop()` has been called, mirroring every other accessor here.
+   */
+  deviceSyncJournalOutbound(): FedosDeviceSyncJournalOutboundCoordinator | undefined;
   /**
    * Secure Runtime Alpha 7881-7960 — the `FedosArchiveSuppressionObservationAuthority`
    * (`../../conversation/retention/fedos_archive_suppression_observation_authority.js`)
@@ -1551,6 +1570,16 @@ export async function startFedosDesktopRuntime(
   // `config.archiveSuppressionSyncEnabled` was true (validated above).
   let archiveSuppressionOutboundCoordinatorInstance: FedosArchiveSuppressionOutboundCoordinator | undefined;
   let archiveSuppressionInboundSubscriptionInstance: FedosArchiveSuppressionInboundSubscription | undefined;
+  // Own-Device Sync Protocol Final Closure arc -- mirrors
+  // archiveSuppressionOutboundCoordinatorInstance's own identical
+  // "assembled inside the deviceTrustEnabled gate, declared here so the
+  // return statement below can see it" pattern exactly.
+  let deviceSyncJournalOutboundInstance: FedosDeviceSyncJournalOutboundCoordinator | undefined;
+  // Own-Device Sync Protocol Final Closure arc -- mirrors
+  // archiveSuppressionInboundSubscriptionInstance's own identical "assembled
+  // inside the deviceTrustEnabled gate, declared here so stop() below can
+  // see it" pattern exactly.
+  let deviceSyncJournalInboundSubscriptionInstance: FedosDeviceSyncJournalInboundSubscription | undefined;
   if (config.deviceTrustEnabled) {
     // Secure Runtime Alpha 6521-6600 -- `deviceRegistryPersistence` itself
     // is now constructed ABOVE (hoisted, shared with the four new
@@ -1667,6 +1696,83 @@ export async function startFedosDesktopRuntime(
       config.deviceSyncRelaySyncObservationLogPath !== undefined
         ? new AppendOnlyFedosDeviceRelaySyncObservationRepository(config.deviceSyncRelaySyncObservationLogPath)
         : new InMemoryFedosDeviceRelaySyncObservationRepository();
+
+    // Own-Device Sync Protocol Final Closure arc -- the REAL Journal Batch
+    // Outbound Coordinator, constructed ONLY when `deviceSyncSchedulerEnabled`
+    // is true AND both real Relay/Signing collaborators AND a real Master
+    // Seed Authority for encrypt-to-self are present (mirrors
+    // `archiveSuppressionSyncEnabled`'s own identical "requires the SAME
+    // `conversationTransportRelays`/`conversationTransportSigningAuthority`"
+    // gate immediately below). Reuses the SAME `deviceRegistryPersistence`/
+    // `syncStateInstance`/`relaySyncObservationRepository` this block
+    // already owns -- never a second, divergent Device Registry or Sync
+    // Journal. Exposed via `runtime.deviceSyncJournalOutbound()` so a
+    // caller (`fedos_electron_beta_main.cts`'s `buildFreshCoordinator()`)
+    // can give the Scheduler's own `deviceSyncAttemptFn` injection point a
+    // real, non-fail-closed implementation.
+    if (
+      config.deviceSyncSchedulerEnabled &&
+      config.deviceSyncJournalMasterSeedAuthority !== undefined &&
+      config.conversationTransportRelays !== undefined &&
+      config.conversationTransportSigningAuthority !== undefined
+    ) {
+      const journalRelaySet = new FedosConversationRelaySet(config.conversationTransportRelays);
+      await journalRelaySet.connectAll();
+      const journalPublisher = new FedosDeviceRelaySyncPublisher(journalRelaySet);
+      const journalEncryptionAuthority = new FedosWasmDeviceSyncJournalPackageEncryptionAuthority(config.deviceSyncJournalMasterSeedAuthority);
+      deviceSyncJournalOutboundInstance = new FedosDeviceSyncJournalOutboundCoordinator({
+        registryPersistence: deviceRegistryPersistence!,
+        syncState: syncStateInstance,
+        signingAuthority: config.conversationTransportSigningAuthority,
+        publisher: journalPublisher,
+        encryptionAuthority: journalEncryptionAuthority,
+        observationRepository: relaySyncObservationRepository,
+        accountRef: config.localAccountRef!,
+        localAccountIndex: config.conversationTransportAccountIndex ?? 0,
+        selfAccountPublicKeyHex: config.localAccountRef!.publicIdentifier,
+        // Alpha 1841-1920/6841-6920's own established real production AEAD
+        // suite default (NIP-17 inbound import, Direct Ratchet) -- never a
+        // new default invented for this Arc.
+        suite: "ChaCha20Poly1305",
+        now: config.clock,
+      });
+
+      // Own-Device Sync Protocol Final Closure arc -- the REAL Journal Batch
+      // Inbound Handler + Subscription, reusing the SAME `journalRelaySet`/
+      // `journalEncryptionAuthority` the outbound coordinator immediately
+      // above already constructed (never a second, divergent Relay
+      // connection for the SAME logical route) -- mirrors Archive
+      // Suppression's own "one relay set, one publisher, one inbound
+      // subscription" wiring exactly. A successful `"imported"` delivery
+      // is applied via `syncState.applyPendingChanges()` inside the
+      // Subscription itself (see that file's own header for why the
+      // Inbound Handler deliberately does not do this on its own).
+      const journalInboundDedupPersistence: FedosDeviceRelaySyncInboundDedupPersistence =
+        config.deviceSyncJournalInboundDedupLogPath !== undefined
+          ? new AppendOnlyFedosDeviceRelaySyncInboundDedupPersistence(config.deviceSyncJournalInboundDedupLogPath)
+          : new InMemoryFedosDeviceRelaySyncInboundDedupPersistence();
+      const journalInboundHandler = new FedosDeviceSyncJournalInboundHandler({
+        registryPersistence: deviceRegistryPersistence!,
+        dedupPersistence: journalInboundDedupPersistence,
+        observationRepository: relaySyncObservationRepository,
+        syncState: syncStateInstance,
+        localDeviceId: config.localDeviceId!,
+        localAccountRef: config.localAccountRef!,
+      });
+      deviceSyncJournalInboundSubscriptionInstance = new FedosDeviceSyncJournalInboundSubscription({
+        relaySet: journalRelaySet,
+        handler: journalInboundHandler,
+        syncState: syncStateInstance,
+        encryptionAuthority: journalEncryptionAuthority,
+        suite: "ChaCha20Poly1305",
+        localAccountIndex: config.conversationTransportAccountIndex ?? 0,
+        selfAccountPublicKeyHex: config.localAccountRef!.publicIdentifier,
+        localDeviceId: config.localDeviceId!,
+        now: config.clock,
+        onApplied: config.deviceSyncJournalOnApplied,
+      });
+      await deviceSyncJournalInboundSubscriptionInstance.start();
+    }
 
     deviceSyncFacadeDeps = {
       deviceTrust: deviceTrustRuntimeInstance,
@@ -2003,6 +2109,21 @@ export async function startFedosDesktopRuntime(
       }
       return devicePairingFacadeInstance;
     },
+    // Own-Device Sync Protocol Final Closure arc -- the real Journal Batch
+    // Outbound Coordinator, or `undefined` (never a throw -- unlike
+    // `deviceTrust()`/`devicePairing()` above, this is read from the
+    // Scheduler's own per-attempt hot path, where "not configured" is an
+    // ordinary, expected outcome -- e.g. no relay configured yet -- not a
+    // caller error) when `config.deviceSyncJournalMasterSeedAuthority`/
+    // `conversationTransportRelays`/`conversationTransportSigningAuthority`
+    // were not all supplied together. See `config.deviceSyncJournalMasterSeedAuthority`'s
+    // own doc comment for the full gate.
+    deviceSyncJournalOutbound(): FedosDeviceSyncJournalOutboundCoordinator | undefined {
+      if (stopped) {
+        throw new Error("FedosRunningDesktopRuntime.deviceSyncJournalOutbound() is inaccessible after stop().");
+      }
+      return deviceSyncJournalOutboundInstance;
+    },
     // Secure Runtime Alpha 7881-7960 -- the real, durable authority ALWAYS
     // constructed when `config.archiveEnabled` is true (see
     // `conversationArchiveSuppressionAuthority`'s own construction comment
@@ -2081,6 +2202,12 @@ export async function startFedosDesktopRuntime(
       // established responsibility, never duplicated here.
       if (archiveSuppressionInboundSubscriptionInstance !== undefined) {
         await archiveSuppressionInboundSubscriptionInstance.stop();
+      }
+      // Own-Device Sync Protocol Final Closure arc -- mirrors the
+      // Archive Suppression Inbound Subscription's own stop() discipline
+      // immediately above exactly.
+      if (deviceSyncJournalInboundSubscriptionInstance !== undefined) {
+        await deviceSyncJournalInboundSubscriptionInstance.stop();
       }
       if (privateTransportStarted && privateTransportInstance !== undefined) {
         await privateTransportInstance.stop();

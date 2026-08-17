@@ -1016,6 +1016,14 @@ export class FedosProfileInitializationCoordinator {
         this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.deviceSyncAttemptFn : undefined,
       deviceSyncScheduleLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncScheduleLogFile : undefined,
       deviceSyncConflictLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.syncConflictLogFile : undefined,
+      // Own-Device Sync Protocol Final Closure arc -- mirrors
+      // `conversationArchiveMasterSeedAuthority`'s own EXISTING pattern
+      // exactly: reuses `this.#deps.masterSeedAuthority` directly (the
+      // SAME real production identity, never a second, divergent one),
+      // gated on the EXISTING `deviceSyncSchedulerEnabled` toggle -- no
+      // new top-level dependency field needed on this Coordinator.
+      deviceSyncJournalMasterSeedAuthority: this.#deps.deviceSyncSchedulerEnabled === true ? this.#deps.masterSeedAuthority : undefined,
+      deviceSyncJournalInboundDedupLogPath: this.#deps.deviceSyncSchedulerEnabled === true ? paths.deviceSyncJournalInboundDedupLogFile : undefined,
       // Secure Runtime Alpha 6521-6600 -- mirrors `archiveEnabled`'s own
       // established "optional capability toggle" convention exactly.
       // `conversationTransportSigningAuthority` reuses `accountSigningAuthority`

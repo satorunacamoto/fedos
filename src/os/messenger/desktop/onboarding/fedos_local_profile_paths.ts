@@ -164,6 +164,8 @@ export interface FedosLocalProfilePaths {
   readonly archiveSuppressionInboundDedupLogFile: string;
   /** Meaningful only when Device Sync suppression propagation is enabled. */
   readonly archiveSuppressionFanoutObservationLogFile: string;
+  /** Own-Device Sync Protocol Final Closure arc -- meaningful only when the real Journal Transport (`deviceSyncJournalMasterSeedAuthority`) is enabled. */
+  readonly deviceSyncJournalInboundDedupLogFile: string;
 }
 
 /** The set of directories `ensureDirectories()` creates (recursively). Derived from the leaf paths above; no caller string is ever a directory component beyond the root itself. */
@@ -221,6 +223,7 @@ export function planFedosLocalProfilePaths(root: string): FedosLocalProfilePaths
     archiveSuppressionObservationLogFile: join(root, "archive-suppression-observation.ndjson"),
     archiveSuppressionInboundDedupLogFile: join(root, "archive-suppression-inbound-dedup.ndjson"),
     archiveSuppressionFanoutObservationLogFile: join(root, "archive-suppression-fanout-observation.ndjson"),
+    deviceSyncJournalInboundDedupLogFile: join(root, "device-sync-journal-inbound-dedup.ndjson"),
   });
 }
 
