@@ -60,6 +60,9 @@ maturity.
 This is Beta software — functional but incomplete. Read the known limitations below before
 installing.
 
+**You're seeing this because you were invited to a limited Beta cohort.** This release is not yet
+publicly announced; please don't share this link outside the group you were invited as part of.
+
 ## What FedOS Beta is
 
 FedOS is a local-first, privacy-oriented desktop app being built for end-to-end encrypted
@@ -78,6 +81,10 @@ install.**
 Device pairing/sync, opening or sending conversations, Archive, search, notifications, and the
 system tray exist and are tested, but do not yet have a complete path through this release's own
 screens — expect this to expand in future Beta releases.
+
+**Not part of this release's claims:** Tor routing and Commerce (ordering/payments) exist in this
+project's codebase but are intentionally not covered by this release — neither has a finished,
+supported path through this build, so please don't rely on either yet.
 
 ## Download
 
