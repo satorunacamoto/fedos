@@ -379,3 +379,267 @@ that found exactly one real issue — the R3 finding — which was found, indepe
 fixed within this same pass). The one thing standing between this and a fully clean GO is a
 mechanical artifact rebuild blocked by transient host memory pressure, not any open product,
 security, or data-integrity question.
+
+==================================================
+FINAL EXACT-HEAD RC ARTIFACT SEAL
+==================================================
+
+*Written by a new Coordinator pass, after a host reboot, closing exactly the one mechanical gap
+left open above (the artifact rebuild blocked by transient host memory pressure). Nothing in this
+section reopens or re-litigates anything above; it only supersedes the "no artifact exists yet for
+883e115b" state.*
+
+## Heads and drift, independently re-verified this pass
+
+```
+SOURCE CANDIDATEHEAD:
+883e115bc89f30ad354cd53af691529086be7552
+
+WORKTREE HEAD AT START OF THIS PASS:
+0425f0f257c5908ec1ccf8dcffd3f85ca5ad64d4 (= the EvidenceHead of the section above)
+
+CANDIDATE -> HEAD ANCESTRY:
+PASS (git merge-base --is-ancestor 883e115b HEAD)
+
+SOURCE DRIFT 883e115b..HEAD:
+NONE — git diff --stat confirms exactly one file, docs/reviews/fedos_final_rc_seal/01_FINAL_RC_REPORT.md
+(the section above), 381 insertions, 0 deletions, 0 files under src/, packages/, scripts/, or any
+build/package-composition path. Independently re-confirmed by two separate read-only forks (R1, R2)
+in addition to the Coordinator's own check.
+```
+
+## Post-reboot host pre-flight
+
+```
+FREE RAM IMMEDIATELY BEFORE BUILD:
+3.78-3.85 GB, sampled 3x over 15s, stable (not draining) — 3.0-4.0 GB conditional band; READY
+because memory was stable and no node.exe/electron.exe/FedOS/build process was active.
+
+C: FREE SPACE:
+227.04 GB
+
+FREE RAM AFTER BUILD + SMOKE TEST:
+4.52 GB (recovered; no leak observed)
+```
+
+## Release pipeline — exact-head run, attempt 1 (no retries needed)
+
+```
+GATE 1  (verify node_modules integrity):        PASS
+GATE 2  (verify clean working tree):            PASS (clean tree confirmed at commit 0425f0f2)
+GATE 3  (verify package allowlist):             PASS
+GATE 4  (build root beta-runtime dist/):        PASS
+GATE 5  (build Electron package):               PASS
+GATE 6  (run electron-builder NSIS+ZIP):        PASS
+GATE 7  (verify packaged runtime dep closure):  PASS
+GATE 8  (generate release manifest):            PASS
+GATE 9  (generate release checksums):           PASS
+GATE 10 (verify release checksums):             PASS
+GATE 11 (generate release-staging bundle):      PASS
+GATE 12 (generate public Beta gate report):     PASS (verdict "ready-for-human-publication", blockingGateIds: [])
+GATE 13 (scan staging inputs for prohibited content): PASS
+
+TOTAL: 13/13 real gates PASS (script's own literal step count; "/14" in the script's own printed
+labels remains a stale, pre-existing off-by-one in the label text, not a missing gate — same finding
+as the section above, re-confirmed unchanged)
+```
+
+```
+PROHIBITED CONTENT SCAN:
+984 staging file(s) scanned across 3 target director(y/ies)
+0 findings
+```
+
+Exit code of `npm run release:electron-beta`: 0. No retry was needed — the environment-pressure
+failure mode from the prior session's 3 attempts against 883e115b did not recur post-reboot.
+
+## Exact artifact identity
+
+```
+INSTALLER:
+FedOS-Desktop-Beta-Setup-0.1.0-beta.1.exe (110,541,542 bytes)
+
+INSTALLER SHA256:
+a1c32889173a0ae9105724d8b708abaa9456f15a054085a20c29ccde3de6dee0
+(independently recomputed twice — once by the Coordinator, once by fork R1 via a separate
+PowerShell Get-FileHash invocation — both match release-manifest.v1.json and SHA256SUMS.txt exactly)
+
+ZIP:
+FedOS Desktop Beta-0.1.0-beta.1-win.zip (402,811,773 bytes)
+
+ZIP SHA256:
+9aa0f584fee09aa7341ec76624cdbaa1a85df05c10662526c2194391075df8a5
+(independently recomputed twice, same result, matches manifest and SHA256SUMS.txt exactly)
+
+MANIFEST GIT COMMIT:
+0425f0f257c5908ec1ccf8dcffd3f85ca5ad64d4 — literally NOT 883e115b. Explanation, independently
+verified three times (Coordinator, R1, R2): the build script stamps gitCommit from the actual
+checked-out HEAD at build time, and this worktree's HEAD is the docs-only report commit sitting
+directly on 883e115b (see "Source drift" above — an empty source diff). No new source-changing
+CandidateHead was created in this arc, so 883e115b remains the one and only source CandidateHead;
+the built artifact's source tree is byte-for-byte equivalent to what a build from 883e115b directly
+would have produced. Treated as PASS-in-substance (source-bound to 883e115b), not a literal
+string-match PASS — reported exactly rather than silently rounded up.
+
+ARTIFACT SELF-CONSISTENCY:
+R1 independently confirmed dist-package-beta/, release/, and release-staging/ all hold
+byte-identical copies of the exe and zip with one coherent, monotonically-increasing timestamp
+sequence (17:34:51 -> 17:37:00 local) — no mixed/stale artifacts from the earlier interrupted
+883e115b attempts (whose leftover partial dist-package-beta zip, hash
+b461bedf031f0a30f016eadabbbe1dd5600af6d794a35a2441cf6302e6f2c254, was recorded before this run and
+is confirmed fully overwritten, not present in the final output).
+```
+
+## Release-notes truthfulness, re-confirmed against THIS exact artifact
+
+```
+RELEASE_NOTES.md (release-staging/), Commit header: 0425f0f257c5908ec1ccf8dcffd3f85ca5ad64d4 — matches
+this run's manifest gitCommit exactly.
+
+Master Seed unlock: "FINAL RC SEAL arc: real WASM Master Seed generation and later real
+profile-unlock proven through the actual packaged installed binary (not a dev/unpackaged
+process)." — not claimed blocked.
+
+Packaged Windows application: "FINAL RC SEAL arc: a real NSIS installer is built, silently
+installed, launched, and used end-to-end (...) the canonical packaged entry point is real and
+proven, not blocked." — not claimed blocked.
+
+Capability manifest source (src/os/messenger/desktop/beta/fedos_desktop_beta_capability_manifest.ts)
+AND the compiled artifact actually inside this build's own
+dist-package-beta/win-unpacked/dist/os/messenger/desktop/beta/fedos_desktop_beta_capability_manifest.js
+both independently confirmed (by R1) to carry "available" for all 7 corrected capability IDs —
+the shipped binary's baked-in manifest matches source, this is not a stale-build risk.
+
+Minor, non-blocking, disclosed here rather than silently fixed (out of this arc's scope per the
+mandate's own "do not casually edit other manifest entries" instruction): RELEASE_NOTES.md line 16
+still reads "14-real-gate release pipeline" — a pre-existing wording artifact matching the build
+script's own stale "/14" step labels (see PIPELINE section above); cosmetic text only, not a status
+or capability claim, and not itself untrue in the sense R3 was (it doesn't assert anything is
+blocked or unavailable).
+```
+
+## Authenticode, checked against the exact new installer
+
+```
+Get-AuthenticodeSignature FedOS-Desktop-Beta-Setup-0.1.0-beta.1.exe
+Status: NotSigned
+StatusMessage: "...is not digitally signed."
+```
+
+```
+AUTHENTICODE:
+UNSIGNED
+```
+
+Matches the declared "unsigned-allowed-for-beta" V1 distribution policy exactly (also confirmed by
+`"unsigned": true` in release-manifest.v1.json and by SECURITY_NOTICE.md). Not a new defect.
+
+## Installed fresh startup, exact new installer, isolated synthetic profile
+
+```
+INSTALLER FILE:
+FedOS-Desktop-Beta-Setup-0.1.0-beta.1.exe
+sha256=a1c32889173a0ae9105724d8b708abaa9456f15a054085a20c29ccde3de6dee0
+
+INSTALL:
+PASS — silent /S /D=<isolated temp dir>, exit code 0, "FedOS Desktop Beta.exe" present at the
+installed path.
+
+LAUNCH:
+PASS — real installed binary spawned directly (never dev Electron), pid observed, real
+FEDOS_ELECTRON_BETA_AUTOTEST=acceptance profile-create script run against an isolated synthetic
+temp dataDir (never real user profile data).
+
+MAIN WINDOW / RENDERER VERIFICATION:
+PASS — real disk-based step log written by the actual renderer/main/preload IPC round-trip; the
+profile-create step returned a real WASM-derived accountPublicIdentifier
+(7adadbc5...2f62a3fcc405), a real localDeviceId (device-52e8b32f7b45acae), deviceTrustState
+"trusted", and a real recovery notice naming real on-disk sealed-secret and profile-descriptor
+paths — this can only be produced by the genuine renderer flow actually running, not a bare process
+launch.
+
+CLEAN EXIT:
+PASS — process exit code 0; independently re-checked via a Win32_Process query 400ms after exit:
+process confirmed gone at the OS level (not just Node's own belief).
+
+UNINSTALL (cleanup):
+PASS — silent uninstaller run, exit code 0. Isolated install/data temp directories removed after.
+```
+
+## Regression scope this pass
+
+Per the mandate's own Section 11: the only source-changing delta anywhere in this arc's full
+history (from the last fully heavy-suite-validated CandidateHead through today) remains the single
+7-entry capability-manifest fix in 883e115b, now independently reconfirmed three times (Coordinator,
+R1, R2) to be a pure metadata change with zero logic/runtime impact. Accordingly:
+
+```
+REUSED, NOT RERUN (unchanged code, already proven in the section above):
+Direct Ratchet 12/12, Tor Strict 12/12, Own-Device Sync 1/1, Commerce E2E 1/1, Disaster Recovery
+core-proof 8/8, Start-Over Isolation 1/1, Signed Deletion + Identity Transition (Node/IPC-level).
+
+RUN FRESH THIS PASS:
+release pipeline (13/13), exact artifact hash/manifest binding, release-notes truthfulness against
+the exact new artifact, Authenticode against the exact new installer, installed fresh-startup smoke
+test against the exact new installer.
+```
+
+No heavy regression suite was re-run needlessly; no unnecessary resource pressure was created.
+
+## Mini red team (2 read-only forks, per mandate Section 13 cap)
+
+```
+R1 (artifact/release binding): 0 inconsistencies found. All hashes match, single coherent build,
+release-notes/capability-manifest claims verified true against both source and the compiled
+artifact actually inside this build.
+
+R2 (release blocking truth): 0 new P0, 0 new blocking P1. Independently re-confirmed 883e115b's own
+diff is exactly the 7-entry metadata fix it claims to be; confirmed zero source commits exist
+between 883e115b and HEAD; swept for TODO/FIXME/XXX/HACK and "known bug"/"broken" language in the
+shipped source tree and found nothing undisclosed beyond the already-recorded ~15-19 stale manifest
+entries (same disclosed gap as the section above, not new).
+```
+
+Both forks stayed strictly read-only (no edits, no commits, no sub-agents) — verified via
+`git status --short` showing no changes during either run.
+
+## Process hygiene
+
+```
+ORPHANED OWNED PROCESSES:
+0 — verified via PowerShell process query immediately after the smoke test's uninstall step; no
+node.exe/electron.exe/FedOS-named process remained; isolated install/data temp directories
+confirmed removed from disk.
+```
+
+## Final decision for this pass
+
+```
+FINAL DECISION:
+GO
+```
+
+**Rationale**: every condition in the mandate's Section 14 GO checklist is met: exact source
+CandidateHead established and unchanged (883e115b); source drift = none (docs-only, independently
+verified 3x); release pipeline 13/13 PASS; prohibited-content findings = 0 (984 files scanned);
+manifest is source-bound to 883e115b (literal commit-string mismatch fully explained by an
+empty-diff docs commit, disclosed exactly rather than glossed over); installer and ZIP checksums
+independently verified twice each; release-notes truthfulness fix confirmed present against this
+exact artifact; the exact newly-built installer installs, launches, and exits cleanly with real
+WASM-backed evidence; P0 = 0; no remaining P1 blocks the advertised Beta core (the sole P1 found
+anywhere in this arc, R3, is fixed and now artifact-verified, not just source-verified). The prior
+session's own stated rationale — "the one thing standing between this and a fully clean GO is a
+mechanical artifact rebuild blocked by transient host memory pressure" — is the exact gap this pass
+closed. Remaining items (disaster-recovery ratchet-nonportability re-confirmation against these
+exact final bytes, Signed Deletion/Identity Transition installed-binary-specific proof, upgrade
+proof, ~15-19 unreconciled capability-manifest entries, and the cosmetic "14-real-gate" wording in
+RELEASE_NOTES.md) are all pre-existing, non-blocking, and already accurately disclosed — none of
+them contradicts real evidence the way the fixed R3 finding did.
+
+```
+PUBLIC PUSH:
+NO
+
+PUBLIC RELEASE:
+NO
+```
