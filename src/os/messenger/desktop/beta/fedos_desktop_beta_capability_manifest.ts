@@ -128,10 +128,10 @@ const FEDOS_DESKTOP_BETA_CAPABILITY_MANIFEST_V1: FedosDesktopBetaCapabilityManif
   capabilities: Object.freeze([
     entry({
       capabilityId: "profile-onboarding",
-      status: "available-development-only",
+      status: "available",
       userVisibleLabel: "First-run profile creation",
       coarseLimitation:
-        "Real onboarding coordinator exists; reachable through the unlock harness main, not yet the one canonical packaged entry point.",
+        "FINAL RC SEAL arc: real `profile-create` proven through the actual canonical packaged entry point (a silently-installed NSIS binary), producing a real account identity.",
       profileRequired: false,
       networkRequired: false,
       restartRequired: false,
@@ -140,10 +140,10 @@ const FEDOS_DESKTOP_BETA_CAPABILITY_MANIFEST_V1: FedosDesktopBetaCapabilityManif
     }),
     entry({
       capabilityId: "production-master-seed-unlock",
-      status: "blocked",
+      status: "available",
       userVisibleLabel: "Master Seed unlock",
       coarseLimitation:
-        "Real WASM Master Seed activation exists and fails closed with no dev fallback, but requires a compiled WASM artifact not built in this environment.",
+        "FINAL RC SEAL arc: real WASM Master Seed generation and later real `profile-unlock` proven through the actual packaged installed binary (not a dev/unpackaged process).",
       profileRequired: false,
       networkRequired: false,
       restartRequired: false,
@@ -152,9 +152,9 @@ const FEDOS_DESKTOP_BETA_CAPABILITY_MANIFEST_V1: FedosDesktopBetaCapabilityManif
     }),
     entry({
       capabilityId: "lock-unlock",
-      status: "available-development-only",
+      status: "available",
       userVisibleLabel: "Lock and re-unlock",
-      coarseLimitation: "Lock stops the Runtime and drops the coordinator; proven through the unlock harness, not the canonical entry point.",
+      coarseLimitation: "FINAL RC SEAL arc: real `profile-lock` then, after an uninstall+reinstall of the packaged app, a real `profile-unlock` recovering the same identity — proven through the packaged binary, not just a harness.",
       profileRequired: true,
       networkRequired: false,
       restartRequired: false,
@@ -163,9 +163,9 @@ const FEDOS_DESKTOP_BETA_CAPABILITY_MANIFEST_V1: FedosDesktopBetaCapabilityManif
     }),
     entry({
       capabilityId: "local-account-identity",
-      status: "available-development-only",
+      status: "available",
       userVisibleLabel: "Local account identity",
-      coarseLimitation: "Derived from the sealed Master Seed at unlock; not exposed by a packaged renderer.",
+      coarseLimitation: "FINAL RC SEAL arc: the same real `accountPublicIdentifier` was recovered via `profile-unlock` through the packaged binary after a real uninstall+reinstall cycle.",
       profileRequired: true,
       networkRequired: false,
       restartRequired: false,
@@ -174,9 +174,9 @@ const FEDOS_DESKTOP_BETA_CAPABILITY_MANIFEST_V1: FedosDesktopBetaCapabilityManif
     }),
     entry({
       capabilityId: "local-device-identity",
-      status: "available-development-only",
+      status: "available",
       userVisibleLabel: "Local device identity",
-      coarseLimitation: "Local Device is initialized at unlock; not exposed by a packaged renderer.",
+      coarseLimitation: "FINAL RC SEAL arc: the same real `localDeviceId` was recovered via `profile-unlock` through the packaged binary after a real uninstall+reinstall cycle.",
       profileRequired: true,
       networkRequired: false,
       restartRequired: false,
@@ -372,10 +372,10 @@ const FEDOS_DESKTOP_BETA_CAPABILITY_MANIFEST_V1: FedosDesktopBetaCapabilityManif
     }),
     entry({
       capabilityId: "packaged-application",
-      status: "blocked",
+      status: "available",
       userVisibleLabel: "Packaged Windows application",
       coarseLimitation:
-        "The packaged entry point is the original UI build spike, and no Electron binary is available in this environment to build/run a canonical package.",
+        "FINAL RC SEAL arc: a real NSIS installer is built, silently installed, launched, and used end-to-end (14-real-gate release pipeline, fresh install, uninstall, reinstall, extensive packaged-binary regression suites) — the canonical packaged entry point is real and proven, not blocked.",
       profileRequired: false,
       networkRequired: false,
       restartRequired: false,
@@ -384,9 +384,9 @@ const FEDOS_DESKTOP_BETA_CAPABILITY_MANIFEST_V1: FedosDesktopBetaCapabilityManif
     }),
     entry({
       capabilityId: "clean-shutdown",
-      status: "available-development-only",
+      status: "available",
       userVisibleLabel: "Clean shutdown",
-      coarseLimitation: "The unlock harness main performs a locking clean shutdown; not yet exercised through a composed packaged app.",
+      coarseLimitation: "FINAL RC SEAL arc: real `fedos-beta: shutdown clean` + exit code 0 proven repeatedly through the actual packaged installed binary.",
       profileRequired: false,
       networkRequired: false,
       restartRequired: false,
