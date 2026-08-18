@@ -13,7 +13,7 @@ contact_links:
     # Security. Until the repository owner enables it, this link will
     # 404 -- see SECURITY.md, which says so plainly rather than
     # pretending the channel is live.
-    url: https://github.com/OWNER/REPO/security/advisories/new
+    url: https://github.com/satorunacamoto/fedos/security/advisories/new
     about: >-
       Anything that could let someone read messages they should not read,
       recover a key or Master Seed, impersonate a user, or bypass unlock.
@@ -22,14 +22,14 @@ contact_links:
       message plaintext, Archive exports, or relay credentials.
 
   - name: Ask a question or discuss a design idea
-    url: https://github.com/OWNER/REPO/discussions
+    url: https://github.com/satorunacamoto/fedos/discussions
     about: >-
       Support questions, setup help, protocol/design discussion, and
       Closed Pilot feedback that is not a specific reproducible bug.
       Requires Discussions to be enabled by the repository owner.
 
   - name: Closed Pilot documentation
-    url: https://github.com/OWNER/REPO/blob/main/docs/pilot/CLOSED_PILOT.md
+    url: https://github.com/satorunacamoto/fedos/blob/main/docs/pilot/CLOSED_PILOT.md
     about: >-
       What the Closed Pilot is, what is in scope, the known risks, and
       the criteria for stopping use of the build.

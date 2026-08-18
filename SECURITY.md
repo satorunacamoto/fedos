@@ -87,7 +87,7 @@ primitive inventory this status list summarizes.
 
 **Use GitHub Private Vulnerability Reporting.** On this repository:
 **Security → Advisories → Report a vulnerability**, or open
-`https://github.com/<owner>/<repo>/security/advisories/new` directly.
+`https://github.com/satorunacamoto/fedos/security/advisories/new` directly.
 
 That channel is private between you and the maintainers. The report, and
 the draft advisory it creates, are not visible to the public unless and
