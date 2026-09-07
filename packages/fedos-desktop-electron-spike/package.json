@@ -5,7 +5,7 @@
   "license": "MPL-2.0",
   "description": "The real FedOS Desktop Beta Electron app and its release-build pipeline (release:beta/package:beta). The pipeline produces UNSIGNED Windows artifacts -- no Authenticode code signing is performed or configured; see SECURITY.md and docs/pilot/KNOWN_RISKS.md. Despite the package name (kept unchanged in this Arc; renaming it touches every --prefix script site and is its own separately-scoped Arc, see docs/reviews/fedos_dead_runtime_production_path_v1/07_misleading_naming.md item 4), this is not a throwaway spike. Originally created (Alpha 3881-3940/4021-4100) as an Electron dependency/build spike physically isolated as its own package so Electron's own transitive @types/node dependency never leaks into the root application's TypeScript graph -- that isolation reason still holds and is why it remains a separate package.",
   "devDependencies": {
-    "electron": "^43.1.1",
+    "electron": "^44.2.0",
     "electron-builder": "^26.15.3"
   },
   "scripts": {
